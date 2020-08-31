@@ -121,6 +121,8 @@ class ReconstructNonDebugGraphTest(test_util.TensorFlowTestCase):
           self._graphDefWithoutBlacklistedNodes(reconstructed_again),
           self._graphDefWithoutBlacklistedNodes(non_debug_graph_def))
 
+  # TFDML #25509695
+  @test_util.skip_dml
   def testReconstructSimpleGraph(self):
     with session.Session() as sess:
       u = variables.Variable([12.0], name="u")
@@ -132,6 +134,8 @@ class ReconstructNonDebugGraphTest(test_util.TensorFlowTestCase):
       self._compareOriginalAndReconstructedGraphDefs(
           sess, w, expected_output=[42.0])
 
+  # TFDML #25509676
+  @test_util.skip_dml
   def testReconstructGraphWithControlEdge(self):
     with session.Session() as sess:
       a = variables.Variable(10.0, name="a")
@@ -144,6 +148,8 @@ class ReconstructNonDebugGraphTest(test_util.TensorFlowTestCase):
       self._compareOriginalAndReconstructedGraphDefs(
           sess, c, expected_output=400.0)
 
+  # TFDML #25562660
+  @test_util.skip_dml
   def testReonstructGraphWithCond(self):
     with session.Session(config=self._no_rewrite_session_config()) as sess:
       x = variables.Variable(10.0, name="x")
@@ -156,6 +162,8 @@ class ReconstructNonDebugGraphTest(test_util.TensorFlowTestCase):
       self._compareOriginalAndReconstructedGraphDefs(
           sess, cond, expected_output=21.0)
 
+  # TFDML #25509686
+  @test_util.skip_dml
   def testReconstructGraphWithWhileLoop(self):
     with session.Session(config=self._no_rewrite_session_config()) as sess:
       loop_body = lambda i: math_ops.add(i, 2)
@@ -165,6 +173,8 @@ class ReconstructNonDebugGraphTest(test_util.TensorFlowTestCase):
 
       self._compareOriginalAndReconstructedGraphDefs(sess, loop)
 
+  # TFDML #25509679
+  @test_util.skip_dml
   def testReconstructGraphWithGradients(self):
     with session.Session(config=self._no_rewrite_session_config()) as sess:
       u = variables.Variable(12.0, name="u")

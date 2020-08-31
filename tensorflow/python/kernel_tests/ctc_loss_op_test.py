@@ -358,7 +358,7 @@ class CTCLossTestV2(test.TestCase):
 
   @test_util.run_v1_only("b/120545219")
   def testCtcLossDenseIsSameAsCtcLoss(self):
-    with ops.device("/GPU:0" if test.is_gpu_available() else "/CPU:0"):
+    with ops.device(test_util.gpu_device_name() or "/CPU:0"):
       random_seed.set_random_seed(5)
 
       batch_size = 8
@@ -524,7 +524,7 @@ class CTCLossTestV2(test.TestCase):
 
   @test_util.run_v1_only("b/120545219")
   def testCtcLossDenseWithNegativeBlankIndexIsSameAsCtcLoss(self):
-    with ops.device("/GPU:0" if test.is_gpu_available() else "/CPU:0"):
+    with ops.device(test_util.gpu_device_name() or "/CPU:0"):
       random_seed.set_random_seed(5)
 
       batch_size = 8
@@ -771,7 +771,7 @@ class CTCLossTestV2(test.TestCase):
 
   @test_util.run_deprecated_v1
   def testScan(self):
-    with ops.device("/GPU:0" if test.is_gpu_available() else "/CPU:0"):
+    with ops.device(test_util.gpu_device_name() or "/CPU:0"):
       out = ctc_ops._scan(
           lambda accum, elem: accum + elem,
           constant_op.constant([1.0, 2.0, 3.0]), 23.0)
@@ -814,7 +814,7 @@ class CTCLossTestV2(test.TestCase):
 
   @test_util.run_deprecated_v1
   def testScanMultipleAccumulators(self):
-    with ops.device("/GPU:0" if test.is_gpu_available() else "/CPU:0"):
+    with ops.device(test_util.gpu_device_name() or "/CPU:0"):
       def fn(accum, elem):
         accum_a, accum_b = accum
         return accum_a + elem, accum_b * elem
@@ -827,7 +827,7 @@ class CTCLossTestV2(test.TestCase):
 
   @test_util.run_deprecated_v1
   def testScanMultipleElements(self):
-    with ops.device("/GPU:0" if test.is_gpu_available() else "/CPU:0"):
+    with ops.device(test_util.gpu_device_name() or "/CPU:0"):
       def fn(accum, elem):
         elem_a, elem_b = elem
         return accum + (elem_a * elem_b)

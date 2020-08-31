@@ -81,8 +81,10 @@ class ResizeNearestNeighborOpTest(test.TestCase):
 
       with self.cached_session(use_gpu=True):
         input_tensor = constant_op.constant(x, shape=in_shape)
-        resize_out = image_ops.resize_nearest_neighbor(input_tensor,
-                                                       out_shape[1:3])
+        resize_out = image_ops.resize_nearest_neighbor(
+            input_tensor,
+            out_shape[1:3],
+            half_pixel_centers=False)
         err = gradient_checker.compute_gradient_error(
             input_tensor, in_shape, resize_out, out_shape, x_init_value=x)
       self.assertLess(err, 1e-3)
@@ -98,14 +100,20 @@ class ResizeNearestNeighborOpTest(test.TestCase):
         with self.cached_session(use_gpu=False):
           input_tensor = constant_op.constant(x, shape=in_shape)
           resize_out = image_ops.resize_nearest_neighbor(
-              input_tensor, out_shape[1:3], align_corners=align_corners)
+              input_tensor,
+              out_shape[1:3],
+              align_corners=align_corners,
+              half_pixel_centers=False)
           grad_cpu = gradient_checker.compute_gradient(
               input_tensor, in_shape, resize_out, out_shape, x_init_value=x)
 
         with self.cached_session(use_gpu=True):
           input_tensor = constant_op.constant(x, shape=in_shape)
           resize_out = image_ops.resize_nearest_neighbor(
-              input_tensor, out_shape[1:3], align_corners=align_corners)
+              input_tensor,
+              out_shape[1:3],
+              align_corners=align_corners,
+              half_pixel_centers=False)
           grad_gpu = gradient_checker.compute_gradient(
               input_tensor, in_shape, resize_out, out_shape, x_init_value=x)
         self.assertAllClose(grad_cpu, grad_gpu, rtol=1e-5, atol=1e-5)
@@ -167,13 +175,15 @@ class ResizeBilinearOpTest(test.TestCase):
     # supported by XLA.
     align_corner_options = [True
                            ] if test_util.is_xla_enabled() else [True, False]
+
     for align_corners in align_corner_options:
       grad = {}
       for use_gpu in [False, True]:
         with self.cached_session(use_gpu=use_gpu):
           input_tensor = constant_op.constant(x, shape=in_shape)
           resized_tensor = image_ops.resize_bilinear(
-              input_tensor, out_shape[1:3], align_corners=align_corners)
+              input_tensor, out_shape[1:3], align_corners=align_corners,
+              half_pixel_centers=False)
           grad[use_gpu] = gradient_checker.compute_gradient(
               input_tensor, in_shape, resized_tensor, out_shape, x_init_value=x)
 

@@ -102,7 +102,15 @@ def is_built_with_rocm():
   return _test_util.IsBuiltWithROCm()
 
 
+@tf_export('test.is_built_with_dml')
+def is_built_with_dml():
+  """Returns whether TensorFlow was built with DML support."""
+  return _test_util.IsBuiltWithDML()
+
+
 @tf_export('test.is_built_with_gpu_support')
 def is_built_with_gpu_support():
-  """Returns whether TensorFlow was built with GPU (i.e. CUDA or ROCm) support."""
-  return is_built_with_cuda() or is_built_with_rocm()
+  """Returns whether TensorFlow was built with GPU
+  (i.e. CUDA, ROCm or DML) support.
+  """
+  return is_built_with_cuda() or is_built_with_rocm() or is_built_with_dml()

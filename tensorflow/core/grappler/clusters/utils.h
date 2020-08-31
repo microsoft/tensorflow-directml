@@ -30,6 +30,10 @@ DeviceProperties GetLocalCPUInfo();
 // which grappler is running.
 DeviceProperties GetLocalGPUInfo(PlatformGpuId platform_gpu_id);
 
+// Returns the DeviceProperties for the specified DML-compatible adapter
+// attached to the server on which grappler is running.
+DeviceProperties GetLocalDMLInfo(int device_id);
+
 // Returns the DeviceProperties of the specified device
 DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device);
 

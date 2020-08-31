@@ -548,6 +548,8 @@ class RMSpropOptimizerTest(test.TestCase):
 
 class SlotColocationTest(test.TestCase, parameterized.TestCase):
 
+  # TFDML #25564544
+  @test_util.skip_dml
   @parameterized.parameters([True, False])
   @test_util.run_gpu_only
   @test_util.run_in_graph_and_eager_modes

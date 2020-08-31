@@ -929,7 +929,7 @@ class SegmentReductionOpBenchmark(test.Benchmark):
     const = np.random.randint(5, size=(outer_dim, inner_dim))
     seg_ids = np.sort(np.random.randint(output_outer_dim, size=outer_dim))
     vs = variables.Variable(seg_ids.astype(np.int32))
-    with ops.device("/gpu:0"):
+    with ops.device(test_util.gpu_device_name()):
       vc = variables.Variable(const.astype(dtype))
     name, op = op_functor(vc, vs, seg_ids)
     with session.Session() as sess:

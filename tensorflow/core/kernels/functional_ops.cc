@@ -15,7 +15,7 @@ limitations under the License.
 #define EIGEN_USE_THREADS
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
-#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM || TENSORFLOW_USE_DIRECTML
 #include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/framework/device_base.h"
 #endif
@@ -332,6 +332,16 @@ REGISTER_KERNEL_BUILDER(Name("StatelessIf").Device(DEVICE_CPU), IfOp);
 REGISTER_KERNEL_BUILDER(
     Name("StatelessIf").Device(DEVICE_GPU).HostMemory("cond"), IfOp);
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("_If").Device(DEVICE_DML).HostMemory("cond"),
+                        IfOp);
+REGISTER_KERNEL_BUILDER(Name("If").Device(DEVICE_DML).HostMemory("cond"), IfOp);
+REGISTER_KERNEL_BUILDER(
+    Name("Case").Device(DEVICE_DML).HostMemory("branch_index"), CaseOp);
+REGISTER_KERNEL_BUILDER(
+    Name("StatelessIf").Device(DEVICE_DML).HostMemory("cond"), IfOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 class WhileOp : public AsyncOpKernel {
  public:
   explicit WhileOp(OpKernelConstruction* ctx) : AsyncOpKernel(ctx) {
@@ -424,12 +434,21 @@ class WhileOp : public AsyncOpKernel {
         return Finish(s);
       }
       Tensor cond_t;
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM || TENSORFLOW_USE_DIRECTML
+      bool is_gpu_device = false;
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-      const DeviceBase::GpuDeviceInfo* gpu_device_info =
-          ctx_->device()->tensorflow_gpu_device_info();
+      if (ctx_->device()->tensorflow_gpu_device_info() != nullptr) {
+        is_gpu_device = true;
+      }
+#endif
+#if TENSORFLOW_USE_DIRECTML
+      if (ctx_->device()->dml_device_context() != nullptr) {
+        is_gpu_device = true;
+      }
+#endif
       const bool is_hostmem_dtype =
           rets_[0].dtype() == DT_INT32 || rets_[0].dtype() == DT_INT64;
-      if (!is_hostmem_dtype && gpu_device_info &&
+      if (!is_hostmem_dtype && is_gpu_device &&
           (opts_.rets_alloc_attrs.empty() ||
            !opts_.rets_alloc_attrs[0].on_host())) {
         // Copy the ret value to host if it's allocated on device.
@@ -509,6 +528,12 @@ REGISTER_KERNEL_BUILDER(Name("While").Device(DEVICE_GPU), WhileOp);
 
 REGISTER_KERNEL_BUILDER(Name("StatelessWhile").Device(DEVICE_CPU), WhileOp);
 REGISTER_KERNEL_BUILDER(Name("StatelessWhile").Device(DEVICE_GPU), WhileOp);
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("_While").Device(DEVICE_DML), WhileOp);
+REGISTER_KERNEL_BUILDER(Name("While").Device(DEVICE_DML), WhileOp);
+REGISTER_KERNEL_BUILDER(Name("StatelessWhile").Device(DEVICE_DML), WhileOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 Status GetScalar(OpKernelContext* ctx, int index, int32* value,
                  const char* label) {
@@ -656,6 +681,15 @@ REGISTER_KERNEL_BUILDER(Name("For")
                             .HostMemory("delta"),
                         ForOp);
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("For")
+                            .Device(DEVICE_DML)
+                            .HostMemory("start")
+                            .HostMemory("limit")
+                            .HostMemory("delta"),
+                        ForOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // FakeParamOp allocates a tensor with a shape conforming to the expected
 // output. This is necessary if the value will be stored in a while_loop's
 // TensorList. The output is otherwise not expected to be consumed by anything
@@ -694,6 +728,10 @@ class FakeParamOp : public OpKernel {
 
 REGISTER_KERNEL_BUILDER(Name("FakeParam").Device(DEVICE_CPU), FakeParamOp);
 REGISTER_KERNEL_BUILDER(Name("FakeParam").Device(DEVICE_GPU), FakeParamOp);
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("FakeParam").Device(DEVICE_DML), FakeParamOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace
 }  // namespace tensorflow

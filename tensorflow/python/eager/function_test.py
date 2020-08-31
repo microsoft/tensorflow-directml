@@ -1013,18 +1013,22 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testFunctionOnDevice(self):
-    x = constant_op.constant([1.]).gpu()
+    with context.device(test_util.gpu_device_type()):
+      x = constant_op.constant([1.])
     f = def_function.function(math_ops.add)
     y = f(x, x).cpu()
     self.assertAllEqual(y, [2.])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_gpu_only
   @test_util.run_in_graph_and_eager_modes
   def testFunctionWithResourcesOnDifferentDevices(self):
     with ops.device('/cpu:0'):
       v_cpu = resource_variable_ops.ResourceVariable([0.0, 1.0, 2.0])
 
-    with ops.device('/gpu:0'):
+    with context.device(test_util.gpu_device_type()):
       v_gpu = resource_variable_ops.ResourceVariable([0.0, 1.0, 2.0])
 
     def sum_gather():
@@ -1047,7 +1051,7 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
       v_also_cpu = resource_variable_ops.ResourceVariable(
           [0.0, 1.0, 2.0], name='also_cpu')
 
-    with ops.device('/gpu:0'):
+    with context.device(test_util.gpu_device_type()):
       v_gpu = resource_variable_ops.ResourceVariable(
           [0.0, 1.0, 2.0], name='gpu')
 
@@ -1079,7 +1083,8 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
   def testFunctionHandlesInputsOnDifferentDevices(self):
     # The Reshape op requires the shape tensor to be placed in host memory.
     reshape = def_function.function(array_ops.reshape)
-    value = constant_op.constant([1., 2.]).gpu()
+    with context.device(test_util.gpu_device_type()):
+      value = constant_op.constant([1., 2.])
     shape = constant_op.constant([2, 1])
     reshaped = reshape(value, shape).cpu()
     self.assertAllEqual(reshaped, [[1], [2]])
@@ -1089,7 +1094,8 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
     # The Reshape op requires the shape tensor to be placed in host memory.
     reshape = def_function.function(array_ops.reshape)
     value = constant_op.constant([1., 2.])
-    shape = constant_op.constant([2, 1]).gpu()
+    with context.device(test_util.gpu_device_type()):
+      shape = constant_op.constant([2, 1])
     reshape(value, shape)  # No error is raised
 
   def testNoneOutput(self):
@@ -1325,7 +1331,10 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
 
     with ops.device('cpu:1'):
       self.assertEqual(0., self.evaluate(default_graph_function()))
-
+           
+  # Device placement in function tests doesn't appear to work correctly in DML
+  # TFDML #25980363
+  @test_util.skip_dml
   @test_util.run_gpu_only
   @test_util.run_in_graph_and_eager_modes
   def testColocateWithRespected(self):
@@ -1333,7 +1342,7 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
     with ops.device('cpu:0'):
       x = constant_op.constant(1.0)
 
-    with ops.device('gpu:0'):
+    with ops.device(test_util.gpu_device_type()):
       y = constant_op.constant(1.0)
 
     @def_function.function
@@ -1344,7 +1353,7 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
       self.assertIn(compat.as_bytes('CPU:0'), self.evaluate(foo()))
 
     with ops.colocate_with(y):
-      self.assertIn(compat.as_bytes('GPU:0'), self.evaluate(foo()))
+      self.assertIn(compat.as_bytes(test_util.gpu_device_type()), self.evaluate(foo()))
 
   def testVariablesAreTracked(self):
     v = resource_variable_ops.ResourceVariable(1.0)
@@ -2227,7 +2236,10 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
     with self.assertRaisesRegexp(
         ValueError, 'All inputs to `ConcreteFunction`s must be Tensors;.*'):
       graph_function('Not a Tensor.')
-
+      
+  # Device placement in function tests doesn't appear to work correctly in DML
+  # TFDML #25980363
+  @test_util.skip_dml
   def testSwapImplementationWithGrapplerPlugin(self):
     # Set the min_graph_nodes to -1 since the graph in this test is too small,
     # and will be ignored by grappler if don't set this.
@@ -2252,7 +2264,7 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
       @function.defun_with_attributes(
           attributes={
               'api_implements': 'random_boost',
-              'api_preferred_device': 'GPU'
+              'api_preferred_device': test_util.gpu_device_type()
           })
       def gpu_boost(x):
         return math_ops.add(x, 4.0)
@@ -2650,13 +2662,13 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
 
     @def_function.function
     def func():
-      with ops.device('GPU:0'):
+      with context.device(test_util.gpu_device_type()):
         return gen_random_ops.random_standard_normal(
             shape, dtype=dtype, seed=seed1, seed2=seed2)
 
-    with ops.device('GPU:0'):
+    with context.device(test_util.gpu_device_type()):
       x = func()
-      self.assertRegexpMatches(x.device, 'GPU')
+      self.assertRegexpMatches(x.device, test_util.gpu_device_type())
 
   @test_util.run_in_graph_and_eager_modes
   def testShapeCaching(self):
@@ -2844,7 +2856,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     def func(a, b, transpose_a):
       with ops.device('/device:CPU:0'):
         m1 = math_ops.matmul(a, b, transpose_a=transpose_a)
-      with ops.device('/device:GPU:0'):
+      with context.device(test_util.gpu_device_type()):
         m2 = math_ops.matmul(a, b, transpose_a=transpose_a)
       return m1, m2
 
@@ -2853,7 +2865,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual(m1.numpy(), [[10, 14], [14, 20]])
     self.assertRegexpMatches(m1.backing_device, 'CPU')
     self.assertAllEqual(m2.numpy(), [[10, 14], [14, 20]])
-    self.assertRegexpMatches(m2.backing_device, 'GPU')
+    self.assertRegexpMatches(m2.backing_device, test_util.gpu_device_type())
 
   @test_util.run_gpu_only
   def testEmptyBody(self):
@@ -2863,12 +2875,12 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
 
     with ops.device('/device:CPU:0'):
       a = constant_op.constant(3.0)
-    with ops.device('/device:GPU:0'):
+    with context.device(test_util.gpu_device_type()):
       b = constant_op.constant(5.0)
 
     m1, m2 = func(a, b)
     self.assertAllEqual(m1.numpy(), 5.0)
-    self.assertRegexpMatches(m1.backing_device, 'GPU')
+    self.assertRegexpMatches(m1.backing_device, test_util.gpu_device_type())
     self.assertAllEqual(m2.numpy(), 3.0)
     self.assertRegexpMatches(m2.backing_device, 'CPU')
 
@@ -2890,14 +2902,14 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     with ops.device('/device:CPU:0'):
       int_cpu = constant_op.constant(3, dtype=dtypes.int32)
       resource = resource_variable_ops.ResourceVariable(5, dtype=dtypes.int32)
-    with ops.device('/device:GPU:0'):
+    with context.device(test_util.gpu_device_type()):
       int_gpu = constant_op.constant(7, dtype=dtypes.int32)
 
     @function.defun
     def func(int_cpu, resource, int_gpu):
       with ops.device('/device:CPU:0'):
         m1 = int_cpu * resource + int_gpu
-      with ops.device('/device:GPU:0'):
+      with context.device(test_util.gpu_device_type()):
         # This computation will happen on GPU but m2 will be copied to CPU.
         m2 = int_gpu * resource + int_cpu + 1
       return m1, m2
@@ -2925,8 +2937,8 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
       with ops.colocate_with(b):
         rb = 3 * b
       return ra, rb
-
-    devices = ['/device:CPU:0', '/device:GPU:0']
+      
+    devices = ['/device:CPU:0', '/device:%s:0' % test_util.gpu_device_type()]
     for dev1, dev2 in itertools.product(devices, devices):
       with ops.device(dev1):
         a = constant_op.constant(1.0)
@@ -2944,7 +2956,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     with ops.device('/device:CPU:0'):
       c1 = resource_variable_ops.ResourceVariable(2.0)
       c2 = resource_variable_ops.ResourceVariable(7.0)
-    with ops.device('/device:GPU:0'):
+    with context.device(test_util.gpu_device_type()):
       g1 = resource_variable_ops.ResourceVariable(3.0)
       g2 = resource_variable_ops.ResourceVariable(5.0)
 
@@ -2952,7 +2964,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     def func(resource1, resource2):
       with ops.device('/device:CPU:0'):
         result1 = resource1 * g2
-      with ops.device('/device:GPU:0'):
+      with context.device(test_util.gpu_device_type()):
         result2 = resource2 * c2
       return result1, result2
 
@@ -2960,7 +2972,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     self.assertEqual(r1.numpy(), 10.0)
     self.assertRegexpMatches(r1.backing_device, 'CPU')
     self.assertEqual(r2.numpy(), 21.0)
-    self.assertRegexpMatches(r2.backing_device, 'GPU')
+    self.assertRegexpMatches(r2.backing_device, test_util.gpu_device_type())
 
     # Call with flipped inputs. Check that we look at resource's
     # device and reinstantiates the function when inputs' devices change.
@@ -2968,20 +2980,20 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     self.assertEqual(r1.numpy(), 15.0)
     self.assertRegexpMatches(r1.backing_device, 'CPU')
     self.assertEqual(r2.numpy(), 14.0)
-    self.assertRegexpMatches(r2.backing_device, 'GPU')
+    self.assertRegexpMatches(r2.backing_device, test_util.gpu_device_type())
 
   @test_util.run_gpu_only
   def testOutputResources(self):
     with ops.device('/device:CPU:0'):
       c1 = resource_variable_ops.ResourceVariable(2.0)
-    with ops.device('/device:GPU:0'):
+    with context.device(test_util.gpu_device_type()):
       g1 = resource_variable_ops.ResourceVariable(3.0)
 
     @function.defun
     def func(resource1, resource2):
       with ops.device('/device:CPU:0'):
         result1 = resource1 * 5
-      with ops.device('/device:GPU:0'):
+      with context.device(test_util.gpu_device_type()):
         result2 = resource2 * 7
       return result1, resource1.handle, result2, resource2.handle
 
@@ -2989,7 +3001,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     self.assertEqual(r1.numpy(), 10.0)
     self.assertRegexpMatches(r1.backing_device, 'CPU')
     self.assertEqual(r2.numpy(), 21.0)
-    self.assertRegexpMatches(r2.backing_device, 'GPU')
+    self.assertRegexpMatches(r2.backing_device, test_util.gpu_device_type())
 
     def check_handle(handle, expected_value):
       self.assertRegexpMatches(handle.backing_device, 'CPU')
@@ -3010,7 +3022,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     self.assertEqual(r1.numpy(), 15.0)
     self.assertRegexpMatches(r1.backing_device, 'CPU')
     self.assertEqual(r2.numpy(), 14.0)
-    self.assertRegexpMatches(r2.backing_device, 'GPU')
+    self.assertRegexpMatches(r2.backing_device, test_util.gpu_device_type())
     check_handle(res1, 3.0)
     check_handle(res2, 2.0)
 
@@ -3023,7 +3035,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     not prune unused function output.
     """
 
-    with ops.device('/device:GPU:0'):
+    with context.device(test_util.gpu_device_type()):
       g1 = resource_variable_ops.ResourceVariable(3.0)
 
     @function.defun_with_attributes(attributes={
@@ -3054,7 +3066,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     return resources on GPU.
     """
 
-    with ops.device('/device:GPU:0'):
+    with context.device(test_util.gpu_device_type()):
       g1 = resource_variable_ops.ResourceVariable(3.0)
 
     @function.defun_with_attributes(attributes={
@@ -3094,7 +3106,7 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
       rc1 = resource_variable_ops.ResourceVariable(3.0)
       cc0 = constant_op.constant(5.0)
       cc1 = constant_op.constant(7.0)
-    with ops.device('/device:GPU:0'):
+    with context.device(test_util.gpu_device_type()):
       rg0 = resource_variable_ops.ResourceVariable(11.0)
       rg1 = resource_variable_ops.ResourceVariable(13.0)
       cg0 = constant_op.constant(17.0)
@@ -3104,18 +3116,18 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     for tensor in [cc0, cc1]:
       self.assertRegexpMatches(tensor.backing_device, 'CPU:0')
     for tensor in [cg0, cg1]:
-      self.assertRegexpMatches(tensor.backing_device, 'GPU:0')
+      self.assertRegexpMatches(tensor.backing_device, '%s:0' % test_util.gpu_device_type())
 
     @function.defun
     def func(rc0, cc0, cg0, rc1, cg1, rg0, rg1, cc1):
       with ops.device('/device:CPU:0'):
         m1 = rc0 * cg0
-      with ops.device('/device:GPU:0'):
+      with context.device(test_util.gpu_device_type()):
         m2 = rg0 * cc0
 
       with ops.device('/device:CPU:0'):
         r1 = 1000.0 * m2 + rc1 * cg1
-      with ops.device('/device:GPU:0'):
+      with context.device(test_util.gpu_device_type()):
         r2 = 1000.0 * m1 + rg1 * cc1
 
       return r1, r2, m2, m1
@@ -3123,8 +3135,8 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     r1, r2, m2, m1 = func(rc0, cc0, cg0, rc1, cg1, rg0, rg1, cc1)
     self.assertRegexpMatches(m1.backing_device, 'CPU')
     self.assertRegexpMatches(r1.backing_device, 'CPU')
-    self.assertRegexpMatches(m2.backing_device, 'GPU')
-    self.assertRegexpMatches(r2.backing_device, 'GPU')
+    self.assertRegexpMatches(m2.backing_device, test_util.gpu_device_type())
+    self.assertRegexpMatches(r2.backing_device, test_util.gpu_device_type())
     self.assertEqual(m1.numpy(), 34.0)
     self.assertEqual(r1.numpy(), 55000.0 + 3.0 * 19.0)
     self.assertEqual(m2.numpy(), 55.0)
@@ -3136,8 +3148,8 @@ class MultiDeviceTest(test.TestCase, parameterized.TestCase):
     with ops.device('/device:CPU:0'):
       c1 = constant_op.constant(5.0)
       c2 = constant_op.constant(7.0)
-
-    with ops.device('/device:GPU:0'):
+      
+    with context.device(test_util.gpu_device_type()):
       g1 = constant_op.constant(11.0)
       g2 = constant_op.constant(13.0)
       g3 = constant_op.constant(17.0)

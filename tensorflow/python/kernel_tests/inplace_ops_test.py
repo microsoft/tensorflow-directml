@@ -149,6 +149,8 @@ class InplaceOpsTest(test_util.TensorFlowTestCase):
           y[idx] -= val
         self.assertAllClose(x.eval(), y)
 
+  # TFDML #25509891
+  @test_util.skip_dml
   def testAlias(self):
     with self.session(use_gpu=True) as sess:
       x = array_ops.ones([2, 3])

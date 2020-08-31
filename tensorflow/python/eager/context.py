@@ -862,6 +862,7 @@ class Context(object):
     # Compute device counts
     config.device_count["CPU"] = 0
     config.device_count["GPU"] = 0
+    config.device_count["DML"] = 0
     for dev in self._physical_devices:
       if dev not in self._visible_device_list:
         continue
@@ -897,19 +898,22 @@ class Context(object):
 
   def _compute_gpu_options(self):
     """Build the GPUOptions proto."""
-    visible_device_list = []
+    visible_device_list = set()
     virtual_devices = []
-    gpu_index = -1
     memory_growths = set()
-    for dev in self.list_physical_devices("GPU"):
-      gpu_index += 1
 
+    # Devices and their indices
+    physical_devices = []
+    physical_devices.extend(enumerate(self.list_physical_devices("GPU")))
+    physical_devices.extend(enumerate(self.list_physical_devices("DML")))
+
+    for gpu_index,dev in physical_devices:
       if dev not in self._visible_device_list:
         continue
 
       growth = self._memory_growth_map[dev]
       memory_growths.add(growth)
-      visible_device_list.append(str(gpu_index))
+      visible_device_list.add(gpu_index)
 
       if self._virtual_device_map:
         vdevs = self._virtual_device_map.get(dev, [])
@@ -930,6 +934,7 @@ class Context(object):
     else:
       allow_growth = None
 
+    visible_device_list = [str(d) for d in sorted(visible_device_list)]
     return config_pb2.GPUOptions(
         allow_growth=allow_growth,
         visible_device_list=",".join(visible_device_list),
@@ -1062,7 +1067,7 @@ class Context(object):
           if not d.device_type.startswith("XLA")
       ]
       self._memory_growth_map = {
-          d: None for d in self._physical_devices if d.device_type == "GPU"
+          d: None for d in self._physical_devices if d.device_type == "GPU" or d.device_type == "DML"
       }
 
     # Import device settings that may have been passed into the constructor
@@ -1211,7 +1216,7 @@ class Context(object):
       raise ValueError(
           "Cannot set memory growth on device when virtual devices configured")
 
-    if dev.device_type != "GPU":
+    if dev.device_type != "GPU" and dev.device_type != "DML":
       raise ValueError("Cannot set memory growth on non-GPU devices")
 
     if self._memory_growth_map.get(dev) == enable:
@@ -1248,10 +1253,15 @@ class Context(object):
       for vdev in virtual_devices:
         if vdev.memory_limit is None:
           raise ValueError(
-              "Setting memory limit is required for GPU virtual devices is")
+              "Setting memory limit is required for GPU virtual devices")
+    elif dev.device_type == "DML":
+      for vdev in virtual_devices:
+        if vdev.memory_limit is None:
+          raise ValueError(
+              "Setting memory limit is required for DML virtual devices")
     else:
       raise ValueError("Virtual devices are not supported for %s" %
-                       dev.device_type())
+                       dev.device_type)
 
     if self._virtual_device_map.get(dev) == virtual_devices:
       return

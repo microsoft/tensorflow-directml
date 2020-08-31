@@ -186,6 +186,12 @@ class Device : public DeviceBase {
 
   virtual bool IsLocal() const { return true; }
 
+  // Called by the session at the beginning and end of Run(). These can be
+  // overridden by derived classes to implement custom behavior. These methods
+  // are intended for debug/logging only.
+  virtual void DebugOnSessionRunStart() {}
+  virtual void DebugOnSessionRunEnd() {}
+
  protected:
   void DeleteResourceMgr() {
     delete rmgr_;

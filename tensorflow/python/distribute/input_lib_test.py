@@ -40,6 +40,7 @@ from tensorflow.python.eager import context
 from tensorflow.python.eager import def_function
 from tensorflow.python.eager import test
 from tensorflow.python.framework import errors
+from tensorflow.python.framework import test_util
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.util import nest
 
@@ -517,6 +518,8 @@ class DistributedIteratorMultiWorkerTest(
         ])
     ]
 
+  # TFDML #25509938
+  @test_util.skip_dml
   @combinations.generate(combinations.combine(
       mode=["graph"],
       input_type=["dataset"],
@@ -550,6 +553,8 @@ class DistributedIteratorMultiWorkerTest(
                                  dataset_or_input_fn, worker_devices,
                                  expected_values, strategy, sess)
 
+  # TFDML #25509938
+  @test_util.skip_dml
   @combinations.generate(
       combinations.combine(
           mode=["graph"],
@@ -632,6 +637,8 @@ class DistributedIteratorMultiWorkerTest(
           strategy,
           sess=sess)
 
+  # TFDML #25509938
+  @test_util.skip_dml
   @combinations.generate(
       combinations.combine(
           mode=["graph"],

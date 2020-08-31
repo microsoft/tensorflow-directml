@@ -39,6 +39,8 @@ class RaggedBooleanMaskOpTest(test_util.TensorFlowTestCase,
   T = True
   F = False
 
+  # TFDML #25564337
+  @test_util.skip_dml
   @parameterized.parameters([
       #=========================================================================
       # Docstring examples

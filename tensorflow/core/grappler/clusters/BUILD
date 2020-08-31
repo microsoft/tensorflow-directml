@@ -5,6 +5,7 @@ load(
     "//tensorflow/core/platform:default/build_config_root.bzl",
     "tf_cuda_tests_tags",
 )
+load("//third_party/dml:build_defs.bzl", "if_dml")
 
 package(
     licenses = ["notice"],  # Apache 2.0
@@ -35,7 +36,7 @@ tf_cuda_library(
     ] + select({
         ":xsmm": ["@libxsmm_archive//:xsmm_avx"],
         "//conditions:default": [],
-    }),
+    }) + if_dml(["//tensorflow/core/common_runtime/dml:dml_core"]),
 )
 
 tf_cc_test(

@@ -31,6 +31,8 @@ from tensorflow.python.platform import test
 @keras_parameterized.run_all_keras_modes
 class MergeLayersTest(keras_parameterized.TestCase):
 
+  # TFDML #25610850
+  @tf_test_util.skip_dml
   def test_merge_add(self):
     i1 = keras.layers.Input(shape=(4, 5))
     i2 = keras.layers.Input(shape=(4, 5))
@@ -65,6 +67,8 @@ class MergeLayersTest(keras_parameterized.TestCase):
     with self.assertRaisesRegexp(ValueError, " should have the same length."):
       add_layer.compute_mask([i1, i2, i3], [None, None])
 
+  # TFDML #25610850
+  @tf_test_util.skip_dml
   def test_merge_subtract(self):
     i1 = keras.layers.Input(shape=(4, 5))
     i2 = keras.layers.Input(shape=(4, 5))
@@ -163,6 +167,8 @@ class MergeLayersTest(keras_parameterized.TestCase):
     self.assertEqual(out.shape, (2, 4, 5))
     self.assertAllClose(out, np.minimum(x1, x2), atol=1e-4)
 
+  # TFDML #25610850
+  @tf_test_util.skip_dml
   def test_merge_concatenate(self):
     i1 = keras.layers.Input(shape=(4, 5))
     i2 = keras.layers.Input(shape=(4, 5))

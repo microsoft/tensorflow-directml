@@ -44,4 +44,13 @@ REGISTER_KERNEL_BUILDER(Name("Abs")
                             .TypeConstraint<int32>("T"),
                         UnaryOp<CPUDevice, functor::abs<int32>>);
 #endif  // TENSORFLOW_USE_SYCL
+
+#if TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Abs")
+                            .Device(DEVICE_DML)
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        UnaryOp<CPUDevice, functor::abs<int32>>);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

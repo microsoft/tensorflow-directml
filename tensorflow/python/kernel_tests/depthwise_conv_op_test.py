@@ -528,8 +528,10 @@ class DepthwiseConv2DTest(test.TestCase):
           "stride: %d, padding: %s", index, input_size, filter_size, stride,
           padding)
       # double datatype is currently not supported for convolution ops
-      # on the ROCm platform
-      optional_float64 = [] if test.is_built_with_rocm() else [dtypes.float64]
+      # on the ROCm platform or DML
+      optional_float64 = []
+      if not test.is_built_with_rocm() and test_util.gpu_device_type() != "DML":
+        optional_float64.append(dtypes.float64)
       for data_type in ([dtypes.float32] + optional_float64):
         self._ConstructAndTestGradient(
             input_size,

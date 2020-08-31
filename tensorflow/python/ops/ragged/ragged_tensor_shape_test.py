@@ -109,6 +109,8 @@ class RaggedTensorShapeTest(test_util.TensorFlowTestCase,
     self.assertShapeEq(broadcasted_shape, expected)
     self.assertEqual(broadcasted_shape.rank, rank)
 
+  # TFDML #25564444
+  @test_util.skip_dml
   @parameterized.parameters([
       #=========================================================================
       # dimension[axis] is uniform inner; and row_lengths is a scalar
@@ -307,6 +309,8 @@ class RaggedTensorShapeTest(test_util.TensorFlowTestCase,
     self.assertShapeEq(bcast2, bcast_shape)
     self.assertShapeEq(bcast3, bcast_shape)
 
+  # TFDML #25576423
+  @test_util.skip_dml
   @parameterized.parameters(
       [
           # Broadcast scalar
@@ -379,6 +383,8 @@ class RaggedTensorShapeTest(test_util.TensorFlowTestCase,
         r'partitioned_dim_sizes=\(<[^>]+>, <[^>]+>\), '
         r'inner_dim_sizes=<[^>]+>\)')
 
+  # TFDML #25571918
+  @test_util.skip_dml
   @parameterized.parameters(
       [
           dict(
@@ -417,6 +423,8 @@ class RaggedTensorShapeTest(test_util.TensorFlowTestCase,
         getattr(result, 'ragged_rank', 0), getattr(expected, 'ragged_rank', 0))
     self.assertAllEqual(result, expected)
 
+  # TFDML #25564456
+  @test_util.skip_dml
   @parameterized.parameters(
       [
           dict(

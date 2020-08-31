@@ -547,6 +547,8 @@ class TileTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual(result, np.tile(inp, tuple(multiples)))
     self.assertShapeEqual(result, tiled)
 
+  # DML doesn't support more than 4 dimensions for Tile
+  @test_util.skip_dml
   def testRandom(self):
     # test low rank, like 5
     for _ in range(5):

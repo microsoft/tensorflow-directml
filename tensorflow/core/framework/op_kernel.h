@@ -1084,7 +1084,14 @@ class OpKernelContext {
     DeviceContext* ret = params_->op_device_context;
     if (ret == nullptr) {
       auto* dev_info = device()->tensorflow_gpu_device_info();
-      if (dev_info) ret = dev_info->default_context;
+      if (dev_info) {
+        ret = dev_info->default_context;
+      }
+#ifdef TENSORFLOW_USE_DIRECTML
+      else {
+        ret = device()->dml_device_context();
+      }
+#endif
     }
     return ret;
   }

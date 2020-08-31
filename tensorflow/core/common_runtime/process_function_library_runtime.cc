@@ -187,6 +187,15 @@ Status ProcessFunctionLibraryRuntime::GetDeviceContext(
       return Status::OK();
     }
   }
+#ifdef TENSORFLOW_USE_DIRECTML
+  else if (device_type == "DML") {
+    auto* dev_context = flr->device()->dml_device_context();
+    if (dev_context) {
+      *device_context = dev_context;
+      return Status::OK();
+    }
+  }
+#endif
   return errors::Internal("Device type: ", device_type,
                           " is currently unsupported for remote ",
                           "function executions");

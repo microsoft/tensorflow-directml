@@ -155,6 +155,8 @@ class AdamOptimizerTest(test.TestCase):
           self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
           self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
 
+  # TFDML #25571890
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSparseDevicePlacement(self):
     for index_dtype in [dtypes.int32, dtypes.int64]:
@@ -202,6 +204,8 @@ class AdamOptimizerTest(test.TestCase):
 
   def doTestBasic(self, use_callable_params=False):
     for i, dtype in enumerate([dtypes.half, dtypes.float32, dtypes.float64]):
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       with self.session(graph=ops.Graph()):
         # Initialize variables for numpy implementation.
         m0, v0, m1, v1 = 0.0, 0.0, 0.0, 0.0
@@ -262,6 +266,8 @@ class AdamOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes(reset_test=True)
   def testBasicWithAmsgrad(self):
     for i, dtype in enumerate([dtypes.half, dtypes.float32, dtypes.float64]):
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       with self.session(graph=ops.Graph()):
         # Initialize variables for numpy implementation.
         m0, v0, v0hat, m1, v1, v1hat = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0

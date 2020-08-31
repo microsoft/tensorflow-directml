@@ -1067,6 +1067,20 @@ class _EagerTensorBase(Tensor):
     """
     return self._copy(context.context(), "GPU:" + str(gpu_index))
 
+  @deprecation.deprecated(None, "Use tf.identity instead.")
+  def dml(self, gpu_index=0):
+    """A copy of this Tensor with contents backed by memory on the DML device.
+
+    Arguments:
+      gpu_index: Identifies which DML device to place the contents on the
+        returned Tensor in.
+
+    Returns:
+      A DML-memory backed Tensor object initialized with the same contents
+      as this Tensor.
+    """
+    return self._copy(context.context(), "DML:" + str(gpu_index))
+
   def set_shape(self, shape):
     if not self.shape.is_compatible_with(shape):
       raise ValueError(

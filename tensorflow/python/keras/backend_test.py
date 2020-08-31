@@ -359,6 +359,8 @@ class BackendLinearAlgebraTest(test.TestCase):
 
     # TODO(fchollet): insufficiently tested.
 
+  # TFDML #25611038
+  @test_util.skip_dml
   def test_reduction_ops(self):
     ops_to_test = [
         (keras.backend.max, np.max),
@@ -548,6 +550,8 @@ class BackendShapeOpsTest(test.TestCase):
                                   width_factor,
                                   data_format='unknown')
 
+  # TFDML #25611056
+  @test_util.skip_dml
   def test_resize_volumes(self):
     height_factor = 2
     width_factor = 2
@@ -700,6 +704,8 @@ class BackendShapeOpsTest(test.TestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class BackendNNOpsTest(test.TestCase, parameterized.TestCase):
 
+  # TFDML #25611042
+  @test_util.skip_dml
   def test_bias_add(self):
     keras_op = keras.backend.bias_add
     np_op = np.add
@@ -1134,6 +1140,8 @@ class BackendNNOpsTest(test.TestCase, parameterized.TestCase):
     with self.assertRaises(ValueError):
       y = keras.backend.conv3d(x, k, (2, 2))
 
+  # TFDML #25622473
+  @test_util.skip_dml
   def test_rnn(self):
     # implement a simple RNN
     num_samples = 4
@@ -1417,6 +1425,8 @@ class BackendNNOpsTest(test.TestCase, parameterized.TestCase):
 
       self.assertAllClose(keras.backend.eval(outputs), expected_outputs)
 
+  # TFDML #25655493
+  @test_util.skip_dml
   def test_rnn_state_num_dim_larger_than_2_masking(self):
     num_samples = 3
     num_timesteps = 4
@@ -1620,6 +1630,8 @@ class BackendCrossEntropyLossesTest(test.TestCase):
         t, p, from_logits=True, axis=0),
     self.assertArrayNear(self.evaluate(result)[0], [.002, 0, .17], 1e-3)
 
+  # TFDML #25611034
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_sparse_categorical_crossentropy_loss_with_unknown_rank_tensor(self):
     t = keras.backend.placeholder()

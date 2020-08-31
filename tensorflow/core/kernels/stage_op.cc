@@ -223,6 +223,9 @@ REGISTER_KERNEL_BUILDER(Name("Stage").Device(DEVICE_GPU), StageOp);
 #ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("Stage").Device(DEVICE_SYCL), StageOp);
 #endif  // TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Stage").Device(DEVICE_DML), StageOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class UnstageOp : public OpKernel {
  public:
@@ -257,6 +260,9 @@ REGISTER_KERNEL_BUILDER(Name("Unstage").Device(DEVICE_GPU), UnstageOp);
 #ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("Unstage").Device(DEVICE_SYCL), UnstageOp);
 #endif  // TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Unstage").Device(DEVICE_DML), UnstageOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class StagePeekOp : public OpKernel {
  public:
@@ -295,6 +301,10 @@ REGISTER_KERNEL_BUILDER(
 REGISTER_KERNEL_BUILDER(
     Name("StagePeek").HostMemory("index").Device(DEVICE_SYCL), StagePeekOp);
 #endif  // TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("StagePeek").HostMemory("index").Device(DEVICE_DML), StagePeekOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class StageSizeOp : public OpKernel {
  public:
@@ -326,6 +336,10 @@ REGISTER_KERNEL_BUILDER(Name("StageSize").HostMemory("size").Device(DEVICE_GPU),
 REGISTER_KERNEL_BUILDER(
     Name("StageSize").HostMemory("size").Device(DEVICE_SYCL), StageSizeOp);
 #endif  // TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("StageSize").HostMemory("size").Device(DEVICE_DML),
+                        StageSizeOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class StageClearOp : public OpKernel {
  public:
@@ -350,5 +364,8 @@ REGISTER_KERNEL_BUILDER(Name("StageClear").Device(DEVICE_GPU), StageClearOp);
 #ifdef TENSORFLOW_USE_SYCL
 REGISTER_KERNEL_BUILDER(Name("StageClear").Device(DEVICE_SYCL), StageClearOp);
 #endif  // TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("StageClear").Device(DEVICE_DML), StageClearOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace tensorflow

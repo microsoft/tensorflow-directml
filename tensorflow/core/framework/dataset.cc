@@ -174,6 +174,20 @@ REGISTER_KERNEL_BUILDER(Name("UnwrapDatasetVariant")
                             .Device(DEVICE_GPU),
                         UnwrapDatasetVariantOp);
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("WrapDatasetVariant")
+                            .HostMemory("input_handle")
+                            .HostMemory("output_handle")
+                            .Device(DEVICE_DML),
+                        WrapDatasetVariantOp);
+
+REGISTER_KERNEL_BUILDER(Name("UnwrapDatasetVariant")
+                            .HostMemory("input_handle")
+                            .HostMemory("output_handle")
+                            .Device(DEVICE_DML),
+                        UnwrapDatasetVariantOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 static Status WrappedDatasetVariantDeviceCopy(
     const WrappedDatasetVariantWrapper& from, WrappedDatasetVariantWrapper* to,
     const UnaryVariantOpRegistry::AsyncTensorDeviceCopyFn& copy) {

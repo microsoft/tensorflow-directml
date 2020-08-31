@@ -180,6 +180,8 @@ class GradientCheckerTest(test.TestCase):
     with self.assertRaisesRegexp(AssertionError, "False is not true"):
       self.assertTrue(error < 1.0)
 
+  # TFDML #25509877
+  @test_util.skip_dml
   def testGradGrad(self):
 
     def f(x):

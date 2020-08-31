@@ -36,6 +36,8 @@ from tensorflow.python.platform import googletest
 class RaggedSegmentStackOpTest(test_util.TensorFlowTestCase,
                                parameterized.TestCase):
 
+  # TFDML #25510231
+  @test_util.skip_dml
   @parameterized.parameters([
       dict(  # empty inputs
           data=[],

@@ -67,6 +67,8 @@ class AdagradOptimizerTest(test.TestCase):
 
   def doTestBasic(self, use_callable_params=False):
     for dtype in [dtypes.float32, dtypes.float64]:
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       with self.cached_session():
         var0_np = np.array([1.0, 2.0], dtype=dtype.as_numpy_dtype)
         var1_np = np.array([3.0, 4.0], dtype=dtype.as_numpy_dtype)

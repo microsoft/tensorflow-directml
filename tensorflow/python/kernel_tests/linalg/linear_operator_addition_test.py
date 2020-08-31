@@ -267,6 +267,8 @@ class AddAndReturnScaledIdentityTest(test.TestCase):
   def setUp(self):
     self._adder = linear_operator_addition._AddAndReturnScaledIdentity()
 
+  # TFDML #25509965
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def test_identity_plus_identity(self):
     id1 = linalg.LinearOperatorIdentity(num_rows=2)

@@ -381,7 +381,7 @@ class CriticalSectionTest(test.TestCase, parameterized.TestCase):
       self.skipTest(
           "b/123899495: Colocation errors for critical sections in map on GPU")
     cs = critical_section_ops.CriticalSection()
-    with ops.device("/gpu:0" if test_util.is_gpu_available() else "/cpu:0"):
+    with ops.device(test_util.gpu_device_name() or "/cpu:0"):
       v = resource_variable_ops.ResourceVariable(1)
     def fn():
       return v.read_value()
@@ -389,7 +389,8 @@ class CriticalSectionTest(test.TestCase, parameterized.TestCase):
     # map() creates a TensorFlow function.
     ds = dataset_ops.Dataset.range(1)
     if test_util.is_gpu_available():
-      ds = (ds.apply(prefetching_ops.copy_to_device("/gpu:0"))
+      gpu_device_name = test_util.gpu_device_name()
+      ds = (ds.apply(prefetching_ops.copy_to_device(gpu_device_name))
             .apply(prefetching_ops.map_on_gpu(lambda _: cs.execute(fn))))
     else:
       ds = ds.map(lambda _: cs.execute(fn))

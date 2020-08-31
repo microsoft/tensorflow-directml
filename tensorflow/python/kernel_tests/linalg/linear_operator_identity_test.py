@@ -367,6 +367,8 @@ class LinearOperatorScaledIdentityTest(
       with self.assertRaisesOpError("not self-adjoint"):
         self.evaluate(operator.assert_self_adjoint())
 
+  # TFDML #25579096
+  @test_util.skip_dml
   def test_float16_matmul(self):
     # float16 cannot be tested by base test class because tf.linalg.solve does
     # not work with float16.

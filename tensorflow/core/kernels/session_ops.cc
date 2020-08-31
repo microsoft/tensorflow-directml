@@ -171,4 +171,11 @@ REGISTER_KERNEL_BUILDER(
     Name("DeleteSessionTensor").Device(DEVICE_SYCL).HostMemory("handle"),
     DeleteSessionTensorOp);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("DeleteSessionTensor").Device(DEVICE_DML).HostMemory("handle"),
+    DeleteSessionTensorOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace tensorflow

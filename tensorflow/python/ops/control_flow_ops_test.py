@@ -342,6 +342,8 @@ class SwitchTestCase(test_util.TensorFlowTestCase):
         self.assertEquals(o, 6)
         self.assertAllEqual(grad, [1] * 3)
 
+  # TFDML #25509176
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testGradientThroughSingleBranchOutsideOfContext(self):
     x = constant_op.constant(2.)
@@ -426,6 +428,8 @@ class CondTest(test_util.TensorFlowTestCase):
     with self.assertRaises(TypeError):
       control_flow_ops.cond(True, lambda: x, lambda: x, fn2=lambda: x)
 
+  # TFDML #25576390
+  @test_util.skip_dml
   @test_util.enable_control_flow_v2
   @test_util.run_in_graph_and_eager_modes
   def testCond_gradient(self):
@@ -957,6 +961,8 @@ class IndexedCaseTest(test_util.TensorFlowTestCase, parameterized.TestCase):
       case_out = control_flow_ops.switch_case(branch_index, branches)
       self.assertEqual(bi * 10, self.evaluate(case_out))
 
+  # TFDML #25509054
+  @test_util.skip_dml
   @parameterized.parameters((0,), (2,), (3,))
   def testCase(self, bi):
     nbranches = 5
@@ -970,6 +976,8 @@ class IndexedCaseTest(test_util.TensorFlowTestCase, parameterized.TestCase):
         branch_index, branches, name=self.make_name())
     self.assertEqual(bi * 10., self.evaluate(case_out))
 
+  # TFDML #25509113
+  @test_util.skip_dml
   @parameterized.parameters((-1,), (2,), (4,), (5,), (6,))
   def testCase_withDefault(self, bi):
     nbranches = 5
@@ -987,6 +995,8 @@ class IndexedCaseTest(test_util.TensorFlowTestCase, parameterized.TestCase):
       expected = bi * 10.
     self.assertEqual(expected, self.evaluate(case_out))
 
+  # TFDML #25509066
+  @test_util.skip_dml
   @parameterized.parameters((-1,), (0,), (3,), (5,))
   def testCase_dictWithDefault(self, bi):
     nbranches = 5
@@ -1004,6 +1014,8 @@ class IndexedCaseTest(test_util.TensorFlowTestCase, parameterized.TestCase):
       expected = bi * 10.
     self.assertEqual(expected, self.evaluate(case_out))
 
+  # TFDML #25509091
+  @test_util.skip_dml
   @parameterized.parameters((-1,), (1,), (4,), (5,))
   def testCase_gradient(self, bi):
     nbranches = 5
@@ -1031,6 +1043,8 @@ class IndexedCaseTest(test_util.TensorFlowTestCase, parameterized.TestCase):
     for expected, actual in zip(expected_grads, actual_grads):
       self.assertEqual(expected, self.evaluate(actual))
 
+  # TFDML #25509101
+  @test_util.skip_dml
   @parameterized.parameters((-2,), (2,), (5,))
   def testCase_gradient_diffShapedIntermediates(self, bi):
     nbranches = 5
@@ -1079,6 +1093,8 @@ class IndexedCaseTest(test_util.TensorFlowTestCase, parameterized.TestCase):
       else:
         self.assertAllEqual(expected, self.evaluate(actual))
 
+  # TFDML #25509161
+  @test_util.skip_dml
   @test_util.run_gpu_only
   @test_util.disable_xla("Wants RunMetadata")
   def testParallelExecution(self):
@@ -1098,7 +1114,7 @@ class IndexedCaseTest(test_util.TensorFlowTestCase, parameterized.TestCase):
       def make_branch(i, mat, name):
         def branch_fn():
           next_i = i + 1
-          with ops.device("gpu:0"):
+          with ops.device(test_util.gpu_device_name()):
             return next_i, math_ops.reduce_sum(
                 linalg_ops.cholesky(mat, name=name + "_Cholesky"))
         return branch_fn

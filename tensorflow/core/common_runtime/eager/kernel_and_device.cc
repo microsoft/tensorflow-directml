@@ -255,6 +255,11 @@ Status KernelAndDeviceOp::Run(ScopedStepContainer* step_container,
     if (device_->tensorflow_gpu_device_info() != nullptr) {
       device_context = device_->tensorflow_gpu_device_info()->default_context;
     }
+#ifdef TENSORFLOW_USE_DIRECTML
+    else if (device_->dml_device_context() != nullptr) {
+      device_context = device_->dml_device_context();
+    }
+#endif
     input_device_contexts.push_back(device_context);
   }
 

@@ -28,6 +28,7 @@ from tensorflow.python.eager import context
 from tensorflow.python.eager import def_function
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import test_util
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.keras import saving
 from tensorflow.python.keras import testing_utils
@@ -189,6 +190,8 @@ def _reuse_ancillary_layer():
 @keras_parameterized.run_all_keras_modes
 class AutoLambdaTest(keras_parameterized.TestCase):
 
+  # DML doesn't support float64
+  @test_util.skip_dml
   @parameterized.named_parameters(
       ('single_op_at_end', _single_op_at_end),
       ('single_identity_op_at_end', _single_identity_op_at_end),

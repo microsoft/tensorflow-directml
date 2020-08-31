@@ -250,6 +250,8 @@ DeviceProperties GetDeviceInfo(const string& device_str) {
       return GetLocalGPUInfo(platform_gpu_id);
     } else if (parsed.type == "CPU") {
       return GetLocalCPUInfo();
+    } else if (parsed.type == "DML") {
+      return GetDeviceInfo(parsed);
     }
   }
   return unknown;
@@ -416,8 +418,10 @@ string GetDeviceClassForNonChannelDevice(const string& device_name) {
     name = str_util::StringReplace(name, "/device_", "/device:", true);
     name = str_util::StringReplace(name, "GPU_", "GPU:", true);
     name = str_util::StringReplace(name, "CPU_", "CPU:", true);
+    name = str_util::StringReplace(name, "DML_", "DML:", true);
     name = str_util::StringReplace(name, "gpu_", "gpu:", true);
     name = str_util::StringReplace(name, "cpu_", "cpu:", true);
+    name = str_util::StringReplace(name, "dml_", "dml:", true);
     parsed = DeviceNameUtils::ParseFullName(name, &parsed_name);
   }
   if (parsed) {

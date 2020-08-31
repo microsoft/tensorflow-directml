@@ -1354,9 +1354,12 @@ class CondV2ColocationGroupAndDeviceTest(test.TestCase):
           return test_ops.device_placement_op()
 
         if test_util.is_gpu_available():
-          with ops.device("/device:GPU:0"):
+          with test_util.force_gpu():
+            name_parts = test_util.gpu_device_name().split("/")[-1].split(":")
+            gpu_name_suffix = "{}:{}".format(name_parts[-2], name_parts[-1])
+
             self.assertIn(
-                compat.as_bytes("GPU:0"),
+                compat.as_bytes(gpu_name_suffix),
                 self.evaluate(cond_v2.cond_v2(constant_op.constant(True),
                                               fn2, fn2)))
         else:

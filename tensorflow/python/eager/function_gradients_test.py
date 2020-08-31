@@ -127,6 +127,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
           (expected, expected),
           f(constant_op.constant(1.), order))
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testIteratedGradientsNested(self):
 
     def _grad(f):
@@ -151,6 +153,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
       f = _grad(f)
       traced_f = def_function.function(_grad(traced_f))
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testIteratedGradientsNestedWithVariable(self):
 
     def _grad(f):
@@ -176,6 +180,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
       self.assertAllClose(expected(two), def_function.function(f)())
       f = _grad(f)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testIteratedGradientsPersistent(self):
 
     @def_function.function
@@ -191,6 +197,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
         self.assertAllClose(expected(start), x)
         x = tape.gradient(x, start)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testHigherOrderWithVariable(self):
 
     v = variables.Variable(1.)
@@ -270,6 +278,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
     self.assertEqual(step_op.output_shapes, tensor_shape.TensorShape([]))
     self.assertAllEqual(step_op(), 2.0)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes()
   def testDefunCondGradient(self):
 
@@ -283,6 +293,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
       y = f(x)
     self.assertAllEqual(self.evaluate(t.gradient(y, x)), 2.0)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes()
   def testGraphLoopGradient(self):
 
@@ -298,6 +310,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
       y = f(x)
     self.assertAllEqual(self.evaluate(t.gradient(y, x)), 4.0)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testGraphLoopGradientInsideSession(self):
     with ops.Graph().as_default():
       n = constant_op.constant(2.0)
@@ -402,6 +416,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
     g = backprop.implicit_grad(g)(constant_op.constant(1.0))[0][0]
     self.assertAllEqual(g, 1.0)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testGradient(self):
     matmul = def_function.function(math_ops.matmul)
 
@@ -438,6 +454,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual(gradient.indices, defun_gradient.indices)
     self.assertAllEqual(gradient.dense_shape, defun_gradient.dense_shape)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testDifferentiableFunctionNoneOutputs(self):
 
     @def_function.function
@@ -849,6 +867,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
       grad, = gradients_impl.gradients(inner_fn(y, v), y)
       self.assertAllEqual(grad, 1.0)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testNestedDifferentiableFunctionNoneOutputs(self):
     @def_function.function
     def foo(a, b):
@@ -872,6 +892,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual(g1, 2 * 5.0 + 1.0)
     self.assertAllEqual(g2, 2.0)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   def testGradientWithKeywordArguments(self):
     matmul = def_function.function(math_ops.matmul)
 
@@ -925,6 +947,8 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
     # gradient defined.
     self.assertAllEqual([2], f_grad().shape)
 
+  # TFDML #25509777
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testBackwardNone(self):
     model = variables.Variable(1.0, name='model')

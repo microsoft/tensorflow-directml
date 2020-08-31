@@ -300,7 +300,7 @@ def randn_sampler_switchover(shape, num_iters, use_gpu=False):
           optimizer_options=optimizer_options))
 
   with session.Session(config=config) as sess:
-    with ops.device("/cpu:0" if not use_gpu else "/gpu:0"):
+    with ops.device("/cpu:0" if not use_gpu else test_util.gpu_device_name()):
       uniform_sampler_op = control_flow_ops.group(
           random_ops.parameterized_truncated_normal(
               shape,

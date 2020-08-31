@@ -449,6 +449,8 @@ class RaggedElementwiseOpsTest(test_util.TensorFlowTestCase,
                                  r'Unable to broadcast: unknown rank'):
       math_ops.add(x, y)
 
+  # TFDML #25564483
+  @test_util.skip_dml
   @parameterized.parameters([
       dict(
           x=ragged_factory_ops.constant_value([[1, 2], [3]]),
@@ -486,6 +488,8 @@ class RaggedElementwiseOpsTest(test_util.TensorFlowTestCase,
     with self.assertRaises((TypeError, ValueError)):
       self.evaluate(math_ops.add_n([x, y]))
 
+  # TFDML #25564497
+  @test_util.skip_dml
   @parameterized.parameters([
       dict(
           op=array_ops.batch_gather,

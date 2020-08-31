@@ -231,7 +231,8 @@ bool NodeIsOnCpu(const NodeDef* node) {
 bool NodeIsOnGpu(const NodeDef* node) {
   string task, device;
   return DeviceNameUtils::SplitDeviceName(node->device(), &task, &device) &&
-         absl::StartsWith(device, DEVICE_GPU);
+         (absl::StartsWith(device, DEVICE_GPU) ||
+          absl::StartsWith(device, DEVICE_DML));
 }
 
 int NumOutputs(const NodeDef& node, GraphDef* graph) {

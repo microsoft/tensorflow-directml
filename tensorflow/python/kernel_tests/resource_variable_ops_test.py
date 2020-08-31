@@ -86,7 +86,7 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
 
   @test_util.run_gpu_only
   def testGPUInt64(self):
-    with context.eager_mode(), context.device("gpu:0"):
+    with context.eager_mode(), context.device(test_util.gpu_device_name()):
       v = resource_variable_ops.ResourceVariable(1, dtype=dtypes.int64)
       self.assertAllEqual(1, v.numpy())
 
@@ -150,7 +150,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
                                                         name="init")
       with self.assertRaises(NotImplementedError):
         copy.deepcopy(variable)
-
+        
+  # DML doesn't support strided slice assign
+  # TFDML #25919816
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testStridedSliceAssign(self):
     v = resource_variable_ops.ResourceVariable([1.0, 2.0])
@@ -257,6 +260,9 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
         resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32))
     self.assertEqual(read, 2)
 
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterAdd(self):
     handle = resource_variable_ops.var_handle_op(
@@ -269,7 +275,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant([[2]], dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[3]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testGradientGatherNd(self):
     v = resource_variable_ops.ResourceVariable(
@@ -283,6 +292,8 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(variables.global_variables_initializer())
     self.assertAllEqual(self.evaluate(grads), [[0., 0.], [0., 1.]])
 
+  # DML doesn't support float64
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testDefaultGradientDtype(self):
     v = resource_variable_ops.ResourceVariable(
@@ -304,7 +315,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     c = constant_op.constant(0.)
     g = gradients_impl.gradients(c, [b], unconnected_gradients="zero")[0]
     self.assertAllEqual(g.shape.as_list(), [1, 2])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testGradientGatherNdIndexedSlices(self):
     v = resource_variable_ops.ResourceVariable(
@@ -317,7 +331,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     grads = tape.gradient(l, v)
     self.evaluate(variables.global_variables_initializer())
     self.assertAllEqual(self.evaluate(grads.values), [[1., 1.], [1., 1.]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterSub(self):
     handle = resource_variable_ops.var_handle_op(
@@ -330,7 +347,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant([[2]], dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[-1]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMul(self):
     handle = resource_variable_ops.var_handle_op(
@@ -362,7 +382,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
         self.assertEqual(new_v.dtype, v.dtype)
         self.assertEqual(new_v.trainable, v.trainable)
         self.assertAllEqual(new_v.numpy(), v.numpy())
-
+        
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterDiv(self):
     handle = resource_variable_ops.var_handle_op(
@@ -384,7 +407,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     with context.eager_mode():
       v = variables.Variable(1.0)
       self.assertIsInstance(v, resource_variable_ops.ResourceVariable)
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMin(self):
     with ops.device("cpu:0"):
@@ -421,7 +447,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
       saver.import_meta_graph(meta_graph_def, import_scope="")
       meta_graph_two = saver.export_meta_graph(graph=graph)
     self.assertEqual(meta_graph_def, meta_graph_two)
-
+  
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMax(self):
     handle = resource_variable_ops.var_handle_op(
@@ -434,7 +463,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant([[3]], dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[6]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterAddScalar(self):
     handle = resource_variable_ops.var_handle_op(
@@ -447,7 +479,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant(2, dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[3]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterSubScalar(self):
     handle = resource_variable_ops.var_handle_op(
@@ -460,7 +495,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant(2, dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[-1]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMulScalar(self):
     handle = resource_variable_ops.var_handle_op(
@@ -473,7 +511,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant(5, dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[5]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterDivScalar(self):
     handle = resource_variable_ops.var_handle_op(
@@ -486,7 +527,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant(3, dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[2]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMinScalar(self):
     handle = resource_variable_ops.var_handle_op(
@@ -499,7 +543,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant(3, dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[3]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMaxScalar(self):
     handle = resource_variable_ops.var_handle_op(
@@ -512,7 +559,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
             handle, [0], constant_op.constant(3, dtype=dtypes.int32)))
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.int32)
     self.assertEqual(self.evaluate(read), [[6]])
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterAddVariableMethod(self):
     v = resource_variable_ops.ResourceVariable([0.0, 1.5], name="add")
@@ -520,7 +570,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(
         v.scatter_add(ops.IndexedSlices(indices=[1], values=[2.5])))
     self.assertAllEqual([0.0, 4.0], self.evaluate(v))
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterSubVariableMethod(self):
     v = resource_variable_ops.ResourceVariable([0.0, 2.5], name="sub")
@@ -528,7 +581,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(
         v.scatter_sub(ops.IndexedSlices(indices=[1], values=[1.5])))
     self.assertAllEqual([0.0, 1.0], self.evaluate(v))
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMaxVariableMethod(self):
     v = resource_variable_ops.ResourceVariable([0.0, 4.0], name="max1")
@@ -542,7 +598,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(
         v.scatter_max(ops.IndexedSlices(indices=[1], values=[2.0])))
     self.assertAllEqual([0.0, 3.5], self.evaluate(v))
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMinVariableMethod(self):
     v = resource_variable_ops.ResourceVariable([0.0, 4.0], name="min1")
@@ -556,7 +615,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(
         v.scatter_min(ops.IndexedSlices(indices=[1], values=[2.0])))
     self.assertAllEqual([0.0, 2.0], self.evaluate(v))
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterMulVariableMethod(self):
     v = resource_variable_ops.ResourceVariable([0.0, 4.0], name="mul")
@@ -564,7 +626,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(
         v.scatter_mul(ops.IndexedSlices(indices=[1], values=[3.0])))
     self.assertAllEqual([0.0, 12.0], self.evaluate(v))
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterDivVariableMethod(self):
     v = resource_variable_ops.ResourceVariable([0.0, 6.0], name="div")
@@ -572,7 +637,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(
         v.scatter_div(ops.IndexedSlices(indices=[1], values=[2.0])))
     self.assertAllEqual([0.0, 3.0], self.evaluate(v))
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterUpdateVariableMethod(self):
     v = resource_variable_ops.ResourceVariable([0.0, 6.0], name="update")
@@ -580,7 +648,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(
         v.scatter_update(ops.IndexedSlices(indices=[1], values=[3.0])))
     self.assertAllEqual([0.0, 3.0], self.evaluate(v))
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testScatterUpdateString(self):
     handle = resource_variable_ops.var_handle_op(
@@ -592,7 +663,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     read = resource_variable_ops.read_variable_op(handle, dtype=dtypes.string)
     self.assertEqual(compat.as_bytes(self.evaluate(read)[0][0]),
                      compat.as_bytes("b"))
-
+                     
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testScatterUpdateStringScalar(self):
     handle = resource_variable_ops.var_handle_op(
@@ -625,7 +699,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
           self.evaluate(
               resource_variable_ops.var_is_initialized_op(abc.handle)),
           True)
-
+          
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testScatterBool(self):
     with context.eager_mode():
       ref = resource_variable_ops.ResourceVariable(
@@ -661,14 +738,14 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
       with self.assertRaises(ValueError):
         resource_variable_ops.ResourceVariable(
             1.0, name="handle-numpy").handle.numpy()
-
+            
   def testCountUpTo(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable(0, name="upto")
       self.assertAllEqual(v.count_up_to(1), 0)
       with self.assertRaises(errors.OutOfRangeError):
         v.count_up_to(1)
-
+        
   def testCountUpToFunction(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable(0, name="upto")
@@ -725,7 +802,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.evaluate(variables.global_variables_initializer())
     v.load(2.0)
     self.assertEqual(2.0, self.evaluate(v.value()))
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testShapePassedToGradient(self):
     with ops.Graph().as_default():
       @custom_gradient.custom_gradient
@@ -811,7 +891,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
           resource_variable_ops.ResourceVariable(
               variable_def=trainable_variable.to_proto())
           .trainable)
-
+        
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testSparseRead(self):
     init_value = np.reshape(np.arange(np.power(4, 3)), (4, 4, 4))
@@ -821,7 +904,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
 
     value = self.evaluate(v.sparse_read([0, 3, 1, 2]))
     self.assertAllEqual(init_value[[0, 3, 1, 2], ...], value)
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testGatherNd(self):
     init_value = np.reshape(np.arange(np.power(4, 3)), (4, 4, 4))
@@ -1004,7 +1090,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
           container=ops.get_default_graph()._container)
       w_read = resource_variable_ops.read_variable_op(w, v.dtype.base_dtype)
       self.assertEqual(300.0, self.evaluate(w_read))
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testShape(self):
     v = resource_variable_ops.ResourceVariable(
@@ -1113,24 +1202,36 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
         resource_variable_ops.destroy_resource_op(var_handle,
                                                   ignore_lookup_error=False)
 
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testScatterUpdate(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable([1.0, 2.0], name="update")
       state_ops.scatter_update(v, [1], [3.0])
       self.assertAllEqual([1.0, 3.0], v.numpy())
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testScatterAddStateOps(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable([1.0, 2.0], name="add")
       state_ops.scatter_add(v, [1], [3])
       self.assertAllEqual([1.0, 5.0], v.numpy())
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testScatterSubStateOps(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable([1.0, 2.0], name="sub")
       state_ops.scatter_sub(v, [1], [3])
       self.assertAllEqual([1.0, -1.0], v.numpy())
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testScatterUpdateVariant(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable([
@@ -1150,7 +1251,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
       assign = v.assign_add(1.0)
       g = control_flow_ops.group([assign])
       self.assertEqual(g.control_inputs[0].type, "AssignAddVariableOp")
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testScatterNdAddStateOps(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable(
@@ -1173,6 +1277,9 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
     self.assertTrue(all(x.type != "ReadVariableOp"
                         for x in graph.get_operations()))
 
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testScatterNdSubStateOps(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable(
@@ -1182,13 +1289,19 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
       expected = np.array([1, -9, 3, -6, -4, 6, 7, -4])
       state_ops.scatter_nd_sub(v, indices, updates)
       self.assertAllClose(expected, v.numpy())
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   def testScatterUpdateCast(self):
     with context.eager_mode():
       v = resource_variable_ops.ResourceVariable([1.0, 2.0], name="update")
       state_ops.scatter_update(v, [1], [3])
       self.assertAllEqual([1.0, 3.0], v.numpy())
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testScatterUpdateInvalidArgs(self):
     v = resource_variable_ops.ResourceVariable([0, 1, 2, 3], name="update")
@@ -1241,7 +1354,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
                     metadata=np.array(value, dtype=np.int32).tobytes())
             ]))
     return value
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   # TODO(ebrevdo): Add run_in_graph_and_eager_modes once we can create
   # EagerTensor constants with TensorProto inputs.
   @test_util.run_in_graph_and_eager_modes()
@@ -1268,7 +1384,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
       self.evaluate(v.initializer)
       self.evaluate(read.op)
       self.evaluate(gather.op)
-
+      
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @parameterized.parameters([
       # batch_dims=0 (equivalent to tf.gather)
       dict(  # 2D indices
@@ -1340,7 +1459,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
       result = resource_variable_ops.resource_gather(
           var.handle, indices, dtype=var.dtype, batch_dims=batch_dims)
     self.assertAllEqual(expected, result)
-
+    
+  # DML doesn't support resource scatter/gather
+  # TFDML #25923582
+  @test_util.skip_dml
   @parameterized.parameters([
       dict(
           params_shape=[2, 3, 4, 5, 6, 7],

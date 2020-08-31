@@ -157,11 +157,16 @@ class ReluTest(test.TestCase):
       with self.cached_session() as sess:
         f = lambda: sess.run([d32_tensor, d16_tensor])
 
+    if test_util.gpu_device_type() == "DML":
+      atol = 5e-4
+    else:
+      atol = 3e-4
+
     # Repeat the experiment for 100 times. All tensor shapes and its tensor
     # values are randomly generated for each run.
     for _ in xrange(100):
       d32, d16 = f()
-      self.assertAllClose(d32, d16, atol=3e-4)
+      self.assertAllClose(d32, d16, atol=atol)
 
   def testGradientFloat64(self):
     with self.cached_session():
@@ -315,7 +320,10 @@ class LeakyReluTest(test.TestCase):
   def _testLeakyRelu(self, np_features, alpha):
     np_leaky_relu = self._npLeakyRelu(np_features, alpha)
     tf_leaky_relu = nn_ops.leaky_relu(np_features, alpha)
-    self.assertAllClose(np_leaky_relu, tf_leaky_relu)
+    if test_util.gpu_device_type() == "DML" and np_features.dtype == np.float16:
+      self.assertAllClose(np_leaky_relu, tf_leaky_relu, atol=1e-3)
+    else:
+      self.assertAllClose(np_leaky_relu, tf_leaky_relu)
     self.assertShapeEqual(np_leaky_relu, tf_leaky_relu)
 
   def testNumbersCPU(self):

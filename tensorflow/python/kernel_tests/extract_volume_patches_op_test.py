@@ -46,7 +46,7 @@ class ExtractVolumePatches(test.TestCase):
     strides = [1] + strides + [1]
 
     out_tensor = array_ops.extract_volume_patches(
-        constant_op.constant(image),
+        constant_op.constant(image, dtype=np.float32),
         ksizes=ksizes,
         strides=strides,
         padding=padding,

@@ -242,6 +242,8 @@ class BetaTest(test.TestCase):
     expected_entropy = stats.beta.entropy(a, b)
     self.assertAllClose(expected_entropy, self.evaluate(dist.entropy()))
 
+  # TFDML #25562201
+  @test_util.skip_dml
   def testBetaSample(self):
     a = 1.
     b = 2.

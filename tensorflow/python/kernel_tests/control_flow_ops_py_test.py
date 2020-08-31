@@ -743,7 +743,10 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       self.assertEqual(
           self._count_matching_switch_nodes_on_device(run_metadata, "CPU"), 1)
       self.assertEqual(
-          self._count_matching_switch_nodes_on_device(run_metadata, "GPU"), 0)
+          self._count_matching_switch_nodes_on_device(
+              run_metadata,
+              test_util.gpu_device_type()),
+          0)
 
   @test_util.run_gpu_only
   @test_util.run_deprecated_v1
@@ -771,7 +774,10 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       self.assertEqual(
           self._count_matching_switch_nodes_on_device(run_metadata, "CPU"), 0)
       self.assertEqual(
-          self._count_matching_switch_nodes_on_device(run_metadata, "GPU"), 1)
+          self._count_matching_switch_nodes_on_device(
+              run_metadata,
+              test_util.gpu_device_type()),
+          1)
 
   def testCondAccessTrueBranchTensorInFalseBranchRaises(self):
 
@@ -4282,7 +4288,11 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
 
       # device set on tensor, default device on graph => default device on dep.
       vdef = variables.VariableV1([0.0], name="vdef")
-      with ops.device("/job:worker/device:GPU:1"):
+
+      device_type = test_util.gpu_device_type()
+      full_device_name = "/job:worker/device:{}:1".format(device_type)
+
+      with ops.device(full_device_name):
         with_vdef_dep = control_flow_ops.with_dependencies([vdef.initializer],
                                                            vdef)
         # The device is empty, but the colocation constraint is set.
@@ -4465,7 +4475,10 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
 
   @test_util.run_v1_only("b/120545219")
   def testQIntSwitchMerge(self):
-    with self.cached_session(force_gpu=test.is_gpu_available()) as sess:
+    # DML doesn't support quantized data types
+    force_gpu = test.is_gpu_available() and test_util.gpu_device_type() != "DML"
+
+    with self.cached_session(force_gpu=force_gpu) as sess:
       constant_qint = constant_op.constant(np.array([42]), dtypes.qint8)
       cond = constant_op.constant(True, dtypes.bool)
       v_f, v_t = control_flow_ops.switch(constant_qint, cond)
@@ -4501,8 +4514,11 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
     @function.Defun(dtypes.qint8)
     def func(x):
       return x
+      
+    # DML doesn't support quantized data types
+    force_gpu = test.is_gpu_available() and test_util.gpu_device_type() != "DML"
 
-    with self.cached_session(force_gpu=test.is_gpu_available()) as sess:
+    with self.cached_session(force_gpu=force_gpu) as sess:
       qint = constant_op.constant(np.array([42]), dtypes.qint8)
       result = func(qint)
       self.evaluate(result)
@@ -4808,7 +4824,8 @@ class AssertTest(test.TestCase):
       unguarded_memcpy_nodestat_names = [
           n for n in unguarded_nodestat_names if "MEMCPYDtoH" in n
       ]
-      if "GPU" in [d.device_type for d in device_lib.list_local_devices()]:
+      if test.gpu_device_type() in [
+          d.device_type for d in device_lib.list_local_devices()]:
         # A copy was performed for the unguarded assert
         self.assertLess(0, len(unguarded_memcpy_nodestat_names),
                         str(unguarded_nodestat_names))

@@ -231,4 +231,78 @@ limitations under the License.
 #define TF_CALL_SYCL_NUMBER_TYPES(m) TF_CALL_float(m) TF_CALL_SYCL_double(m)
 #endif  // __ANDROID_TYPES_SLIM__
 
+#if TENSORFLOW_USE_DIRECTML
+
+// Call "m" on all float types supported by DirectML.
+#define TF_CALL_DML_FLOAT_TYPES(m) TF_CALL_float(m) TF_CALL_half(m)
+
+#define TF_CALL_DML_FLOAT_INT32_INT64_TYPES(m)                        \
+  TF_CALL_float(m) TF_CALL_half(m) TF_CALL_int32(m) TF_CALL_uint32(m) \
+      TF_CALL_int64(m) TF_CALL_uint64(m)
+
+#define TF_CALL_DML_FLOAT_INT64_TYPES(m)                              \
+  TF_CALL_float(m) TF_CALL_half(m) TF_CALL_int32(m) TF_CALL_uint32(m) \
+      TF_CALL_int64(m) TF_CALL_uint64(m)
+
+// Call "m" on all types supported by DirectML.
+#define TF_CALL_DML_ALL_TYPES(m)                                         \
+  TF_CALL_float(m) TF_CALL_half(m) TF_CALL_uint32(m) TF_CALL_uint16(m)   \
+      TF_CALL_uint8(m) TF_CALL_int32(m) TF_CALL_int16(m) TF_CALL_int8(m) \
+          TF_CALL_bool(m) TF_CALL_uint64(m) TF_CALL_int64(m)
+
+// Call "m" on all types supported by DirectML except int32.
+#define TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(m)                           \
+  TF_CALL_float(m) TF_CALL_half(m) TF_CALL_uint32(m) TF_CALL_uint16(m)  \
+      TF_CALL_uint8(m) TF_CALL_int16(m) TF_CALL_int8(m) TF_CALL_bool(m) \
+          TF_CALL_uint64(m) TF_CALL_int64(m)
+
+// Call "m" on all signed types supported by DirectML.
+#define TF_CALL_DML_SIGNED_TYPES(m)                                  \
+  TF_CALL_float(m) TF_CALL_half(m) TF_CALL_int32(m) TF_CALL_int16(m) \
+      TF_CALL_int8(m)
+
+// Call "m" on all signed types supported by DirectML, except int32.
+#define TF_CALL_DML_SIGNED_TYPES_EXCEPT_INT32(m) \
+  TF_CALL_float(m) TF_CALL_half(m) TF_CALL_int16(m) TF_CALL_int8(m)
+
+// Call "m" on all number types unsupported by DirectML.
+#define TF_CALL_DML_UNSUPPORTED_NUMBER_TYPES(m)                \
+  TF_CALL_double(m) TF_CALL_complex64(m) TF_CALL_complex128(m) \
+      TF_CALL_bfloat16(m)
+
+#define TF_CALL_DML_OP_FLOAT_TYPES(opName, m) \
+  m(opName, float) m(opName, Eigen::half)
+
+#define TF_CALL_DML_OP_FLOAT_INT32_INT64_TYPES(opName, m)                \
+  m(opName, float) m(opName, Eigen::half) m(opName, ::tensorflow::int32) \
+      m(opName, ::tensorflow::uint32) m(opName, ::tensorflow::int64)     \
+          m(opName, ::tensorflow::uint64)
+
+#define TF_CALL_DML_OP_FLOAT_INT32_INT64_TYPES_EXCEPT_INT32(opName, m)    \
+  m(opName, float) m(opName, Eigen::half) m(opName, ::tensorflow::uint32) \
+      m(opName, ::tensorflow::int64) m(opName, ::tensorflow::uint64)
+
+#define TF_CALL_DML_OP_ALL_TYPES(opName, m)                                   \
+  m(opName, float) m(opName, Eigen::half) m(opName, ::tensorflow::int8)       \
+      m(opName, ::tensorflow::int16) m(opName, ::tensorflow::int32)           \
+          m(opName, ::tensorflow::int64) m(opName, ::tensorflow::uint8)       \
+              m(opName, ::tensorflow::uint16) m(opName, ::tensorflow::uint32) \
+                  m(opName, ::tensorflow::uint64)
+
+#define TF_CALL_DML_OP_ALL_TYPES_EXCEPT_INT32(opName, m)                 \
+  m(opName, float) m(opName, Eigen::half) m(opName, ::tensorflow::int8)  \
+      m(opName, ::tensorflow::int16) m(opName, ::tensorflow::int64)      \
+          m(opName, ::tensorflow::uint8) m(opName, ::tensorflow::uint16) \
+              m(opName, ::tensorflow::uint32) m(opName, ::tensorflow::uint64)
+
+#define TF_CALL_DML_OP_SIGNED_TYPES(opName, m)                          \
+  m(opName, float) m(opName, Eigen::half) m(opName, ::tensorflow::int8) \
+      m(opName, ::tensorflow::int16) m(opName, ::tensorflow::int32)
+
+#define TF_CALL_DML_OP_SIGNED_TYPES_EXCEPT_INT32(opName, m)             \
+  m(opName, float) m(opName, Eigen::half) m(opName, ::tensorflow::int8) \
+      m(opName, ::tensorflow::int16)
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 #endif  // TENSORFLOW_CORE_FRAMEWORK_REGISTER_TYPES_H_

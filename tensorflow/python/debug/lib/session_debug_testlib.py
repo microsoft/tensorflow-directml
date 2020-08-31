@@ -266,6 +266,8 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
       self.assertEqual("DebugNumericSummary;%s;0" % debug_urls[0],
                        debug_ops_spec[0].decode("utf-8"))
 
+  # TFDML #25510608
+  @test_util.skip_dml
   def testConcurrentDumpingToPathsWithOverlappingParentDirsWorks(self):
     results = self._generate_dump_from_simple_addition_graph()
     self.assertTrue(results.dump.loaded_partition_graphs())
@@ -303,6 +305,8 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
         results.dump.get_dump_sizes_bytes("%s/read" % results.v_name, 0,
                                           "DebugIdentity")[0], 0)
 
+  # TFDML #25576363
+  @test_util.skip_dml
   def testGetOpTypeWorks(self):
     results = self._generate_dump_from_simple_addition_graph()
 
@@ -760,9 +764,10 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
     u_read_name = u_name + "/read"
 
     # Test node name list lookup of the DebugDumpDir object.
-    if test_util.gpu_device_name():
-      node_names = dump.nodes(
-          device_name="/job:localhost/replica:0/task:0/device:GPU:0")
+    device_type = test_util.gpu_device_type()
+    if device_type:
+      device_name = "/job:localhost/replica:0/task:0/device:%s:0" % device_type
+      node_names = dump.nodes(device_name=device_name)
     else:
       node_names = dump.nodes()
     self.assertTrue(u_name in node_names)

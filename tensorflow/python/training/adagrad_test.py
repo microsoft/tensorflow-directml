@@ -41,6 +41,8 @@ class AdagradOptimizerTest(test.TestCase):
                   use_resource=False,
                   use_callable_params=False):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       if use_resource:
         var0 = resource_variable_ops.ResourceVariable([1.0, 2.0], dtype=dtype)
         var1 = resource_variable_ops.ResourceVariable([3.0, 4.0], dtype=dtype)

@@ -59,6 +59,12 @@ class RenamedDevice : public Device {
     return underlying_device_->tensorflow_gpu_device_info();
   }
 
+#ifdef TENSORFLOW_USE_DIRECTML
+  DeviceContext* dml_device_context() const override {
+    return underlying_device_->dml_device_context();
+  }
+#endif
+
   Allocator* GetAllocator(AllocatorAttributes attr) override {
     return underlying_device_->GetAllocator(attr);
   }

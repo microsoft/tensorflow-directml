@@ -22,6 +22,7 @@ limitations under the License.
 #ifdef TENSORFLOW_USE_SYCL
 #include "tensorflow/core/common_runtime/sycl/sycl_util.h"
 #endif  // TENSORFLOW_USE_SYCL
+#include "tensorflow/core/common_runtime/device.h"
 #include "tensorflow/core/debug/debug_io_utils.h"
 #include "tensorflow/core/framework/device_base.h"
 #include "tensorflow/core/framework/op_kernel.h"
@@ -96,6 +97,24 @@ class CopyOp : public OpKernel {
       if (off_host_input) {
         SYCLmemcpy(context->eigen_sycl_device(), src_tensor, copied_tensor);
       } else {
+        *copied_tensor = tensor::DeepCopy(src_tensor);
+      }
+#elif defined(TENSORFLOW_USE_DIRECTML)
+      Device* device = static_cast<Device*>(context->device());
+      // Determine if the input tensor is not on CPU (e.g., on GPU).
+      const bool off_host_input = device->device_type() == DEVICE_DML &&
+                                  !context->input_alloc_attr(0).on_host();
+
+      if (off_host_input) {
+        DeviceContext* device_ctxt = context->op_device_context();
+        // Input is not on host: deep-copy it from GPU to the same GPU.
+        Notification done_copy;
+        device_ctxt->CopyTensorInSameDevice(
+            &src_tensor, device, copied_tensor,
+            [&done_copy](const Status& s) { done_copy.Notify(); });
+        done_copy.WaitForNotification();
+      } else {
+        // The input tensor is on the host (CPU): deep-copy from CPU to CPU.
         *copied_tensor = tensor::DeepCopy(src_tensor);
       }
 #else

@@ -93,6 +93,8 @@ class FunctionTest(test.TestCase):
   and without C API support.
   """
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testIdentity(self):
 
     @function.Defun(dtypes.float32, func_name="MyIdentity")
@@ -105,6 +107,8 @@ class FunctionTest(test.TestCase):
       with session.Session() as sess:
         self.assertAllEqual([18.0], self.evaluate(call))
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_v1_only("b/120545219")
   def testIdentityImplicitDeref(self):
 
@@ -121,6 +125,8 @@ class FunctionTest(test.TestCase):
           self.evaluate(var.initializer)
           self.assertAllEqual([18.0], self.evaluate(call))
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testIdentityOutputName(self):
 
     @function.Defun(
@@ -150,6 +156,8 @@ class FunctionTest(test.TestCase):
            "output names size = 2 outputs size = 1")):
         MyIdentityFunc([18.0])
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testDefineFunction2Args(self):
 
     @function.Defun(dtypes.float32, dtypes.float32, func_name="APlus2B")
@@ -173,6 +181,8 @@ class FunctionTest(test.TestCase):
       # Call function. There should be no exceptions.
       APlus2B([1.0], [2.0])
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testDefineFunction2ArgsOutputName(self):
 
     @function.Defun(
@@ -229,6 +239,8 @@ class FunctionTest(test.TestCase):
         self.assertAllClose([5.0], self.evaluate(call_f))
         self.assertAllClose([0.4], self.evaluate(call_g))
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testTanhSymGrad(self):
 
     @function.Defun(dtypes.float32)
@@ -252,6 +264,8 @@ class FunctionTest(test.TestCase):
       out, = sess.run(dx, feed)
     self.assertAllClose(1 - np.square(np.tanh(inp)), out)
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testCustomGradient(self):
     dtype = dtypes.float32
 
@@ -325,6 +339,8 @@ class FunctionTest(test.TestCase):
       self.assertEqual(x.get_shape(), dx.get_shape())
       self.assertEqual(y.get_shape(), dy.get_shape())
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSymGradAttr(self):
 
@@ -380,6 +396,8 @@ class FunctionTest(test.TestCase):
     # Tests for constant folding of grad_ys
     self._testZNoDepOnY(True)
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testDefineFunctionNoArgs(self):
 
     @function.Defun(func_name="AConstant")
@@ -524,6 +542,8 @@ class FunctionTest(test.TestCase):
                                    "assertion"):
         sess.run(loop, {pred: True, x: 3})
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testVar(self):
 
@@ -644,6 +664,8 @@ class FunctionTest(test.TestCase):
       with self.assertRaisesRegexp(ValueError, "Unknown keyword arguments"):
         _ = PlusOne(1, device="/device:GPU:0")
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testFunctionDecorator(self):
 
     @function.Defun(dtypes.float32, func_name="Minus1")
@@ -662,6 +684,8 @@ class FunctionTest(test.TestCase):
         self.assertAllEqual([1], self.evaluate(call1))
         self.assertAllEqual([0], self.evaluate(call2))
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testNestedFunction(self):
 
     @function.Defun(dtypes.float32)
@@ -677,6 +701,8 @@ class FunctionTest(test.TestCase):
       with self.cached_session():
         self.assertAllEqual(z.eval(), 25.0)
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testNestedDefinedFunction(self):
 
     @function.Defun(dtypes.float32, dtypes.float32)
@@ -792,6 +818,8 @@ class FunctionTest(test.TestCase):
         # NOTE: We still do not support capturing control deps.
         _ = Foo(x)
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testCaptureInWhileLoop(self):
     g = ops.Graph()
@@ -825,6 +853,8 @@ class FunctionTest(test.TestCase):
       self.assertEqual(self.evaluate(y), 1)
       self.assertEqual(self.evaluate(z), 2)
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSignatureHash(self):
     # Foo.Inner and Bar.Inner have identical function body but have
@@ -953,6 +983,8 @@ class FunctionTest(test.TestCase):
         [result])
     self.assertEqual(len(f.signature.input_arg), 3)
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testGradientWithIntegerFunctionArgument(self):
 
     @function.Defun(dtypes.int32, dtypes.float32)
@@ -999,6 +1031,8 @@ class FunctionTest(test.TestCase):
       self.assertEqual(100, self.evaluate(result_2))
       self.assertEqual((4.0, 100), sess.run((result_1, result_2)))
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testStatefulFunction(self):
 
@@ -1109,6 +1143,8 @@ class FunctionTest(test.TestCase):
       self.evaluate(var.initializer)
       _ = sess.run(CapturesGuaranteedConst(), {also_not_const: 1.0})
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSameFunctionDifferentGrads(self):
 
@@ -1421,6 +1457,8 @@ class FunctionOverloadTest(test.TestCase):
       self.assertAllClose(x.eval(), np.sinh(0.25))
       self.assertAllClose(y.eval(), np.sinh(0.25))
 
+  # TFDML #25509788
+  @test_util.skip_dml
   def testGradient(self):
 
     @function.Defun(func_name="Spec")
@@ -1565,6 +1603,8 @@ class UnrollLSTMTest(test.TestCase):
 
       return LSTMLoop10(weights, inp)
 
+  # TFDML #25562864
+  @test_util.skip_dml
   def testUnrollLSTM(self):
     # Run one step of the unrolled lstm graph.
     def RunForward(mode, cfg=None):
@@ -1592,6 +1632,8 @@ class UnrollLSTMTest(test.TestCase):
       self.assertAllClose(mv0, mv2, rtol=1e-4)
       self.assertAllClose(mv0, mv3, rtol=1e-4)
 
+  # TFDML #25562902
+  @test_util.skip_dml
   def testUnrollLSTMGrad(self):
     # Run one step of the unrolled lstm graph.
     def RunForwardBackward(mode, cfg=None):
@@ -1624,6 +1666,8 @@ class UnrollLSTMTest(test.TestCase):
 
 class FunctionInlineControlTest(test.TestCase):
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.disable_xla("XLA changes the names, breaking graph analysis")
   def testFoo(self):
     dtype = dtypes.float32
@@ -1767,11 +1811,15 @@ class VariableHoistingTest(test.TestCase):
     self.assertAllEqual(db.shape, (64,))
     self.assertAllClose(np.sum(db), 0.509, rtol=1e-2)
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testBasic(self):
     self._testSimpleModel(False)
     self._testSimpleModel(True)
 
+  # TFDML #25509788
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testBasicResource(self):
     self._testSimpleModel(False, use_resource=True)

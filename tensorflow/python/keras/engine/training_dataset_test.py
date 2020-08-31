@@ -267,6 +267,8 @@ class TestTrainingWithDataset(keras_parameterized.TestCase):
     #  equals 42.5 / 4 = 10.625
     self.assertEqual(result, 10.625)
 
+  # TFDML #25564761
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes
   def test_dataset_with_sparse_labels(self):
@@ -364,6 +366,8 @@ class TestTrainingWithDataset(keras_parameterized.TestCase):
                                    r'expected (.*?) to have shape \(3,\)'):
         model.train_on_batch(dataset)
 
+  # TFDML #25564761
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes
   def test_finite_dataset_known_cardinality_no_steps_arg(self):
@@ -388,6 +392,8 @@ class TestTrainingWithDataset(keras_parameterized.TestCase):
     out = model.predict(dataset)
     self.assertEqual(out.shape[0], 100)
 
+  # TFDML #25564761
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes
   def test_finite_dataset_unknown_cardinality_no_steps_arg(self):
@@ -414,6 +420,8 @@ class TestTrainingWithDataset(keras_parameterized.TestCase):
     out = model.predict(dataset)
     self.assertEqual(out.shape[0], 100)
 
+  # TFDML #25564761
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes(always_skip_v1=True)
   def test_finite_dataset_unknown_cardinality_no_step_with_train_and_val(self):
@@ -465,6 +473,8 @@ class TestTrainingWithDataset(keras_parameterized.TestCase):
     out = model.predict(dataset)
     self.assertEqual(out.shape[0], 100)
 
+  # TFDML #25564761
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes
   def test_finite_dataset_unknown_cardinality_out_of_data(self):

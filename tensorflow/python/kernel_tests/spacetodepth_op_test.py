@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+import os
 
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
@@ -275,6 +276,10 @@ class SpaceToDepthTest(test.TestCase):
     # force_cpu is needed because quantize_v2 runs on only CPU.
     with test_util.force_cpu():
       if data_type == dtypes.qint8:
+        # Quantized ops are not supported on Windows
+        if os.name == "nt":
+          return
+
         # Initialize the input tensor with qint8 values that circle -127..127.
         x = [((f + 128) % 255) - 127 for f in range(total_size)]
         t = constant_op.constant(
@@ -289,6 +294,10 @@ class SpaceToDepthTest(test.TestCase):
 
     with test_util.device(use_gpu):
       if data_format == "NCHW_VECT_C":
+        # DML doesn't support NCHW_VECT_C
+        if test_util.gpu_device_type() == "DML":
+          return
+
         assert data_type == dtypes.qint8
 
         # Convert to int8, then NHWCToNCHW_VECT_C, and then back to qint8.
@@ -336,9 +345,12 @@ class SpaceToDepthTest(test.TestCase):
     self.compareToTranspose(3, 2, 3, 2, 3, "NCHW", dtypes.float32, True)
     self.compareToTranspose(5, 7, 11, 3, 2, "NCHW", dtypes.float32, True)
 
-    self.compareToTranspose(3, 2, 3, 4, 2, "NCHW_VECT_C", dtypes.qint8, True)
-    self.compareToTranspose(3, 2, 3, 8, 3, "NCHW_VECT_C", dtypes.qint8, True)
-    self.compareToTranspose(5, 7, 11, 12, 2, "NCHW_VECT_C", dtypes.qint8, True)
+    # DML doesn't support NCHW_VECT_C
+    if test_util.gpu_device_type() != "DML":
+      self.compareToTranspose(3, 2, 3, 4, 2, "NCHW_VECT_C", dtypes.qint8, True)
+      self.compareToTranspose(3, 2, 3, 8, 3, "NCHW_VECT_C", dtypes.qint8, True)
+      self.compareToTranspose(
+        5, 7, 11, 12, 2, "NCHW_VECT_C", dtypes.qint8, True)
 
 
 class SpaceToDepthGradientTest(test.TestCase):

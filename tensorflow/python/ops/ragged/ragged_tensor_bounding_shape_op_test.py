@@ -42,6 +42,8 @@ class RaggedTensorBoundingShapeOp(test_util.TensorFlowTestCase):
     self.assertAllEqual(rt2.bounding_shape(), [1, 7])
     self.assertAllEqual(rt3.bounding_shape(), [3, 7])
 
+  # TFDML #25510238
+  @test_util.skip_dml
   def test3DRaggedTensorWithOneRaggedDimension(self):
     values = [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11], [12, 13]]
     rt1 = ragged_tensor.RaggedTensor.from_row_splits(values, [0, 2, 5, 6, 6, 7])

@@ -4,6 +4,7 @@ load(
     "if_android",
     "if_cuda_or_rocm",
     "if_not_windows",
+    "if_windows",
     "tf_cc_binary",
     "tf_cc_shared_object",
     "tf_cc_test",
@@ -37,10 +38,12 @@ load(
     "mkl_deps",
 )
 load("@local_config_cuda//cuda:build_defs.bzl", "if_cuda")
+load("//third_party/dml:build_defs.bzl", "if_dml")
 load(
     "@local_config_rocm//rocm:build_defs.bzl",
     "if_rocm",
 )
+load("//tensorflow:tensorflow.bzl", "tf_dml_cc_test")
 
 # Description:
 # Op kernel implementations for TensorFlow.
@@ -194,6 +197,17 @@ tf_cc_test(
     ],
 )
 
+# virtual targets since nested select statements not possible
+tf_kernel_library(
+    name = "virtual_nccl",
+    deps = if_cuda(["@local_config_nccl//:nccl"]),
+)
+
+tf_kernel_library(
+    name = "virtual_rccl",
+    deps = if_rocm(["@local_config_rocm//rocm:rccl"]),
+)
+
 tf_kernel_library(
     name = "collective_ops",
     srcs = if_nccl([
@@ -213,7 +227,8 @@ tf_kernel_library(
         "//tensorflow/core:protos_all_cc",
         "//tensorflow/core/profiler/lib:traceme",
     ] + if_nccl([
-        "@local_config_nccl//:nccl",
+        ":virtual_nccl",
+        ":virtual_rccl",
         "//tensorflow/core/nccl:nccl_lib",
     ]),
 )
@@ -382,11 +397,14 @@ cc_library(
 
 tf_kernel_library(
     name = "nccl_kernels",
-    srcs = if_cuda([
+    srcs = if_cuda_or_rocm([
         "nccl_ops.cc",
     ]),
     deps = if_cuda([
         "@local_config_nccl//:nccl",
+    ]) + if_rocm([
+        "@local_config_rocm//rocm:rccl",
+    ]) + if_cuda_or_rocm([
         "//tensorflow/core/nccl:nccl_lib",
         "//tensorflow/core:framework",
         "//tensorflow/core:gpu_headers_lib",
@@ -1647,6 +1665,7 @@ tf_cuda_cc_test(
     srcs = ["conv_ops_test.cc"],
     deps = [
         ":conv_ops",
+        ":dml_ops",
         ":image",
         ":ops_testutil",
         ":ops_util",
@@ -1662,6 +1681,8 @@ tf_cuda_cc_test(
         "//tensorflow/core:testlib",
         "@com_google_absl//absl/algorithm:container",
     ],
+    linkstatic = if_windows(True, False),
+    linkopts = if_windows(["-DEFAULTLIB:ws2_32.lib"]) 
 )
 
 tf_cuda_cc_test(
@@ -2470,6 +2491,7 @@ tf_kernel_library(
 tf_kernel_library(
     name = "tensor_array_ops",
     prefix = "tensor_array_ops",
+    hdrs = if_dml(["dml_tensor_array.h"]),
     deps = DATA_FLOW_DEPS,
 )
 
@@ -2667,7 +2689,7 @@ cc_library(
 tf_kernel_library(
     name = "tensor_array",
     srcs = ["tensor_array.cc"],
-    hdrs = ["tensor_array.h"],
+    hdrs = ["tensor_array.h", "concat_lib.h", "split_lib.h"],
     visibility = ["//visibility:private"],
     deps = [
         ":aggregate_ops",
@@ -2694,7 +2716,15 @@ tf_kernel_library(
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
         "@com_google_absl//absl/strings",
-    ],
+    ] + if_dml(["//tensorflow/core/common_runtime/dml:dml_runtime"]),
+    copts = tf_copts() + if_not_windows([
+        "-fms-extensions", 
+        "-Ithird_party/dml/winadapter",
+    ]) + if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+
+    ]),
 )
 
 tf_kernel_library(
@@ -6499,6 +6529,7 @@ filegroup(
             "*_gpu*",
             "*_3d*",
             "*.cu.*",
+            "dml_*",
             # Ops already in android_srcs
             "pooling_ops_common.cc",
             # Ops which we are currently excluding because they are likely
@@ -8017,4 +8048,128 @@ tf_cc_shared_object(
         ":kernel_platform_strings",
         "//tensorflow/core:all_kernels_impl",
     ],
+)
+
+tf_kernel_library(
+    name = "dml_ops",
+    srcs = [
+        "dml_kernel_wrapper.cc",
+        "dml_ops_common.cc",
+        "dml_cwise_ops.cc",
+        "dml_image_ops.cc",
+        "dml_relu_op.cc",
+        "dml_random_ops.cc",
+        "dml_batch_norm_ops.cc",
+        "dml_conv_ops.cc",
+        "dml_snapshot_op.cc",
+        "dml_fill_op.cc",
+        "dml_addn_op.cc",
+        "dml_concat_op.cc",
+        "dml_split_op.cc",
+        "dml_slice_op.cc",
+        "dml_strided_slice_op.cc",
+        "dml_cast_op.cc",
+        "dml_pooling_ops.cc",
+        "dml_tile_op.cc",
+        "dml_resize_op.cc",
+        "dml_resize_grad_op.cc",
+        "dml_assign_ops.cc",
+        "dml_gather_op.cc",
+        "dml_scan_ops.cc",
+        "dml_dynamic_stitch_op.cc",
+        "dml_l2loss_op.cc",
+        "dml_reduce_ops.cc",
+        "dml_training_ops.cc",
+        "dml_bias_add_op.cc",
+        "dml_sparse_xent_op.cc",
+        "dml_matmul_op.cc",
+        "dml_transpose_op.cc",
+        "dml_broadcast_to_op.cc",
+        "dml_select_op.cc",
+        "dml_pack_op.cc",
+        "dml_unpack_op.cc",
+        "dml_pad_op.cc",
+        "dml_mirror_pad_grad_op.cc",
+        "dml_one_hot_op.cc",
+        "dml_data_format_vec_permute.cc",
+        "dml_data_format_dim_map.cc",
+        "dml_reverse_op.cc",
+        "dml_lrn_op.cc",
+        "dml_space_depth_ops.cc",
+        "dml_batch_to_space_op.cc",
+        "dml_resource_variable_ops.cc",
+        "dml_zeros_like_op.cc",
+        "dml_tensor_array.cc",
+        "dml_where_op.cc",
+        "dml_check_numerics_op.cc",
+        "dml_lstm_ops.cc",
+        "dml_reverse_sequence_op.cc",
+        "dml_diag_op.cc",
+        "dml_diag_part_op.cc",
+        "dml_matrix_diag_helpers.cc",
+        "dml_matrix_diag_part_ops.cc",
+        "dml_gru_ops.cc",
+        "dml_roll_op.cc",
+        "dml_matrix_band_part_ops.cc",
+        "dml_matrix_set_diag_ops.cc",
+        "dml_matrix_diag_ops.cc",
+        "dml_extract_patches_helpers.cc",
+        "dml_extract_image_patches_op.cc",
+        "dml_extract_volume_patches_op.cc",
+    ],
+    hdrs = [
+        "dml_kernel_wrapper.h",
+        "dml_ops_common.h",
+        "assign_op.h",
+        "stateless_random_ops.h",
+        "tensor_array.h",
+        "concat_lib.h",
+        "split_lib.h",
+        "aggregate_ops.h",
+        "dml_tensor_array.h",
+        "dml_matrix_diag_helpers.h",
+        "dml_extract_patches_helpers.h",
+    ],
+    deps = NN_DEPS + [
+        "//tensorflow/core/common_runtime/dml:dml_runtime",
+        ":bias_op",
+        ":reduction_ops",
+        ":transpose_functor",
+        ":training_op_helpers",
+        ":conv_ops",
+        ":pooling_ops",
+        ":rnn_ops",
+        ":fused_batch_norm_op",
+    ],
+    copts = tf_copts() + if_not_windows([
+        "-fms-extensions", 
+        "-Ithird_party/dml/winadapter",
+    ]) + if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+    ]),
+)
+
+tf_dml_cc_test(
+    name = "dml_ops_test",
+    size = "small",
+    srcs = [
+        "dml_ops_simple_test.cc",
+    ],
+    linkstatic = 1,
+    deps = [
+        ":dml_ops",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+        "//tensorflow/core:testlib",
+        "//tensorflow/cc:cc_ops",
+        "//tensorflow/cc:cc_ops_internal",
+        "//tensorflow/cc:client_session",
+        "//tensorflow/core:tensorflow",
+    ],
+    # TODO: TFDML #24658011
+    # TF build for WSL should have configurable linker path for D3D/DXCore/DML
+    linkopts = if_not_windows([
+        "-L/mnt/c/Windows/System32/lxss/lib",
+    ]),
 )

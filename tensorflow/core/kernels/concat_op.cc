@@ -275,6 +275,23 @@ REGISTER_KERNEL_BUILDER(Name("ConcatV2")
 #undef REGISTER_SYCL
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Concat")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("concat_dim")
+                            .HostMemory("values")
+                            .HostMemory("output"),
+                        ConcatOp<CPUDevice, int32>);
+REGISTER_KERNEL_BUILDER(Name("ConcatV2")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("values")
+                            .HostMemory("axis")
+                            .HostMemory("output"),
+                        ConcatV2Op<CPUDevice, int32>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 class ConcatOffsetOp : public OpKernel {
  public:
   explicit ConcatOffsetOp(OpKernelConstruction* ctx) : OpKernel(ctx) {}
@@ -369,4 +386,13 @@ REGISTER_KERNEL_BUILDER(Name("ConcatOffset")
                             .HostMemory("offset"),
                         ConcatOffsetOp);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("ConcatOffset")
+                            .Device(DEVICE_DML)
+                            .HostMemory("concat_dim")
+                            .HostMemory("shape")
+                            .HostMemory("offset"),
+                        ConcatOffsetOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

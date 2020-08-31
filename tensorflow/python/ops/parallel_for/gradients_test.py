@@ -537,6 +537,9 @@ class GradientsTest(test.TestCase):
     self.run_and_assert_equal(pfor_outputs, while_outputs, rtol=1e-3)
     os.environ.pop("TF_ENABLE_WINOGRAD_NONFUSED", None)
 
+  # DML doesn't support more than 5 dimensions for Transpose, but this test uses
+  # executes a 6D Transpose
+  @test_util.skip_dml
   def test_mnist_per_eg_jacobian(self):
     # It looks like CUDNN_CONVOLUTION_BWD_DATA_ALGO_WINOGRAD_NONFUSED
     # configuration of Winograd can cause low precision output resulting in

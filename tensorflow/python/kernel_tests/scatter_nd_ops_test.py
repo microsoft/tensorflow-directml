@@ -210,14 +210,20 @@ class StatefulScatterNdTest(test.TestCase):
       result = self.evaluate(scatter)
       self.assertAllClose(result, expected)
 
+  # TFDML #25510543
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testVariableRankUpdate(self):
     self._VariableRankTests(_NumpyUpdate, state_ops.scatter_nd_update)
 
+  # TFDML #25510543
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testVariableRankAdd(self):
     self._VariableRankTests(_NumpyAdd, state_ops.scatter_nd_add)
 
+  # TFDML #25510543
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testVariableRankSub(self):
     self._VariableRankTests(_NumpySub, state_ops.scatter_nd_sub)
@@ -236,6 +242,8 @@ class StatefulScatterNdTest(test.TestCase):
         self._VariableRankTest(
             np_scatter, tf_scatter, vtype, itype, repeat_indices=True)
 
+  # TFDML #25510543
+  @test_util.skip_dml
   @test_util.run_v1_only("b/120545219")
   def testScatterRepeatIndices(self):
     """This tests scatter_add using indices that repeat."""

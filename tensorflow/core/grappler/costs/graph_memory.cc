@@ -171,8 +171,8 @@ void GraphMemory::InferFromTrace(const StepStats& timeline) {
     node_map[node.name()] = &node;
   }
   for (const auto& dev_stats : timeline.dev_stats()) {
-    const string& device_name = dev_stats.device();
-    const bool is_gpu = (device_name.find("GPU:") || device_name.find("gpu:"));
+    string device_name = absl::AsciiStrToLower(dev_stats.device());
+    const bool is_gpu = (device_name.find("gpu:") || device_name.find("dml:"));
     std::deque<LiveTensor>& device_tensors =
         live_tensors_per_device[dev_stats.device()];
     for (const auto& node_stats : dev_stats.node_stats()) {

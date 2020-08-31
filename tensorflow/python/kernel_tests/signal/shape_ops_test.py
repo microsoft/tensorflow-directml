@@ -185,6 +185,8 @@ class FrameTest(test.TestCase):
                                  pad_end=False).eval()
         self.assertAllEqual(expected, result)
 
+  # This test uses 6D StridedSlice, which isn't supported by DML
+  @test_util.skip_dml
   @tf_test_util.run_deprecated_v1
   def test_basic_stereo(self):
     signal = np.vstack([np.arange(6),

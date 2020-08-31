@@ -258,10 +258,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
       self.skipTest("No GPU available")
 
     host_dataset = dataset_ops.Dataset.range(10)
-    device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0"))
 
-    with ops.device("/gpu:0"):
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
+    device_dataset = host_dataset.apply(
+        prefetching_ops.copy_to_device(device_name))
+
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -278,11 +281,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     host_dataset = dataset_ops.Dataset.range(10)
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0")).prefetch(1)
+        prefetching_ops.copy_to_device(device_name)).prefetch(1)
 
-    with ops.device("/gpu:0"):
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -303,10 +308,18 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
       for i in range(10):
         yield i, float(i), str(i)
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
+    # DML doesn't support int32 for square
+    if test_util.gpu_device_type() == "DML":
+      output_types = (dtypes.float32, dtypes.float32, dtypes.string)
+    else:
+      output_types = (dtypes.int32, dtypes.float32, dtypes.string)
+
     host_dataset = dataset_ops.Dataset.from_generator(
-        generator, output_types=(dtypes.int32, dtypes.float32, dtypes.string))
+        generator, output_types=output_types)
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0"))
+        prefetching_ops.copy_to_device(device_name))
 
     def gpu_map_func(x, y, z):
       return math_ops.square(x), math_ops.square(y), z
@@ -317,7 +330,7 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     options.experimental_optimization.autotune = False
     device_dataset = device_dataset.with_options(options)
 
-    with ops.device("/gpu:0"):
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -326,8 +339,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
       self.evaluate(iterator.initializer)
       for i in range(10):
         x, y, z = self.evaluate(next_element)
-        self.assertEqual(i**2, x)
-        self.assertEqual(float(i**2), y)
+
+        if test_util.gpu_device_type() == "DML":
+          self.assertAllCloseAccordingToType(float(i**2), x)
+          self.assertAllCloseAccordingToType(float(i**2), y)
+        else:
+          self.assertEqual(i**2, x)
+          self.assertEqual(float(i**2), y)
         self.assertEqual(util_compat.as_bytes(str(i)), z)
       with self.assertRaises(errors.OutOfRangeError):
         self.evaluate(next_element)
@@ -337,11 +355,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     host_dataset = dataset_ops.Dataset.from_tensors([0, 1, 2, 3])
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0"))
+        prefetching_ops.copy_to_device(device_name))
 
-    with ops.device("/gpu:0"):
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -357,11 +377,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     host_dataset = dataset_ops.Dataset.from_tensors([0, 1, 2, 3])
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0")).prefetch(1)
+        prefetching_ops.copy_to_device(device_name)).prefetch(1)
 
-    with ops.device("/gpu:0"):
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -377,11 +399,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     host_dataset = dataset_ops.Dataset.from_tensors(["a", "b", "c"])
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0"))
+        prefetching_ops.copy_to_device(device_name))
 
-    with ops.device("/gpu:0"):
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -397,11 +421,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     host_dataset = dataset_ops.Dataset.from_tensors(["a", "b", "c"])
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0"))
+        prefetching_ops.copy_to_device(device_name))
 
-    with ops.device("/gpu:0"):
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -417,12 +443,14 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     with compat.forward_compatibility_horizon(2018, 8, 4):
       host_dataset = dataset_ops.Dataset.range(10)
       device_dataset = host_dataset.apply(
-          prefetching_ops.copy_to_device("/gpu:0", source_device="/cpu:0"))
+          prefetching_ops.copy_to_device(device_name, source_device="/cpu:0"))
       back_to_cpu_dataset = device_dataset.apply(
-          prefetching_ops.copy_to_device("/cpu:0", source_device="/gpu:0"))
+          prefetching_ops.copy_to_device("/cpu:0", source_device=device_name))
 
       with ops.device("/cpu:0"):
         iterator = dataset_ops.make_initializable_iterator(back_to_cpu_dataset)
@@ -499,11 +527,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     host_dataset = dataset_ops.Dataset.range(10)
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0"))
+        prefetching_ops.copy_to_device(device_name))
 
-    with ops.device("/gpu:0"):
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -523,11 +553,13 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     host_dataset = dataset_ops.Dataset.range(10)
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0")).prefetch(1)
+        prefetching_ops.copy_to_device(device_name)).prefetch(1)
 
-    with ops.device("/gpu:0"):
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_element = iterator.get_next()
 
@@ -547,10 +579,12 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_name = "/%s:0" % test_util.gpu_device_type()
+
     host_dataset = dataset_ops.Dataset.range(3)
     device_dataset = host_dataset.apply(
-        prefetching_ops.copy_to_device("/gpu:0"))
-    with ops.device("/gpu:0"):
+        prefetching_ops.copy_to_device(device_name))
+    with ops.device(device_name):
       iterator = dataset_ops.make_initializable_iterator(device_dataset)
       next_elem = iterator_ops.get_next_as_optional(iterator)
       elem_has_value_t = next_elem.has_value()

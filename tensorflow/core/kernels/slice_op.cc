@@ -385,4 +385,15 @@ REGISTER_KERNEL_BUILDER(Name("Slice")
 #undef REGISTER_SYCL
 
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Slice")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("input")
+                            .HostMemory("begin")
+                            .HostMemory("size")
+                            .HostMemory("output"),
+                        SliceOp<CPUDevice, int32>);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

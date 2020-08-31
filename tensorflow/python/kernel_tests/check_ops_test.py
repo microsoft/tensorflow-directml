@@ -413,7 +413,6 @@ class AssertNoneEqualTest(test.TestCase):
         check_ops.assert_none_equal(
             t, t, message="This is the error message.", summarize=2)
 
-
 class AssertAllCloseTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes

@@ -35,7 +35,10 @@ from tensorflow.python.ops import variables
 from tensorflow.python.platform import test
 
 # The maximum input rank to test.
-_MAX_RANK = 5
+if test_util.gpu_device_type() == "DML":
+  _MAX_RANK = 4 # DML only supports up to 4D reduction
+else:
+  _MAX_RANK = 5
 
 
 def _powerset(iterable):
@@ -477,6 +480,8 @@ class MeanReductionTest(BaseReductionTest):
       error = gradient_checker.compute_gradient_error(x, [0, 3], y, [0])
       self.assertEqual(error, 0)
 
+  # Degenerate cases are undefined in DML (NaN's are not guaranteed)
+  @test_util.skip_dml()
   @test_util.run_deprecated_v1
   def testDegenerate(self):
     with self.session(use_gpu=True):

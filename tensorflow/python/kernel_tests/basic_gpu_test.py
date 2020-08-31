@@ -54,6 +54,8 @@ class GPUBinaryOpsTest(test.TestCase):
 
     self.assertAllClose(tf_cpu, tf_gpu)
 
+  # TFDML #25508846
+  @test_util.skip_dml
   def testFloatBasic(self):
     x = np.linspace(-5, 20, 15).reshape(1, 3, 5).astype(np.float32)
     y = np.linspace(20, -5, 15).reshape(1, 3, 5).astype(np.float32)
@@ -131,6 +133,8 @@ class MathBuiltinUnaryTest(test.TestCase):
     self._compare(data, np.tanh, math_ops.tanh, use_gpu)
     self._compare(data, np.arctanh, math_ops.atanh, use_gpu)
 
+  # TFDML #25508857
+  @test_util.skip_dml
   def testTypes(self):
     for dtype in [np.float32]:
       self._testDtype(dtype, use_gpu=True)
@@ -240,7 +244,7 @@ class GpuMultiSessionMemoryTest(test_util.TensorFlowTestCase):
     n_iterations = 500
     with session as s:
       data = variables.Variable(1.0)
-      with ops.device('/device:GPU:0'):
+      with test_util.force_gpu():
         random_seed.set_random_seed(1)
         matrix1 = variables.Variable(
             random_ops.truncated_normal([1024, 1]), name='matrix1')

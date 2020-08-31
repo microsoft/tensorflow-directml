@@ -286,6 +286,8 @@ class NormalTest(test.TestCase):
     expected_sf = stats.norm(mu, sigma).logsf(x)
     self.assertAllClose(expected_sf, self.evaluate(sf), atol=0, rtol=1e-5)
 
+  # TFDML #25564220
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testNormalEntropyWithScalarInputs(self):
     # Scipy.stats.norm cannot deal with the shapes in the other test.
@@ -391,6 +393,8 @@ class NormalTest(test.TestCase):
   def testQuantileFiniteGradientAtDifficultPointsFloat64(self):
     self._baseQuantileFiniteGradientAtDifficultPoints(np.float64)
 
+  # TFDML #25564228
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testNormalVariance(self):
     # sigma will be broadcast to [7, 7, 7]

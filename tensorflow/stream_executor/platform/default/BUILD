@@ -28,5 +28,6 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@local_config_cuda//cuda:cuda_headers",
         "@local_config_tensorrt//:tensorrt_headers",
+        "@dml_redist//:headers",
     ],
 )

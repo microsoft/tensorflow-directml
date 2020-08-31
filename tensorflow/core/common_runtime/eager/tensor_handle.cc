@@ -465,10 +465,29 @@ void TensorHandle::Poison(Status status) {
 Status TensorHandle::CopyToDevice(EagerContext* ctx, tensorflow::Device* dstd,
                                   tensorflow::Tensor* output) {
   tensorflow::Device* srcd = DeviceOrHostCPU(ctx);
-  const bool dst_cpu = dstd->tensorflow_gpu_device_info() == nullptr;
-  const bool src_cpu = srcd->tensorflow_gpu_device_info() == nullptr;
-  bool is_same_device =
-      (srcd == dstd) || (srcd->name() == dstd->name()) || (dst_cpu && src_cpu);
+
+  tensorflow::DeviceContext* dst_device_context =
+      dstd->tensorflow_gpu_device_info()
+          ? dstd->tensorflow_gpu_device_info()->default_context
+          : nullptr;
+
+  tensorflow::DeviceContext* src_device_context =
+      srcd->tensorflow_gpu_device_info()
+          ? srcd->tensorflow_gpu_device_info()->default_context
+          : nullptr;
+
+#ifdef TENSORFLOW_USE_DIRECTML
+  if (!dst_device_context) {
+    dst_device_context = dstd->dml_device_context();
+  }
+
+  if (!src_device_context) {
+    src_device_context = srcd->dml_device_context();
+  }
+#endif
+
+  bool is_same_device = (srcd == dstd) || (srcd->name() == dstd->name()) ||
+                        (dst_device_context == src_device_context);
 
   const tensorflow::Tensor* src = nullptr;
   TF_RETURN_IF_ERROR(Tensor(&src));
@@ -476,7 +495,7 @@ Status TensorHandle::CopyToDevice(EagerContext* ctx, tensorflow::Device* dstd,
     *output = *src;
     return Status::OK();
   }
-  if (!dst_cpu && (src->dtype() != tensorflow::DT_VARIANT &&
+  if (!dst_device_context && (src->dtype() != tensorflow::DT_VARIANT &&
                    !tensorflow::DataTypeCanUseMemcpy(src->dtype()))) {
     return tensorflow::errors::InvalidArgument(
         "Can't copy Tensor with type ",
@@ -491,14 +510,6 @@ Status TensorHandle::CopyToDevice(EagerContext* ctx, tensorflow::Device* dstd,
   if (src->shape().num_elements() == 0) {
     *output = dst;
     return Status::OK();
-  }
-  tensorflow::DeviceContext* src_device_context = nullptr;
-  if (!src_cpu) {
-    src_device_context = srcd->tensorflow_gpu_device_info()->default_context;
-  }
-  tensorflow::DeviceContext* dst_device_context = nullptr;
-  if (!dst_cpu) {
-    dst_device_context = dstd->tensorflow_gpu_device_info()->default_context;
   }
   // TODO(ashankar): The Sync() call below may be more aggressive than
   // necessary. It is based on knowledge of implementation details - that

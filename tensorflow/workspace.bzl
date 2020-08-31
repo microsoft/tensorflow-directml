@@ -33,6 +33,7 @@ load("//third_party/opencl_headers:workspace.bzl", opencl_headers = "repo")
 load("//third_party/kissfft:workspace.bzl", kissfft = "repo")
 load("//third_party/keras_applications_archive:workspace.bzl", keras_applications = "repo")
 load("//third_party/pasta:workspace.bzl", pasta = "repo")
+load("//third_party/dml/redist:workspace.bzl", "dml_repository")
 
 def initialize_third_party():
     """ Load third party repositories.  See above load() statements. """
@@ -84,6 +85,14 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     # For windows bazel build
     # TODO: Remove def file filter when TensorFlow can export symbols properly on Windows.
     def_file_filter_configure(name = "local_config_def_file_filter")
+
+    dml_repository(
+        name = "dml_redist",
+        package = "DirectML",
+        version = "1.3.0-dev1",
+        source = "https://pkgs.dev.azure.com/ms/DirectML/_packaging/tensorflow-directml/nuget/v3/index.json",
+        build_file = "//third_party/dml/redist:BUILD.bazel",
+    )
 
     # Point //external/local_config_arm_compiler to //external/arm_compiler
     arm_compiler_configure(
@@ -180,11 +189,11 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     tf_http_archive(
         name = "arm_compiler",
         build_file = clean_dep("//:arm_compiler.BUILD"),
-        sha256 = "4c622a5c7b9feb9615d4723b03a13142a7f3f813f9296861d5401282b9fbea96",
-        strip_prefix = "tools-0e906ebc527eab1cdbf7adabff5b474da9562e9f/arm-bcm2708/arm-rpi-4.9.3-linux-gnueabihf",
+        sha256 = "b9e7d50ffd9996ed18900d041d362c99473b382c0ae049b2fce3290632d2656f",
+        strip_prefix = "rpi-newer-crosstools-eb68350c5c8ec1663b7fe52c742ac4271e3217c5/x64-gcc-6.5.0/arm-rpi-linux-gnueabihf/",
         urls = [
-            "https://storage.googleapis.com/mirror.tensorflow.org/github.com/raspberrypi/tools/archive/0e906ebc527eab1cdbf7adabff5b474da9562e9f.tar.gz",
-            "https://github.com/raspberrypi/tools/archive/0e906ebc527eab1cdbf7adabff5b474da9562e9f.tar.gz",
+            "https://storage.googleapis.com/mirror.tensorflow.org/github.com/rvagg/rpi-newer-crosstools/archive/eb68350c5c8ec1663b7fe52c742ac4271e3217c5.tar.gz",
+            "https://github.com/rvagg/rpi-newer-crosstools/archive/eb68350c5c8ec1663b7fe52c742ac4271e3217c5.tar.gz",
         ],
     )
 
@@ -273,12 +282,12 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     tf_http_archive(
         name = "org_sqlite",
         build_file = clean_dep("//third_party:sqlite.BUILD"),
-        sha256 = "d02fc4e95cfef672b45052e221617a050b7f2e20103661cda88387349a9b1327",
-        strip_prefix = "sqlite-amalgamation-3280000",
+        sha256 = "f3c79bc9f4162d0b06fa9fe09ee6ccd23bb99ce310b792c5145f87fbcc30efca",
+        strip_prefix = "sqlite-amalgamation-3310100",
         system_build_file = clean_dep("//third_party/systemlibs:sqlite.BUILD"),
         urls = [
-            "https://storage.googleapis.com/mirror.tensorflow.org/www.sqlite.org/2019/sqlite-amalgamation-3280000.zip",
-            "https://www.sqlite.org/2019/sqlite-amalgamation-3280000.zip",
+            "https://storage.googleapis.com/mirror.tensorflow.org/www.sqlite.org/2020/sqlite-amalgamation-3310100.zip",
+            "https://www.sqlite.org/2020/sqlite-amalgamation-3310100.zip",
         ],
     )
 
@@ -291,7 +300,7 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
         system_build_file = clean_dep("//third_party/systemlibs:gif.BUILD"),
         urls = [
             "https://storage.googleapis.com/mirror.tensorflow.org/pilotfiber.dl.sourceforge.net/project/giflib/giflib-5.2.1.tar.gz",
-            "http://pilotfiber.dl.sourceforge.net/project/giflib/giflib-5.2.1.tar.gz",
+            "https://pilotfiber.dl.sourceforge.net/project/giflib/giflib-5.2.1.tar.gz",
         ],
     )
 
@@ -499,12 +508,12 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     tf_http_archive(
         name = "curl",
         build_file = clean_dep("//third_party:curl.BUILD"),
-        sha256 = "4376ac72b95572fb6c4fbffefb97c7ea0dd083e1974c0e44cd7e49396f454839",
-        strip_prefix = "curl-7.65.3",
+        sha256 = "01ae0c123dee45b01bbaef94c0bc00ed2aec89cb2ee0fd598e0d302a6b5e0a98",
+        strip_prefix = "curl-7.69.1",
         system_build_file = clean_dep("//third_party/systemlibs:curl.BUILD"),
         urls = [
-            "https://storage.googleapis.com/mirror.tensorflow.org/curl.haxx.se/download/curl-7.65.3.tar.gz",
-            "https://curl.haxx.se/download/curl-7.65.3.tar.gz",
+            "https://storage.googleapis.com/mirror.tensorflow.org/curl.haxx.se/download/curl-7.69.1.tar.gz",
+            "https://curl.haxx.se/download/curl-7.69.1.tar.gz",
         ],
     )
 

@@ -489,12 +489,15 @@ class FunctionalOpsTest(test.TestCase):
       a = variables.Variable(2, dtype=dtypes.float32)
       b = variables.Variable(3, dtype=dtypes.float32)
 
+    gpu_name = test_util.gpu_device_name()
+    gpu_device = "/job:localhost/replica:0/task:0{}".format(gpu_name)
+
     with ops.device("/job:localhost/replica:0/task:0/cpu:0"):
       remote_op = functional_ops.remote_call(
           args=[a, b],
           Tout=[dtypes.float32],
           f=_remote_fn,
-          target="/job:localhost/replica:0/task:0/device:GPU:0")[0] + 3.0
+          target=gpu_device)[0] + 3.0
 
     with self.cached_session() as sess:
       self.evaluate(variables.global_variables_initializer())
@@ -510,11 +513,14 @@ class FunctionalOpsTest(test.TestCase):
     def _remote_fn(a, b):
       return math_ops.multiply(a, b)
 
-    with ops.device("/job:localhost/replica:0/task:0/device:GPU:0"):
+    gpu_name = test_util.gpu_device_name()
+    gpu_device = "/job:localhost/replica:0/task:0{}".format(gpu_name)
+
+    with ops.device(gpu_device):
       a = variables.Variable(2, dtype=dtypes.float32)
       b = variables.Variable(3, dtype=dtypes.float32)
 
-    with ops.device("/job:localhost/replica:0/task:0/device:GPU:0"):
+    with ops.device(gpu_device):
       remote_op = functional_ops.remote_call(
           args=[a, b],
           Tout=[dtypes.float32],
@@ -537,7 +543,7 @@ class FunctionalOpsTest(test.TestCase):
 
     a = array_ops.constant("a")
 
-    with ops.device("/gpu:0"):
+    with ops.device(test_util.gpu_device_name()):
       remote_op = functional_ops.remote_call(
           args=[a], Tout=[dtypes.string], f=_remote_fn, target="/cpu:0")
 
@@ -1021,7 +1027,7 @@ class PartitionedCallTest(test.TestCase):
 
     @function.Defun(*[dtypes.float32] * 2)
     def Body(x, y):
-      with ops.device("/gpu:0"):
+      with ops.device(test_util.gpu_device_name()):
         a = x + x
         b = y + y
       with ops.device("/cpu:0"):
@@ -1108,7 +1114,7 @@ class PartitionedCallTest(test.TestCase):
       v_cpu_one = resource_variable_ops.ResourceVariable(
           [0.0, 1.0, 2.0], name="v_cpu_one")
 
-    with ops.device("/gpu:0"):
+    with ops.device(test_util.gpu_device_name()):
       v_gpu = resource_variable_ops.ResourceVariable(
           [0.0, 1.0, 2.0], name="v_gpu")
 

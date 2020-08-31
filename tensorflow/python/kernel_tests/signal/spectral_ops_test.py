@@ -21,6 +21,7 @@ from __future__ import print_function
 import numpy as np
 
 from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import test_util
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import gradients_impl
 from tensorflow.python.ops import math_ops
@@ -278,6 +279,8 @@ class SpectralOpsTest(test.TestCase):
     loss = math_ops.reduce_sum(magnitude_stft)
     return gradients_impl.gradients([loss], [signal])[0]
 
+  # TFDML #25510668
+  @test_util.skip_dml
   def test_gradients(self):
     """Test that spectral_ops.stft has a working gradient."""
     with spectral_ops_test_util.fft_kernel_label_map(), (

@@ -197,6 +197,8 @@ class ReconstructionOpsTest(test.TestCase):
       self.assertEqual(output.shape, (1, 9))
       self.assertEqual(string_output, self.expected_string)
 
+  # TFDML #25510486
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def test_gradient(self):
     configurations = [
@@ -219,6 +221,8 @@ class ReconstructionOpsTest(test.TestCase):
         gradient = sess.run(gradients_impl.gradients([loss], [signal])[0])
         self.assertTrue((gradient == 1.0).all())
 
+  # TFDML #25510491
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def test_gradient_batch(self):
     with self.session(use_gpu=True) as sess:

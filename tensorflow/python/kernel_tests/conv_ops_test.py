@@ -154,8 +154,8 @@ def GetTestConfigs():
     all the valid test configs as tuples of data_format and use_gpu.
   """
   test_configs = [("NHWC", False), ("NHWC", True)]
-  if test.is_gpu_available(cuda_only=True):
-    # "NCHW" format is only supported on CUDA.
+  if test.is_gpu_available(skip_devices=["SYCL"]):
+    # "NCHW" format is not supported on SYCL.
     test_configs += [("NCHW", True)]
   return test_configs
 
@@ -163,9 +163,13 @@ def GetTestConfigs():
 class Conv2DTest(test.TestCase):
 
   def _DtypesToTest(self, use_gpu):
+    optional_float64 = []
+
     # double datatype is currently not supported for convolution ops
-    # on the ROCm platform
-    optional_float64 = [] if test.is_built_with_rocm() else [dtypes.float64]
+    # on the ROCm platform and DML
+    if not test.is_built_with_rocm() and test_util.gpu_device_type() != "DML":
+      optional_float64.append(dtypes.float64)
+
     if use_gpu and not test_util.GpuSupportsHalfMatMulAndConv():
       return [dtypes.float32] + optional_float64
     else:
@@ -329,7 +333,7 @@ class Conv2DTest(test.TestCase):
                     test_grappler_layout_optimizer=False,
                     tol=1e-5,
                     fp16_tol=1e-3):
-    if gpu_only and not test.is_gpu_available(cuda_only=True):
+    if gpu_only and not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     tensors = []
     dilations = list(dilations)
@@ -822,7 +826,7 @@ class Conv2DTest(test.TestCase):
                                  use_gpu,
                                  err,
                                  dilations=(1, 1)):
-    if use_gpu and not test.is_gpu_available(cuda_only=True):
+    if use_gpu and not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     x1 = self._CreateNumpyTensor(filter_sizes)
     x2 = self._CreateNumpyTensor(output_sizes)
@@ -1274,7 +1278,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2D2x2Depth3ValidBackpropFilterStride1x1Dilation2x1(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropFilterDilation(
             input_sizes=[1, 3, 6, 1],
@@ -1289,7 +1293,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2D2x2Depth1ValidBackpropFilterDilation1x2(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropFilterDilation(
             input_sizes=[1, 2, 3, 1],
@@ -1304,7 +1308,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2DEmptyBackpropFilterDilation1x2(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropFilterDilation(
             input_sizes=[1, 2, 3, 1],
@@ -1319,7 +1323,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2D2x2Depth3ValidBackpropFilterDilation2x2(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropFilterDilation(
             input_sizes=[1, 3, 4, 3],
@@ -1334,7 +1338,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2DKernelSizeMatchesInputSizeBackpropFilterDilation2x2(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropFilterDilation(
             input_sizes=[1, 3, 3, 1],
@@ -1349,7 +1353,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2D2x2Depth3ValidBackpropInputStride1x1Dilation2x1(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropInputDilation(
             input_sizes=[1, 3, 6, 1],
@@ -1364,7 +1368,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2D2x2Depth1ValidBackpropInputDilation1x2(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropInputDilation(
             input_sizes=[1, 2, 3, 1],
@@ -1379,7 +1383,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2DEmptyBackpropInputDilation1x2(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropInputDilation(
             input_sizes=[0, 2, 3, 1],
@@ -1394,7 +1398,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2D2x2Depth3ValidBackpropInputDilation2x1(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         # The GPU version of this test is not very stable. So adjusting the
         # error threshold to 1e-4.
@@ -1411,7 +1415,7 @@ class Conv2DTest(test.TestCase):
 
   @test_util.deprecated_graph_mode_only
   def testConv2DKernelSizeMatchesInputSizeBackpropInputDilation2x2(self):
-    if test.is_gpu_available(cuda_only=True) or test_util.IsMklEnabled():
+    if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
       for (data_format, use_gpu) in GetTestConfigs():
         self._RunAndVerifyBackpropInputDilation(
             input_sizes=[1, 3, 3, 1],
@@ -1434,7 +1438,7 @@ class Conv2DTest(test.TestCase):
                                                 use_gpu,
                                                 dilations=(1, 1),
                                                 err=2e-5):
-    if use_gpu and not test.is_gpu_available(cuda_only=True):
+    if use_gpu and not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     if not use_gpu and dilations != (1, 1):
       return  # Non-default dilations is currently not supported on the CPU.
@@ -1596,7 +1600,7 @@ class Conv2DTest(test.TestCase):
                                                  use_gpu,
                                                  dilations=(1, 1),
                                                  err=1e-5):
-    if use_gpu and not test.is_gpu_available(cuda_only=True):
+    if use_gpu and not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     if not use_gpu and dilations != (1, 1):
       return  # Non-default dilations is currently not supported on the CPU.
@@ -2685,6 +2689,7 @@ class SeparableConv2DTest(test.TestCase):
         expected=expected_output,
         data_format=data_format)
 
+  @test_util.skip_dml  # separable_conv2d is not yet implemented
   def testSeparableConv2D(self):
     self._testSeparableConv2D("NHWC")
 
@@ -2722,10 +2727,12 @@ class SeparableConv2DTest(test.TestCase):
         expected=expected_output,
         data_format=data_format)
 
+  @test_util.skip_dml   # separable_conv2d is not yet implemented
   @test_util.deprecated_graph_mode_only
   def testSeparableConv2DEqualInputOutputDepth(self):
     self._testSeparableConv2DEqualInputOutputDepth("NHWC")
 
+  @test_util.skip_dml   # separable_conv2d is not yet implemented
   def testSeparableConv2DEqualInputOutputDepthNCHW(self):
     if not test.is_gpu_available():
       return

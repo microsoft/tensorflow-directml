@@ -168,6 +168,8 @@ class SparseTensorDenseMatMulTest(test.TestCase):
             sparse_ops.sparse_tensor_dense_matmul(
                 sparse_t, dense_t, adjoint_a=True))
 
+  # TFDML #25510620
+  @test_util.skip_dml
   def testInvalidIndicesForSparseTensorDenseMatmulOnGPU(self):
     # Note: use_gpu=False because nice errors are only returned from CPU kerne
     if not test.is_gpu_available():

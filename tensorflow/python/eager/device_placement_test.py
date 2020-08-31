@@ -33,6 +33,8 @@ class SoftDevicePlacementTest(test.TestCase):
     context.context().soft_device_placement = True
     context.context().log_device_placement = True
 
+  # TFDML #25509642
+  @test_util.skip_dml
   @test_util.run_gpu_only
   def testDefaultPlacement(self):
     a = constant_op.constant(1)
@@ -40,27 +42,33 @@ class SoftDevicePlacementTest(test.TestCase):
     c = a + b
     with ops.device('CPU'):
       d = a + b
-    self.assertIn('GPU', c.device)
+    self.assertIn(test_util.gpu_device_type(), c.device)
     self.assertIn('CPU', d.device)
 
+  # TFDML #25509663
+  @test_util.skip_dml
   @test_util.run_gpu_only
   def testUnsupportedDevice(self):
-    a = constant_op.constant(1)
+    gpu_type = test_util.gpu_device_type()
+    a = constant_op.constant(1.0)
     b = constant_op.constant(2)
     s = constant_op.constant(list('hello world'))
-    with ops.device('GPU:0'):
+    with ops.device('%s:0' % gpu_type):
       c = a + b
       t = s[a]
-    self.assertIn('GPU:0', c.device)
+    self.assertIn('%s:0' % gpu_type, c.device)
     self.assertIn('CPU', t.device)
 
+  # TFDML #25509659
+  @test_util.skip_dml
   @test_util.run_gpu_only
   def testUnknownDevice(self):
+    gpu_type = test_util.gpu_device_type()
     a = constant_op.constant(1)
     b = constant_op.constant(2)
-    with ops.device('GPU:42'):
+    with ops.device('%s:42' % gpu_type):
       c = a + b
-    self.assertIn('GPU:0', c.device)
+    self.assertIn('%s:0' % gpu_type, c.device)
 
   def testNoGpu(self):
     if test_util.is_gpu_available():
@@ -74,15 +82,18 @@ class SoftDevicePlacementTest(test.TestCase):
     self.assertIn('CPU', c.device)
     self.assertIn('CPU', d.device)
 
+  # TFDML #25509650
+  @test_util.skip_dml
   @test_util.run_gpu_only
   def testNestedDeviceScope(self):
+    gpu_type = test_util.gpu_device_type()
     a = constant_op.constant(1)
     b = constant_op.constant(2)
     with ops.device('CPU:0'):
-      with ops.device('GPU:42'):
+      with ops.device('GPU:42' % gpu_type):
         c = a + b
     # We don't support nested device placement right now.
-    self.assertIn('GPU:0', c.device)
+    self.assertIn('%s:0' % gpu_type, c.device)
 
 
 class ClusterPlacementTest(test.TestCase):
@@ -100,12 +111,15 @@ class ClusterPlacementTest(test.TestCase):
       c = a + b
     self.assertIn('/job:worker/replica:0/task:0', c.device)
 
+  # TFDML #25576336
+  @test_util.skip_dml
   def testRemoteUnknownDevice(self):
+    gpu_type = test_util.gpu_device_type()
     a = constant_op.constant(1)
     b = constant_op.constant(2)
     # Right now we don't support soft device place on remote worker.
     with self.assertRaises(errors.InvalidArgumentError) as cm:
-      with ops.device('/job:worker/replica:0/task:0/device:GPU:42'):
+      with ops.device('/job:worker/replica:0/task:0/device:%s:42' % gpu_type):
         c = a + b
         del c
       self.assertIn('unknown device', cm.exception.message)

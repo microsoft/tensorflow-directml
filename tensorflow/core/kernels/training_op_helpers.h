@@ -25,11 +25,18 @@ limitations under the License.
 
 namespace tensorflow {
 
+template <typename Device, typename T>
+void DefaultCopyFunctor(OpKernelContext* ctx, Tensor* dst, const Tensor& src) {
+  functor::DenseUpdate<Device, T, ASSIGN> f;
+  f(ctx->eigen_device<Device>(), dst->flat<T>(), src.flat<T>());
+};
+
 // Must be called before performing a sparse operation on a variable. Ensures
 // that no concurrent dense operations can happen while holding the variable's
 // lock.
-template <typename Device, typename T>
-Status EnsureSparseVariableAccess(OpKernelContext* ctx, Var* var) {
+template <typename CopyFunctor>
+Status EnsureSparseVariableAccess(OpKernelContext* ctx, Var* var,
+                                  CopyFunctor copy_functor) {
   if (var->copy_on_read_mode.load()) {
     return Status::OK();
   }
@@ -43,7 +50,7 @@ Status EnsureSparseVariableAccess(OpKernelContext* ctx, Var* var) {
   }
   PersistentTensor unused;
   Tensor* tmp;
-  if (std::is_same<T, Variant>::value) {
+  if (BaseType(var->tensor()->dtype()) == DT_VARIANT) {
     AllocatorAttributes attr;
     attr.set_on_host(true);
     TF_RETURN_IF_ERROR(ctx->allocate_persistent(
@@ -60,13 +67,16 @@ Status EnsureSparseVariableAccess(OpKernelContext* ctx, Var* var) {
     attr.set_nic_compatible(true);
     TF_RETURN_IF_ERROR(ctx->allocate_persistent(
         var->tensor()->dtype(), var->tensor()->shape(), &unused, &tmp, attr));
-    functor::DenseUpdate<Device, T, ASSIGN> copy_functor;
-    copy_functor(ctx->eigen_device<Device>(), tmp->flat<T>(),
-                 const_cast<const Tensor*>(var->tensor())->flat<T>());
+    copy_functor(ctx, tmp, *var->tensor());
   }
   *var->tensor() = *tmp;
   var->copy_on_read_mode.store(true);
   return Status::OK();
+}
+
+template <typename Device, typename T>
+Status EnsureSparseVariableAccess(OpKernelContext* ctx, Var* var) {
+  return EnsureSparseVariableAccess(ctx, var, &DefaultCopyFunctor<Device, T>);
 }
 
 // Utility structure that releases a sequence of borrowed mutexes when it is
@@ -107,14 +117,15 @@ struct VariableInputLockHolder {
 // If `input` corresponds to a `DT_RESOURCE`-type variable input,
 // `*maybe_resource` will be updated to contain the underlying resource, and the
 // caller will be responsible for calling `Unref()` on that resource.
-template <typename Device, typename T>
+template <typename CopyFunctor>
 mutex* GetTrainingVariableMutex(OpKernelContext* ctx, int input, bool sparse,
-                                Var** maybe_resource) {
+                                Var** maybe_resource,
+                                CopyFunctor copy_functor) {
   *maybe_resource = nullptr;
   if (ctx->input_dtype(input) == DT_RESOURCE) {
     if (LookupResource(ctx, HandleFromInput(ctx, input), maybe_resource).ok()) {
       if (sparse) {
-        EnsureSparseVariableAccess<Device, T>(ctx, *maybe_resource)
+        EnsureSparseVariableAccess(ctx, *maybe_resource, copy_functor)
             .IgnoreError();
       }
       return (*maybe_resource)->mu();
@@ -127,6 +138,13 @@ mutex* GetTrainingVariableMutex(OpKernelContext* ctx, int input, bool sparse,
   return ctx->input_ref_mutex(input);
 }
 
+template <typename Device, typename T>
+mutex* GetTrainingVariableMutex(OpKernelContext* ctx, int input, bool sparse,
+                                Var** maybe_resource) {
+  return GetTrainingVariableMutex(ctx, input, sparse, maybe_resource,
+                                  &DefaultCopyFunctor<Device, T>);
+}
+
 // MaybeLockVariableInputMutexesInOrder is a helper function to acquire mutexes
 // in address order to mitigate deadlock.  Returns a structure that, when
 // deleted, will release the acquired mutexes. Safe to pass duplicates - will
@@ -137,10 +155,10 @@ mutex* GetTrainingVariableMutex(OpKernelContext* ctx, int input, bool sparse,
 // is false, exclusive lock otherwise.  Note that this silently doesn't lock
 // mutexes for invalid variable references; in all usages this is followed by
 // GetInputTensor which will signal a failure.
-template <typename Device, typename T>
+template <typename CopyFunctor>
 VariableInputLockHolder MaybeLockVariableInputMutexesInOrder(
     OpKernelContext* ctx, bool do_lock, bool sparse,
-    const std::vector<int>& input_ids) {
+    const std::vector<int>& input_ids, CopyFunctor copy_functor) {
   bool any_resource = false;
   for (auto i : input_ids) {
     if (ctx->input_dtype(i) == DT_RESOURCE) {
@@ -157,7 +175,7 @@ VariableInputLockHolder MaybeLockVariableInputMutexesInOrder(
   for (auto input : input_ids) {
     Var* var;
     mutex* mutex =
-        GetTrainingVariableMutex<Device, T>(ctx, input, sparse, &var);
+        GetTrainingVariableMutex(ctx, input, sparse, &var, copy_functor);
     if (var) vars.push_back(var);
     // Only lock each mutex once if duplicates exist (n^2 but n is 2 or 3).
     if (std::find(mutexes.begin(), mutexes.end(), mutex) == mutexes.end()) {
@@ -174,7 +192,8 @@ VariableInputLockHolder MaybeLockVariableInputMutexesInOrder(
 
   for (auto input : acquire_order) {
     Var* var;
-    mutex* mu = GetTrainingVariableMutex<Device, T>(ctx, input, sparse, &var);
+    mutex* mu =
+        GetTrainingVariableMutex(ctx, input, sparse, &var, copy_functor);
     core::ScopedUnref scoped_unref(var);
     if (mu != nullptr) {
       if (!sparse || do_lock) {
@@ -188,21 +207,30 @@ VariableInputLockHolder MaybeLockVariableInputMutexesInOrder(
                                  std::move(shared_locks));
 }
 
+template <typename Device, typename T>
+VariableInputLockHolder MaybeLockVariableInputMutexesInOrder(
+    OpKernelContext* ctx, bool do_lock, bool sparse,
+    const std::vector<int>& input_ids) {
+  return MaybeLockVariableInputMutexesInOrder(ctx, do_lock, sparse, input_ids,
+                                              &DefaultCopyFunctor<Device, T>);
+}
+
 void MaybeForwardRefInputToRefOutput(OpKernelContext* ctx, int input,
                                      int output);
 
 // This is for use with ResourceVariables to ensure *tensor has a
 // reference count of 1 before you update it.
 // REQUIRES: If you pass in variable->tensor(), *variable->mu() must be held.
-template <typename Device, typename T>
+template <typename CopyFunctor>
 Status PrepareToUpdateVariable(OpKernelContext* ctx, Tensor* tensor,
-                               bool copy_on_read_mode) {
+                               bool copy_on_read_mode,
+                               CopyFunctor copy_functor) {
   if (copy_on_read_mode || !tensor->RefCountIsOne()) {
     // Tensor's buffer is in use by some read, so we need to copy before
     // updating.
     PersistentTensor unused;
     Tensor* tmp;
-    if (std::is_same<T, Variant>::value) {
+    if (BaseType(tensor->dtype()) == DT_VARIANT) {
       AllocatorAttributes attr;
       attr.set_on_host(true);
       TF_RETURN_IF_ERROR(ctx->allocate_persistent(
@@ -219,13 +247,19 @@ Status PrepareToUpdateVariable(OpKernelContext* ctx, Tensor* tensor,
       attr.set_nic_compatible(true);
       TF_RETURN_IF_ERROR(ctx->allocate_persistent(
           tensor->dtype(), tensor->shape(), &unused, &tmp, attr));
-      functor::DenseUpdate<Device, T, ASSIGN> copy_functor;
-      copy_functor(ctx->eigen_device<Device>(), tmp->flat<T>(),
-                   const_cast<const Tensor*>(tensor)->flat<T>());
+
+      copy_functor(ctx, tmp, *tensor);
     }
     *tensor = *tmp;
   }
   return Status::OK();
+}
+
+template <typename Device, typename T>
+Status PrepareToUpdateVariable(OpKernelContext* ctx, Tensor* tensor,
+                               bool copy_on_read_mode) {
+  return PrepareToUpdateVariable(ctx, tensor, copy_on_read_mode,
+                                 &DefaultCopyFunctor<Device, T>);
 }
 
 // This gives you `*out`, a tensor you can update, corresponding to a variable
@@ -236,24 +270,33 @@ Status PrepareToUpdateVariable(OpKernelContext* ctx, Tensor* tensor,
 // For resource variables we, if sparse is true, ensure it's in copy-on-read
 // mode, and then, regardless of the value of sparse, ensure its refcount is 1
 // (by potentially copying its contents). In this case lock_held is ignored.
-template <typename Device, typename T>
+template <typename CopyFunctor>
 Status GetInputTensorFromVariable(OpKernelContext* ctx, int input,
-                                  bool lock_held, bool sparse, Tensor* out) {
+                                  bool lock_held, bool sparse,
+                                  CopyFunctor copy_functor, Tensor* out) {
   if (ctx->input_dtype(input) == DT_RESOURCE) {
     core::RefCountPtr<Var> var;
     TF_RETURN_IF_ERROR(LookupResource(ctx, HandleFromInput(ctx, input), &var));
     if (sparse) {
-      TF_RETURN_IF_ERROR(EnsureSparseVariableAccess<Device, T>(ctx, var.get()));
+      TF_RETURN_IF_ERROR(
+          EnsureSparseVariableAccess(ctx, var.get(), copy_functor));
       *out = *var->tensor();
       return Status::OK();
     }
-    TF_RETURN_IF_ERROR(PrepareToUpdateVariable<Device, T>(
-        ctx, var->tensor(), var->copy_on_read_mode.load()));
+    TF_RETURN_IF_ERROR(PrepareToUpdateVariable(
+        ctx, var->tensor(), var->copy_on_read_mode.load(), copy_functor));
     *out = *var->tensor();
     return Status::OK();
   }
   *out = ctx->mutable_input(input, lock_held);
   return Status::OK();
+}
+
+template <typename Device, typename T>
+Status GetInputTensorFromVariable(OpKernelContext* ctx, int input,
+                                  bool lock_held, bool sparse, Tensor* out) {
+  return GetInputTensorFromVariable(ctx, input, lock_held, sparse,
+                                    &DefaultCopyFunctor<Device, T>, out);
 }
 
 }  // end namespace tensorflow

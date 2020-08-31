@@ -103,6 +103,8 @@ load("//tensorflow:tensorflow.bzl", "tf_cuda_cc_test")
 load("//tensorflow:tensorflow.bzl", "tf_portable_proto_library")
 load("//tensorflow:tensorflow.bzl", "tf_version_info_genrule")
 
+load("//tensorflow:tensorflow.bzl", "if_cuda_or_dml")
+
 # For platform specific build config
 load(
     "//tensorflow/core/platform:default/build_config.bzl",
@@ -156,6 +158,7 @@ load(
     "if_mkl",
     "mkl_deps",
 )
+load("//third_party/dml:build_defs.bzl", "if_dml")
 # Placeholder for Google-internal load statements.
 
 package(
@@ -1520,7 +1523,7 @@ cc_library(
         ":core_cpu",
         ":gpu_runtime",
         ":sycl_runtime",
-    ],
+    ] + if_dml(["//tensorflow/core/common_runtime/dml:dml_runtime"]),
 )
 
 # This includes implementations of all kernels built into TensorFlow.
@@ -1613,7 +1616,7 @@ cc_library(
         "//tensorflow/core/kernels:mkl_batch_matmul_op",
         "//tensorflow/core/kernels:mkl_matmul_op",
         "//tensorflow/core/kernels:mkl_tfconv_op",
-    ]) + if_cuda([
+    ]) + if_cuda_or_dml([
         "//tensorflow/core/grappler/optimizers:gpu_swapping_kernels",
         "//tensorflow/core/grappler/optimizers:gpu_swapping_ops",
     ]) + if_nccl([
@@ -1621,6 +1624,8 @@ cc_library(
     ]) + if_tensorrt([
         "//tensorflow/compiler/tf2tensorrt:trt_engine_resource_op_kernels",
         "//tensorflow/compiler/tf2tensorrt:trt_op_kernels",
+    ]) + if_dml([
+        "//tensorflow/core/kernels:dml_ops",
     ]),
 )
 

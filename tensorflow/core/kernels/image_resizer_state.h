@@ -163,8 +163,8 @@ struct ImageResizerGradientState {
       : align_corners_(align_corners),
         half_pixel_centers_(half_pixel_centers) {}
 
-  void ValidateAndCreateOutput(OpKernelContext* context, const Tensor& input,
-                               const Tensor& original_image) {
+  void ValidateAndCalculateScales(OpKernelContext* context, const Tensor& input,
+                                  const Tensor& original_image) {
     OP_REQUIRES(
         context,
         !half_pixel_centers_ || (half_pixel_centers_ && !align_corners_),
@@ -203,6 +203,12 @@ struct ImageResizerGradientState {
         CalculateResizeScale(original_height, resized_height, align_corners_);
     width_scale =
         CalculateResizeScale(original_width, resized_width, align_corners_);
+  }
+
+  void ValidateAndCreateOutput(OpKernelContext* context, const Tensor& input,
+                               const Tensor& original_image) {
+    ValidateAndCalculateScales(context, input, original_image);
+    if (!context->status().ok()) return;
     output = nullptr;
     OP_REQUIRES_OK(context, context->allocate_output(
                                 0,

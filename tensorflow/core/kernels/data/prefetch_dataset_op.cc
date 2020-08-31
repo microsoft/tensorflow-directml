@@ -537,6 +537,16 @@ REGISTER_KERNEL_BUILDER(Name("PrefetchDataset")
                             .HostMemory("handle")
                             .Priority(1),
                         PrefetchDatasetOp);
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("PrefetchDataset")
+                            .Device(DEVICE_DML)
+                            .HostMemory("buffer_size")
+                            .HostMemory("input_dataset")
+                            .HostMemory("handle")
+                            .Priority(1),
+                        PrefetchDatasetOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace
 
 }  // namespace data

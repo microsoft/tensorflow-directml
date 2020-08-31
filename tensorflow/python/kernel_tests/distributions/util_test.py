@@ -920,6 +920,11 @@ class SoftplusTest(test.TestCase):
     zero = np.asarray(0).astype(np_features.dtype)
     return np.logaddexp(zero, np_features)
 
+  # DML skips since comparing softplus_inverse(softplus(x)) is mathematically 
+  # equivalent to producing x, but susceptible to calculating softplus_inverse(0) in DML.
+  # DML cannot guarantee softplus doesn't produce 0 for some hardware. This test is already
+  # repeated in kernel_tests/softplus_op_test.py.
+  @test_util.skip_dml
   def _testSoftplus(self, np_features, use_gpu=False):
     np_features = np.asarray(np_features)
     np_softplus = self._npSoftplus(np_features)

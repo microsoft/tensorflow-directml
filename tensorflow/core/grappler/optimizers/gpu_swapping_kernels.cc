@@ -51,10 +51,6 @@ class CopyFromGpuToHostKernel : public AsyncOpKernel {
   }
 };
 
-REGISTER_KERNEL_BUILDER(
-    Name("_CopyFromGpuToHost").Device(DEVICE_GPU).HostMemory("output"),
-    CopyFromGpuToHostKernel);
-
 class CopyFromHostToGpuKernel : public AsyncOpKernel {
  public:
   explicit CopyFromHostToGpuKernel(OpKernelConstruction* context)
@@ -80,9 +76,24 @@ class CopyFromHostToGpuKernel : public AsyncOpKernel {
   }
 };
 
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+REGISTER_KERNEL_BUILDER(
+    Name("_CopyFromGpuToHost").Device(DEVICE_GPU).HostMemory("output"),
+    CopyFromGpuToHostKernel);
 REGISTER_KERNEL_BUILDER(
     Name("_CopyFromHostToGpu").Device(DEVICE_GPU).HostMemory("input"),
     CopyFromHostToGpuKernel);
+#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("_CopyFromGpuToHost").Device(DEVICE_DML).HostMemory("output"),
+    CopyFromGpuToHostKernel);
+REGISTER_KERNEL_BUILDER(
+    Name("_CopyFromHostToGpu").Device(DEVICE_DML).HostMemory("input"),
+    CopyFromHostToGpuKernel);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace
 }  // namespace tensorflow

@@ -203,6 +203,8 @@ class KerasMeanTest(keras_parameterized.TestCase):
     self.assertEqual(m2.dtype, dtypes.float32)
     self.assertEqual(len(m2.variables), 2)
 
+  # DML doesn't support float64
+  @test_util.skip_dml
   def test_mean_with_sample_weight(self):
     m = metrics.Mean(dtype=dtypes.float64)
     self.assertEqual(m.dtype, dtypes.float64)
@@ -1435,7 +1437,12 @@ class MeanTensorTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_invalid_value_shape(self):
-    m = metrics.MeanTensor(dtype=dtypes.float64)
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      m = metrics.MeanTensor(dtype=dtypes.float32)
+    else:
+      m = metrics.MeanTensor(dtype=dtypes.float64)
+
     m([1])
     with self.assertRaisesRegexp(
         ValueError, 'MeanTensor input values must always have the same shape'):
@@ -2100,6 +2107,9 @@ class ResetStatesTest(keras_parameterized.TestCase):
       self.assertEqual(self.evaluate(auc_obj.false_negatives[1]), 25.)
       self.assertEqual(self.evaluate(auc_obj.true_negatives[1]), 25.)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_reset_states_mean_iou(self):
     m_obj = metrics.MeanIoU(num_classes=2)
     model = _get_model([m_obj])

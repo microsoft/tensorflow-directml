@@ -52,7 +52,7 @@ VirtualPlacer::VirtualPlacer(
     default_device_name_ = devices_.begin()->first;
   } else {
     // Default device is set from the devices in the cluster in the following
-    // priority: /gpu:0, /cpu:0, or any device.
+    // priority: /gpu:0 or /dml:0, /cpu:0, or any device.
     // TODO(dyoon): This logic assumes single machine with CPU and GPU devices.
     // Make it more general to support multiple machines, job types, and devices
     // other than CPU and GPU.
@@ -67,7 +67,7 @@ VirtualPlacer::VirtualPlacer(
         // Parsed devices are stored to cpu_devices or gpu_devices map,
         // addressed (and ordered) by device id.
         const auto type = absl::AsciiStrToLower(parsed_name.type);
-        if (type == "gpu") {
+        if (type == "gpu" || type == "dml") {
           gpu_devices[parsed_name.id] = cluster_device_name;
         } else if (type == "cpu") {
           cpu_devices[parsed_name.id] = cluster_device_name;
@@ -148,7 +148,8 @@ string VirtualPlacer::to_lfqn_or_empty(const string& device_name) const {
     parsed_name.job = "localhost";
   }
   if (!parsed) {
-    if (lowercase_name == "gpu" || lowercase_name == "cpu") {
+    if (lowercase_name == "gpu" || lowercase_name == "cpu" ||
+        lowercase_name == "dml") {
       parsed_name.job = "localhost";
       parsed_name.type = lowercase_name;
       parsed = true;

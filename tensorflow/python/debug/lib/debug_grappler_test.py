@@ -61,6 +61,8 @@ class SessionDebugGrapplerInteractionTest(test_util.TensorFlowTestCase):
       shutil.rmtree(self._dump_root)
     super(SessionDebugGrapplerInteractionTest, self).tearDown()
 
+  # TFDML #25509599
+  @test_util.skip_dml
   def testArithmeticOptimizationActive(self):
     """Tests that tfdbg can dump the tensor from nodes created by Grappler."""
     with session.Session(config=_grappler_enabled_session_config()) as sess:

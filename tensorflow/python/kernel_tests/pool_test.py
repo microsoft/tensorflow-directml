@@ -247,54 +247,56 @@ class PoolingTest(test.TestCase):
                     dilation_rate=[1, 1, 1],
                     strides=strides)
 
+  # TFDML #25564273
+  @test_util.skip_dml
+  # "NC*" format is currently not supported on SYCL.
+  @test_util.run_gpu_only(skip_devices=["SYCL"])
   def testPoolNC(self):
-    if test.is_gpu_available(cuda_only=True):
-      # "NC*" format is currently only supported on CUDA.
-      with self.session(use_gpu=True):
-        for padding in ["SAME", "VALID"]:
-          self._test(
-              input_shape=[2, 2, 9],
-              window_shape=[2],
-              padding=padding,
-              pooling_type="MAX",
-              strides=[1],
-              dilation_rate=[1],
-              data_format="NCW")
-          self._test(
-              input_shape=[2, 2, 9],
-              window_shape=[2],
-              padding=padding,
-              pooling_type="MAX",
-              strides=[2],
-              dilation_rate=[1],
-              data_format="NCW")
-          self._test(
-              input_shape=[2, 2, 7, 9],
-              window_shape=[2, 2],
-              padding=padding,
-              pooling_type="MAX",
-              strides=[1, 2],
-              dilation_rate=[1, 1],
-              data_format="NCHW")
-          if test.is_built_with_rocm():
-            # Pooling with 3D tensors is not supported in ROCm
-            continue
-          self._test(
-              input_shape=[2, 2, 7, 5, 3],
-              window_shape=[2, 2, 2],
-              padding=padding,
-              pooling_type="MAX",
-              strides=[1, 2, 1],
-              dilation_rate=[1, 1, 1],
-              data_format="NCDHW")
+    with self.session(use_gpu=True):
+      for padding in ["SAME", "VALID"]:
+        self._test(
+            input_shape=[2, 2, 9],
+            window_shape=[2],
+            padding=padding,
+            pooling_type="MAX",
+            strides=[1],
+            dilation_rate=[1],
+            data_format="NCW")
+        self._test(
+            input_shape=[2, 2, 9],
+            window_shape=[2],
+            padding=padding,
+            pooling_type="MAX",
+            strides=[2],
+            dilation_rate=[1],
+            data_format="NCW")
         self._test(
             input_shape=[2, 2, 7, 9],
             window_shape=[2, 2],
-            padding="VALID",
+            padding=padding,
             pooling_type="MAX",
-            strides=[1, 1],
-            dilation_rate=[2, 2],
+            strides=[1, 2],
+            dilation_rate=[1, 1],
             data_format="NCHW")
+        if test.is_built_with_rocm():
+          # Pooling with 3D tensors is not supported in ROCm
+          continue
+        self._test(
+            input_shape=[2, 2, 7, 5, 3],
+            window_shape=[2, 2, 2],
+            padding=padding,
+            pooling_type="MAX",
+            strides=[1, 2, 1],
+            dilation_rate=[1, 1, 1],
+            data_format="NCDHW")
+      self._test(
+          input_shape=[2, 2, 7, 9],
+          window_shape=[2, 2],
+          padding="VALID",
+          pooling_type="MAX",
+          strides=[1, 1],
+          dilation_rate=[2, 2],
+          data_format="NCHW")
 
   def _test_gradient(self, input_shape, **kwargs):
     x_val = -np.arange(

@@ -688,7 +688,10 @@ class FillTest(test.TestCase):
   def testFillInt32(self):
     np_ans = np.array([[42] * 3] * 2).astype(np.int32)
     self._compareAll([2, 3], np_ans[0][0], np_ans)
-
+    
+  # This test uses negative values, which aren't supported with int64
+  # TFDML #24881131
+  @test_util.skip_dml
   def testFillInt64(self):
     np_ans = np.array([[-42] * 3] * 2).astype(np.int64)
     self._compareAll([2, 3], np_ans[0][0], np_ans)

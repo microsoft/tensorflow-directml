@@ -174,11 +174,11 @@ class ConcatOpTest(test.TestCase):
     with self.assertRaises(ValueError):
       array_ops.concat(1, constant_op.constant(0, shape=[1]))
 
-  def _testGradientsSimple(self, dtype):
+  def _testGradientsSimple(self, dtype, skip_devices=()):
     # Test both positive and negative concat axis.
     # -2 and 1 correspond to the same axis for 3-dimensional tensors.
     for axis in [-2, 1]:
-      with test_util.use_gpu():
+      with test_util.use_gpu(skip_devices=skip_devices):
         inp = []
         inp_tensors = []
         for x in [1, 2, 6]:
@@ -207,7 +207,7 @@ class ConcatOpTest(test.TestCase):
   @test_util.run_deprecated_v1
   def testGradientsSimple(self):
     self._testGradientsSimple(dtypes.float32)
-    self._testGradientsSimple(dtypes.complex64)
+    self._testGradientsSimple(dtypes.complex64, skip_devices=["DML"])
 
   @test_util.run_deprecated_v1
   def testGradientsFirstDim(self):

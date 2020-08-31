@@ -172,6 +172,8 @@ class StringSplitOpTest(test.TestCase):
 
 class StringSplitV2OpTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
+  # TFDML #25510654
+  @test_util.skip_dml
   @parameterized.named_parameters([
       {"testcase_name": "Simple",
        "input": [b"pigs on the wing", b"animals"],

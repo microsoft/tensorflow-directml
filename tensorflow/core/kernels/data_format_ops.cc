@@ -18,10 +18,11 @@ limitations under the License.
 #define EIGEN_USE_THREADS
 
 #include "tensorflow/core/kernels/data_format_ops.h"
-#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
+
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/framework/tensor.h"
+#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
 namespace tensorflow {
 
@@ -234,5 +235,26 @@ TF_CALL_int32(REGISTER_GPU_KERNEL);
 TF_CALL_int64(REGISTER_GPU_KERNEL);
 #undef REGISTER_GPU_KERNEL
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(T)                                   \
+  REGISTER_KERNEL_BUILDER(Name("DataFormatVecPermute")           \
+                              .Device(DEVICE_DML)                \
+                              .HostMemory("x")                   \
+                              .HostMemory("y")                   \
+                              .Label("host")                     \
+                              .TypeConstraint<T>("T"),           \
+                          DataFormatVecPermuteOp<CPUDevice, T>); \
+  REGISTER_KERNEL_BUILDER(Name("DataFormatDimMap")               \
+                              .Device(DEVICE_DML)                \
+                              .HostMemory("x")                   \
+                              .HostMemory("y")                   \
+                              .Label("host")                     \
+                              .TypeConstraint<T>("T"),           \
+                          DataFormatDimMapOp<CPUDevice, T>);
+TF_CALL_int32(REGISTER_DML_KERNEL);
+TF_CALL_int64(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace tensorflow

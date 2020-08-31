@@ -189,4 +189,13 @@ REGISTER_KERNEL_BUILDER(Name("Pack")
                         PackOp<CPUDevice, int32>);
 #undef REGISTER_SYCL
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Pack")
+                            .Device(DEVICE_DML)
+                            .HostMemory("values")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T"),
+                        PackOp<CPUDevice, int32>);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

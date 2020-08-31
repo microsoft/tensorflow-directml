@@ -232,6 +232,14 @@ REGISTER_KERNEL_BUILDER(Name("ExperimentalMapDataset")
                         MapDatasetOp);
 REGISTER_INPUT_COLOCATION_EXEMPTION("MapDataset");
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("ExperimentalMapDataset")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input_dataset")
+                            .HostMemory("handle"),
+                        MapDatasetOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace
 }  // namespace data
 }  // namespace tensorflow

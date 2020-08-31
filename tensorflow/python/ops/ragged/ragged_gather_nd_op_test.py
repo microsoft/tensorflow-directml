@@ -39,6 +39,8 @@ class RaggedGatherNdOpTest(test_util.TensorFlowTestCase,
                       [['100'], ['110', '111', '112'], ['120']],
                       [[], ['210']]]  # pyformat: disable
 
+  # TFDML #25510406
+  @test_util.skip_dml
   @parameterized.parameters([
       #=========================================================================
       # Docstring Examples

@@ -138,4 +138,43 @@ TF_CALL_INTEGRAL_TYPES(REGISTER_SYCL_DEBUG_NUMERIC_SUMMARY_COUNT);
 TF_CALL_float(REGISTER_SYCL_DEBUG_NUMERIC_SUMMARY_COUNT);
 TF_CALL_double(REGISTER_SYCL_DEBUG_NUMERIC_SUMMARY_COUNT);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Copy").Device(DEVICE_DML), CopyOp);
+
+REGISTER_KERNEL_BUILDER(Name("CopyHost")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input")
+                            .HostMemory("output"),
+                        CopyOp);
+
+REGISTER_KERNEL_BUILDER(Name("DebugIdentity")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input")
+                            .HostMemory("output"),
+                        DebugIdentityOp);
+
+#define REGISTER_DML_DEBUG_NAN_COUNT(type)                \
+  REGISTER_KERNEL_BUILDER(Name("DebugNanCount")           \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("input")        \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          DebugNanCountOp<type>);
+REGISTER_DML_DEBUG_NAN_COUNT(Eigen::half);
+REGISTER_DML_DEBUG_NAN_COUNT(float);
+REGISTER_DML_DEBUG_NAN_COUNT(double);
+
+#define REGISTER_DML_DEBUG_NUMERIC_SUMMARY_COUNT(type)    \
+  REGISTER_KERNEL_BUILDER(Name("DebugNumericSummary")     \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("input")        \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          DebugNumericSummaryOp<type>);
+TF_CALL_bool(REGISTER_DML_DEBUG_NUMERIC_SUMMARY_COUNT);
+TF_CALL_INTEGRAL_TYPES(REGISTER_DML_DEBUG_NUMERIC_SUMMARY_COUNT);
+TF_CALL_float(REGISTER_DML_DEBUG_NUMERIC_SUMMARY_COUNT);
+TF_CALL_double(REGISTER_DML_DEBUG_NUMERIC_SUMMARY_COUNT);
+#endif TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

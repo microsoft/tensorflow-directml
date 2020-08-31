@@ -31,6 +31,8 @@ from tensorflow.python.platform import googletest
 class RaggedStackOpTest(test_util.TensorFlowTestCase,
                         parameterized.TestCase):
 
+  # TFDML #25510238
+  @test_util.skip_dml
   @parameterized.parameters(
       dict(
           descr='One rank-2 input (ragged_rank=1), axis=0',

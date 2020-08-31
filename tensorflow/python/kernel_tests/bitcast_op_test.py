@@ -55,6 +55,9 @@ class BitcastTest(test.TestCase):
     shape = [3, 4]
     self._testBitcast(x, x.dtype, shape)
 
+  # TODO: Enable when DML supports int64
+  # TFDML #24755571
+  @test_util.skip_dml
   def testSameSize(self):
     x = np.random.rand(3, 4)
     shape = [3, 4]
@@ -85,6 +88,9 @@ class BitcastTest(test.TestCase):
     datatype = dtypes.quint16
     self._testBitcast(x, datatype, shape)
 
+  # TODO: Enable when DML supports uint64
+  # TFDML #24755571
+  @test_util.skip_dml
   def testUnsignedType(self):
     shape = [3, 4]
     x = np.zeros(shape, np.int64)

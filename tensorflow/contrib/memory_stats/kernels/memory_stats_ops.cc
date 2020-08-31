@@ -64,6 +64,11 @@ REGISTER_KERNEL_BUILDER(
     Name("BytesInUse").Device(DEVICE_SYCL).HostMemory("out"), BytesInUseOp);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("BytesInUse").Device(DEVICE_DML).HostMemory("out"),
+                        BytesInUseOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // Op that measures the total memory (in bytes) of a device.
 class BytesLimitOp : public MemoryStatsOp {
  public:
@@ -85,6 +90,11 @@ REGISTER_KERNEL_BUILDER(Name("BytesLimit").Device(DEVICE_GPU).HostMemory("out"),
 REGISTER_KERNEL_BUILDER(
     Name("BytesLimit").Device(DEVICE_SYCL).HostMemory("out"), BytesLimitOp);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("BytesLimit").Device(DEVICE_DML).HostMemory("out"),
+                        BytesLimitOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 // Op that measures the peak memory in bytes.
 class MaxBytesInUseOp : public MemoryStatsOp {
@@ -110,5 +120,11 @@ REGISTER_KERNEL_BUILDER(
     Name("MaxBytesInUse").Device(DEVICE_SYCL).HostMemory("out"),
     MaxBytesInUseOp);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("MaxBytesInUse").Device(DEVICE_DML).HostMemory("out"),
+    MaxBytesInUseOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace tensorflow

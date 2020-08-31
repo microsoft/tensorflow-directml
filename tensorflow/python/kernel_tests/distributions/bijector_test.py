@@ -232,6 +232,8 @@ class ConstantJacobian(bijector.Bijector):
 class BijectorReduceEventDimsTest(test.TestCase):
   """Test caching with BrokenBijector."""
 
+  # TFDML #25508862
+  @test_util.skip_dml
   def testReduceEventNdimsForward(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian()
@@ -251,6 +253,8 @@ class BijectorReduceEventDimsTest(test.TestCase):
     with self.assertRaisesRegexp(ValueError, "must be larger than"):
       bij.forward_log_det_jacobian(x, event_ndims=0)
 
+  # TFDML #25508862
+  @test_util.skip_dml
   def testReduceEventNdimsInverse(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ExpOnlyJacobian()
@@ -270,6 +274,8 @@ class BijectorReduceEventDimsTest(test.TestCase):
     with self.assertRaisesRegexp(ValueError, "must be larger than"):
       bij.inverse_log_det_jacobian(x, event_ndims=0)
 
+  # TFDML #25508862
+  @test_util.skip_dml
   def testReduceEventNdimsForwardConstJacobian(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ConstantJacobian()
@@ -283,6 +289,8 @@ class BijectorReduceEventDimsTest(test.TestCase):
         -8.,
         self.evaluate(bij.forward_log_det_jacobian(x, event_ndims=2)))
 
+  # TFDML #25508862
+  @test_util.skip_dml
   def testReduceEventNdimsInverseConstJacobian(self):
     x = [[[1., 2.], [3., 4.]]]
     bij = ConstantJacobian()
@@ -296,6 +304,8 @@ class BijectorReduceEventDimsTest(test.TestCase):
         8.,
         self.evaluate(bij.inverse_log_det_jacobian(x, event_ndims=2)))
 
+  # TFDML #25508862
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testHandlesNonStaticEventNdims(self):
     x_ = [[[1., 2.], [3., 4.]]]

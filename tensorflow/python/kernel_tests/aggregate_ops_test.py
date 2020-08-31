@@ -39,10 +39,18 @@ class AddNTest(test.TestCase):
   _MAX_N = 10
 
   def _supported_types(self):
-    if test.is_gpu_available():
+    if test_util.gpu_device_type() == "DML":
       return [
-          dtypes.float16, dtypes.float32, dtypes.float64, dtypes.complex64,
-          dtypes.complex128, dtypes.int64
+        dtypes.float16, dtypes.float32,
+
+        # This test uses negative values, which aren't supported with int64
+        # TFDML #24881131
+        #dtypes.int64
+      ]
+    elif test.is_gpu_available():
+      return [
+        dtypes.float16, dtypes.float32, dtypes.float64, dtypes.complex64,
+        dtypes.complex128, dtypes.int64
       ]
     return [dtypes.int8, dtypes.int16, dtypes.int32, dtypes.int64,
             dtypes.float16, dtypes.float32, dtypes.float64, dtypes.complex64,

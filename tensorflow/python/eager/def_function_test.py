@@ -152,7 +152,6 @@ class DefFunctionTest(test.TestCase):
     self.assertEqual(state[0].numpy(), 2.0)
 
   def testVariableInitializerNotConstant(self):
-
     state = []
 
     @def_function.function
@@ -249,6 +248,8 @@ class DefFunctionTest(test.TestCase):
     self.assertEqual(func().numpy(), 9)
     self.assertEqual(func(y=8).numpy(), 11)
 
+  # TFDML #25562739
+  @test_util.skip_dml
   def test_functools_partial_keywords(self):
     def f(x, y):
       return x + y
@@ -265,6 +266,8 @@ class DefFunctionTest(test.TestCase):
         functools.partial(f, constant_op.constant(1)))
     self.assertAllEqual(func(5), 6)
 
+  # TFDML #25562699
+  @test_util.skip_dml
   def test_complicated_partial_with_defaults(self):
 
     def identity(*args):
@@ -396,7 +399,6 @@ class DefFunctionTest(test.TestCase):
       f(array_ops.zeros(shape=(8, 42, 3)))
 
   def testRuntimeErrorNotSticky(self):
-
     @def_function.function
     def fail(i):
       control_flow_ops.Assert(math_ops.equal(i, 0), ['ick'])
@@ -407,7 +409,6 @@ class DefFunctionTest(test.TestCase):
     fail(constant_op.constant(0))  # OK
 
   def testUnderscoreName(self):
-
     @def_function.function
     def f(_):
       return _ + _

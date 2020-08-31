@@ -188,6 +188,8 @@ class LinearToMelTest(test.TestCase):
         rewritten_graph = test_util.grappler_optimize(g, [mel_matrix])
         self.assertEqual(1, len(rewritten_graph.node))
 
+  # TFDML #25510012
+  @tf_test_util.skip_dml
   @tf_test_util.run_deprecated_v1
   def test_num_spectrogram_bins_dynamic(self):
     with self.session(use_gpu=True):

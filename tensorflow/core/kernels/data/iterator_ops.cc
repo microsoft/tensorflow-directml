@@ -1179,6 +1179,43 @@ REGISTER_KERNEL_BUILDER(Name("DeserializeIterator").Device(DEVICE_CPU),
 
 REGISTER_INPUT_COLOCATION_EXEMPTION("ReduceDataset");
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("IteratorV2").Device(DEVICE_DML).Priority(1),
+                        IteratorHandleOp);
+REGISTER_KERNEL_BUILDER(
+    Name("MakeIterator").Device(DEVICE_DML).Priority(1).HostMemory("dataset"),
+    MakeIteratorOp);
+REGISTER_KERNEL_BUILDER(
+    Name("DeleteIterator").Device(DEVICE_DML).HostMemory("deleter").Priority(1),
+    DeleteIteratorOp);
+REGISTER_KERNEL_BUILDER(
+    Name("AnonymousIterator").Device(DEVICE_DML).Priority(1),
+    AnonymousIteratorHandleOp);
+REGISTER_KERNEL_BUILDER(Name("AnonymousIteratorV2")
+                            .Device(DEVICE_DML)
+                            .HostMemory("deleter")
+                            .Priority(1),
+                        AnonymousIteratorHandleOp);
+REGISTER_KERNEL_BUILDER(Name("IteratorGetNext").Device(DEVICE_DML).Priority(1),
+                        IteratorGetNextOp);
+REGISTER_KERNEL_BUILDER(
+    Name("IteratorGetNextSync").Device(DEVICE_DML).Priority(1),
+    IteratorGetNextSyncOp);
+REGISTER_KERNEL_BUILDER(
+    Name("IteratorGetNextAsOptional").Device(DEVICE_DML).Priority(1),
+    IteratorGetNextAsOptionalOp);
+REGISTER_KERNEL_BUILDER(Name("IteratorToStringHandle")
+                            .Device(DEVICE_DML)
+                            .HostMemory("string_handle")
+                            .Priority(1),
+                        IteratorToStringHandleOp);
+REGISTER_KERNEL_BUILDER(Name("IteratorFromStringHandleV2")
+                            .Device(DEVICE_DML)
+                            .HostMemory("string_handle")
+                            .Priority(1),
+                        IteratorFromStringHandleOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace
 
 }  // namespace data

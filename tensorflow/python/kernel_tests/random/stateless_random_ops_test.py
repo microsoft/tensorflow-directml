@@ -129,6 +129,8 @@ class StatelessOpsTest(test.TestCase):
           yield (functools.partial(stateless.stateless_multinomial, **kwds),
                  functools.partial(random_ops.multinomial, **kwds))
 
+  # DML doesn't implement all distributions/stateful random ops yet
+  @test_util.skip_dml 
   @test_util.run_deprecated_v1
   def testMatchFloat(self):
     self._test_match(self._float_cases())
@@ -141,6 +143,8 @@ class StatelessOpsTest(test.TestCase):
   def testMatchMultinomial(self):
     self._test_match(self._multinomial_cases())
 
+  # DML doesn't implement all distributions/stateful random ops yet
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testDeterminismFloat(self):
     self._test_determinism(

@@ -182,6 +182,8 @@ class CheckpointingTests(test.TestCase):
             optimizer_node.slot_variables[0]
             .slot_variable_node_id].attributes[0].checkpoint_key)
 
+  # TFDML #25997929
+  @test_util.skip_dml_linux
   @test_util.run_in_graph_and_eager_modes
   def testSaveRestore(self):
     model = MyModel()
@@ -254,6 +256,8 @@ class CheckpointingTests(test.TestCase):
     self.assertAllEqual(optimizer_variables[1], self.evaluate(beta2_power))
 
   # TODO(allenl): Debug garbage created by this test in python3.
+  # TFDML #25997929
+  @test_util.skip_dml_linux
   def testDeferredRestorationUsageEager(self):
     """An idiomatic eager execution example."""
     num_training_steps = 10
@@ -466,6 +470,8 @@ class CheckpointingTests(test.TestCase):
       pass  # Make sure we can use this as an op name if we prefix it.
     return named_variable.name
 
+  # TFDML #25997929
+  @test_util.skip_dml_linux
   def testAnonymousVarsInInit(self):
 
     class Model(training.Model):
@@ -495,6 +501,8 @@ class CheckpointingTests(test.TestCase):
         optimizer.apply_gradients(
             [(g, v) for g, v in zip(grad, model.vars)])
 
+  # TFDML #25997929
+  @test_util.skip_dml_linux
   @test_util.run_in_graph_and_eager_modes
   def testDeferredSlotRestoration(self):
     checkpoint_directory = self.get_temp_dir()
@@ -743,6 +751,8 @@ class _ManualScope(tracking.AutoTrackable):
 
 class TemplateTests(test.TestCase):
 
+  # TFDML #25997929
+  @test_util.skip_dml_linux
   @test_util.run_in_graph_and_eager_modes
   def test_trackable_save_restore(self):
 
@@ -891,6 +901,8 @@ class CheckpointCompatibilityTests(test.TestCase):
       with self.assertRaises(AssertionError):
         status.assert_existing_objects_matched()
 
+  # TFDML #25997929
+  @test_util.skip_dml_linux
   def testSaveGraphLoadEager(self):
     checkpoint_directory = self.get_temp_dir()
     checkpoint_prefix = os.path.join(checkpoint_directory, "ckpt")
@@ -906,6 +918,8 @@ class CheckpointCompatibilityTests(test.TestCase):
       root.restore(save_path).assert_consumed()
       self._check_sentinels(root)
 
+  # TFDML #25997929
+  @test_util.skip_dml_linux
   def testSaveEagerLoadGraph(self):
     checkpoint_directory = self.get_temp_dir()
     checkpoint_prefix = os.path.join(checkpoint_directory, "ckpt")

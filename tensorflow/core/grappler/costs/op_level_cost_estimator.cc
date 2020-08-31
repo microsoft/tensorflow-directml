@@ -16,13 +16,14 @@ limitations under the License.
 
 #include "tensorflow/core/grappler/costs/op_level_cost_estimator.h"
 
-#include "third_party/eigen3/Eigen/Core"
+#include "tensorflow/core/common_runtime/dml/dml_adapter_heuristics.h"
 #include "tensorflow/core/framework/attr_value.pb.h"
 #include "tensorflow/core/framework/attr_value_util.h"
 #include "tensorflow/core/framework/tensor.pb.h"
 #include "tensorflow/core/framework/tensor_shape.pb.h"
 #include "tensorflow/core/framework/types.h"
 #include "tensorflow/core/grappler/clusters/utils.h"
+#include "third_party/eigen3/Eigen/Core"
 
 namespace tensorflow {
 namespace grappler {
@@ -528,6 +529,9 @@ DeviceInfo OpLevelCostEstimator::GetDeviceInfo(
     } else {
       gb_per_sec = 100;
     }
+  } else if (device.type() == "DML") {
+    gflops = DmlAdapterArchetype::kComputeFlops / 1e9;
+    gb_per_sec = device.bandwidth() / 1e6;
   }
   VLOG(1) << "Device: " << device.type() << " gflops: " << gflops
           << " gb_per_sec: " << gb_per_sec;

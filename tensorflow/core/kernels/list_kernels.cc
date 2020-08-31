@@ -271,6 +271,14 @@ REGISTER_KERNEL_BUILDER(Name("EmptyTensorList")
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("EmptyTensorList")
+                            .Device(DEVICE_DML)
+                            .HostMemory("element_shape")
+                            .HostMemory("max_num_elements"),
+                        EmptyTensorList);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 class TensorListPushBack : public OpKernel {
  public:
   explicit TensorListPushBack(OpKernelConstruction* c) : OpKernel(c) {

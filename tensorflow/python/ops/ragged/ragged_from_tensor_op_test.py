@@ -32,6 +32,8 @@ from tensorflow.python.platform import googletest
 class RaggedTensorToSparseOpTest(test_util.TensorFlowTestCase,
                                  parameterized.TestCase):
 
+  # TFDML #25564352
+  @test_util.skip_dml
   def testDocStringExamples(self):
     # The examples from RaggedTensor.from_tensor.__doc__.
     dt = constant_op.constant([[5, 7, 0], [0, 3, 0], [6, 0, 0]])
@@ -51,6 +53,8 @@ class RaggedTensorToSparseOpTest(test_util.TensorFlowTestCase,
         RaggedTensor.from_tensor(dt_3d, lengths=([2, 0, 3], [1, 1, 2, 0, 1])),
         [[[5], [7]], [], [[6, 0], [], [0]]])
 
+  # TFDML #25654613
+  @test_util.skip_dml
   @parameterized.parameters(
       # 2D test cases, no length or padding.
       {
@@ -321,6 +325,8 @@ class RaggedTensorToSparseOpTest(test_util.TensorFlowTestCase,
         '%s is incompatible with %s' % (dt.shape, rt.shape))
     self.assertAllEqual(rt, expected)
 
+  # TFDML #25654643
+  @test_util.skip_dml
   def testHighDimensions(self):
     # Use distinct prime numbers for all dimension shapes in this test, so
     # we can see any errors that are caused by mixing up dimension sizes.

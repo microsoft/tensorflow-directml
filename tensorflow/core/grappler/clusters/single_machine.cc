@@ -100,6 +100,14 @@ Status SingleMachine::Provision() {
                                    tf_gpu_id.value(), ": ", s.ToString());
       }
       attr = GetLocalGPUInfo(platform_gpu_id);
+    } else if (dev.device_type() == "DML") {
+      DeviceNameUtils::ParsedName parsed;
+      if (!DeviceNameUtils::ParseFullName(dev.name(), &parsed)) {
+        return errors::InvalidArgument(
+            strings::StrCat("Not able to parse DML device name: ", dev.name()));
+      }
+
+      attr = GetDeviceInfo(parsed);
     } else if (dev.device_type().find("XLA") == string::npos) {
       // Filter out the fake XLA devices to avoid double counting the actual
       // hardware resources that are available.

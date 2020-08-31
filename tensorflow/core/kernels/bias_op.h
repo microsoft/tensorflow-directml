@@ -19,6 +19,8 @@ limitations under the License.
 
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/tensor_types.h"
+#include "tensorflow/core/framework/tensor.h"
+#include "tensorflow/core/util/tensor_format.h"
 
 namespace tensorflow {
 namespace functor {
@@ -50,6 +52,13 @@ struct Bias {
 };
 
 }  // namespace functor
+
+void GetBiasValueDims(const TensorShape& value_tensor, TensorFormat data_format,
+                      int32* batch, int32* height, int32* width, int32* depth,
+                      int32* channel);
+void GetBiasValueDims(const Tensor& value_tensor, TensorFormat data_format,
+                      int32* batch, int32* height, int32* width, int32* depth,
+                      int32* channel);
 }  // namespace tensorflow
 
 #endif  // TENSORFLOW_CORE_KERNELS_BIAS_OP_H_

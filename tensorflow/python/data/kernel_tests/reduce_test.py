@@ -192,6 +192,8 @@ class ReduceTest(test_base.DatasetTestBase, parameterized.TestCase):
     self.assertEqual(self.evaluate(fn()), b"hello")
     self.assertEqual(self.evaluate(counter_var), 4)
 
+  # TFDML #25564515
+  @test_util.skip_dml
   def testStateOnGPU(self):
     if not test_util.is_gpu_available():
       self.skipTest("No GPUs available.")

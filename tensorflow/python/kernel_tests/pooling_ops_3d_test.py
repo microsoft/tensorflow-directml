@@ -36,8 +36,8 @@ def GetTestConfigs():
     all the valid test configs as tuples of data_format and use_gpu.
   """
   test_configs = [("NDHWC", False), ("NDHWC", True)]
-  if test.is_gpu_available(cuda_only=True):
-    # "NCHW" format is currently supported exclusively on CUDA GPUs.
+  if test.is_gpu_available(skip_devices=["SYCL"]):
+    # "NCHW" format is currently not supported on SYCL GPUs.
     test_configs += [("NCDHW", True)]
   return test_configs
 
@@ -92,6 +92,8 @@ class PoolingTest(test.TestCase):
       self._VerifyOneTest(pool_func, input_sizes, window, strides, padding,
                           data_format, expected, use_gpu)
 
+  # TFDML #25510219
+  @test_util.skip_dml
   def testAvgPool3dValidPadding(self):
     expected_output = [20.5, 21.5, 22.5]
     self._VerifyValues(
@@ -102,6 +104,8 @@ class PoolingTest(test.TestCase):
         padding="VALID",
         expected=expected_output)
 
+  # TFDML #25510208
+  @test_util.skip_dml
   def testAvgPool3dSamePadding(self):
     expected_output = [20.5, 21.5, 22.5, 26.5, 27.5, 28.5]
     self._VerifyValues(
@@ -112,6 +116,8 @@ class PoolingTest(test.TestCase):
         padding="SAME",
         expected=expected_output)
 
+  # TFDML #25510215
+  @test_util.skip_dml
   def testAvgPool3dSamePaddingDifferentStrides(self):
     expected_output = [1.5, 4.5, 7.5, 17.5, 20.5, 23.5, 33.5, 36.5, 39.5]
     self._VerifyValues(
@@ -315,6 +321,8 @@ class PoolingTest(test.TestCase):
                                               use_gpu=use_gpu,
                                               **kwargs)
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradValidPadding1_1_3d(self):
     self._ConstructAndTestGradient(
@@ -325,6 +333,8 @@ class PoolingTest(test.TestCase):
         strides=(1, 1, 1),
         padding="VALID")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradValidPadding2_1_6_3d(self):
     self._ConstructAndTestGradient(
@@ -335,6 +345,8 @@ class PoolingTest(test.TestCase):
         strides=(1, 1, 1),
         padding="VALID")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradValidPadding2_1_7_3d(self):
     self._ConstructAndTestGradient(
@@ -345,6 +357,8 @@ class PoolingTest(test.TestCase):
         strides=(1, 1, 1),
         padding="VALID")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradValidPadding1_2_3d(self):
     self._ConstructAndTestGradient(
@@ -355,6 +369,8 @@ class PoolingTest(test.TestCase):
         strides=(2, 2, 2),
         padding="VALID")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradValidPadding2_2_3d(self):
     self._ConstructAndTestGradient(
@@ -365,6 +381,8 @@ class PoolingTest(test.TestCase):
         strides=(2, 2, 2),
         padding="VALID")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradSamePadding1_1_3d(self):
     self._ConstructAndTestGradient(
@@ -375,6 +393,8 @@ class PoolingTest(test.TestCase):
         strides=(1, 1, 1),
         padding="SAME")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradSamePadding1_2_3d(self):
     self._ConstructAndTestGradient(
@@ -385,6 +405,8 @@ class PoolingTest(test.TestCase):
         strides=(2, 2, 2),
         padding="SAME")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradSamePadding2_1_3d(self):
     self._ConstructAndTestGradient(
@@ -395,6 +417,8 @@ class PoolingTest(test.TestCase):
         strides=(1, 1, 1),
         padding="SAME")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradSamePadding2_2_3d(self):
     self._ConstructAndTestGradient(
@@ -405,6 +429,8 @@ class PoolingTest(test.TestCase):
         strides=(2, 2, 2),
         padding="SAME")
 
+  # TFDML #25307194
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradSamePadding3_1_3d(self):
     self._ConstructAndTestGradient(

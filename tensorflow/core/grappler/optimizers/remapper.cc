@@ -315,7 +315,16 @@ bool IsGpuCompatible(const RemapperContext& ctx,
 }
 bool IsGpuCompatible(const RemapperContext& ctx,
                      const ContractionWithBiasAdd& matched) {
-  return false;
+  const GraphDef* graph = ctx.graph_view.graph();
+  const NodeDef& contraction_node = graph->node(matched.contraction);
+  string task, device;
+
+  bool is_on_dml = DeviceNameUtils::SplitDeviceName(contraction_node.device(),
+                                                    &task, &device) &&
+                   absl::StartsWith(device, DEVICE_DML);
+
+  return is_on_dml && IsConv2D(contraction_node) &&
+         IsGpuCompatibleConv2D(&contraction_node);
 }
 bool IsGpuCompatible(const RemapperContext& ctx,
                      const ContractionWithSqueezeAndBiasAdd& matched) {

@@ -320,8 +320,12 @@ class XlogyTest(test.TestCase):
       xlogy_xgrad, xlogy_ygrad = self._xlogy_gradients(x, y)
       xlogy_expected_xgrad = self.evaluate(math_ops.log(y))
       xlogy_expected_ygrad = self.evaluate(x / y)
-      self.assertAllClose(xlogy_expected_xgrad, xlogy_xgrad)
-      self.assertAllClose(xlogy_expected_ygrad, xlogy_ygrad)
+      if test_util.gpu_device_type() == "DML":
+        self.assertAllCloseAccordingToType(xlogy_expected_xgrad, xlogy_xgrad)
+        self.assertAllCloseAccordingToType(xlogy_expected_ygrad, xlogy_ygrad)
+      else:
+        self.assertAllClose(xlogy_expected_xgrad, xlogy_xgrad)
+        self.assertAllClose(xlogy_expected_ygrad, xlogy_ygrad)
 
   @test_util.run_deprecated_v1
   def testZeroXGrad(self):

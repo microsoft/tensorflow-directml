@@ -50,6 +50,10 @@ load(
     "//third_party/ngraph:build_defs.bzl",
     "if_ngraph",
 )
+load(
+    "//third_party/dml:build_defs.bzl",
+    "if_dml",
+)
 
 def register_extension_info(**kwargs):
     pass
@@ -58,7 +62,7 @@ def register_extension_info(**kwargs):
 # not contain rc or alpha, only numbers.
 # Also update tensorflow/core/public/version.h
 # and tensorflow/tools/pip_package/setup.py
-VERSION = "1.15.0"
+VERSION = "1.15.3"
 VERSION_MAJOR = VERSION.split(".")[0]
 
 def if_v2(a):
@@ -298,6 +302,7 @@ def tf_copts(
         if_mkl_v1_open_source_only(["-DENABLE_MKLDNN_V1"]) +
         if_enable_mkl(["-DENABLE_MKL"]) +
         if_ngraph(["-DINTEL_NGRAPH=1"]) +
+        if_dml(["-DTENSORFLOW_USE_DIRECTML"]) +
         if_android_arm(["-mfpu=neon"]) +
         if_linux_x86_64(["-msse3"]) +
         if_ios_x86_64(["-msse4.1"]) +
@@ -973,6 +978,7 @@ def tf_cc_test(
         data = [],
         linkstatic = 0,
         extra_copts = [],
+        allow_exceptions = False,
         suffix = "",
         linkopts = [],
         kernels = [],
@@ -980,7 +986,7 @@ def tf_cc_test(
     native.cc_test(
         name = "%s%s" % (name, suffix),
         srcs = srcs + tf_binary_additional_srcs(),
-        copts = tf_copts() + extra_copts,
+        copts = tf_copts(allow_exceptions=allow_exceptions) + extra_copts,
         linkopts = select({
             clean_dep("//tensorflow:android"): [
                 "-pie",
@@ -1164,6 +1170,39 @@ def tf_cuda_only_cc_test(*args, **kwargs):
 register_extension_info(
     extension_name = "tf_cuda_only_cc_test",
     label_regex_for_dep = "{extension_name}_gpu",
+)
+
+def tf_dml_cc_test(
+        name,
+        srcs = [],
+        deps = [],
+        tags = [],
+        data = [],
+        size = "medium",
+        extra_copts = [],
+        allow_exceptions = False,
+        linkstatic = 0,
+        args = [],
+        kernels = [],
+        linkopts = []):
+    tf_cc_test(
+        name = name,
+        srcs = srcs,
+        deps = deps,
+        tags = tags + ["dml"],
+        data = data,
+        size = size,
+        extra_copts = extra_copts,
+        linkstatic = linkstatic,
+        allow_exceptions = allow_exceptions,
+        args = args,
+        kernels = kernels,
+        linkopts = linkopts
+    )
+
+register_extension_info(
+    extension_name = "tf_dml_cc_test",
+    label_regex_for_dep = "{extension_name}",
 )
 
 # Create a cc_test for each of the tensorflow tests listed in "tests"
@@ -1973,7 +2012,7 @@ def tf_py_wrap_cc(
             "-Wno-sign-compare",
             "-Wno-write-strings",
         ]),
-        linkopts = extra_linkopts,
+        linkopts = extra_linkopts + if_dml(["-Wl,-L/mnt/c/Windows/System32/lxss/lib"]),
         linkstatic = 1,
         deps = deps + extra_deps,
         **kwargs
@@ -2546,6 +2585,35 @@ def if_cuda_or_rocm(if_true, if_false = []):
         "@local_config_cuda//cuda:using_nvcc": if_true,
         "@local_config_cuda//cuda:using_clang": if_true,
         "@local_config_rocm//rocm:using_hipcc": if_true,
+        "//conditions:default": if_false,
+    })
+
+def if_cuda_or_dml(if_true, if_false = []):
+    """Shorthand for select()'ing whether to build for either CUDA or DML.
+
+      Returns a select statement which evaluates to
+         if_true if we're building with either CUDA or DML enabled.
+         if_false, otherwise.
+
+      Sometimes a target has additional CUDA or DML specific dependencies.
+      The `if_cuda` / `if_dml` functions are used to specify these additional
+      dependencies.
+
+      If the same additional dependency is needed for both CUDA and DML,
+      then specifying that dependency in both  both `if_cuda` and `if_dml` will
+      result in both those functions returning a select statement, which contains
+      the same dependency, which then leads to a duplicate dependency bazel error.
+
+      In order to work around this error, any additional dependency that is common
+      to both the CUDA and DML platforms, should be specified using this function.
+      Doing so will eliminate the cause of the bazel error (i.e. the  same
+      dependency showing up in two different select statements)
+
+      """
+    return select({
+        "@local_config_cuda//cuda:using_nvcc": if_true,
+        "@local_config_cuda//cuda:using_clang": if_true,
+        str(Label("//third_party/dml:using_dml")): if_true,
         "//conditions:default": if_false,
     })
 

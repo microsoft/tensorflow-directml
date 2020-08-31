@@ -44,7 +44,7 @@ class ExtractImagePatches(test.TestCase):
     rates = [1] + rates + [1]
 
     out_tensor = array_ops.extract_image_patches(
-        constant_op.constant(image),
+        constant_op.constant(image, dtype=np.float32),
         ksizes=ksizes,
         strides=strides,
         rates=rates,

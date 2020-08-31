@@ -902,6 +902,8 @@ int GetCudaVersion(const Cluster& cluster) {
   auto devices = cluster.GetDevices();
   for (const auto& device : devices) {
     const DeviceProperties& device_properties = device.second;
+    // TODO #26542950: Enable Tensorcore specific grappler optimizations
+    // TFDML #26542950
     if (device_properties.type() == "GPU") {
       const auto& device_env = device_properties.environment();
       auto it = device_env.find("cuda");
@@ -1072,6 +1074,9 @@ bool AutoMixedPrecisionImpl::IsOnGPU(const NodeDef& node) const {
   }
   string device;
   string not_used;
+  
+  // TODO #26542950: Enable Tensorcore specific grappler optimizations
+  // TFDML #26542950
   if (DeviceNameUtils::SplitDeviceName(device_name, &not_used, &device) &&
       absl::StrContains(absl::AsciiStrToLower(device),
                         absl::AsciiStrToLower(DEVICE_GPU))) {
@@ -1083,6 +1088,8 @@ bool AutoMixedPrecisionImpl::IsOnGPU(const NodeDef& node) const {
 // Returns the GPU architecture (compute capability) as a (major, minor) pair.
 std::pair<int, int> GetDeviceGPUArch(
     const DeviceProperties& device_properties) {
+  // TODO #26542950: Enable Tensorcore specific grappler optimizations
+  // TFDML #26542950
   if (device_properties.type() != "GPU") return {0, 0};
   string arch_str = device_properties.environment().at("architecture");
   std::vector<string> split_arch_str = str_util::Split(arch_str, '.');
@@ -1778,6 +1785,8 @@ Status AutoMixedPrecisionImpl::ChangeTypeAttrsAndAddCasts(
 int GetNumGPUs(const Cluster& cluster,
                const std::pair<int, int>& min_arch = {0, 0}) {
   auto devices = cluster.GetDevices();
+  // TODO #26542950: Enable Tensorcore specific grappler optimizations
+  // TFDML #26542950
   int num_gpus = 0;
   for (const auto& device : devices) {
     const DeviceProperties& device_properties = device.second;

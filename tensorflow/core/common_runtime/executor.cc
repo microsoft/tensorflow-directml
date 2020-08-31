@@ -2215,7 +2215,20 @@ bool ExecutorState::NodeDone(const Status& s, const Node* node,
   nodestats::SetAllEnd(stats);
   if (stats) {
     if (stats_collector_) {
+#if TENSORFLOW_USE_DIRECTML
+      const auto& physical_device_desc =
+          impl_->params_.device->attributes().physical_device_desc();
+      if (!physical_device_desc.empty()) {
+        auto device_name = absl::StrCat(impl_->params_.device->name(), " (",
+                                        physical_device_desc, ")");
+        stats->Done(device_name);
+      }
+      else {
+        stats->Done(impl_->params_.device->name());
+      }
+#else
       stats->Done(impl_->params_.device->name());
+#endif
     } else {
       delete stats;
     }

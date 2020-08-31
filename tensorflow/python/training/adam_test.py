@@ -110,6 +110,8 @@ class AdamOptimizerTest(test.TestCase):
   def testResourceSparse(self):
     self.doTestSparse(use_resource=True)
 
+  # TFDML #25571890
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSparseDevicePlacement(self):
     for index_dtype in [dtypes.int32, dtypes.int64]:
@@ -159,7 +161,14 @@ class AdamOptimizerTest(test.TestCase):
     if context.executing_eagerly() and not use_resource:
       self.skipTest(
           "Skipping test with use_resource=False and executing eagerly.")
-    for i, dtype in enumerate([dtypes.half, dtypes.float32, dtypes.float64]):
+
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == "DML":
+      data_types = [dtypes.half, dtypes.float32]
+    else:
+      data_types = [dtypes.half, dtypes.float32, dtypes.float64]
+
+    for i, dtype in enumerate(data_types):
       with self.session(graph=ops.Graph()):
         # Initialize variables for numpy implementation.
         m0, v0, m1, v1 = 0.0, 0.0, 0.0, 0.0
@@ -233,8 +242,17 @@ class AdamOptimizerTest(test.TestCase):
           var1_np, m1, v1 = adam_update_numpy(var1_np, grads1_np, t, m1, v1)
 
           # Validate updated params
-          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
-          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
+          if test_util.gpu_device_type() == "DML":
+            self.assertAllCloseAccordingToType(var0_np,
+                                               self.evaluate(var0),
+                                               half_rtol=1e-2)
+            self.assertAllCloseAccordingToType(var1_np,
+                                               self.evaluate(var1),
+                                               half_rtol=1e-2)
+          else:
+            self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
+            self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
+
           if use_resource:
             self.assertEqual("var0_%d/Adam:0" % (i,),
                              opt.get_slot(var=var0, name="m").name)
@@ -336,23 +354,26 @@ class AdamOptimizerTest(test.TestCase):
   def testTwoSessions(self):
     optimizer = adam.AdamOptimizer()
 
+    # DML doesn't support float64
+    dtype = np.float32 if test_util.gpu_device_type() == "DML" else np.float64
+
     with context.eager_mode():
-      var0 = variables.Variable(np.array([1.0, 2.0]), name="v0")
-      grads0 = constant_op.constant(np.array([0.1, 0.1]))
+      var0 = variables.Variable(np.array([1.0, 2.0], dtype=dtype), name="v0")
+      grads0 = constant_op.constant(np.array([0.1, 0.1], dtype=dtype))
       optimizer.apply_gradients([(grads0, var0)])
 
     g = ops.Graph()
     with g.as_default():
       with session.Session():
-        var0 = variables.Variable(np.array([1.0, 2.0]), name="v0")
-        grads0 = constant_op.constant(np.array([0.1, 0.1]))
+        var0 = variables.Variable(np.array([1.0, 2.0], dtype=dtype), name="v0")
+        grads0 = constant_op.constant(np.array([0.1, 0.1], dtype=dtype))
         optimizer.apply_gradients([(grads0, var0)])
 
     gg = ops.Graph()
     with gg.as_default():
       with session.Session():
-        var0 = variables.Variable(np.array([1.0, 2.0]), name="v0")
-        grads0 = constant_op.constant(np.array([0.1, 0.1]))
+        var0 = variables.Variable(np.array([1.0, 2.0], dtype=dtype), name="v0")
+        grads0 = constant_op.constant(np.array([0.1, 0.1], dtype=dtype))
 
         # If the optimizer saves any state not keyed by graph the following line
         # fails.

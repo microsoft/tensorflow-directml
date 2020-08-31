@@ -180,6 +180,21 @@ REGISTER_KERNEL_BUILDER(Name("OptionalGetValue").Device(DEVICE_CPU).Priority(2),
 REGISTER_KERNEL_BUILDER(Name("OptionalGetValue").Device(DEVICE_GPU).Priority(1),
                         OptionalGetValueOp);
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("OptionalNone").Device(DEVICE_DML).Priority(1),
+                        OptionalNoneOp);
+REGISTER_KERNEL_BUILDER(
+    Name("OptionalFromValue").Device(DEVICE_DML).Priority(1),
+    OptionalFromValueOp);
+REGISTER_KERNEL_BUILDER(Name("OptionalHasValue")
+                            .Device(DEVICE_DML)
+                            .HostMemory("has_value")
+                            .Priority(1),
+                        OptionalHasValueOp);
+REGISTER_KERNEL_BUILDER(Name("OptionalGetValue").Device(DEVICE_DML).Priority(1),
+                        OptionalGetValueOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace
 
 REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,

@@ -313,11 +313,13 @@ class DepthToSpaceTest(test.TestCase):
     self.compareToTranspose(5, 7, 11, 3, 2, "NCHW", True)
     self.compareToTranspose(3, 200, 300, 32, 2, "NCHW", True)
 
-    self.compareToTranspose(3, 2, 3, 8, 2, "NCHW_VECT_C", True)
-    self.compareToTranspose(3, 2, 3, 4, 3, "NCHW_VECT_C", True)
-    self.compareToTranspose(3, 2, 3, 8, 3, "NCHW_VECT_C", True)
-    self.compareToTranspose(5, 7, 11, 12, 2, "NCHW_VECT_C", True)
-    self.compareToTranspose(3, 200, 300, 32, 2, "NCHW_VECT_C", True)
+    # DML doesn't support NCHW_VECT_C
+    if test_util.gpu_device_type() != "DML":
+      self.compareToTranspose(3, 2, 3, 8, 2, "NCHW_VECT_C", True)
+      self.compareToTranspose(3, 2, 3, 4, 3, "NCHW_VECT_C", True)
+      self.compareToTranspose(3, 2, 3, 8, 3, "NCHW_VECT_C", True)
+      self.compareToTranspose(5, 7, 11, 12, 2, "NCHW_VECT_C", True)
+      self.compareToTranspose(3, 200, 300, 32, 2, "NCHW_VECT_C", True)
 
 
 class DepthToSpaceGradientTest(test.TestCase):

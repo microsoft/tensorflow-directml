@@ -33,6 +33,8 @@ from tensorflow.python.platform import googletest
 class RaggedTileOpTest(test_util.TensorFlowTestCase,
                        parameterized.TestCase):
 
+  # TFDML #25564432
+  @test_util.skip_dml
   @parameterized.parameters([
       #=========================================================================
       # Docstring Example

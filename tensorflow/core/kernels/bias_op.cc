@@ -23,9 +23,7 @@ limitations under the License.
 #include "tensorflow/core/framework/numeric_op.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
-#include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/kernels/redux_functor.h"
-#include "tensorflow/core/util/tensor_format.h"
 
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 #include "tensorflow/core/kernels/bias_op_gpu.h"
@@ -43,9 +41,7 @@ typedef Eigen::GpuDevice GPUDevice;
 typedef Eigen::SyclDevice SYCLDevice;
 #endif  // TENSORFLOW_USE_SYCL
 
-namespace {
-
-void GetBiasValueDims(const Tensor& value_tensor, TensorFormat data_format,
+void GetBiasValueDims(const TensorShape& value_tensor, TensorFormat data_format,
                       int32* batch, int32* height, int32* width, int32* depth,
                       int32* channel) {
   *batch = 1;
@@ -72,6 +68,14 @@ void GetBiasValueDims(const Tensor& value_tensor, TensorFormat data_format,
   }
 }
 
+void GetBiasValueDims(const Tensor& value_tensor, TensorFormat data_format,
+                      int32* batch, int32* height, int32* width, int32* depth,
+                      int32* channel) {
+  GetBiasValueDims(value_tensor.shape(), data_format, batch, height, width,
+                   depth, channel);
+}
+
+namespace {
 template <class T>
 struct AccumulatorType {
   typedef T type;

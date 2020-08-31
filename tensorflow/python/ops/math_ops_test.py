@@ -100,7 +100,10 @@ class LogSumExpTest(test_util.TensorFlowTestCase):
       with self.cached_session(use_gpu=True):
         y_tf_np = math_ops.reduce_logsumexp(x_np).eval()
         y_np = log(np.sum(exp(x_np)))
-        self.assertAllClose(y_tf_np, y_np)
+        if test_util.gpu_device_type() == "DML" and dtype == np.float16:
+          self.assertAllClose(y_tf_np, y_np, rtol=1e-3)
+        else:
+          self.assertAllClose(y_tf_np, y_np)
 
   def testReductionIndices(self):
     for dtype in [np.float16, np.float32, np.double]:
@@ -110,7 +113,10 @@ class LogSumExpTest(test_util.TensorFlowTestCase):
         y_np = log(np.sum(exp(x_np), axis=0))
         self.assertShapeEqual(y_np, y_tf)
         y_tf_np = self.evaluate(y_tf)
-        self.assertAllClose(y_tf_np, y_np)
+        if test_util.gpu_device_type() == "DML" and dtype == np.float16:
+          self.assertAllClose(y_tf_np, y_np, rtol=1e-3)
+        else:
+          self.assertAllClose(y_tf_np, y_np)
 
   def testReductionIndices2(self):
     for dtype in [np.float16, np.float32, np.double]:
@@ -120,7 +126,10 @@ class LogSumExpTest(test_util.TensorFlowTestCase):
         y_np = log(np.sum(exp(x_np), axis=0))
         self.assertShapeEqual(y_np, y_tf)
         y_tf_np = self.evaluate(y_tf)
-        self.assertAllClose(y_tf_np, y_np)
+        if test_util.gpu_device_type() == "DML" and dtype == np.float16:
+          self.assertAllClose(y_tf_np, y_np, rtol=1e-3)
+        else:
+          self.assertAllClose(y_tf_np, y_np)
 
   @test_util.run_deprecated_v1
   def testKeepDims(self):
@@ -130,7 +139,10 @@ class LogSumExpTest(test_util.TensorFlowTestCase):
         y_tf_np = math_ops.reduce_logsumexp(x_np, keepdims=True).eval()
         self.assertEqual(y_tf_np.ndim, x_np.ndim)
         y_np = log(np.sum(exp(x_np), keepdims=True))
-        self.assertAllClose(y_tf_np, y_np)
+        if test_util.gpu_device_type() == "DML" and dtype == np.float16:
+          self.assertAllClose(y_tf_np, y_np, rtol=1e-3)
+        else:
+          self.assertAllClose(y_tf_np, y_np)
 
   @test_util.run_deprecated_v1
   def testOverflow(self):
@@ -148,7 +160,10 @@ class LogSumExpTest(test_util.TensorFlowTestCase):
         x_tf = constant_op.constant(x_np, shape=x_np.shape)
         y_tf_np = math_ops.reduce_logsumexp(x_tf).eval()
         y_np = log(np.sum(exp(x_np - max_np))) + max_np
-        self.assertAllClose(y_tf_np, y_np)
+        if test_util.gpu_device_type() == "DML" and dtype == np.float16:
+          self.assertAllClose(y_tf_np, y_np, rtol=1e-3)
+        else:
+          self.assertAllClose(y_tf_np, y_np)
 
   @test_util.run_deprecated_v1
   def testUnderflow(self):
@@ -555,7 +570,10 @@ class DivNoNanTest(test_util.TensorFlowTestCase):
 
       with self.cached_session(use_gpu=True):
         tf_result = math_ops.div_no_nan(nums, divs).eval()
-        self.assertAllEqual(tf_result, np_result)
+        if test_util.gpu_device_type() == "DML":
+          self.assertAllClose(tf_result, np_result, rtol=1e-6, atol=1e-6)
+        else:
+          self.assertAllEqual(tf_result, np_result)
 
 
 class MultiplyNoNanTest(test_util.TensorFlowTestCase):
@@ -584,7 +602,10 @@ class XlogyTest(test_util.TensorFlowTestCase):
       with self.cached_session(use_gpu=True):
         xlogy = self.evaluate(math_ops.xlogy(x, y))
         xtimeslogy = self.evaluate(x * math_ops.log(y))
-        self.assertAllClose(xlogy, xtimeslogy)
+        if test_util.gpu_device_type() == "DML":
+          self.assertAllCloseAccordingToType(xlogy, xtimeslogy)
+        else:
+          self.assertAllClose(xlogy, xtimeslogy)
 
   @test_util.run_in_graph_and_eager_modes
   def testXlogyWithZero(self):

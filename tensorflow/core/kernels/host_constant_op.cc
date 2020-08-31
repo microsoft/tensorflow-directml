@@ -62,6 +62,14 @@ REGISTER_KERNEL_BUILDER(Name("Const")
                         _HostConstantOp);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Const")
+                            .Device(DEVICE_DML)
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("dtype"),
+                        _HostConstantOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // HostConst: forced to generate output on the host.
 REGISTER_KERNEL_BUILDER(Name("HostConst").Device(DEVICE_CPU), _HostConstantOp);
 REGISTER_KERNEL_BUILDER(

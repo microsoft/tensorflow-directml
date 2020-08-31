@@ -341,11 +341,15 @@ class TrainingTest(keras_parameterized.TestCase):
       self.assertEqual(labels.dtype, preds.dtype)
       return labels - preds
 
-    layers = [keras.layers.Dense(10, dtype=np.float64),
-              keras.layers.Dense(10, dtype=np.float64)]
+    # DML doesn't support float64
+    dtype = (np.float32 if tf_test_util.gpu_device_type() == 'DML'
+             else np.float64)
+
+    layers = [keras.layers.Dense(10, dtype=dtype),
+              keras.layers.Dense(10, dtype=dtype)]
     model = testing_utils.get_model_from_layers(layers, input_shape=(1,))
-    inputs = np.ones(10, dtype=np.float64)
-    targets = np.ones(10, dtype=np.float64)
+    inputs = np.ones(10, dtype=dtype)
+    targets = np.ones(10, dtype=dtype)
     model.compile(
         'sgd',
         loss=_loss_fn,
@@ -353,7 +357,7 @@ class TrainingTest(keras_parameterized.TestCase):
         experimental_run_tf_function=testing_utils.should_run_tf_function())
     model.train_on_batch(inputs, targets)
     model.test_on_batch(inputs, targets)
-    self.assertEqual(model.predict(inputs).dtype, np.float64)
+    self.assertEqual(model.predict(inputs).dtype, dtype)
 
   @keras_parameterized.run_all_keras_modes
   def test_fit_and_validate_nested_training_arg(self):

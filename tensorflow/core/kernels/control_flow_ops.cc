@@ -55,43 +55,30 @@ void SwitchNOp::Compute(OpKernelContext* context) {
 REGISTER_KERNEL_BUILDER(
     Name("Switch").Device(DEVICE_DEFAULT).HostMemory("pred"), SwitchOp);
 
-#define REGISTER_CPU_SWITCH(type)                         \
+#define REGISTER_SWITCH(type, dev)                        \
   REGISTER_KERNEL_BUILDER(Name("Switch")                  \
-                              .Device(DEVICE_CPU)         \
+                              .Device(DEVICE_##dev)       \
                               .HostMemory("pred")         \
                               .TypeConstraint<type>("T"), \
                           SwitchOp)                       \
   REGISTER_KERNEL_BUILDER(Name("_SwitchN")                \
-                              .Device(DEVICE_CPU)         \
+                              .Device(DEVICE_##dev)       \
                               .HostMemory("output_index") \
                               .TypeConstraint<type>("T"), \
                           SwitchNOp)
 
-#define REGISTER_CPU_REF_SWITCH(type)                     \
+#define REGISTER_REF_SWITCH(type, dev)                    \
   REGISTER_KERNEL_BUILDER(Name("RefSwitch")               \
-                              .Device(DEVICE_CPU)         \
+                              .Device(DEVICE_##dev)       \
                               .HostMemory("pred")         \
                               .TypeConstraint<type>("T"), \
                           SwitchOp)
 
-#define REGISTER_GPU_SWITCH(type)                         \
-  REGISTER_KERNEL_BUILDER(Name("Switch")                  \
-                              .Device(DEVICE_GPU)         \
-                              .HostMemory("pred")         \
-                              .TypeConstraint<type>("T"), \
-                          SwitchOp)                       \
-  REGISTER_KERNEL_BUILDER(Name("_SwitchN")                \
-                              .Device(DEVICE_GPU)         \
-                              .HostMemory("output_index") \
-                              .TypeConstraint<type>("T"), \
-                          SwitchNOp)
+#define REGISTER_CPU_SWITCH(type) REGISTER_SWITCH(type, CPU)
+#define REGISTER_CPU_REF_SWITCH(type) REGISTER_REF_SWITCH(type, CPU)
 
-#define REGISTER_GPU_REF_SWITCH(type)                     \
-  REGISTER_KERNEL_BUILDER(Name("RefSwitch")               \
-                              .Device(DEVICE_GPU)         \
-                              .HostMemory("pred")         \
-                              .TypeConstraint<type>("T"), \
-                          SwitchOp)
+#define REGISTER_GPU_SWITCH(type) REGISTER_SWITCH(type, GPU)
+#define REGISTER_GPU_REF_SWITCH(type) REGISTER_REF_SWITCH(type, GPU)
 
 TF_CALL_ALL_TYPES(REGISTER_CPU_SWITCH);
 TF_CALL_ALL_TYPES(REGISTER_CPU_REF_SWITCH);
@@ -106,6 +93,8 @@ TF_CALL_QUANTIZED_TYPES(REGISTER_GPU_REF_SWITCH);
 REGISTER_GPU_SWITCH(uint64);
 TF_CALL_variant(REGISTER_GPU_SWITCH);
 
+#undef REGISTER_SWITCH
+#undef REGISTER_REF_SWITCH
 #undef REGISTER_CPU_SWITCH
 #undef REGISTER_CPU_REF_SWITCH
 #undef REGISTER_GPU_SWITCH
@@ -203,6 +192,76 @@ REGISTER_SYCL_HOST_REF_KERNEL(tstring);
 #undef REGISTER_SYCL_HOST_KERNEL
 #undef REGISTER_SYCL_HOST_REF_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML_SWITCH(type)                         \
+  REGISTER_KERNEL_BUILDER(Name("Switch")                  \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("pred")         \
+                              .TypeConstraint<type>("T"), \
+                          SwitchOp)                       \
+  REGISTER_KERNEL_BUILDER(Name("_SwitchN")                \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("output_index") \
+                              .TypeConstraint<type>("T"), \
+                          SwitchNOp)
+
+#define REGISTER_DML_REF_SWITCH(type)                     \
+  REGISTER_KERNEL_BUILDER(Name("RefSwitch")               \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("pred")         \
+                              .TypeConstraint<type>("T"), \
+                          SwitchOp)
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_SWITCH);
+TF_CALL_QUANTIZED_TYPES(REGISTER_DML_SWITCH);
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_REF_SWITCH);
+TF_CALL_QUANTIZED_TYPES(REGISTER_DML_REF_SWITCH);
+REGISTER_DML_SWITCH(uint64);
+TF_CALL_variant(REGISTER_DML_SWITCH);
+
+#undef REGISTER_DML_SWITCH
+#undef REGISTER_DML_REF_SWITCH
+
+#define REGISTER_DML_HOST_KERNEL(type)                    \
+  REGISTER_KERNEL_BUILDER(Name("Switch")                  \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("pred")         \
+                              .HostMemory("output_false") \
+                              .HostMemory("output_true")  \
+                              .TypeConstraint<type>("T"), \
+                          SwitchOp)                       \
+  REGISTER_KERNEL_BUILDER(Name("_SwitchN")                \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("output_index") \
+                              .HostMemory("outputs")      \
+                              .TypeConstraint<type>("T"), \
+                          SwitchNOp)
+
+#define REGISTER_DML_HOST_REF_KERNEL(type)                \
+  REGISTER_KERNEL_BUILDER(Name("RefSwitch")               \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("pred")         \
+                              .HostMemory("output_false") \
+                              .HostMemory("output_true")  \
+                              .TypeConstraint<type>("T"), \
+                          SwitchOp)
+
+REGISTER_DML_HOST_KERNEL(int32);
+REGISTER_DML_HOST_REF_KERNEL(int32);
+REGISTER_DML_HOST_KERNEL(bool);
+REGISTER_DML_HOST_REF_KERNEL(bool);
+REGISTER_DML_HOST_KERNEL(tstring);
+REGISTER_DML_HOST_REF_KERNEL(tstring);
+REGISTER_DML_HOST_KERNEL(ResourceHandle);
+
+#undef REGISTER_DML_HOST_KERNEL
+#undef REGISTER_DML_HOST_REF_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class RefSelectOp : public OpKernel {
  public:
@@ -330,6 +389,36 @@ TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_SYCL_REF_KERNEL);
 #undef REGISTER_SYCL_REF_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
 
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML_KERNEL(type)                         \
+  REGISTER_KERNEL_BUILDER(Name("Merge")                   \
+                              .Device(DEVICE_DML)         \
+                              .TypeConstraint<type>("T")  \
+                              .HostMemory("value_index"), \
+                          MergeOp);
+
+#define REGISTER_DML_REF_KERNEL(type)                     \
+  REGISTER_KERNEL_BUILDER(Name("RefMerge")                \
+                              .Device(DEVICE_DML)         \
+                              .TypeConstraint<type>("T")  \
+                              .HostMemory("value_index"), \
+                          MergeOp);
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_REF_KERNEL);
+TF_CALL_QUANTIZED_TYPES(REGISTER_DML_KERNEL);
+TF_CALL_QUANTIZED_TYPES(REGISTER_DML_REF_KERNEL);
+REGISTER_DML_KERNEL(bool);
+REGISTER_DML_REF_KERNEL(bool);
+REGISTER_DML_KERNEL(uint64);
+TF_CALL_variant(REGISTER_DML_KERNEL);
+
+#undef REGISTER_DML_KERNEL
+#undef REGISTER_DML_REF_KERNEL
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // Special GPU kernels for int32 and string.
 // TODO(b/25387198): Also enable int32 in device memory. This kernel
 // registration requires all int32 inputs and outputs to be in host memory.
@@ -378,6 +467,30 @@ REGISTER_SYCL_HOST_KERNEL(ResourceHandle);
 
 #undef REGISTER_SYCL_HOST_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_HOST_KERNEL(type)                    \
+  REGISTER_KERNEL_BUILDER(Name("Merge")                   \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("inputs")       \
+                              .HostMemory("output")       \
+                              .HostMemory("value_index")  \
+                              .TypeConstraint<type>("T"), \
+                          MergeOp);                       \
+  REGISTER_KERNEL_BUILDER(Name("RefMerge")                \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("inputs")       \
+                              .HostMemory("output")       \
+                              .HostMemory("value_index")  \
+                              .TypeConstraint<type>("T"), \
+                          MergeOp)
+
+REGISTER_DML_HOST_KERNEL(int32);
+REGISTER_DML_HOST_KERNEL(tstring);
+REGISTER_DML_HOST_KERNEL(ResourceHandle);
+
+#undef REGISTER_DML_HOST_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
 
 void EnterOp::Compute(OpKernelContext* context) {
   if (IsRefType(context->input_dtype(0))) {
@@ -446,6 +559,48 @@ REGISTER_SYCL_HOST_KERNEL(ResourceHandle);
 #undef REGISTER_SYCL_HOST_KERNEL
 #undef REGISTER_SYCL_HOST_REF_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
+
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML_KERNEL(type) \
+  REGISTER_KERNEL_BUILDER(        \
+      Name("Enter").Device(DEVICE_DML).TypeConstraint<type>("T"), EnterOp)
+#define REGISTER_DML_REF_KERNEL(type) \
+  REGISTER_KERNEL_BUILDER(            \
+      Name("RefEnter").Device(DEVICE_DML).TypeConstraint<type>("T"), EnterOp)
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_REF_KERNEL);
+REGISTER_DML_KERNEL(bool);
+REGISTER_DML_REF_KERNEL(bool);
+TF_CALL_variant(REGISTER_DML_KERNEL);
+
+#undef REGISTER_DML_KERNEL
+#undef REGISTER_DML_REF_KERNEL
+
+#define REGISTER_DML_HOST_KERNEL(type)                    \
+  REGISTER_KERNEL_BUILDER(Name("Enter")                   \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          EnterOp)
+
+#define REGISTER_DML_HOST_REF_KERNEL(type)                \
+  REGISTER_KERNEL_BUILDER(Name("RefEnter")                \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          EnterOp)
+
+REGISTER_DML_HOST_KERNEL(int32);
+REGISTER_DML_HOST_REF_KERNEL(int32);
+REGISTER_DML_HOST_KERNEL(tstring);
+REGISTER_DML_HOST_REF_KERNEL(tstring);
+REGISTER_DML_HOST_KERNEL(ResourceHandle);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 // Special GPU kernels for int32 and string.
 // TODO(b/25387198): Also enable int32 in device memory. This kernel
@@ -532,6 +687,43 @@ REGISTER_SYCL_HOST_KERNEL(int32);
 REGISTER_SYCL_HOST_KERNEL(tstring);
 #undef REGISTER_SYCL_HOST_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
+
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML_KERNEL(type) \
+  REGISTER_KERNEL_BUILDER(        \
+      Name("Exit").Device(DEVICE_DML).TypeConstraint<type>("T"), ExitOp);
+#define REGISTER_DML_REF_KERNEL(type) \
+  REGISTER_KERNEL_BUILDER(            \
+      Name("RefExit").Device(DEVICE_DML).TypeConstraint<type>("T"), ExitOp);
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_REF_KERNEL);
+REGISTER_DML_KERNEL(bool);
+REGISTER_DML_REF_KERNEL(bool);
+TF_CALL_variant(REGISTER_DML_KERNEL);
+
+#undef REGISTER_DML_KERNEL
+#undef REGISTER_DML_REF_KERNEL
+
+#define REGISTER_DML_HOST_KERNEL(type)                    \
+  REGISTER_KERNEL_BUILDER(Name("Exit")                    \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          ExitOp);                        \
+  REGISTER_KERNEL_BUILDER(Name("RefExit")                 \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          ExitOp)
+
+REGISTER_DML_HOST_KERNEL(int32);
+REGISTER_DML_HOST_KERNEL(tstring);
+REGISTER_DML_HOST_KERNEL(ResourceHandle);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 // Special GPU kernels for int32 and string.
 // TODO(b/25387198): Also enable int32 in device memory. This kernel
@@ -637,6 +829,42 @@ REGISTER_SYCL_HOST_KERNEL(int32);
 REGISTER_SYCL_HOST_KERNEL(tstring);
 #undef REGISTER_SYCL_HOST_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
+
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML_KERNEL(type)                                            \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name("NextIteration").Device(DEVICE_DML).TypeConstraint<type>("T"),    \
+      NextIterationOp);                                                      \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name("RefNextIteration").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      NextIterationOp)
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+REGISTER_DML_KERNEL(bool);
+TF_CALL_variant(REGISTER_DML_KERNEL);
+
+#undef REGISTER_DML_KERNEL
+
+#define REGISTER_DML_HOST_KERNEL(type)                    \
+  REGISTER_KERNEL_BUILDER(Name("NextIteration")           \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          NextIterationOp);               \
+  REGISTER_KERNEL_BUILDER(Name("RefNextIteration")        \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("data")         \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          NextIterationOp)
+
+REGISTER_DML_HOST_KERNEL(int32);
+REGISTER_DML_HOST_KERNEL(tstring);
+REGISTER_DML_HOST_KERNEL(ResourceHandle);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 LoopCondOp::LoopCondOp(OpKernelConstruction* context) : OpKernel(context) {}
 LoopCondOp::~LoopCondOp() = default;

@@ -274,4 +274,17 @@ REGISTER_KERNEL_BUILDER(
     Name("ConsumeMutexLock").Device(DEVICE_GPU).HostMemory("mutex_lock"),
     ConsumeMutexLockOp);
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("MutexLock")
+                            .Device(DEVICE_DML)
+                            .HostMemory("mutex_lock")
+                            .HostMemory("mutex"),
+                        MutexLockOp);
+REGISTER_KERNEL_BUILDER(Name("MutexV2").Device(DEVICE_DML),
+                        ResourceHandleOp<Mutex>);
+REGISTER_KERNEL_BUILDER(
+    Name("ConsumeMutexLock").Device(DEVICE_DML).HostMemory("mutex_lock"),
+    ConsumeMutexLockOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace tensorflow

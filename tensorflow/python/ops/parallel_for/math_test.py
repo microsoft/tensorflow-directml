@@ -71,6 +71,8 @@ class MathTest(PForTestCase):
 
       self._test_loop_fn(loop_fn, 3, loop_fn_dtypes=output_dtypes)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_unary_cwise_complex_ops(self):
     complex_ops = [
         math_ops.angle,
@@ -81,6 +83,8 @@ class MathTest(PForTestCase):
     ]
     self._test_unary_cwise_ops(complex_ops, True)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_unary_cwise_real_ops_1(self):
     real_ops = [
         lambda x: math_ops.acosh(1 + math_ops.square(x)),
@@ -108,6 +112,8 @@ class MathTest(PForTestCase):
     ]
     self._test_unary_cwise_ops(real_ops, False)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_unary_cwise_real_ops_2(self):
     real_ops = [
         math_ops.neg,
@@ -133,6 +139,8 @@ class MathTest(PForTestCase):
     ]
     self._test_unary_cwise_ops(real_ops, False)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_unary_cwise_no_grad(self):
     for op in [math_ops.ceil,
                math_ops.floor,
@@ -149,6 +157,8 @@ class MathTest(PForTestCase):
 
       self._test_loop_fn(loop_fn, 3, loop_fn_dtypes=x.dtype)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_binary_cwise_ops(self):
     logical_ops = [
         math_ops.logical_and,
@@ -218,6 +228,8 @@ class MathTest(PForTestCase):
 
       self._test_loop_fn(loop_fn, 3, loop_fn_dtypes=output_dtypes)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_approximate_equal(self):
     x = random_ops.random_uniform([3, 5])
     y = random_ops.random_uniform([3, 5])
@@ -229,6 +241,8 @@ class MathTest(PForTestCase):
 
     self._test_loop_fn(loop_fn, 3, loop_fn_dtypes=[dtypes.bool])
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_addn(self):
     x = random_ops.random_uniform([2, 3, 5])
     y = random_ops.random_uniform([3, 5])
@@ -239,7 +253,10 @@ class MathTest(PForTestCase):
       return math_ops.add_n([x1, y, z])
 
     self._test_loop_fn(loop_fn, 2)
-
+  
+  # DML doesn't have a kernel for _Arg
+  # TFDML #25591293
+  @test_util.skip_dml
   def test_cross(self):
     x = random_ops.random_uniform([4, 2, 3])
     y = random_ops.random_uniform([4, 2, 3])
@@ -252,6 +269,8 @@ class MathTest(PForTestCase):
 
     self._test_loop_fn(loop_fn, 4, loop_fn_dtypes=[dtypes.float32] * 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_matmul(self):
     for tr_a in (True, False):
       for tr_b in (True, False):
@@ -277,6 +296,8 @@ class MathTest(PForTestCase):
 
             self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_batch_matmul(self):
     for tr_a in (True, False):
       for tr_b in (True, False):
@@ -302,6 +323,8 @@ class MathTest(PForTestCase):
 
             self._test_loop_fn(loop_fn, 2)
 
+  # DML doesn't support 5D for some of the ops used in this test
+  @test_util.skip_dml
   def test_batch_matmul_broadcast(self):
     if not compat.forward_compatible(2019, 4, 25):
       self.skipTest("Skipping test for future functionality.")
@@ -325,6 +348,8 @@ class MathTest(PForTestCase):
             # pylint: enable=cell-var-from-loop
             self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_reduction(self):
     x = random_ops.random_uniform([2, 3, 4, 5])
     for op in [
@@ -343,6 +368,8 @@ class MathTest(PForTestCase):
 
           self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_boolean_reduction(self):
     x = random_ops.random_uniform([2, 3, 4, 5]) > 0.5
     for op in [math_ops.reduce_any, math_ops.reduce_all]:
@@ -358,6 +385,8 @@ class MathTest(PForTestCase):
 
           self._test_loop_fn(loop_fn, 2, loop_fn_dtypes=[dtypes.bool])
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_cum_sum(self):
     x = random_ops.random_uniform([2, 3, 4, 5])
     for axis in (1, -2):
@@ -374,6 +403,8 @@ class MathTest(PForTestCase):
 
           self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_cum_prod(self):
     x = random_ops.random_uniform([2, 3, 4, 5])
     for axis in (1, -2):
@@ -390,6 +421,8 @@ class MathTest(PForTestCase):
 
           self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_bias_add(self):
     for data_format in ("NCHW", "NHWC"):
       for stacked_value in (True, False):
@@ -431,7 +464,10 @@ class MathTest(PForTestCase):
             out_dtypes = out_dtypes + [dtypes.int32]
           self._test_loop_fn(
               loop_fn, 2, loop_fn_dtypes=out_dtypes)
-
+              
+  # DML doesn't have a kernel for _Arg
+  # TFDML #25591293
+  @test_util.skip_dml
   def test_unsorted_segment_sum(self):
     t = random_ops.random_uniform([3, 3, 2])
     for segment_ids_dtype in (dtypes.int32, dtypes.int64):
@@ -463,7 +499,10 @@ class MathTest(PForTestCase):
 
     self._test_loop_fn(
         loop_fn, 2, loop_fn_dtypes=[dtypes.float32, dtypes.int32])
-
+        
+  # DML doesn't have a kernel for _Arg
+  # TFDML #25591293
+  @test_util.skip_dml
   def test_tanh_axpy(self):
     a = constant_op.constant(3.)
     x = random_ops.random_uniform([4, 5])
@@ -474,7 +513,10 @@ class MathTest(PForTestCase):
       return math_ops.tanh(a * array_ops.gather(x, i) + array_ops.gather(y, i))
 
     self._test_loop_fn(loop_fn, n)
-
+    
+  # DML doesn't have a kernel for _Arg
+  # TFDML #25591293
+  @test_util.skip_dml
   def test_select(self):
     a = random_ops.random_uniform([2, 3, 5])
     b = random_ops.random_uniform([2, 3, 5])
@@ -492,6 +534,8 @@ class MathTest(PForTestCase):
 
       self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_selectv2_cond_needs_broadcast(self):
     a = random_ops.random_uniform([2, 3, 5])
     b = random_ops.random_uniform([2, 3, 5])
@@ -512,6 +556,8 @@ class MathTest(PForTestCase):
 
       self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_selectv2_args_need_broadcast(self):
     a = random_ops.random_uniform([2, 5])
     b = random_ops.random_uniform([2, 3, 5])
@@ -532,6 +578,8 @@ class MathTest(PForTestCase):
 
       self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_selectv2_cond_fixed(self):
     cond = random_ops.random_uniform([3, 5]) > 0.5
     b = random_ops.random_uniform([2, 3, 5])
@@ -555,6 +603,8 @@ class MathTest(PForTestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class LinalgTest(PForTestCase):
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_cholesky(self):
     z = random_ops.random_normal([2, 3, 3])
     x = (math_ops.matmul(z, array_ops.matrix_transpose(z))  # Ensure pos. def.
@@ -565,6 +615,8 @@ class LinalgTest(PForTestCase):
 
     self._test_loop_fn(loop_fn, 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_log_matrix_determinant(self):
     x = random_ops.random_normal([3, 4, 2, 2])
 
@@ -573,6 +625,8 @@ class LinalgTest(PForTestCase):
 
     self._test_loop_fn(loop_fn, 3, loop_fn_dtypes=[dtypes.float32] * 2)
 
+  # TFDML #25509983
+  @test_util.skip_dml
   def test_matrix_triangular_solve(self):
     for lower in (True, False):
       for adjoint in (True, False):

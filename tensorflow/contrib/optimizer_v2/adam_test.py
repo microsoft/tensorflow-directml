@@ -107,6 +107,8 @@ class AdamOptimizerTest(test.TestCase):
   def testResourceSparse(self):
     self.doTestSparse(use_resource=True)
 
+  # TFDML #25561492
+  @test_util.skip_dml
   def testSparseDevicePlacement(self):
     for index_dtype in [dtypes.int32, dtypes.int64]:
       with self.cached_session(force_gpu=test.is_gpu_available()):

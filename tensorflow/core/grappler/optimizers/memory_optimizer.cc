@@ -741,7 +741,8 @@ Status BuildSwapPair(NodeDef* node, int input_to_swap,
                      std::pair<NodeDef*, NodeDef*>* swap_pair) {
   string task, device;
   if (!DeviceNameUtils::SplitDeviceName(node->device(), &task, &device) ||
-      !absl::StrContains(device, DEVICE_GPU)) {
+      !absl::StrContains(device, DEVICE_GPU) &&
+          !absl::StrContains(device, DEVICE_DML)) {
     return errors::InvalidArgument("Can't swap input ", input_to_swap,
                                    " of node ", node->name(),
                                    " since it is not on GPU");
@@ -988,7 +989,7 @@ static bool IdentifySwappingCandidates(
   for (const auto& device : devices) {
     const string& name = device.first;
     const DeviceProperties& prop = device.second;
-    if (prop.type() != "GPU") {
+    if (prop.type() != "GPU" && prop.type() != "DML") {
       continue;
     }
     if (prop.memory_size() <= 0) {
@@ -1271,6 +1272,10 @@ bool CrossesTaskOrCpuGpuBoundary(const NodeDef& node1, const NodeDef& node2) {
          (absl::StrContains(device1, DEVICE_CPU) &&
           absl::StrContains(device2, DEVICE_GPU)) ||
          (absl::StrContains(device1, DEVICE_GPU) &&
+          absl::StrContains(device2, DEVICE_CPU)) ||
+         (absl::StrContains(device1, DEVICE_CPU) &&
+          absl::StrContains(device2, DEVICE_DML)) ||
+         (absl::StrContains(device1, DEVICE_DML) &&
           absl::StrContains(device2, DEVICE_CPU));
 }
 

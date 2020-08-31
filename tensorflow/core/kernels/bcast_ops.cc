@@ -162,6 +162,23 @@ REGISTER_KERNEL_BUILDER(Name("BroadcastArgs")
                         BCastArgsOp<int32>);
 #endif
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("BroadcastArgs")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("s0")
+                            .HostMemory("s1")
+                            .HostMemory("r0"),
+                        BCastArgsOp<int32>);
+REGISTER_KERNEL_BUILDER(Name("BroadcastArgs")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int64>("T")
+                            .HostMemory("s0")
+                            .HostMemory("s1")
+                            .HostMemory("r0"),
+                        BCastArgsOp<int64>);
+#endif
+
 REGISTER_KERNEL_BUILDER(Name("BroadcastGradientArgs")
                             .Device(DEVICE_CPU)
                             .TypeConstraint<int32>("T")
@@ -206,6 +223,25 @@ REGISTER_KERNEL_BUILDER(Name("BroadcastGradientArgs")
                         BCastGradArgsOp<int32>);
 REGISTER_KERNEL_BUILDER(Name("BroadcastGradientArgs")
                             .Device(DEVICE_SYCL)
+                            .TypeConstraint<int64>("T")
+                            .HostMemory("s0")
+                            .HostMemory("s1")
+                            .HostMemory("r0")
+                            .HostMemory("r1"),
+                        BCastGradArgsOp<int64>);
+#endif
+
+#if TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("BroadcastGradientArgs")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("s0")
+                            .HostMemory("s1")
+                            .HostMemory("r0")
+                            .HostMemory("r1"),
+                        BCastGradArgsOp<int32>);
+REGISTER_KERNEL_BUILDER(Name("BroadcastGradientArgs")
+                            .Device(DEVICE_DML)
                             .TypeConstraint<int64>("T")
                             .HostMemory("s0")
                             .HostMemory("s1")

@@ -16,6 +16,7 @@ limitations under the License.
 // See docs in ../ops/array_ops.cc.
 
 #include "tensorflow/core/kernels/shape_ops.h"
+
 #include "tensorflow/core/framework/node_def.pb.h"
 #include "tensorflow/core/framework/register_types.h"
 
@@ -108,6 +109,42 @@ REGISTER_KERNEL_BUILDER(Name("Shape")
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                                \
+  REGISTER_KERNEL_BUILDER(Name("Shape")                          \
+                              .Device(DEVICE_DML)                \
+                              .HostMemory("output")              \
+                              .TypeConstraint<int32>("out_type") \
+                              .TypeConstraint<type>("T"),        \
+                          ShapeOp<int32>);                       \
+  REGISTER_KERNEL_BUILDER(Name("Shape")                          \
+                              .Device(DEVICE_DML)                \
+                              .HostMemory("output")              \
+                              .TypeConstraint<int64>("out_type") \
+                              .TypeConstraint<type>("T"),        \
+                          ShapeOp<int64>);
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+REGISTER_KERNEL_BUILDER(Name("Shape")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("out_type")
+                            .TypeConstraint<int32>("T"),
+                        ShapeOp<int32>);
+REGISTER_KERNEL_BUILDER(Name("Shape")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input")
+                            .HostMemory("output")
+                            .TypeConstraint<int64>("out_type")
+                            .TypeConstraint<int32>("T"),
+                        ShapeOp<int64>);
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // ShapeN ---------------------------------------
 REGISTER_KERNEL_BUILDER(Name("ShapeN")
                             .Device(DEVICE_CPU)
@@ -193,6 +230,41 @@ REGISTER_KERNEL_BUILDER(Name("ShapeN")
                         ShapeNOp<int64>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                                \
+  REGISTER_KERNEL_BUILDER(Name("ShapeN")                         \
+                              .Device(DEVICE_DML)                \
+                              .HostMemory("output")              \
+                              .TypeConstraint<int32>("out_type") \
+                              .TypeConstraint<type>("T"),        \
+                          ShapeNOp<int32>);                      \
+  REGISTER_KERNEL_BUILDER(Name("ShapeN")                         \
+                              .Device(DEVICE_DML)                \
+                              .HostMemory("output")              \
+                              .TypeConstraint<int64>("out_type") \
+                              .TypeConstraint<type>("T"),        \
+                          ShapeNOp<int64>)
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+REGISTER_KERNEL_BUILDER(Name("ShapeN")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("out_type"),
+                        ShapeNOp<int32>);
+REGISTER_KERNEL_BUILDER(Name("ShapeN")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int64>("out_type"),
+                        ShapeNOp<int64>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // Rank ------------------------------------------
 REGISTER_KERNEL_BUILDER(Name("Rank").Device(DEVICE_CPU).HostMemory("output"),
                         RankOp);
@@ -251,6 +323,34 @@ REGISTER_KERNEL_BUILDER(Name("Rank")
                         RankOp);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                        \
+  REGISTER_KERNEL_BUILDER(Name("Rank")                   \
+                              .Device(DEVICE_DML)        \
+                              .TypeConstraint<type>("T") \
+                              .HostMemory("output"),     \
+                          RankOp);
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_variant(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+REGISTER_KERNEL_BUILDER(Name("Rank")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("input")
+                            .HostMemory("output"),
+                        RankOp);
+
+REGISTER_KERNEL_BUILDER(Name("Rank")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<bool>("T")
+                            .HostMemory("input")
+                            .HostMemory("output"),
+                        RankOp);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 // Size ------------------------------------------
 REGISTER_KERNEL_BUILDER(Name("Size")
@@ -337,6 +437,41 @@ REGISTER_KERNEL_BUILDER(Name("Size")
                         SizeOp<int64>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                                \
+  REGISTER_KERNEL_BUILDER(Name("Size")                           \
+                              .Device(DEVICE_DML)                \
+                              .TypeConstraint<type>("T")         \
+                              .TypeConstraint<int32>("out_type") \
+                              .HostMemory("output"),             \
+                          SizeOp<int32>);                        \
+  REGISTER_KERNEL_BUILDER(Name("Size")                           \
+                              .Device(DEVICE_DML)                \
+                              .TypeConstraint<type>("T")         \
+                              .TypeConstraint<int64>("out_type") \
+                              .HostMemory("output"),             \
+                          SizeOp<int64>);
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+REGISTER_KERNEL_BUILDER(Name("Size")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("out_type")
+                            .HostMemory("input")
+                            .HostMemory("output"),
+                        SizeOp<int32>);
+REGISTER_KERNEL_BUILDER(Name("Size")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int64>("out_type")
+                            .HostMemory("input")
+                            .HostMemory("output"),
+                        SizeOp<int64>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // ExpandDims ------------------------------------
 REGISTER_KERNEL_BUILDER(Name("ExpandDims")
                             .Device(DEVICE_CPU)
@@ -421,6 +556,43 @@ REGISTER_KERNEL_BUILDER(Name("ExpandDims")
                         ExpandDimsOp<int64>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                            \
+  REGISTER_KERNEL_BUILDER(Name("ExpandDims")                 \
+                              .Device(DEVICE_DML)            \
+                              .TypeConstraint<type>("T")     \
+                              .TypeConstraint<int32>("Tdim") \
+                              .HostMemory("dim"),            \
+                          ExpandDimsOp<int32>);              \
+  REGISTER_KERNEL_BUILDER(Name("ExpandDims")                 \
+                              .Device(DEVICE_DML)            \
+                              .TypeConstraint<type>("T")     \
+                              .TypeConstraint<int64>("Tdim") \
+                              .HostMemory("dim"),            \
+                          ExpandDimsOp<int64>);
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+REGISTER_KERNEL_BUILDER(Name("ExpandDims")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("Tdim")
+                            .HostMemory("input")
+                            .HostMemory("dim")
+                            .HostMemory("output"),
+                        ExpandDimsOp<int32>);
+REGISTER_KERNEL_BUILDER(Name("ExpandDims")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int64>("Tdim")
+                            .HostMemory("input")
+                            .HostMemory("dim")
+                            .HostMemory("output"),
+                        ExpandDimsOp<int64>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // Squeeze ---------------------------------------
 REGISTER_KERNEL_BUILDER(Name("Squeeze").Device(DEVICE_CPU), SqueezeOp);
 
@@ -460,6 +632,25 @@ REGISTER_KERNEL_BUILDER(Name("Squeeze")
                             .HostMemory("output"),
                         SqueezeOp);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                                   \
+  REGISTER_KERNEL_BUILDER(                                          \
+      Name("Squeeze").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      SqueezeOp);
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+REGISTER_KERNEL_BUILDER(Name("Squeeze")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("input")
+                            .HostMemory("output"),
+                        SqueezeOp);
+
+#undef REGISTER_DML_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class EnsureShapeOp : public OpKernel {
  public:
@@ -550,6 +741,33 @@ REGISTER_GPU_HOST_KERNEL(tstring);
 REGISTER_GPU_HOST_KERNEL(ResourceHandle);
 
 #undef REGISTER_GPU_HOST_KERNEL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                         \
+  REGISTER_KERNEL_BUILDER(Name("EnsureShape")             \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("input")        \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          EnsureShapeOp)
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+REGISTER_DML_KERNEL(Variant);
+#undef REGISTER_DML_KERNEL
+
+#define REGISTER_DML_HOST_KERNEL(type)                    \
+  REGISTER_KERNEL_BUILDER(Name("EnsureShape")             \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("input")        \
+                              .HostMemory("output")       \
+                              .TypeConstraint<type>("T"), \
+                          EnsureShapeOp)
+
+REGISTER_DML_HOST_KERNEL(int32);
+REGISTER_DML_HOST_KERNEL(bool);
+REGISTER_DML_HOST_KERNEL(tstring);
+REGISTER_DML_HOST_KERNEL(ResourceHandle);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 #endif
 }  // namespace tensorflow

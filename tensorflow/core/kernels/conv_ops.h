@@ -114,6 +114,9 @@ Status InitConv2DParameters(const OpKernelConstruction* context,
 Status ComputeConv2DDimension(const Conv2DParameters& params,
                               const Tensor& input, const Tensor& filter,
                               Conv2DDimensions* dimensions);
+Status ComputeConv2DDimension(const Conv2DParameters& params,
+                              const TensorShape& input, const TensorShape& filter,
+                              Conv2DDimensions* dimensions);
 
 }  // namespace tensorflow
 

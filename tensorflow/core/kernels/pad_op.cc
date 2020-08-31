@@ -466,4 +466,41 @@ REGISTER_KERNEL_BUILDER(Name("PadV2")
 #undef REGISTER_SYCL_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Pad")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("Tpaddings")
+                            .HostMemory("input")
+                            .HostMemory("paddings")
+                            .HostMemory("output"),
+                        PadOp<CPUDevice, int32, int32>);
+REGISTER_KERNEL_BUILDER(Name("Pad")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int64>("Tpaddings")
+                            .HostMemory("input")
+                            .HostMemory("paddings")
+                            .HostMemory("output"),
+                        PadOp<CPUDevice, int32, int64>);
+REGISTER_KERNEL_BUILDER(Name("PadV2")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("Tpaddings")
+                            .HostMemory("input")
+                            .HostMemory("paddings")
+                            .HostMemory("constant_values")
+                            .HostMemory("output"),
+                        PadOp<CPUDevice, int32, int32>);
+REGISTER_KERNEL_BUILDER(Name("PadV2")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int64>("Tpaddings")
+                            .HostMemory("input")
+                            .HostMemory("paddings")
+                            .HostMemory("constant_values")
+                            .HostMemory("output"),
+                        PadOp<CPUDevice, int32, int64>);
+#endif
+
 }  // end namespace tensorflow

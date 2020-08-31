@@ -452,6 +452,8 @@ class TestSequential(keras_parameterized.TestCase):
 
 class TestSequentialEagerIntegration(keras_parameterized.TestCase):
 
+  # TFDML #25564662
+  @tf_test_util.skip_dml
   @keras_parameterized.run_all_keras_modes
   def test_defun_on_call(self):
     # Check that one can subclass Sequential and place the `call` in a `defun`.

@@ -572,7 +572,9 @@ tf_py_test(
         "//tensorflow/python:nn_ops",
     ],
     shard_count = 16,
-    tags = ["notsan"],
+    tags = [
+        "notsan",
+    ],
 )
 
 tf_py_test(
@@ -777,7 +779,9 @@ tf_py_test(
         "//tensorflow/python:client_testlib",
     ],
     shard_count = 4,
-    tags = ["no_rocm"],
+    tags = [
+        "no_rocm",
+    ],
 )
 
 cuda_py_test(
@@ -819,8 +823,8 @@ cuda_py_test(
     ],
     shard_count = 4,
     tags = [
-        "no_rocm",
         "no_windows_gpu",
+        "no_dml",
     ],
     xla_enable_strict_auto_jit = True,
 )
@@ -983,7 +987,9 @@ tf_py_test(
         "//tensorflow/python:client_testlib",
     ],
     shard_count = 4,
-    tags = ["notsan"],
+    tags = [
+        "notsan",
+    ],
 )
 
 tf_py_test(
@@ -997,7 +1003,9 @@ tf_py_test(
         "//tensorflow/python:client_testlib",
     ],
     shard_count = 4,
-    tags = ["notsan"],  # http://b/62136390
+    tags = [
+        "notsan",  # http://b/62136390
+    ],
 )
 
 tf_py_test(
@@ -1013,7 +1021,7 @@ tf_py_test(
     shard_count = 4,
     tags = [
         "noasan",  # times out b/63678675
-        "notsan",  # http://b/62189182
+        "notsan",  # http://b/62189182,
     ],
 )
 
@@ -1083,7 +1091,9 @@ cuda_py_test(
         "//tensorflow/python:client_testlib",
     ],
     shard_count = 12,
-    tags = ["no_rocm"],
+    tags = [
+        "no_rocm",
+    ],
     xla_enable_strict_auto_jit = True,
 )
 
@@ -1669,7 +1679,7 @@ tf_py_test(
     shard_count = 8,
     tags = [
         "no_rocm",
-        "nomac",  # TODO(mihaimaruseac): b/127695564
+        "nomac",  # TODO(mihaimaruseac): b/127695564,
     ],
 )
 
@@ -1732,7 +1742,9 @@ tf_py_test(
         "//tensorflow/python:training",
     ],
     shard_count = 8,
-    tags = ["notsan"],  # b/67509773
+    tags = [
+        "notsan",  # b/67509773
+    ],
 )
 
 tf_py_test(

@@ -238,4 +238,31 @@ TF_CALL_int64(REGISTER_GPU_KERNELS);
 #undef REGISTER_GPU_KERNELS
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#ifdef TENSORFLOW_USE_DIRECTML
+// Only register 'Variable' on GPU for the subset of types also supported by
+// 'Assign' (see dml_assign_ops.cc.)
+#define REGISTER_DML_KERNELS(type)                                         \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name("Variable").Device(DEVICE_DML).TypeConstraint<type>("dtype"),   \
+      VariableOp);                                                         \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name("VariableV2").Device(DEVICE_DML).TypeConstraint<type>("dtype"), \
+      VariableOp);                                                         \
+  REGISTER_KERNEL_BUILDER(Name("TemporaryVariable")                        \
+                              .Device(DEVICE_DML)                          \
+                              .TypeConstraint<type>("dtype"),              \
+                          TemporaryVariableOp);                            \
+  REGISTER_KERNEL_BUILDER(Name("DestroyTemporaryVariable")                 \
+                              .Device(DEVICE_DML)                          \
+                              .TypeConstraint<type>("T"),                  \
+                          DestroyTemporaryVariableOp);                     \
+  REGISTER_KERNEL_BUILDER(Name("IsVariableInitialized")                    \
+                              .Device(DEVICE_DML)                          \
+                              .TypeConstraint<type>("dtype")               \
+                              .HostMemory("is_initialized"),               \
+                          IsVariableInitializedOp);
+
+TF_CALL_DML_FLOAT_TYPES(REGISTER_DML_KERNELS);
+#undef REGISTER_DML_KERNELS
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

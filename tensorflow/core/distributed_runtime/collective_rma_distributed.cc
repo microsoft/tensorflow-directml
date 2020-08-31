@@ -116,7 +116,14 @@ void CollectiveRemoteAccessDistributed::RecvFromPeer(
         delete state;
         return;
       }
-      if (to_device->tensorflow_gpu_device_info()) {
+
+      bool is_cpu_device = to_device->tensorflow_gpu_device_info() == nullptr;
+
+#ifdef TENSORFLOW_USE_DIRECTML
+      is_cpu_device &= to_device->dml_device_context() == nullptr;
+#endif
+
+      if (!is_cpu_device) {
         // Move the bytes into a CPU tensor then use tensor-to-tensor copy.
         // Use GPU-registered memory for the CPU tensor so the transfer
         // goes faster.

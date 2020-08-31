@@ -118,6 +118,8 @@ class TestSaveModel(test.TestCase):
 
     self.assertLen(loaded_model.predict({'a': inputs_a, 'b': inputs_b}), 10)
 
+  # TFDML #25564562
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_saving_with_sequence_features(self):
     cols = [

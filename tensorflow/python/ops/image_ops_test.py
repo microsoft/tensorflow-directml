@@ -2668,8 +2668,8 @@ class ResizeImagesV2Test(test_util.TensorFlowTestCase):
           with self.cached_session(use_gpu=use_gpu):
             image = constant_op.constant(img_np, shape=input_shape)
             new_size = constant_op.constant([target_height, target_width])
-            out_op = image_ops.resize_images(image, new_size,
-                                             image_ops.ResizeMethod.BILINEAR)
+            out_op = image_ops.resize_images_v2(image, new_size,
+                                                image_ops.ResizeMethod.BILINEAR)
             value[use_gpu] = self.evaluate(out_op)
         self.assertAllClose(value[True], value[False], rtol=1e-5, atol=1e-5)
 

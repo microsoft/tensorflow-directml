@@ -157,8 +157,9 @@ Status IsNodeOutputPortHostFriendly(const GraphView& graph,
 
   // Find the kernel.
   const KernelDef* kernel = nullptr;
-  s = TryFindKernelDef({node.device().c_str(), DEVICE_GPU, DEVICE_CPU}, node,
-                       &kernel);
+  s = TryFindKernelDef(
+      {node.device().c_str(), DEVICE_GPU, DEVICE_CPU, DEVICE_DML}, node,
+      &kernel);
   if (!s.ok()) {
     LOG(INFO) << "Could not find KernelDef for: " << node.op();
     return Status::OK();
@@ -195,7 +196,8 @@ bool IsNodeInputPortHostFriendly(const NodeDef& node, int port_id) {
   // Find the kernel.
   const KernelDef* kernel = nullptr;
   s = internal::TryFindKernelDef(
-      {node.device().c_str(), DEVICE_GPU, DEVICE_CPU}, node, &kernel);
+      {node.device().c_str(), DEVICE_GPU, DEVICE_CPU, DEVICE_DML}, node,
+      &kernel);
   if (!s.ok()) {
     LOG(INFO) << "Could not find KernelDef for: " << node.op();
     return false;
@@ -273,12 +275,14 @@ string TryFindHostDevice(const gtl::FlatSet<string>& devices,
   // Force this node onto the CPU.
   if (device.empty() && has_device_cpu) {
     return "/device:CPU:0";
-  } else if (absl::StrContains(device, DEVICE_GPU)) {
+  } else if (absl::StrContains(device, DEVICE_GPU) ||
+             absl::StrContains(device, DEVICE_DML)) {
     // Sometimes the cluster can have:
     //   devices = {"/device:CPU:0", "/device:XLA_GPU:0"}
     // and we need to handle them properly.
     for (const auto& device_match :
          {std::pair<string, string>("GPU", "CPU:0"),
+          std::pair<string, string>("DML", "CPU:0"),
           std::pair<string, string>("/device", "/device:CPU:0")}) {
       const string device_host =
           strings::StrCat(device.substr(0, device.rfind(device_match.first)),

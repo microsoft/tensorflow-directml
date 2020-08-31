@@ -128,6 +128,8 @@ class AdamaxOptimizerTest(test.TestCase):
   def testResourceSparse(self):
     self.doTestSparse(use_resource=True)
 
+  # TFDML #25508752
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSparseDevicePlacement(self):
     for index_dtype in [dtypes.int32, dtypes.int64]:
@@ -176,6 +178,8 @@ class AdamaxOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes(reset_test=True)
   def testBasic(self):
     for i, dtype in enumerate([dtypes.half, dtypes.float32, dtypes.float64]):
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       with self.session(graph=ops.Graph()):
         # Initialize variables for numpy implementation.
         m0, v0, m1, v1 = 0.0, 0.0, 0.0, 0.0
@@ -224,6 +228,8 @@ class AdamaxOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes(reset_test=True)
   def testBasicWithLearningRateDecay(self):
     for i, dtype in enumerate([dtypes.half, dtypes.float32, dtypes.float64]):
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       with self.session(graph=ops.Graph()):
         # Initialize variables for numpy implementation.
         m0, v0, m1, v1 = 0.0, 0.0, 0.0, 0.0

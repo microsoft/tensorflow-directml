@@ -42,6 +42,11 @@ limitations under the License.
 #include "tensorflow/core/platform/types.h"
 #include "tensorflow/core/util/ptr_util.h"
 
+#if TENSORFLOW_USE_DIRECTML
+#include "tensorflow/core/kernels/dml_tensor_array.h"
+using DMLDevice = tensorflow::tensor_array::DMLDeviceTag;
+#endif  // TENSORFLOW_USE_DIRECTML
+
 typedef Eigen::ThreadPoolDevice CPUDevice;
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 typedef Eigen::GpuDevice GPUDevice;
@@ -265,6 +270,37 @@ REGISTER_GPU(bfloat16);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML(type)                                   \
+  REGISTER_KERNEL_BUILDER(Name("TensorArray")                \
+                              .Device(DEVICE_DML)            \
+                              .TypeConstraint<type>("dtype") \
+                              .HostMemory("size")            \
+                              .HostMemory("handle"),         \
+                          TensorArrayOp);                    \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayV2")              \
+                              .Device(DEVICE_DML)            \
+                              .TypeConstraint<type>("dtype") \
+                              .HostMemory("size")            \
+                              .HostMemory("handle"),         \
+                          TensorArrayOp);                    \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayV3")              \
+                              .Device(DEVICE_DML)            \
+                              .TypeConstraint<type>("dtype") \
+                              .HostMemory("size")            \
+                              .HostMemory("handle"),         \
+                          TensorArrayOp);
+
+TF_CALL_GPU_NUMBER_TYPES(REGISTER_DML);
+TF_CALL_complex64(REGISTER_DML);
+TF_CALL_complex128(REGISTER_DML);
+TF_CALL_int64(REGISTER_DML);
+REGISTER_DML(bfloat16);
+#undef REGISTER_DML
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // GRADIENT *******************************************************************
 // Note that this op may have an optional third input. If present, it represents
 // a shape value. It indicates that element shape of this gradient array is that
@@ -410,6 +446,32 @@ REGISTER_KERNEL_BUILDER(Name("TensorArrayGradWithShape")
                             .HostMemory("grad_handle"),
                         TensorArrayGradOp);
 
+#if TENSORFLOW_USE_DIRECTML
+
+REGISTER_KERNEL_BUILDER(Name("TensorArrayGrad")
+                            .Device(DEVICE_DML)
+                            .HostMemory("handle")
+                            .HostMemory("grad_handle"),
+                        TensorArrayGradOp);
+REGISTER_KERNEL_BUILDER(Name("TensorArrayGradV2")
+                            .Device(DEVICE_DML)
+                            .HostMemory("handle")
+                            .HostMemory("grad_handle"),
+                        TensorArrayGradOp);
+REGISTER_KERNEL_BUILDER(Name("TensorArrayGradV3")
+                            .Device(DEVICE_DML)
+                            .HostMemory("handle")
+                            .HostMemory("grad_handle"),
+                        TensorArrayGradOp);
+REGISTER_KERNEL_BUILDER(Name("TensorArrayGradWithShape")
+                            .Device(DEVICE_DML)
+                            .HostMemory("handle")
+                            .HostMemory("shape_to_prepend")
+                            .HostMemory("grad_handle"),
+                        TensorArrayGradOp);
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // WRITE **********************************************************************
 
 template <typename Device, typename T>
@@ -492,6 +554,33 @@ REGISTER_GPU(bfloat16);
 #undef REGISTER_GPU
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML(type)                                      \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayWrite")              \
+                              .Device(DEVICE_DML)               \
+                              .TypeConstraint<type>("T")        \
+                              .HostMemory("handle")             \
+                              .HostMemory("index"),             \
+                          TensorArrayWriteOp<DMLDevice, type>); \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayWriteV2")            \
+                              .Device(DEVICE_DML)               \
+                              .TypeConstraint<type>("T")        \
+                              .HostMemory("handle")             \
+                              .HostMemory("index"),             \
+                          TensorArrayWriteOp<DMLDevice, type>); \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayWriteV3")            \
+                              .Device(DEVICE_DML)               \
+                              .TypeConstraint<type>("T")        \
+                              .HostMemory("handle")             \
+                              .HostMemory("index"),             \
+                          TensorArrayWriteOp<DMLDevice, type>);
+
+TF_CALL_DML_FLOAT_TYPES(REGISTER_DML);
+#undef REGISTER_DML
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 // READ ***********************************************************************
 
@@ -583,6 +672,34 @@ REGISTER_GPU(bfloat16);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML(type)                                     \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayRead")              \
+                              .Device(DEVICE_DML)              \
+                              .TypeConstraint<type>("dtype")   \
+                              .HostMemory("handle")            \
+                              .HostMemory("index"),            \
+                          TensorArrayReadOp<DMLDevice, type>); \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayReadV2")            \
+                              .Device(DEVICE_DML)              \
+                              .TypeConstraint<type>("dtype")   \
+                              .HostMemory("handle")            \
+                              .HostMemory("index"),            \
+                          TensorArrayReadOp<DMLDevice, type>); \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayReadV3")            \
+                              .Device(DEVICE_DML)              \
+                              .TypeConstraint<type>("dtype")   \
+                              .HostMemory("handle")            \
+                              .HostMemory("index"),            \
+                          TensorArrayReadOp<DMLDevice, type>);
+
+TF_CALL_DML_FLOAT_TYPES(REGISTER_DML);
+TF_CALL_int64(REGISTER_DML);
+#undef REGISTER_DML
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // PACK and GATHER ************************************************************
 
 // Concatenate the elements in a TensorArray.  All elements must be
@@ -590,9 +707,6 @@ REGISTER_GPU(bfloat16);
 template <typename Device, typename T, bool LEGACY_PACK>
 class TensorArrayPackOrGatherOp : public OpKernel {
  public:
-  typedef typename TTypes<T, 2>::ConstMatrix ConstMatrix;
-  typedef std::vector<std::unique_ptr<ConstMatrix> > ConstMatrixVector;
-
   explicit TensorArrayPackOrGatherOp(OpKernelConstruction* context)
       : OpKernel(context) {
     OP_REQUIRES_OK(context, context->GetAttr("dtype", &dtype_));
@@ -669,6 +783,17 @@ class TensorArrayPackOrGatherOp : public OpKernel {
                                 " which does not match the Tensor at index 0: ",
                                 value_0_t->shape().DebugString()));
 
+    // Validate shapes
+    for (int i = 1; i < num_indices; ++i) {
+      const Tensor* value_t = values[i].AccessTensor(ctx);
+      OP_REQUIRES(
+          ctx, value_0_t->shape() == value_t->shape(),
+          errors::InvalidArgument(
+              "TensorArray has inconsistent shapes.  Index 0 has shape: ",
+              value_0_t->shape().DebugString(), " but index ", i,
+              " has shape: ", value_t->shape().DebugString()));
+    }
+
     TensorShape output_shape(value_0_t->shape());
     output_shape.InsertDim(0, num_indices);
 
@@ -680,34 +805,8 @@ class TensorArrayPackOrGatherOp : public OpKernel {
       return;
     }
 
-    ConstMatrixVector input_tensors_flat;
-    input_tensors_flat.reserve(num_indices);
-    auto output_flat =
-        output_tensor->shaped<T, 2>({1, output_shape.num_elements()});
-
-    // Insert the first value
-    input_tensors_flat.push_back(MakeUnique<ConstMatrix>(
-        value_0_t->shaped<T, 2>({1, value_0_t->NumElements()})));
-
-    for (int i = 1; i < num_indices; ++i) {
-      const Tensor* value_t = values[i].AccessTensor(ctx);
-      OP_REQUIRES(
-          ctx, value_0_t->shape() == value_t->shape(),
-          errors::InvalidArgument(
-              "TensorArray has inconsistent shapes.  Index 0 has shape: ",
-              value_0_t->shape().DebugString(), " but index ", i,
-              " has shape: ", value_t->shape().DebugString()));
-      input_tensors_flat.push_back(MakeUnique<ConstMatrix>(
-          value_t->shaped<T, 2>({1, value_t->NumElements()})));
-    }
-
-#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-    if (std::is_same<Device, GPUDevice>::value) {
-      ConcatGPU<T>(ctx, input_tensors_flat, output_tensor, &output_flat);
-      return;
-    }
-#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-    ConcatCPU<T>(ctx->device(), input_tensors_flat, &output_flat);
+    tensor_array::ConcatTensors<Device, T>(ctx, output_tensor,
+                                           absl::MakeSpan(values));
   }
 
  private:
@@ -809,6 +908,70 @@ REGISTER_KERNEL_BUILDER(
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML(type)                                                  \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("TensorArrayPack")                                               \
+          .Device(DEVICE_DML)                                               \
+          .TypeConstraint<type>("dtype")                                    \
+          .HostMemory("handle"),                                            \
+      TensorArrayPackOrGatherOp<DMLDevice, type, true /* LEGACY_PACK */>);  \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("TensorArrayGather")                                             \
+          .Device(DEVICE_DML)                                               \
+          .TypeConstraint<type>("dtype")                                    \
+          .HostMemory("indices")                                            \
+          .HostMemory("handle"),                                            \
+      TensorArrayPackOrGatherOp<DMLDevice, type, false /* LEGACY_PACK */>); \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("TensorArrayGatherV2")                                           \
+          .Device(DEVICE_DML)                                               \
+          .TypeConstraint<type>("dtype")                                    \
+          .HostMemory("indices")                                            \
+          .HostMemory("handle"),                                            \
+      TensorArrayPackOrGatherOp<DMLDevice, type, false /* LEGACY_PACK */>); \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("TensorArrayGatherV3")                                           \
+          .Device(DEVICE_DML)                                               \
+          .TypeConstraint<type>("dtype")                                    \
+          .HostMemory("indices")                                            \
+          .HostMemory("handle"),                                            \
+      TensorArrayPackOrGatherOp<DMLDevice, type, false /* LEGACY_PACK */>);
+
+TF_CALL_GPU_NUMBER_TYPES(REGISTER_DML);
+TF_CALL_complex64(REGISTER_DML);
+TF_CALL_complex128(REGISTER_DML);
+REGISTER_DML(bfloat16);
+#undef REGISTER_DML
+
+// A special GPU kernel for int32.
+// TODO(b/25387198): Also enable int32 in device memory. This kernel
+// registration requires all int32 inputs and outputs to be in host memory.
+REGISTER_KERNEL_BUILDER(
+    Name("TensorArrayGather")
+        .Device(DEVICE_DML)
+        .TypeConstraint<int32>("dtype")
+        .HostMemory("indices")
+        .HostMemory("handle"),
+    TensorArrayPackOrGatherOp<CPUDevice, int32, false /* LEGACY_PACK */>);
+REGISTER_KERNEL_BUILDER(
+    Name("TensorArrayGatherV2")
+        .Device(DEVICE_DML)
+        .TypeConstraint<int32>("dtype")
+        .HostMemory("indices")
+        .HostMemory("handle"),
+    TensorArrayPackOrGatherOp<CPUDevice, int32, false /* LEGACY_PACK */>);
+REGISTER_KERNEL_BUILDER(
+    Name("TensorArrayGatherV3")
+        .Device(DEVICE_DML)
+        .TypeConstraint<int32>("dtype")
+        .HostMemory("indices")
+        .HostMemory("handle"),
+    TensorArrayPackOrGatherOp<CPUDevice, int32, false /* LEGACY_PACK */>);
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // CONCAT *********************************************************************
 
 // Concatenate the elements in a TensorArray.  All elements must be
@@ -816,9 +979,6 @@ REGISTER_KERNEL_BUILDER(
 template <typename Device, typename T>
 class TensorArrayConcatOp : public OpKernel {
  public:
-  typedef typename TTypes<T, 2>::ConstMatrix ConstMatrix;
-  typedef std::vector<std::unique_ptr<ConstMatrix> > ConstMatrixVector;
-
   explicit TensorArrayConcatOp(OpKernelConstruction* context)
       : OpKernel(context) {
     OP_REQUIRES_OK(context, context->GetAttr("dtype", &dtype_));
@@ -920,27 +1080,14 @@ class TensorArrayConcatOp : public OpKernel {
 
     Tensor* output_tensor = nullptr;
     OP_REQUIRES_OK(ctx, ctx->allocate_output(0, output_shape, &output_tensor));
-    ConstMatrixVector input_tensors_flat;
-    input_tensors_flat.reserve(values.size());
-    for (size_t i = 0; i < values.size(); ++i) {
-      const Tensor* value_t = value_tensors[i];
-      if (value_t->NumElements() > 0) {
-        input_tensors_flat.push_back(MakeUnique<ConstMatrix>(
-            value_t->shaped<T, 2>({1, value_t->NumElements()})));
-      }
+
+    // If output_tensor is empty, there is nothing to concatenate so return it.
+    if (output_shape.num_elements() == 0) {
+      return;
     }
 
-    if (output_shape.num_elements() > 0) {
-      auto output_flat =
-          output_tensor->shaped<T, 2>({1, output_shape.num_elements()});
-#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-      if (std::is_same<Device, GPUDevice>::value) {
-        ConcatGPU<T>(ctx, input_tensors_flat, output_tensor, &output_flat);
-        return;
-      }
-#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-      ConcatCPU<T>(ctx->device(), input_tensors_flat, &output_flat);
-    }
+    tensor_array::ConcatTensors<Device, T>(ctx, output_tensor,
+                                           absl::MakeSpan(values));
   }
 
  private:
@@ -1026,6 +1173,58 @@ REGISTER_KERNEL_BUILDER(Name("TensorArrayConcatV3")
                         TensorArrayConcatOp<CPUDevice, int32>);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML(type)                                       \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayConcat")              \
+                              .Device(DEVICE_DML)                \
+                              .TypeConstraint<type>("dtype")     \
+                              .HostMemory("lengths")             \
+                              .HostMemory("handle"),             \
+                          TensorArrayConcatOp<DMLDevice, type>); \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayConcatV2")            \
+                              .Device(DEVICE_DML)                \
+                              .TypeConstraint<type>("dtype")     \
+                              .HostMemory("lengths")             \
+                              .HostMemory("handle"),             \
+                          TensorArrayConcatOp<DMLDevice, type>)  \
+  REGISTER_KERNEL_BUILDER(Name("TensorArrayConcatV3")            \
+                              .Device(DEVICE_DML)                \
+                              .TypeConstraint<type>("dtype")     \
+                              .HostMemory("lengths")             \
+                              .HostMemory("handle"),             \
+                          TensorArrayConcatOp<DMLDevice, type>)
+
+TF_CALL_GPU_NUMBER_TYPES(REGISTER_DML);
+TF_CALL_complex64(REGISTER_DML);
+TF_CALL_complex128(REGISTER_DML);
+REGISTER_DML(bfloat16);
+#undef REGISTER_DML
+
+// A special GPU kernel for int32.
+// TODO(b/25387198): Also enable int32 in device memory. This kernel
+// registration requires all int32 inputs and outputs to be in host memory.
+REGISTER_KERNEL_BUILDER(Name("TensorArrayConcat")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("dtype")
+                            .HostMemory("lengths")
+                            .HostMemory("handle"),
+                        TensorArrayConcatOp<CPUDevice, int32>);
+REGISTER_KERNEL_BUILDER(Name("TensorArrayConcatV2")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("dtype")
+                            .HostMemory("lengths")
+                            .HostMemory("handle"),
+                        TensorArrayConcatOp<CPUDevice, int32>);
+REGISTER_KERNEL_BUILDER(Name("TensorArrayConcatV3")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("dtype")
+                            .HostMemory("lengths")
+                            .HostMemory("handle"),
+                        TensorArrayConcatOp<CPUDevice, int32>);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 // UNPACK and SCATTER *********************************************************
 
@@ -1117,13 +1316,6 @@ class TensorArrayUnpackOrScatterOp : public OpKernel {
     }
     element_shape.RemoveDim(0);
 
-    auto tensor_value_t = tensor_value->shaped<T, 3>(
-        {1, num_values, element_shape.num_elements()});
-
-    Eigen::DSizes<Eigen::DenseIndex, 3> indices{0, 0, 0};
-    Eigen::DSizes<Eigen::DenseIndex, 3> sizes{
-        1, 1, static_cast<Eigen::DenseIndex>(element_shape.num_elements())};
-
     std::vector<PersistentTensor> write_values;
     write_values.reserve(num_values);
 
@@ -1133,14 +1325,12 @@ class TensorArrayUnpackOrScatterOp : public OpKernel {
       OP_REQUIRES_OK(
           ctx, ctx->allocate_persistent(tensor_array->ElemType(), element_shape,
                                         &persistent_tensor, &tensor_value_i));
-      auto tensor_value_i_t =
-          tensor_value_i->shaped<T, 3>({1, 1, element_shape.num_elements()});
-      indices[1] = i;
 
       if (element_shape.num_elements() > 0) {
-        functor::Split<Device, T, 3>()(ctx->eigen_device<Device>(),
-                                       tensor_value_i_t, tensor_value_t,
-                                       indices, sizes);
+        int64 index = i * element_shape.num_elements();
+        int64 size = element_shape.num_elements();
+        tensor_array::SplitTensor<Device, T>(ctx, tensor_value_i, *tensor_value,
+                                             index, size);
       }
 
       write_values.push_back(persistent_tensor);
@@ -1225,6 +1415,49 @@ TF_CALL_int64(REGISTER_GPU);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML(type)                                      \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("TensorArrayUnpack")                                 \
+          .Device(DEVICE_DML)                                   \
+          .TypeConstraint<type>("T")                            \
+          .HostMemory("handle"),                                \
+      TensorArrayUnpackOrScatterOp<DMLDevice, type,             \
+                                   true /* LEGACY_UNPACK */>);  \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("TensorArrayScatter")                                \
+          .Device(DEVICE_DML)                                   \
+          .TypeConstraint<type>("T")                            \
+          .HostMemory("indices")                                \
+          .HostMemory("handle"),                                \
+      TensorArrayUnpackOrScatterOp<DMLDevice, type,             \
+                                   false /* LEGACY_UNPACK */>); \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("TensorArrayScatterV2")                              \
+          .Device(DEVICE_DML)                                   \
+          .TypeConstraint<type>("T")                            \
+          .HostMemory("indices")                                \
+          .HostMemory("handle"),                                \
+      TensorArrayUnpackOrScatterOp<DMLDevice, type,             \
+                                   false /* LEGACY_UNPACK */>); \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("TensorArrayScatterV3")                              \
+          .Device(DEVICE_DML)                                   \
+          .TypeConstraint<type>("T")                            \
+          .HostMemory("indices")                                \
+          .HostMemory("handle"),                                \
+      TensorArrayUnpackOrScatterOp<DMLDevice, type,             \
+                                   false /* LEGACY_UNPACK */>);
+
+TF_CALL_GPU_NUMBER_TYPES(REGISTER_DML);
+TF_CALL_complex64(REGISTER_DML);
+TF_CALL_complex128(REGISTER_DML);
+TF_CALL_int64(REGISTER_DML);
+#undef REGISTER_DML
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // SPLIT *********************************************************************
 
 template <typename Device, typename T>
@@ -1307,9 +1540,6 @@ class TensorArraySplitOp : public OpKernel {
                                 " but Op is trying to write dtype ",
                                 DataTypeString(tensor_value->dtype()), "."));
 
-    auto tensor_value_t =
-        tensor_value->shaped<T, 3>({1, total_length, elements_per_row});
-
     std::vector<PersistentTensor> write_values;
     write_values.reserve(array_size);
 
@@ -1317,24 +1547,17 @@ class TensorArraySplitOp : public OpKernel {
       Tensor* tensor_value_i;
       PersistentTensor persistent_tensor;
 
-      int64 previous_length = (i == 0) ? 0 : cumulative_lengths[i - 1];
-      Eigen::DSizes<Eigen::DenseIndex, 3> indices{
-          0, static_cast<Eigen::DenseIndex>(previous_length), 0};
-      Eigen::DSizes<Eigen::DenseIndex, 3> sizes{
-          1, static_cast<Eigen::DenseIndex>(tensor_lengths_t(i)),
-          static_cast<Eigen::DenseIndex>(elements_per_row)};
-
       OP_REQUIRES_OK(ctx, ctx->allocate_persistent(
                               tensor_array->ElemType(), element_shapes[i],
                               &persistent_tensor, &tensor_value_i));
 
       if (tensor_lengths_t(i) > 0) {
-        auto tensor_value_i_t = tensor_value_i->shaped<T, 3>(
-            {1, tensor_lengths_t(i), elements_per_row});
+        int64 previous_length = (i == 0) ? 0 : cumulative_lengths[i - 1];
 
-        functor::Split<Device, T, 3>()(ctx->eigen_device<Device>(),
-                                       tensor_value_i_t, tensor_value_t,
-                                       indices, sizes);
+        int64 flat_index = previous_length * elements_per_row;
+        int64 flat_size = tensor_lengths_t(i) * elements_per_row;
+        tensor_array::SplitTensor<Device, T>(ctx, tensor_value_i, *tensor_value,
+                                             flat_index, flat_size);
       }
 
       write_values.push_back(persistent_tensor);
@@ -1395,6 +1618,35 @@ TF_CALL_complex128(REGISTER_GPU);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML(type)                                      \
+  REGISTER_KERNEL_BUILDER(Name("TensorArraySplit")              \
+                              .Device(DEVICE_DML)               \
+                              .TypeConstraint<type>("T")        \
+                              .HostMemory("lengths")            \
+                              .HostMemory("handle"),            \
+                          TensorArraySplitOp<DMLDevice, type>); \
+  REGISTER_KERNEL_BUILDER(Name("TensorArraySplitV2")            \
+                              .Device(DEVICE_DML)               \
+                              .TypeConstraint<type>("T")        \
+                              .HostMemory("lengths")            \
+                              .HostMemory("handle"),            \
+                          TensorArraySplitOp<DMLDevice, type>); \
+  REGISTER_KERNEL_BUILDER(Name("TensorArraySplitV3")            \
+                              .Device(DEVICE_DML)               \
+                              .TypeConstraint<type>("T")        \
+                              .HostMemory("lengths")            \
+                              .HostMemory("handle"),            \
+                          TensorArraySplitOp<DMLDevice, type>);
+
+TF_CALL_GPU_NUMBER_TYPES(REGISTER_DML);
+TF_CALL_complex64(REGISTER_DML);
+TF_CALL_complex128(REGISTER_DML);
+#undef REGISTER_DML
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 // SIZE ***********************************************************************
 
 // Get the size of the TensorArray
@@ -1435,6 +1687,26 @@ REGISTER_KERNEL_BUILDER(Name("TensorArraySizeV3")
                             .HostMemory("handle")
                             .HostMemory("size"),
                         TensorArraySizeOp);
+
+#if TENSORFLOW_USE_DIRECTML
+
+REGISTER_KERNEL_BUILDER(Name("TensorArraySize")
+                            .Device(DEVICE_DML)
+                            .HostMemory("handle")
+                            .HostMemory("size"),
+                        TensorArraySizeOp);
+REGISTER_KERNEL_BUILDER(Name("TensorArraySizeV2")
+                            .Device(DEVICE_DML)
+                            .HostMemory("handle")
+                            .HostMemory("size"),
+                        TensorArraySizeOp);
+REGISTER_KERNEL_BUILDER(Name("TensorArraySizeV3")
+                            .Device(DEVICE_DML)
+                            .HostMemory("handle")
+                            .HostMemory("size"),
+                        TensorArraySizeOp);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 // CLOSE
 // **********************************************************************
@@ -1479,5 +1751,19 @@ REGISTER_KERNEL_BUILDER(
 REGISTER_KERNEL_BUILDER(
     Name("TensorArrayCloseV3").Device(DEVICE_GPU).HostMemory("handle"),
     TensorArrayCloseOp);
+
+#if TENSORFLOW_USE_DIRECTML
+
+REGISTER_KERNEL_BUILDER(
+    Name("TensorArrayClose").Device(DEVICE_DML).HostMemory("handle"),
+    TensorArrayCloseOp);
+REGISTER_KERNEL_BUILDER(
+    Name("TensorArrayCloseV2").Device(DEVICE_DML).HostMemory("handle"),
+    TensorArrayCloseOp);
+REGISTER_KERNEL_BUILDER(
+    Name("TensorArrayCloseV3").Device(DEVICE_DML).HostMemory("handle"),
+    TensorArrayCloseOp);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace tensorflow

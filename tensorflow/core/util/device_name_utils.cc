@@ -176,6 +176,16 @@ bool DeviceNameUtils::ParseFullName(StringPiece fullname, ParsedName* p) {
       }
       progress = true;
     }
+    if (absl::ConsumePrefix(&fullname, "/dml:") ||
+        absl::ConsumePrefix(&fullname, "/DML:")) {
+      p->has_type = true;
+      p->type = "DML";  // Treat '/dml:..' as uppercase '/device:DML:...'
+      p->has_id = !absl::ConsumePrefix(&fullname, "*");
+      if (p->has_id && !ConsumeNumber(&fullname, &p->id)) {
+        return false;
+      }
+      progress = true;
+    }
 
     if (!progress) {
       return false;

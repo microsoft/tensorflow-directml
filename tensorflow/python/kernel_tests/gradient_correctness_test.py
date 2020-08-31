@@ -42,6 +42,8 @@ class GradientCorrectnessTest(test.TestCase):
       # [dexp(x)/dx + d(log(exp(x)))/dx] @ x=1 == exp(1) + 1
       self.assertAllClose(grad_vals[0], exp1_plus_one)
 
+  # TFDML #25509832
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testIdentityGradient(self):
     x = constant_op.constant(3.)

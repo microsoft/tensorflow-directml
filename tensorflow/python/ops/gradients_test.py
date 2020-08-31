@@ -90,20 +90,20 @@ class GradientsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
     with ops.Graph().as_default() as g:
       w = constant(1.0, shape=[1, 1])
       x = constant(1.0, shape=[1, 2])
-      with g.device("/device:GPU:0"):
+      with g.device("/device:{}:0".format(test_util.gpu_device_type())):
         wx = math_ops.matmul(w, x)
       gw = gradients.gradients(wx, [w], colocate_gradients_with_ops=True)[0]
     self.assertEqual(gw.op.colocation_groups(), wx.op.colocation_groups())
 
   def testColocateGradientsWithAggregation(self):
     with ops.Graph().as_default() as g:
-      with g.device("/device:GPU:1"):
+      with g.device("/device:{}:1".format(test_util.gpu_device_type())):
         w = constant(1.0, shape=[1, 1])
       x = constant(1.0, shape=[1, 2])
       y = constant(1.0, shape=[1, 2])
       wx = math_ops.matmul(w, x)
       wy = math_ops.matmul(w, y)
-      with g.device("/device:GPU:0"):
+      with g.device("/device:{}:0".format(test_util.gpu_device_type())):
         z = wx + wy
 
       gw1 = gradients.gradients(z, [w], colocate_gradients_with_ops=True)[0]
@@ -114,7 +114,7 @@ class GradientsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
   def testColocateGradientsWithAggregationInMultipleDevices(self):
     with ops.Graph().as_default() as g:
-      with g.device("/device:GPU:1"):
+      with g.device("/device:{}:1".format(test_util.gpu_device_type())):
         w = constant(1.0, shape=[1, 1])
       x = constant(1.0, shape=[1, 2])
       y = constant(1.0, shape=[1, 2])
@@ -122,7 +122,7 @@ class GradientsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
         wx = math_ops.matmul(w, x)
       with g.device("/task:2"):
         wy = math_ops.matmul(w, y)
-      with g.device("/device:GPU:0"):
+      with g.device("/device:{}:0".format(test_util.gpu_device_type())):
         z = wx + wy
 
       gw1 = gradients.gradients(z, [w], colocate_gradients_with_ops=True)[0]
@@ -139,7 +139,7 @@ class GradientsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
         x = constant(1.0, shape=[1, 1])
         y = constant(1.0, shape=[1, 1])
         s = x + y
-      with g.device("/device:GPU:0"):
+      with g.device("/device:{}:0".format(test_util.gpu_device_type())):
         z = math_ops.reduce_sum(s)
 
       gz_x = gradients.gradients(z, [x], colocate_gradients_with_ops=True,

@@ -67,7 +67,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
                                   ("WithMaxNumElements", 2))
   @test_util.run_gpu_only
   def testPushPopGPU(self, max_num_elements):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self._testPushPop(max_num_elements)
 
   @test_util.run_deprecated_v1
@@ -169,7 +169,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
                                   ("WithMaxNumElements", 2))
   @test_util.run_gpu_only
   def testStackGPU(self, max_num_elements):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self._testStack(max_num_elements)
 
   @parameterized.named_parameters(("NoMaxNumElements", None),
@@ -261,7 +261,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testStackWithUninitializedTensorsGpu(self):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self._testStackWithUninitializedTensors()
 
   def _testStackWithUninitializedTensorsInferShape(self):
@@ -276,7 +276,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testStackWithUninitializedTensorsInferShapeGpu(self):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self._testStackWithUninitializedTensorsInferShape()
 
   def testStackReservedListWithNoElementsAndPartialElementShapeFails(self):
@@ -431,7 +431,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testGatherWithUninitializedTensorsGpu(self):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self._testGatherWithUninitializedTensors()
 
   def _testGatherWithUninitializedTensorsInferShape(self):
@@ -446,7 +446,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testGatherWithUninitializedTensorsInferShapeGpu(self):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self._testGatherWithUninitializedTensorsInferShape()
 
   def testGatherReservedListWithNoElementsAndPartialElementShapeFails(self):
@@ -561,7 +561,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testFromTensorGPU(self):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self.testTensorListFromTensor()
 
   def testGetSet(self):
@@ -575,7 +575,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testGetSetGPU(self):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self.testGetSet()
 
   def testGetSetReserved(self):
@@ -589,7 +589,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testGetSetReservedGPU(self):
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       self.testGetSetReserved()
 
   def testSetGetGrad(self):
@@ -694,7 +694,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
   def testCPUGPUCopy(self):
     t = constant_op.constant([1.0, 2.0])
     l = list_ops.tensor_list_from_tensor(t, element_shape=[])
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       l_gpu = array_ops.identity(l)
       self.assertAllEqual(
           self.evaluate(
@@ -714,7 +714,7 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
         element_shape=constant_op.constant([], dtype=dtypes.int32),
         element_dtype=dtypes.variant)
     l = list_ops.tensor_list_push_back(l, child_l)
-    with context.device("gpu:0"):
+    with context.device(test_util.gpu_device_name()):
       l_gpu = array_ops.identity(l)
       _, child_l_gpu = list_ops.tensor_list_pop_back(
           l_gpu, element_dtype=dtypes.variant)
@@ -1587,7 +1587,12 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
     if context.num_gpus() < 2:
       self.skipTest("Need at least 2 GPUs for this test, found %d" %
                     context.num_gpus())
-    with ops.device("gpu:0"):
+
+    gpu_type = test_util.gpu_device_type()
+    first_device_name = "{}:0".format(gpu_type)
+    second_device_name = "{}:1".format(gpu_type)
+
+    with ops.device(first_device_name):
       t = constant_op.constant([1.0, 2.0, 3.0])
       inner_l = list_ops.tensor_list_from_tensor(t, element_shape=[])
       outer_l = list_ops.empty_tensor_list(
@@ -1596,12 +1601,12 @@ class ListOpsTest(test_util.TensorFlowTestCase, parameterized.TestCase):
 
     # Stress test.
     for _ in range(1024):
-      with ops.device("gpu:1"):
+      with ops.device(second_device_name):
         outer_l = array_ops.identity(outer_l)
-      with ops.device("gpu:0"):
+      with ops.device(first_device_name):
         outer_l = array_ops.identity(outer_l)
 
-    with ops.device("gpu:1"):
+    with ops.device(second_device_name):
       _, inner_l = list_ops.tensor_list_pop_back(
           outer_l, element_dtype=dtypes.variant)
       t = list_ops.tensor_list_stack(inner_l, element_dtype=dtypes.float32)

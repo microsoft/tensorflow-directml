@@ -51,6 +51,8 @@ port::StatusOr<void*> GetMiopenDsoHandle();
 port::StatusOr<void*> GetRocfftDsoHandle();
 port::StatusOr<void*> GetRocrandDsoHandle();
 port::StatusOr<void*> GetHipDsoHandle();
+port::StatusOr<void*> GetDirectMLDsoHandle();
+port::StatusOr<void*> GetDirectMLDebugDsoHandle();
 
 // The following method tries to dlopen all necessary GPU libraries for the GPU
 // platform TF is built with (CUDA or ROCm) only when these libraries should be
@@ -83,6 +85,8 @@ port::StatusOr<void*> GetMiopenDsoHandle();
 port::StatusOr<void*> GetRocfftDsoHandle();
 port::StatusOr<void*> GetRocrandDsoHandle();
 port::StatusOr<void*> GetHipDsoHandle();
+port::StatusOr<void*> GetDirectMLDsoHandle();
+port::StatusOr<void*> GetDirectMLDebugDsoHandle();
 }  // namespace CachedDsoLoader
 
 }  // namespace internal

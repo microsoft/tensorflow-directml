@@ -28,6 +28,8 @@ from tensorflow.python.platform import googletest
 class RaggedWhereOpTest(test_util.TensorFlowTestCase,
                         parameterized.TestCase):
 
+  # TFDML #25564411
+  @test_util.skip_dml
   @parameterized.parameters([
       #=========================================================================
       # Docstring Examples

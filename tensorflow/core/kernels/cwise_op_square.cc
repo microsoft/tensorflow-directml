@@ -43,4 +43,13 @@ REGISTER_KERNEL_BUILDER(Name("Square")
                             .TypeConstraint<int32>("T"),
                         UnaryOp<CPUDevice, functor::square<int32>>);
 #endif  // TENSORFLOW_USE_SYC
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Square")
+                            .Device(DEVICE_DML)
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        UnaryOp<CPUDevice, functor::square<int32>>);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

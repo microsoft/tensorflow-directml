@@ -76,6 +76,10 @@ limitations under the License.
 #include "tensorflow/core/platform/types.h"
 #include "tensorflow/core/util/util.h"
 
+#if TENSORFLOW_USE_DIRECTML
+#include "tensorflow/core/common_runtime/dml/dml_util.h"
+#endif  // TENSORFLOW_USE_DIRECTML
+
 namespace tensorflow {
 
 REGISTER_KERNEL_BUILDER(Name("_VarHandlesOp").Device(DEVICE_CPU),
@@ -297,6 +301,38 @@ REGISTER_KERNEL_BUILDER(Name("_VarHandlesOp")
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#if TENSORFLOW_USE_DIRECTML
+
+REGISTER_KERNEL_BUILDER(
+    Name("ReadVariableOp").Device(DEVICE_DML).HostMemory("resource"),
+    ReadVariableOp);
+REGISTER_KERNEL_BUILDER(
+    Name("_ReadVariablesOp").Device(DEVICE_DML).HostMemory("resources"),
+    ReadVariablesOp);
+
+#define REGISTER_DML_KERNEL(type)                             \
+  REGISTER_KERNEL_BUILDER(Name("VarHandleOp")                 \
+                              .Device(DEVICE_DML)             \
+                              .HostMemory("resource")         \
+                              .TypeConstraint<type>("dtype"), \
+                          VarHandleOp)
+// We deliberately register the same types here that CUDA does.
+TF_CALL_GPU_ALL_TYPES(REGISTER_DML_KERNEL);
+TF_CALL_int64(REGISTER_DML_KERNEL);
+TF_CALL_variant(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+REGISTER_KERNEL_BUILDER(Name("_VarHandlesOp")
+                            .Device(DEVICE_DML)
+                            .HostMemory("resources")
+                            .TypeConstraint("dtypes",
+                                            {DT_INT64, DT_COMPLEX64,
+                                             DT_COMPLEX128, DT_HALF, DT_FLOAT,
+                                             DT_DOUBLE, DT_BOOL, DT_VARIANT}),
+                        ResourceHandlesOp<Var>);
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 template <typename T>
 class VariableShapeOp : public OpKernel {
  public:
@@ -341,6 +377,23 @@ REGISTER_KERNEL_BUILDER(Name("VariableShape")
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#if TENSORFLOW_USE_DIRECTML
+
+REGISTER_KERNEL_BUILDER(Name("VariableShape")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("out_type")
+                            .HostMemory("output")
+                            .HostMemory("input"),
+                        VariableShapeOp<int32>);
+REGISTER_KERNEL_BUILDER(Name("VariableShape")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int64>("out_type")
+                            .HostMemory("output")
+                            .HostMemory("input"),
+                        VariableShapeOp<int64>);
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 DestroyResourceOp::DestroyResourceOp(OpKernelConstruction* ctx)
     : OpKernel(ctx) {
   OP_REQUIRES_OK(ctx,
@@ -362,10 +415,17 @@ REGISTER_KERNEL_BUILDER(
     Name("DestroyResourceOp").Device(DEVICE_GPU).HostMemory("resource"),
     DestroyResourceOp);
 
-template <typename Device, typename T>
-class AssignVariableOp : public OpKernel {
+#if TENSORFLOW_USE_DIRECTML
+
+REGISTER_KERNEL_BUILDER(
+    Name("DestroyResourceOp").Device(DEVICE_DML).HostMemory("resource"),
+    DestroyResourceOp);
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
+class AssignVariableOpBase : public OpKernel {
  public:
-  explicit AssignVariableOp(OpKernelConstruction* c) : OpKernel(c) {
+  explicit AssignVariableOpBase(OpKernelConstruction* c) : OpKernel(c) {
     OP_REQUIRES_OK(c, c->GetAttr("dtype", &dtype_));
     if (!c->GetAttr("_grappler_relax_allocator_constraints",
                     &relax_constraints_)
@@ -374,7 +434,9 @@ class AssignVariableOp : public OpKernel {
     }
   }
 
-  void Compute(OpKernelContext* context) override {
+ protected:
+  template <typename CopyFunctor>
+  void ComputeImpl(OpKernelContext* context, CopyFunctor copy_functor) {
     OP_REQUIRES(context, dtype_ == context->input(1).dtype(),
                 errors::InvalidArgument(
                     "Variable and value dtypes don't match; respectively, ",
@@ -413,9 +475,7 @@ class AssignVariableOp : public OpKernel {
       OP_REQUIRES_OK(context,
                      context->allocate_persistent(value.dtype(), value.shape(),
                                                   &unused, &tmp, attr));
-      functor::DenseUpdate<Device, T, ASSIGN> copy_functor;
-      copy_functor(context->eigen_device<Device>(), tmp->flat<T>(),
-                   value.flat<T>());
+      copy_functor(context, tmp, value);
       *variable->tensor() = *tmp;
     } else {
       *variable->tensor() = value;
@@ -426,6 +486,17 @@ class AssignVariableOp : public OpKernel {
  private:
   DataType dtype_;
   bool relax_constraints_;
+};
+
+template <typename Device, typename T>
+class AssignVariableOp : public AssignVariableOpBase {
+ public:
+  explicit AssignVariableOp(OpKernelConstruction* c)
+      : AssignVariableOpBase(c) {}
+
+  void Compute(OpKernelContext* context) override {
+    ComputeImpl(context, &DefaultCopyFunctor<Device, T>);
+  }
 };
 
 template <typename Device>
@@ -529,6 +600,39 @@ TF_CALL_variant(REGISTER_GPU_KERNELS);
 #undef REGISTER_GPU_KERNELS
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#if TENSORFLOW_USE_DIRECTML
+
+class DmlAssignVariableOp : public AssignVariableOpBase {
+ public:
+  explicit DmlAssignVariableOp(OpKernelConstruction* c)
+      : AssignVariableOpBase(c) {}
+
+  void Compute(OpKernelContext* context) override {
+    ComputeImpl(context, &dml_util::CopyTensorInSameDevice);
+  }
+};
+
+#define REGISTER_DML_KERNEL(type)                            \
+  REGISTER_KERNEL_BUILDER(Name("AssignVariableOp")           \
+                              .Device(DEVICE_DML)            \
+                              .TypeConstraint<type>("dtype") \
+                              .HostMemory("resource"),       \
+                          DmlAssignVariableOp);
+// We deliberately register the same types here that CUDA does.
+TF_CALL_GPU_ALL_TYPES(REGISTER_DML_KERNEL);
+TF_CALL_int64(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+// DML can use the existing kernel for variant
+struct DummyDevice {};
+REGISTER_KERNEL_BUILDER(Name("AssignVariableOp")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<Variant>("dtype")
+                            .HostMemory("resource"),
+                        AssignVariableOp<DummyDevice, Variant>);
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 template <typename Device, typename T, DenseUpdateType Op>
 class AssignUpdateVariableOp : public OpKernel {
  public:
@@ -623,6 +727,16 @@ REGISTER_KERNEL_BUILDER(Name("VarIsInitializedOp")
                             .HostMemory("is_initialized"),
                         IsResourceInitialized<Var>);
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#if TENSORFLOW_USE_DIRECTML
+
+REGISTER_KERNEL_BUILDER(Name("VarIsInitializedOp")
+                            .Device(DEVICE_DML)
+                            .HostMemory("resource")
+                            .HostMemory("is_initialized"),
+                        IsResourceInitialized<Var>);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 template <typename Device, typename T, typename Index>
 class ResourceGatherOp : public OpKernel {

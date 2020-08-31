@@ -71,6 +71,13 @@ Status AssignAndLog(int assigned_device, Node* node,
 
 }  // namespace
 
+static bool ShouldLogDevicePlacement(bool initial_value) {
+  if (initial_value) return true;
+
+  const char* force_logging = getenv("TF_CPP_LOG_DEVICE_PLACEMENT");
+  return force_logging != nullptr && !strcmp(force_logging, "1");
+}
+
 Placer::Placer(Graph* graph, const string& function_name,
                const FunctionLibraryDefinition* flib_def,
                const DeviceSet* devices, const Device* default_local_device,
@@ -81,7 +88,7 @@ Placer::Placer(Graph* graph, const string& function_name,
       devices_(devices),
       default_local_device_(default_local_device),
       allow_soft_placement_(allow_soft_placement),
-      log_device_placement_(log_device_placement) {}
+      log_device_placement_(ShouldLogDevicePlacement(log_device_placement)) {}
 
 Placer::Placer(Graph* graph, const string& function_name,
                const DeviceSet* devices, const Device* default_local_device)

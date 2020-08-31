@@ -27,10 +27,13 @@ limitations under the License.
 #include "tensorflow/core/framework/tensor_shape.h"
 #include "tensorflow/core/framework/types.h"
 #include "tensorflow/core/kernels/aggregate_ops.h"
+#include "tensorflow/core/kernels/concat_lib.h"
 #include "tensorflow/core/kernels/fill_functor.h"
+#include "tensorflow/core/kernels/split_lib.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/types.h"
+#include "tensorflow/core/util/ptr_util.h"
 
 namespace tensorflow {
 
@@ -96,6 +99,56 @@ TF_CALL_complex128(TENSOR_ARRAY_SET_ZERO_GPU);
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 #undef TENSOR_ARRAY_SET_ZERO
+
+// Concatenates the tensors in `values` and writes the result into
+// `output_tensor`. The shapes of the tensors are ignored; they are treated as
+// linear buffers.
+template <typename Device, typename T>
+void ConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
+                   absl::Span<PersistentTensor> values) {
+  typedef typename TTypes<T, 2>::ConstMatrix ConstMatrix;
+  typedef std::vector<std::unique_ptr<ConstMatrix> > ConstMatrixVector;
+
+  int32 num_indices = static_cast<int32>(values.size());
+
+  ConstMatrixVector input_tensors_flat;
+  input_tensors_flat.reserve(num_indices);
+  auto output_flat =
+      output_tensor->shaped<T, 2>({1, output_tensor->NumElements()});
+
+  for (int i = 0; i < num_indices; ++i) {
+    const Tensor* value_t = values[i].AccessTensor(ctx);
+    input_tensors_flat.push_back(MakeUnique<ConstMatrix>(
+        value_t->shaped<T, 2>({1, value_t->NumElements()})));
+  }
+
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+  if (std::is_same<Device, GPUDevice>::value) {
+    ConcatGPU<T>(ctx, input_tensors_flat, output_tensor, &output_flat);
+    return;
+  }
+#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+  ConcatCPU<T>(ctx->device(), input_tensors_flat, &output_flat);
+}
+
+// Extracts a single contiguous slice from the input tensor, starting at
+// `start_element` and `element_count` elements large. The shapes of the tensors
+// are ignored; they are treated as linear buffers.
+template <typename Device, typename T>
+void SplitTensor(OpKernelContext* ctx, Tensor* output_tensor,
+                 const Tensor& input_tensor, int64 start_element,
+                 int64 element_count) {
+  auto output_tensor_t =
+      output_tensor->shaped<T, 3>({1, 1, output_tensor->NumElements()});
+  auto input_tensor_t =
+      input_tensor.shaped<T, 3>({1, 1, input_tensor.NumElements()});
+
+  Eigen::DSizes<Eigen::DenseIndex, 3> index{0, 0, start_element};
+  Eigen::DSizes<Eigen::DenseIndex, 3> size{1, 1, element_count};
+
+  functor::Split<Device, T, 3>()(ctx->eigen_device<Device>(), output_tensor_t,
+                                 input_tensor_t, index, size);
+}
 
 }  // namespace tensor_array
 

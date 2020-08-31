@@ -51,10 +51,12 @@ inline std::pair<int, int> GetNumGPUs(const Cluster& cluster) {
   int num_gpus = 0;
   int num_volta = 0;
   for (const auto& device : devices) {
-    if (device.second.type() != kGPU) {
+    if (device.second.type() != kGPU && device.second.type() != kDML) {
       continue;
     }
     num_gpus++;
+    // TODO #26542950: Enable Tensorcore specific grappler optimizations
+    // TFDML #26542950
     auto compute_capability_it =
         device.second.environment().find("architecture");
     if (compute_capability_it == device.second.environment().end()) {
@@ -109,6 +111,8 @@ inline std::pair<string, string> GetSrcAndDstDataFormats(
     const TransposeContext& context, int num_gpus, int num_voltas) {
   string src_format = kNHWC;
   string dst_format = kNCHW;
+  // TODO #26542950: Enable Tensorcore specific grappler optimizations
+  // TFDML #26542950
   if (((static_cast<float>(num_voltas) / static_cast<float>(num_gpus)) >=
        kVoltaGPURatioThreshold) &&
       NumConv2DOnDeviceWithDataTypeOverThreshold(context, kGPU, DT_HALF)) {
@@ -417,6 +421,8 @@ Status GenericLayoutOptimizer::Optimize(Cluster* cluster,
   const auto src_dst_formats =
       GetSrcAndDstDataFormats(context, num_gpus, num_gpus_and_num_volta.second);
   context.AssignDeviceAndDataFormats(kGPU, src_dst_formats.first,
+                                     src_dst_formats.second);
+  context.AssignDeviceAndDataFormats(kDML, src_dst_formats.first,
                                      src_dst_formats.second);
 
   TransposerFactory transposer_factory;

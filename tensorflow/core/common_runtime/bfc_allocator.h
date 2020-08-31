@@ -49,7 +49,8 @@ class BFCAllocator : public Allocator {
   // Takes ownership of sub_allocator.
   BFCAllocator(SubAllocator* sub_allocator, size_t total_memory,
                bool allow_growth, const string& name,
-               bool garbage_collection = false);
+               bool garbage_collection = false,
+               size_t max_allocation_size = -1);
   ~BFCAllocator() override;
 
   string Name() override { return name_; }
@@ -491,6 +492,11 @@ class BFCAllocator : public Allocator {
   // Whether the allocator will deallocate free regions to avoid OOM due to
   // memory fragmentation.
   bool garbage_collection_;
+
+  // The largest single allocation size, in bytes, that is supported by the the
+  // SubAllocator (and therefore the largest allocation supported by this
+  // allocator)
+  size_t max_allocation_size_bytes_;
 
   std::unique_ptr<SubAllocator> sub_allocator_;
   string name_;

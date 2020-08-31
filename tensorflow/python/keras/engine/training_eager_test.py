@@ -27,6 +27,7 @@ from tensorflow.python import keras
 from tensorflow.python.data.ops import dataset_ops
 from tensorflow.python.eager import context
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import test_util as tf_test_util
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.keras import metrics as metrics_module
 from tensorflow.python.keras import testing_utils
@@ -37,6 +38,8 @@ from tensorflow.python.platform import test
 
 class TrainingTest(keras_parameterized.TestCase):
 
+  # TFDML #25564887
+  @tf_test_util.skip_dml
   @keras_parameterized.run_all_keras_modes(always_skip_v1=True)
   def test_dynamic_model_has_trainable_weights(self):
     if not context.executing_eagerly():
@@ -66,6 +69,8 @@ class TrainingTest(keras_parameterized.TestCase):
     # account during tracking.
     self.assertLess(loss, 1)
 
+  # TFDML #25564887
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types(exclude_models='sequential')
   @keras_parameterized.run_all_keras_modes
   def test_model_methods_with_eager_tensors_multi_io(self):
@@ -146,6 +151,8 @@ class TrainingTest(keras_parameterized.TestCase):
                    batch_size=2, verbose=0)
     model.test_on_batch([input_a, input_b], [target_a, target_b])
 
+  # TFDML #25564887
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes
   def test_model_methods_with_eager_tensors_single_io(self):
@@ -235,6 +242,8 @@ class TrainingTest(keras_parameterized.TestCase):
 
 class CorrectnessTest(keras_parameterized.TestCase):
 
+  # TFDML #25564887
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes
   def test_loss_correctness(self):
@@ -256,6 +265,8 @@ class CorrectnessTest(keras_parameterized.TestCase):
     history = model.fit(x, y, epochs=1, batch_size=10)
     self.assertAlmostEqual(history.history['loss'][-1], 0.5836, 4)
 
+  # TFDML #25564887
+  @tf_test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes
   def test_loss_correctness_with_iterator(self):

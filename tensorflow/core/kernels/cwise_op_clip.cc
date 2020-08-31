@@ -211,4 +211,18 @@ REGISTER_KERNEL_BUILDER(Name("ClipByValue")
 #undef REGISTER_GPU_KERNEL
 #endif
 
+#ifdef TENSORFLOW_USE_DIRECTML
+// A special GPU kernel for int32.
+// TODO(b/25387198): Also enable int32 in device memory. This kernel
+// registration requires all int32 inputs and outputs to be in host memory.
+REGISTER_KERNEL_BUILDER(Name("ClipByValue")
+                            .Device(DEVICE_DML)
+                            .HostMemory("t")
+                            .HostMemory("clip_value_min")
+                            .HostMemory("clip_value_max")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T"),
+                        ClipOp<CPUDevice, int32>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace tensorflow

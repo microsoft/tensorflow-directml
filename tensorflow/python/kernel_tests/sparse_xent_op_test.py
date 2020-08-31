@@ -154,6 +154,7 @@ class SparseXentTest(test.TestCase):
         nn_ops.sparse_softmax_cross_entropy_with_logits(
             labels=constant_op.constant(0), logits=constant_op.constant(1.0))
 
+  @test_util.skip_dml # TFDML #25501035
   @test_util.run_deprecated_v1
   def testLabelsPlaceholderScalar(self):
     with self.session(use_gpu=True):
@@ -163,6 +164,7 @@ class SparseXentTest(test.TestCase):
       with self.assertRaisesOpError("labels must be 1-D"):
         y.eval(feed_dict={labels: 0})
 
+  @test_util.skip_dml # TFDML #25501035
   def testVector(self):
     with self.session(use_gpu=True):
       loss = nn_ops.sparse_softmax_cross_entropy_with_logits(

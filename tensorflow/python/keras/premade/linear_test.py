@@ -27,6 +27,7 @@ from tensorflow.python.feature_column import feature_column_v2 as fc
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import sparse_tensor
+from tensorflow.python.framework import test_util as tf_test_util
 from tensorflow.python.keras import backend
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.keras import losses
@@ -115,8 +116,12 @@ class LinearModelTest(keras_parameterized.TestCase):
           values.append(val_2)
           target[i] = 0.3 * val_1 + 0.2 * val_2
 
+      # DML doesn't support float64
+      values_dtype = (np.float32 if tf_test_util.gpu_device_type() == 'DML'
+                      else np.float64)
+
       indices = np.asarray(indices)
-      values = np.asarray(values)
+      values = np.asarray(values, dtype=values_dtype)
       shape = constant_op.constant([batch_size, 2], dtype=dtypes.int64)
       inp = sparse_tensor.SparseTensor(indices, values, shape)
       model = linear.LinearModel(use_bias=False)

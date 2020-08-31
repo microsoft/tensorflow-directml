@@ -787,6 +787,8 @@ class StaticVocabularyTableTest(BaseLookupTableTest):
     self.assertAllEqual([0, 1, 2, 3], self.evaluate(out))
     self.assertEqual(vocab_size + oov_buckets, self.evaluate(table.size()))
 
+  # TFDML #25563599
+  @test_util.skip_dml
   def testInt32StaticVocabularyTable(self):
     vocab_file = self._createVocabFile("feat_to_id_2.txt", ("42", "1", "-1000"))
     vocab_size = 3
@@ -924,6 +926,8 @@ class StaticVocabularyTableTest(BaseLookupTableTest):
     self.assertAllEqual([0, 1, 0, 2, 3], sp_ids_val)
     self.assertAllEqual(input_shape, sp_ids_shape)
 
+  # TFDML #25563557
+  @test_util.skip_dml
   def testInt32SparseTensor(self):
     input_indices = [[0, 0], [0, 1], [2, 0], [2, 2], [3, 0]]
     input_shape = [4, 4]

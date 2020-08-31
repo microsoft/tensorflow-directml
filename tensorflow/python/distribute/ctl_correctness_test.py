@@ -31,6 +31,7 @@ from tensorflow.python.eager import def_function
 from tensorflow.python.eager import test
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import random_seed
+from tensorflow.python.framework import test_util
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import nn
 
@@ -216,6 +217,8 @@ class TestDistributionStrategyDnnCorrectness(test.TestCase,
     np.random.seed(_RANDOM_SEED)
     random_seed.set_random_seed(_RANDOM_SEED)
 
+  # TFDML #25610789
+  @test_util.skip_dml
   @combinations.generate(
       combinations.combine(
           distribution=strategy_combinations.strategies_minus_tpu,

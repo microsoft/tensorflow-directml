@@ -50,6 +50,8 @@ def _initialized_session(config=None):
 
 class SequenceFeaturesTest(test.TestCase, parameterized.TestCase):
 
+  # TFDML #25564605
+  @test_util.skip_dml
   @parameterized.named_parameters(
       {'testcase_name': '2D',
        'sparse_input_args_a': {
@@ -275,6 +277,8 @@ class SequenceFeaturesTest(test.TestCase, parameterized.TestCase):
       _, _ = sequence_input_layer({'aaa': sparse_input_a,
                                    'bbb': sparse_input_b})
 
+  # TFDML #25564605
+  @test_util.skip_dml
   @parameterized.named_parameters(
       {'testcase_name': '2D',
        'sparse_input_args_a': {
@@ -961,6 +965,8 @@ class SequenceCategoricalColumnWithVocabularyListTest(
 class SequenceEmbeddingColumnTest(
     test.TestCase, parameterized.TestCase):
 
+  # TFDML #25564605
+  @test_util.skip_dml
   @parameterized.named_parameters(
       {'testcase_name': '2D',
        'inputs_args': {
@@ -1095,6 +1101,8 @@ class SequenceEmbeddingColumnTest(
 
 class SequenceSharedEmbeddingColumnTest(test.TestCase):
 
+  # TFDML #25564605
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def test_get_sequence_dense_tensor(self):
     vocabulary_size = 3
@@ -1314,6 +1322,8 @@ class SequenceIndicatorColumnTest(test.TestCase, parameterized.TestCase):
 
     self.assertAllEqual(expected, self.evaluate(indicator_tensor))
 
+  # TFDML #25564605
+  @test_util.skip_dml
   @parameterized.named_parameters(
       {'testcase_name': '2D',
        'inputs_args': {
@@ -1347,6 +1357,8 @@ class SequenceIndicatorColumnTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual(expected_sequence_length, sequence_length)
     self.assertEqual(np.int64, sequence_length.dtype)
 
+  # TFDML #25564605
+  @test_util.skip_dml
   def test_sequence_length_with_empty_rows(self):
     """Tests _sequence_length when some examples do not have ids."""
     vocabulary_size = 3
@@ -1556,6 +1568,8 @@ class SequenceNumericColumnTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual(expected_sequence_length, sequence_length)
     self.assertEqual(np.int64, sequence_length.dtype)
 
+  # TFDML #25564605
+  @test_util.skip_dml
   def test_sequence_length_with_empty_rows(self):
     """Tests _sequence_length when some examples do not have ids."""
     sparse_input = sparse_tensor.SparseTensorValue(

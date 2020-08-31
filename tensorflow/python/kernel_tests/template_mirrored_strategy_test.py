@@ -44,7 +44,8 @@ class TemplateMirroredStrategyTest(test.TestCase):
 
     temp = template.make_template("my_template", fn)
 
-    strategy = mirrored_strategy.MirroredStrategy(["/cpu:0", "/gpu:0"])
+    gpu_device_name = test_util.gpu_device_name()
+    strategy = mirrored_strategy.MirroredStrategy(["/cpu:0", gpu_device_name])
     out = strategy.experimental_local_results(
         strategy.experimental_run_v2(temp))
 

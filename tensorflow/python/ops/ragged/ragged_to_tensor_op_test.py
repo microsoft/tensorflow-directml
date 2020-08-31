@@ -252,6 +252,8 @@ class RaggedToTensorOpAdditionalTests(test_util.TensorFlowTestCase):
     if expected is not None:
       self.assertAllEqual(expected, treatment)
 
+  # TFDML #25510296
+  @test_util.skip_dml
   def test_already_dense_simple(self):
     """This studies a tensor initialized with value_rowids and nrows."""
     input_data = RaggedTensor.from_value_rowids(
@@ -262,6 +264,8 @@ class RaggedToTensorOpAdditionalTests(test_util.TensorFlowTestCase):
         validate=True)
     self._compare_to_reference(input_data, [[6, 7, 8], [9, 10, 11]])
 
+  # TFDML #25510296
+  @test_util.skip_dml
   def test_already_dense_with_dense_values_and_default(self):
     """This studies a tensor initialized with value_rowids and nrows."""
     input_data = RaggedTensor.from_value_rowids(
@@ -277,6 +281,8 @@ class RaggedToTensorOpAdditionalTests(test_util.TensorFlowTestCase):
         [[[6, 7], [8, 9], [10, 11]], [[12, 13], [14, 15], [16, 17]]],
         default_value=constant_op.constant([31, 32], dtype=dtypes.int64))
 
+  # TFDML #25510296
+  @test_util.skip_dml
   def test_already_dense_with_dense_values(self):
     """This studies a tensor initialized with value_rowids and nrows."""
     input_data = RaggedTensor.from_value_rowids(
@@ -291,6 +297,8 @@ class RaggedToTensorOpAdditionalTests(test_util.TensorFlowTestCase):
         input_data,
         [[[6, 7], [8, 9], [10, 11]], [[12, 13], [14, 15], [16, 17]]])
 
+  # TFDML #25510296
+  @test_util.skip_dml
   def test_ragged_with_dense_values_and_default(self):
     """This studies a tensor initialized with value_rowids and nrows."""
     input_data = RaggedTensor.from_value_rowids(
@@ -303,6 +311,8 @@ class RaggedToTensorOpAdditionalTests(test_util.TensorFlowTestCase):
         input_data, [[[6, 7], [8, 9], [10, 11]], [[12, 13], [14, 15], [2, 3]]],
         default_value=[2, 3])
 
+  # TFDML #25510296
+  @test_util.skip_dml
   def test_ragged_with_dense_values_and_small_default(self):
     """This studies a tensor initialized with value_rowids and nrows."""
     input_data = RaggedTensor.from_value_rowids(
@@ -315,6 +325,8 @@ class RaggedToTensorOpAdditionalTests(test_util.TensorFlowTestCase):
         input_data, [[[6, 7], [8, 9], [10, 11]], [[12, 13], [14, 15], [2, 2]]],
         default_value=2)
 
+  # TFDML #25510296
+  @test_util.skip_dml
   def test_already_dense_with_dense_values_string(self):
     """This studies a tensor initialized with value_rowids and nrows."""
     input_data = RaggedTensor.from_value_rowids(
@@ -331,6 +343,8 @@ class RaggedToTensorOpAdditionalTests(test_util.TensorFlowTestCase):
                                 [[b'g', b'jalapeno'], [b'kangaroo', b'llama'],
                                  [b'manzana', b'nectar']]])
 
+  # TFDML #25510296
+  @test_util.skip_dml
   def test_already_dense_with_string(self):
     """This studies a tensor initialized with value_rowids and nrows."""
     input_data = RaggedTensor.from_value_rowids(
@@ -433,6 +447,8 @@ class RaggedToTensorOpAdditionalTests(test_util.TensorFlowTestCase):
         actual, [[0, 1, 2, 0], [0, 0, 0, 0], [3, 0, 0, 0], [0, 0, 0, 0]])
     self.assertEqual(actual.shape.as_list(), [4, 4])
 
+  # TFDML #25510296
+  @test_util.skip_dml
   def test_value_transposed(self):
     # This test tries to get a tensor in columnar format, where I am uncertain
     # as to whether the underlying op, which copies data in the raw format,

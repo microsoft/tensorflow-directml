@@ -36,6 +36,7 @@ from tensorflow.python.keras.engine import sequential
 from tensorflow.python.keras.optimizer_v2 import gradient_descent
 from tensorflow.python.platform import test
 from tensorflow.python.training import gradient_descent as gradient_descent_v1
+from tensorflow.python.framework import test_util as tf_test_util
 
 
 class KerasMultiWorkerOptimizerTest(test_base.IndependentWorkerTestBase,
@@ -124,6 +125,8 @@ class KerasMultiWorkerOptimizerTest(test_base.IndependentWorkerTestBase,
       threads_to_join = [threads['worker'][0]]
     self.join_independent_workers(threads_to_join)
 
+  # TFDML #25564181
+  @tf_test_util.skip_dml
   @combinations.generate(
       combinations.combine(
           mode=['graph'],

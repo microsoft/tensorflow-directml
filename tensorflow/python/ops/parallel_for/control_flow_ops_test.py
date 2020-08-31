@@ -299,6 +299,8 @@ class BitwiseTest(PForTestCase):
 @test_util.run_all_in_graph_and_eager_modes
 class NNTest(PForTestCase):
 
+  # 5D gather isn't supported by DML
+  @test_util.skip_dml
   def test_conv2d(self):
     x = random_ops.random_uniform([3, 2, 12, 12, 3])
     filt = random_ops.random_uniform([3, 3, 3, 7])
@@ -310,6 +312,8 @@ class NNTest(PForTestCase):
 
     self._test_loop_fn(loop_fn, 3)
 
+  # 5D gather isn't supported by DML
+  @test_util.skip_dml
   def test_conv2d_backprop_input(self):
     x_shape = [2, 12, 12, 3]
     filt = random_ops.random_uniform([3, 3, 3, 7])
@@ -327,6 +331,8 @@ class NNTest(PForTestCase):
 
     self._test_loop_fn(loop_fn, 3)
 
+  # 5D gather isn't supported by DML
+  @test_util.skip_dml
   def test_conv2d_backprop_filter(self):
     x = random_ops.random_uniform([3, 2, 12, 12, 3])
     x_0 = array_ops.gather(x, 0)
@@ -348,6 +354,8 @@ class NNTest(PForTestCase):
 
     self._test_loop_fn(loop_fn, 3, loop_fn_dtypes=[dtypes.float32] * 2)
 
+  # 5D gather isn't supported by DML
+  @test_util.skip_dml
   def test_avg_pool(self):
     with backprop.GradientTape(persistent=True) as g:
       x = random_ops.random_uniform([3, 2, 12, 12, 3])
@@ -409,6 +417,8 @@ class NNTest(PForTestCase):
 
     self._test_loop_fn(loop_fn, 3, loop_fn_dtypes=[dtypes.float32] * 3)
 
+  # 5D gather isn't supported by DML
+  @test_util.skip_dml
   def test_fused_batch_norm(self):
     with compat.forward_compatibility_horizon(2019, 6, 7):
       data_formats = ["NHWC"]

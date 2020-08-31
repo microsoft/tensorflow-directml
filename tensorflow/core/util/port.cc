@@ -15,7 +15,6 @@ limitations under the License.
 
 #include "tensorflow/core/util/port.h"
 
-
 namespace tensorflow {
 
 bool IsGoogleCudaEnabled() {
@@ -34,9 +33,18 @@ bool IsBuiltWithROCm() {
 #endif
 }
 
+bool IsBuiltWithDML() {
+#if TENSORFLOW_USE_DIRECTML
+  return true;
+#else
+  return false;
+#endif
+}
+
 bool GpuSupportsHalfMatMulAndConv() {
-#if (defined(GOOGLE_CUDA) && GOOGLE_CUDA) || \
-    (defined(TENSORFLOW_USE_ROCM) && TENSORFLOW_USE_ROCM)
+#if (defined(GOOGLE_CUDA) && GOOGLE_CUDA) ||                 \
+    (defined(TENSORFLOW_USE_ROCM) && TENSORFLOW_USE_ROCM) || \
+    defined(TENSORFLOW_USE_DIRECTML)
   return true;
 #else
   return false;

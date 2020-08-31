@@ -1708,6 +1708,8 @@ DirectSession::RunState::RunState(
           }
           ScopedAllocatorMgr* sam = d->GetScopedAllocatorMgr();
           if (sam) sam->Cleanup(step_id);
+
+          d->DebugOnSessionRunEnd();
         }
       }) {
   // Initially all the feeds and fetches are pending.
@@ -1716,6 +1718,10 @@ DirectSession::RunState::RunState(
   }
   for (auto& name : pending_output_names) {
     pending_outputs[name] = false;
+  }
+
+  for (Device* device : *devices) {
+    device->DebugOnSessionRunStart();
   }
 }
 

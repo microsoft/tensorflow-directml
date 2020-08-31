@@ -143,7 +143,7 @@ class PrefetchToDeviceTest(test_base.DatasetTestBase):
 
     host_dataset = dataset_ops.Dataset.range(10)
     device_dataset = host_dataset.apply(
-        prefetching_ops.prefetch_to_device("/gpu:0"))
+        prefetching_ops.prefetch_to_device(test_util.gpu_device_name()))
 
     iterator = dataset_ops.make_initializable_iterator(device_dataset)
     next_element = iterator.get_next()
@@ -191,7 +191,7 @@ class PrefetchToDeviceTest(test_base.DatasetTestBase):
 
     host_dataset = dataset_ops.Dataset.range(10)
     device_dataset = host_dataset.apply(
-        prefetching_ops.prefetch_to_device("/gpu:0"))
+        prefetching_ops.prefetch_to_device(test_util.gpu_device_name()))
 
     iterator = dataset_ops.make_initializable_iterator(device_dataset)
     next_element = iterator.get_next()

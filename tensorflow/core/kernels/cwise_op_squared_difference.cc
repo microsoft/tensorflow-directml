@@ -48,4 +48,15 @@ REGISTER_KERNEL_BUILDER(
     BinaryOp<CPUDevice, functor::squared_difference<int32>>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("SquaredDifference")
+        .Device(DEVICE_DML)
+        .HostMemory("x")
+        .HostMemory("y")
+        .HostMemory("z")
+        .TypeConstraint<int32>("T"),
+    BinaryOp<CPUDevice, functor::squared_difference<int32>>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace tensorflow

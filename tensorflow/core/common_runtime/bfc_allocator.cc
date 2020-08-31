@@ -31,8 +31,9 @@ namespace tensorflow {
 
 BFCAllocator::BFCAllocator(SubAllocator* sub_allocator, size_t total_memory,
                            bool allow_growth, const string& name,
-                           bool garbage_collection)
+                           bool garbage_collection, size_t max_allocation_size)
     : garbage_collection_(garbage_collection),
+      max_allocation_size_bytes_(max_allocation_size),
       sub_allocator_(sub_allocator),
       name_(name),
       free_chunks_list_(kInvalidChunkHandle),
@@ -45,6 +46,9 @@ BFCAllocator::BFCAllocator(SubAllocator* sub_allocator, size_t total_memory,
   } else {
     curr_region_allocation_bytes_ = RoundedBytes(total_memory);
   }
+
+  curr_region_allocation_bytes_ =
+      std::min(curr_region_allocation_bytes_, max_allocation_size_bytes_);
 
   // Allocate the requested amount of memory.
   memory_limit_ = total_memory;
@@ -114,6 +118,9 @@ bool BFCAllocator::Extend(size_t alignment, size_t rounded_bytes) {
     increased_allocation = true;
   }
 
+  curr_region_allocation_bytes_ =
+      std::min(curr_region_allocation_bytes_, max_allocation_size_bytes_);
+
   // Try allocating.
   size_t bytes = std::min(curr_region_allocation_bytes_, available_bytes);
   void* mem_addr = sub_allocator_->Alloc(alignment, bytes);
@@ -138,6 +145,9 @@ bool BFCAllocator::Extend(size_t alignment, size_t rounded_bytes) {
   if (!increased_allocation) {
     // Increase the region size of the next required allocation.
     curr_region_allocation_bytes_ *= 2;
+
+    curr_region_allocation_bytes_ =
+        std::min(curr_region_allocation_bytes_, max_allocation_size_bytes_);
   }
 
   VLOG(1) << "Extending allocation by " << strings::HumanReadableNumBytes(bytes)
@@ -361,6 +371,14 @@ void* BFCAllocator::AllocateRawInternal(size_t unused_alignment,
     VLOG(2) << "tried to allocate 0 bytes";
     return nullptr;
   }
+
+  if (num_bytes > max_allocation_size_bytes_) {
+    VLOG(2) << "requested allocation of " << num_bytes
+            << " exceeds maximum supported allocation size of "
+            << max_allocation_size_bytes_;
+    return nullptr;
+  }
+
   // First, always allocate memory of at least kMinAllocationSize
   // bytes, and always allocate multiples of kMinAllocationSize bytes
   // so all memory addresses are nicely byte aligned.

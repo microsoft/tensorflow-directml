@@ -981,6 +981,9 @@ cuda_py_test(
         "//tensorflow/python/eager:test",
         "//tensorflow/python/keras",
     ],
+    tags = [
+        "no_dml", # TFDML #25579048
+    ],
 )
 
 py_library(
@@ -1404,6 +1407,16 @@ py_library(
         ":util",
         ":while_v2",
     ],
+)
+
+tf_py_test(
+    name = "framework_constant_op_test",
+    size = "small",
+    srcs = ["framework/constant_op_test.py"],
+    additional_deps = [
+        ":constant_op",
+    ],
+    main = "framework/constant_op_test.py",
 )
 
 tf_py_test(
@@ -2531,6 +2544,7 @@ cuda_py_test(
         "no_cuda_on_cpu_tap",
         "no_rocm",
         "no_windows",
+        "no_dml",
     ],
 )
 
@@ -5050,11 +5064,13 @@ filegroup(
 
 cc_import(
     name = "_pywrap_tensorflow_internal_linux",
+    interface_library = "not_existing_on_unix.lib",  # Just a placeholder for Unix platforms
     shared_library = "//tensorflow/python:lib_pywrap_tensorflow_internal.so",
 )
 
 cc_import(
     name = "_pywrap_tensorflow_internal_macos",
+    interface_library = "not_existing_on_unix.lib",  # Just a placeholder for Unix platforms
     shared_library = "//tensorflow/python:lib_pywrap_tensorflow_internal.dylib",
 )
 
@@ -6886,6 +6902,7 @@ cuda_py_test(
         "no_oss",
         "noguitar",
         "notap",
+        "no_dml",
     ],
 )
 

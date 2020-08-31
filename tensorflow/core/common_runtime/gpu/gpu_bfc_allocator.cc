@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.h"
 
+#include "tensorflow/core/common_runtime/gpu/gpu_mem_allocator.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 
 namespace tensorflow {
@@ -73,16 +74,20 @@ bool GPUBFCAllocator::GetGarbageCollectionValue() {
   return true;
 }
 
-GPUBFCAllocator::GPUBFCAllocator(GPUMemAllocator* sub_allocator,
-                                 size_t total_memory, const string& name)
-    : GPUBFCAllocator(sub_allocator, total_memory, GPUOptions(), name) {}
+GPUBFCAllocator::GPUBFCAllocator(SubAllocator* sub_allocator,
+                                 size_t total_memory, const string& name,
+                                 size_t max_allocation_size)
+    : GPUBFCAllocator(sub_allocator, total_memory, GPUOptions(), name,
+                      max_allocation_size) {}
 
-GPUBFCAllocator::GPUBFCAllocator(GPUMemAllocator* sub_allocator,
+GPUBFCAllocator::GPUBFCAllocator(SubAllocator* sub_allocator,
                                  size_t total_memory,
                                  const GPUOptions& gpu_options,
-                                 const string& name)
+                                 const string& name,
+                                 size_t max_allocation_size)
     : BFCAllocator(sub_allocator, total_memory,
                    GPUBFCAllocator::GetAllowGrowthValue(gpu_options), name,
-                   GPUBFCAllocator::GetGarbageCollectionValue()) {}
+                   GPUBFCAllocator::GetGarbageCollectionValue(),
+                   max_allocation_size) {}
 
 }  // namespace tensorflow

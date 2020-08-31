@@ -209,6 +209,8 @@ class UniformTest(test.TestCase):
     s_uniform = stats.uniform(loc=a, scale=b - a)
     self.assertAllClose(self.evaluate(uniform.mean()), s_uniform.mean())
 
+  # TFDML #25564949
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testUniformVariance(self):
     a = 10.0

@@ -238,11 +238,13 @@ class MultiDeviceIteratorTest(test_base.DatasetTestBase,
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_type = test_util.gpu_device_type()
+
     dataset = dataset_ops.Dataset.range(10)
     multi_device_iterator = multi_device_iterator_ops.MultiDeviceIterator(
-        dataset, ["/cpu:1", "/gpu:0"])
+        dataset, ["/cpu:1", "/%s:0" % device_type])
 
-    config = config_pb2.ConfigProto(device_count={"CPU": 2, "GPU": 1})
+    config = config_pb2.ConfigProto(device_count={"CPU": 2, device_type: 1})
     with self.test_session(config=config):
       self.evaluate(multi_device_iterator.initializer)
       for i in range(0, 10, 2):
@@ -259,18 +261,20 @@ class MultiDeviceIteratorTest(test_base.DatasetTestBase,
     if not test_util.is_gpu_available():
       self.skipTest("No GPU available")
 
+    device_type = test_util.gpu_device_type()
+
     dataset = dataset_ops.Dataset.range(10)
     multi_device_iterator = multi_device_iterator_ops.MultiDeviceIterator(
-        dataset, ["/cpu:1", "/gpu:0"], max_buffer_size=4)
+        dataset, ["/cpu:1", "/%s:0" % device_type], max_buffer_size=4)
 
-    config = config_pb2.ConfigProto(device_count={"CPU": 2, "GPU": 1})
+    config = config_pb2.ConfigProto(device_count={"CPU": 2, device_type: 1})
     with self.test_session(config=config):
       self.evaluate(multi_device_iterator.initializer)
       for i in range(0, 10, 2):
         elem_on_1 = multi_device_iterator.get_next("/cpu:1")
         self.assertEqual(i, self.evaluate(elem_on_1))
       for i in range(0, 10, 2):
-        elem_on_2 = multi_device_iterator.get_next("/gpu:0")
+        elem_on_2 = multi_device_iterator.get_next("/%s:0" % device_type)
         self.assertEqual(i + 1, self.evaluate(elem_on_2))
       with self.assertRaises(errors.OutOfRangeError):
         elem_on_1, elem_on_2 = multi_device_iterator.get_next()
@@ -282,16 +286,18 @@ class MultiDeviceIteratorTest(test_base.DatasetTestBase,
     if not test_util.is_gpu_available() or context.executing_eagerly():
       self.skipTest("No GPU available")
 
+    device_type = test_util.gpu_device_type()
+
     dataset = dataset_ops.Dataset.range(9)
     multi_device_iterator = multi_device_iterator_ops.MultiDeviceIterator(
-        dataset, ["/cpu:1", "/gpu:0"])
+        dataset, ["/cpu:1", "/%s:0" % device_type])
     elem_on_1, elem_on_2 = multi_device_iterator.get_next_as_optional()
     elem_on_1_has_value_t = elem_on_1.has_value()
     elem_on_1_t = elem_on_1.get_value()
     elem_on_2_has_value_t = elem_on_2.has_value()
     elem_on_2_t = elem_on_2.get_value()
 
-    config = config_pb2.ConfigProto(device_count={"CPU": 2, "GPU": 1})
+    config = config_pb2.ConfigProto(device_count={"CPU": 2, device_type: 1})
     with self.test_session(config=config) as sess:
       self.evaluate(multi_device_iterator.initializer)
       for i in range(0, 8, 2):
@@ -351,8 +357,10 @@ class MultiDeviceIteratorV2Test(test_base.DatasetTestBase):
     with ops.device("/cpu:0"):
       dataset = dataset_ops.Dataset.range(1000)
 
+    device_type = test_util.gpu_device_type()
+
     mdi = multi_device_iterator_ops.MultiDeviceIteratorV2(
-        dataset, ["/cpu:0", "/gpu:0"])
+        dataset, ["/cpu:0", "/%s:0" % device_type])
 
     for i, el in enumerate(mdi):
       self.assertEqual([i * 2, i * 2 + 1], [el[0].numpy(), el[1].numpy()])
@@ -368,8 +376,11 @@ class MultiDeviceIteratorV2Test(test_base.DatasetTestBase):
     def fn():
       with ops.device("/cpu:0"):
         dataset = dataset_ops.Dataset.range(10)
+
+      device_type = test_util.gpu_device_type()
+
       iterator = multi_device_iterator_ops.MultiDeviceIteratorV2(
-          dataset, ["/cpu:0", "/gpu:0"])
+          dataset, ["/cpu:0", "/%s:0" % device_type])
       for _ in range(5):
         el0, el1 = next(iterator)
         queue.enqueue(el0)
@@ -405,8 +416,11 @@ class MultiDeviceIteratorV2Test(test_base.DatasetTestBase):
     @def_function.function
     def fn():
       dataset = dataset_ops._GeneratorDataset(1, init_fn, next_fn, finalize_fn)
+
+      device_type = test_util.gpu_device_type()
+
       iterator = multi_device_iterator_ops.MultiDeviceIteratorV2(
-          dataset, ["/cpu:0", "/gpu:0"])
+          dataset, ["/cpu:0", "/%s:0" % device_type])
       next(iterator)
 
     with self.assertRaises(errors.OutOfRangeError):
@@ -422,9 +436,11 @@ class MultiDeviceIteratorV2Test(test_base.DatasetTestBase):
     with ops.device("/cpu:0"):
       dataset = dataset_ops.Dataset.range(1000)
 
+    device_type = test_util.gpu_device_type()
+
     for _ in range(5):
       multi_device_iterator = multi_device_iterator_ops.MultiDeviceIteratorV2(
-          dataset, ["/cpu:0", "/gpu:0"])
+          dataset, ["/cpu:0", "/%s:0" % device_type])
       for i, el in enumerate(multi_device_iterator):
         self.assertEqual([i * 2, i * 2 + 1], [el[0].numpy(), el[1].numpy()])
 
@@ -448,17 +464,20 @@ class MultiDeviceIteratorV2Test(test_base.DatasetTestBase):
     dataset = dataset_ops.Dataset.range(10)
     dataset2 = dataset_ops.Dataset.range(20)
 
+    device_type = test_util.gpu_device_type()
+
     for _ in range(10):
       multi_device_iterator = multi_device_iterator_ops.MultiDeviceIteratorV2(
-          dataset, ["/cpu:0", "/gpu:0"])
+          dataset, ["/cpu:0", "/%s:0" % device_type])
       self.assertEqual(self.evaluate(f(multi_device_iterator)), 45)
       multi_device_iterator2 = multi_device_iterator_ops.MultiDeviceIteratorV2(
-          dataset2, ["/cpu:0", "/gpu:0"])
+          dataset2, ["/cpu:0", "/%s:0" % device_type])
       self.assertEqual(self.evaluate(f(multi_device_iterator2)), 45)
       self.assertEqual(trace_count[0], 1)
 
 
 if __name__ == "__main__":
   ops.enable_eager_execution(
-      config=config_pb2.ConfigProto(device_count={"CPU": 3, "GPU": 1}))
+      config=config_pb2.ConfigProto(
+          device_count={"CPU": 3, test_util.gpu_device_type(): 1}))
   test.main()

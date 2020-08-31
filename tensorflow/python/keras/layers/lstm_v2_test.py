@@ -518,6 +518,8 @@ class LSTMV2Test(keras_parameterized.TestCase):
     self.assertAllClose(y, y_ref)
     self.assertAllClose(layer.get_weights(), new_layer.get_weights())
 
+  # TFDML #25563771
+  @test_util.skip_dml
   def test_lstm_output_on_multiple_kernel(self):
     input_shape = 10
     rnn_state_size = 8
@@ -570,6 +572,8 @@ class LSTMV2Test(keras_parameterized.TestCase):
         input_shape=(num_samples, timesteps, embedding_dim))
 
   def test_float64_LSTM(self):
+    if test.is_built_with_rocm:
+      self.skipTest("Double type is yet not supported in ROCm")
     num_samples = 2
     timesteps = 3
     embedding_dim = 4

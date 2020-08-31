@@ -2429,7 +2429,7 @@ class TensorArrayOnCorrectDeviceTest(test.TestCase):
     for ds in step_stats.dev_stats:
       if "cpu:0" in ds.device[-5:].lower():
         cpu_stats = ds.node_stats
-      if "gpu:0" == ds.device[-5:].lower():
+      if ds.device[-5:].lower() in ["gpu:0", "dml:0"]:
         gpu_stats = ds.node_stats
     return cpu_stats, gpu_stats
 
@@ -2891,7 +2891,7 @@ class RNNCellTest(test.TestCase, parameterized.TestCase):
     for ds in step_stats.dev_stats:
       if "cpu:0" in ds.device[-5:].lower():
         cpu_stats = ds.node_stats
-      if "gpu:0" == ds.device[-5:].lower():
+      if ds.device[-5:].lower() in ["gpu:0", "dml:0"]:
         gpu_stats = ds.node_stats
     return cpu_stats, gpu_stats
 

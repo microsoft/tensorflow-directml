@@ -567,6 +567,17 @@ REGISTER_KERNEL_BUILDER(Name("OrderedMapStage")
                         MapStageOp<true>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("MapStage").HostMemory("key").HostMemory("indices").Device(DEVICE_DML),
+    MapStageOp<false>);
+REGISTER_KERNEL_BUILDER(Name("OrderedMapStage")
+                            .HostMemory("key")
+                            .HostMemory("indices")
+                            .Device(DEVICE_DML),
+                        MapStageOp<true>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 template <bool Ordered>
 class MapUnstageOp : public OpKernel {
  public:
@@ -628,6 +639,19 @@ REGISTER_KERNEL_BUILDER(Name("OrderedMapUnstage")
                         MapUnstageOp<true>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("MapUnstage")
+                            .HostMemory("key")
+                            .HostMemory("indices")
+                            .Device(DEVICE_DML),
+                        MapUnstageOp<false>);
+REGISTER_KERNEL_BUILDER(Name("OrderedMapUnstage")
+                            .HostMemory("key")
+                            .HostMemory("indices")
+                            .Device(DEVICE_DML),
+                        MapUnstageOp<true>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 template <bool Ordered>
 class MapPeekOp : public OpKernel {
  public:
@@ -684,6 +708,17 @@ REGISTER_KERNEL_BUILDER(Name("OrderedMapPeek")
                             .Device(DEVICE_SYCL),
                         MapPeekOp<true>);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("MapPeek").HostMemory("key").HostMemory("indices").Device(DEVICE_DML),
+    MapPeekOp<false>);
+REGISTER_KERNEL_BUILDER(Name("OrderedMapPeek")
+                            .HostMemory("key")
+                            .HostMemory("indices")
+                            .Device(DEVICE_DML),
+                        MapPeekOp<true>);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 template <bool Ordered>
 class MapUnstageNoKeyOp : public OpKernel {
@@ -752,6 +787,19 @@ REGISTER_KERNEL_BUILDER(Name("OrderedMapUnstageNoKey")
                         MapUnstageNoKeyOp<true>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("MapUnstageNoKey")
+                            .HostMemory("key")
+                            .HostMemory("indices")
+                            .Device(DEVICE_DML),
+                        MapUnstageNoKeyOp<false>);
+REGISTER_KERNEL_BUILDER(Name("OrderedMapUnstageNoKey")
+                            .HostMemory("key")
+                            .HostMemory("indices")
+                            .Device(DEVICE_DML),
+                        MapUnstageNoKeyOp<true>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 template <bool Ordered>
 class MapSizeOp : public OpKernel {
  public:
@@ -789,6 +837,14 @@ REGISTER_KERNEL_BUILDER(
     Name("OrderedMapSize").Device(DEVICE_SYCL).HostMemory("size"),
     MapSizeOp<true>);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("MapSize").Device(DEVICE_DML).HostMemory("size"),
+                        MapSizeOp<false>);
+REGISTER_KERNEL_BUILDER(
+    Name("OrderedMapSize").Device(DEVICE_DML).HostMemory("size"),
+    MapSizeOp<true>);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 template <bool Ordered>
 class MapIncompleteSizeOp : public OpKernel {
@@ -831,6 +887,15 @@ REGISTER_KERNEL_BUILDER(
     MapIncompleteSizeOp<true>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("MapIncompleteSize").Device(DEVICE_DML).HostMemory("size"),
+    MapIncompleteSizeOp<false>);
+REGISTER_KERNEL_BUILDER(
+    Name("OrderedMapIncompleteSize").Device(DEVICE_DML).HostMemory("size"),
+    MapIncompleteSizeOp<true>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 template <bool Ordered>
 class MapClearOp : public OpKernel {
  public:
@@ -860,6 +925,11 @@ REGISTER_KERNEL_BUILDER(Name("MapClear").Device(DEVICE_SYCL),
 REGISTER_KERNEL_BUILDER(Name("OrderedMapClear").Device(DEVICE_SYCL),
                         MapClearOp<true>);
 #endif  // TENSORFLOW_USE_SYCL
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("MapClear").Device(DEVICE_DML), MapClearOp<false>);
+REGISTER_KERNEL_BUILDER(Name("OrderedMapClear").Device(DEVICE_DML),
+                        MapClearOp<true>);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace
 }  // namespace tensorflow

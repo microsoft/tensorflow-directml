@@ -217,6 +217,14 @@ REGISTER_KERNEL_BUILDER(Name("GeneratorDataset")
                             .HostMemory("handle")
                             .Priority(1),
                         GeneratorDatasetOp);
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("GeneratorDataset")
+                            .Device(DEVICE_DML)
+                            .HostMemory("handle")
+                            .Priority(1),
+                        GeneratorDatasetOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace
 
 }  // namespace data

@@ -24,6 +24,7 @@ from tensorflow.python.distribute import strategy_combinations
 from tensorflow.python.distribute import tpu_strategy
 from tensorflow.python.eager import test
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import test_util
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import metrics
 from tensorflow.python.ops import variables
@@ -262,6 +263,8 @@ class MetricsV1Test(test.TestCase, parameterized.TestCase):
     self._test_metric(
         distribution, _boolean_dataset_fn, _metric_fn, _expected_fn)
 
+  # TFDML #25564121
+  @test_util.skip_dml
   @combinations.generate(all_combinations() + tpu_combinations())
   def testFalseNegativesAtThresholds(self, distribution):
     def _metric_fn(x):
@@ -288,6 +291,8 @@ class MetricsV1Test(test.TestCase, parameterized.TestCase):
     self._test_metric(
         distribution, _boolean_dataset_fn, _metric_fn, _expected_fn)
 
+  # TFDML #25564152
+  @test_util.skip_dml
   @combinations.generate(all_combinations() + tpu_combinations())
   def testTrueNegativesAtThresholds(self, distribution):
     def _metric_fn(x):

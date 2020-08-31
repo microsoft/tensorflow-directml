@@ -247,6 +247,8 @@ class DynamicLossScaleTest(test.TestCase, parameterized.TestCase):
       self._test_helper(inputs, expected_outputs, init_loss_scale,
                         increment_period)
 
+  # TFDML #25576397
+  @test_util.skip_dml
   @parameterized.named_parameters(*TESTCASES)
   @test_util.run_in_graph_and_eager_modes
   def test_nondefault_multiplier(self, strategy_fn):

@@ -356,6 +356,8 @@ class TensorArrayTest(test.TestCase):
       self.assertAllEqual([[2.0]], g_d1)
       self.assertAllEqual(-2.0, g_d2)
 
+  # TFDML #25510683
+  @test_util.skip_dml
   @test_util.deprecated_graph_mode_only
   def testSkipEagerTensorArrayGradGrad(self):
     if not control_flow_util.ENABLE_CONTROL_FLOW_V2:
@@ -1599,6 +1601,8 @@ class TensorArrayTest(test.TestCase):
         self.assertFalse(
             [s for s in dev_stats[d] if "/TensorArray" in s.node_name])
 
+  # TFDML #25576384
+  @test_util.skip_dml
   @test_util.disable_control_flow_v2("colocate_with not supported in v2.")
   @test_util.run_v1_only("b/120545219")
   def testSkipEagerTensorArrayGetsDeviceFromFirstWriteInWhileLoop(self):
@@ -1733,6 +1737,8 @@ class TensorArrayTest(test.TestCase):
         vdx, vdy = self.evaluate([dx, dy])
       self.assertAllClose(vdx, vdy)
 
+  # TFDML #25571925
+  @test_util.skip_dml
   @test_util.deprecated_graph_mode_only
   def testSkipEagerTensorArrayInt64GPU(self):
     if not test.is_gpu_available():

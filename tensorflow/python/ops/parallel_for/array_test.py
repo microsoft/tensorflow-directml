@@ -360,6 +360,7 @@ class ArrayTest(PForTestCase):
     self._test_loop_fn(
         loop_fn, 3, loop_fn_dtypes=[dtypes.float32] * num_outputs)
 
+  @test_util.skip_dml
   def test_strided_slice(self):
     with backprop.GradientTape(persistent=True) as g:
       x = random_ops.random_uniform([3, 3, 4, 4, 2, 2, 2])

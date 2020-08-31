@@ -661,13 +661,14 @@ class Tensor {
   friend class XlaTensor;             // For access to RefCountIsOne().
   template <typename Device, typename T>
   friend class AssignVariableOp;  // For access to RefCountIsOne().
-  template <typename Device, typename T>
+  template <typename CopyFunctor>
   friend Status PrepareToUpdateVariable(
-      OpKernelContext* ctx, Tensor* tensor,
-      bool copy_on_read_mode);  // For access to RefCountIsOne().
-  template <typename Device, typename T>
+      OpKernelContext* ctx, Tensor* tensor, bool copy_on_read_mode,
+      CopyFunctor copy_functor);  // For access to RefCountIsOne().
+  template <typename CopyFunctor>
   friend Status EnsureSparseVariableAccess(
-      OpKernelContext* ctx, Var* var);  // For access to RefCountIsOne().
+      OpKernelContext* ctx, Var* var,
+      CopyFunctor copy_functor);  // For access to RefCountIsOne().
   friend Status batch_util::CopyElementToSlice(
       Tensor element, Tensor* parent,
       int64 index);  // For access to RefCountIsOne().

@@ -363,13 +363,21 @@ Status InitConv2DParameters(const OpKernelConstruction* context,
 Status ComputeConv2DDimension(const Conv2DParameters& params,
                               const Tensor& input, const Tensor& filter,
                               Conv2DDimensions* dimensions) {
+  return ComputeConv2DDimension(params, input.shape(), filter.shape(),
+                                dimensions);
+}
+
+Status ComputeConv2DDimension(const Conv2DParameters& params,
+                              const TensorShape& input,
+                              const TensorShape& filter,
+                              Conv2DDimensions* dimensions) {
   // Check that 2D convolution input and filter have exactly 4 dimensions.
   TF_REQUIRES(input.dims() == 4,
               errors::InvalidArgument("input must be 4-dimensional",
-                                      input.shape().DebugString()));
+                                      input.DebugString()));
   TF_REQUIRES(filter.dims() == 4,
               errors::InvalidArgument("filter must be 4-dimensional: ",
-                                      filter.shape().DebugString()));
+                                      filter.DebugString()));
   for (int i = 0; i < 3; i++) {
     TF_REQUIRES(
         FastBoundsCheck(filter.dim_size(i), std::numeric_limits<int>::max()),

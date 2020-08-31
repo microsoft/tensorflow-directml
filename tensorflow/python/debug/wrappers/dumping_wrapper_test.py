@@ -96,6 +96,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     # Cleanup.
     gfile.DeleteRecursively(new_dir_path)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingOnASingleRunWorks(self):
     sess = dumping_wrapper.DumpingDebugWrapperSession(
         self.sess, session_root=self.session_root, log_usage=False)
@@ -111,6 +113,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     self.assertEqual(repr(self.inc_v), dump.run_fetches_info)
     self.assertEqual(repr(None), dump.run_feed_keys_info)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingOnASingleRunWorksWithRelativePathForDebugDumpDir(self):
     sess = dumping_wrapper.DumpingDebugWrapperSession(
         self.sess, session_root=self.session_root, log_usage=False)
@@ -125,6 +129,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     finally:
       os.chdir(cwd)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingOnASingleRunWithFeedDictWorks(self):
     sess = dumping_wrapper.DumpingDebugWrapperSession(
         self.sess, session_root=self.session_root, log_usage=False)
@@ -141,6 +147,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     self.assertEqual(repr(self.inc_w_ph), dump.run_fetches_info)
     self.assertEqual(repr(feed_dict.keys()), dump.run_feed_keys_info)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingOnMultipleRunsWorks(self):
     sess = dumping_wrapper.DumpingDebugWrapperSession(
         self.sess, session_root=self.session_root, log_usage=False)
@@ -168,6 +176,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
           watch_fn=bad_watch_fn,
           log_usage=False)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingWithLegacyWatchFnOnFetchesWorks(self):
     """Use a watch_fn that returns different whitelists for different runs."""
 
@@ -210,6 +220,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
         self.assertEqual(repr(self.dec_v), dump.run_fetches_info)
         self.assertEqual(repr(None), dump.run_feed_keys_info)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingWithLegacyWatchFnWithNonDefaultDebugOpsWorks(self):
     """Use a watch_fn that specifies non-default debug ops."""
 
@@ -233,6 +245,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     self.assertEqual(14,
                      len(dump.get_tensors("v", 0, "DebugNumericSummary")[0]))
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingWithWatchFnWithNonDefaultDebugOpsWorks(self):
     """Use a watch_fn that specifies non-default debug ops."""
 
@@ -264,6 +278,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     self.assertNotIn("inc_v", dumped_nodes)
     self.assertNotIn("delta", dumped_nodes)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingDebugHookWithoutWatchFnWorks(self):
     dumping_hook = hooks.DumpingDebugHook(self.session_root, log_usage=False)
     mon_sess = monitored_session._HookedSession(self.sess, [dumping_hook])
@@ -279,6 +295,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     self.assertEqual(repr(self.inc_v), dump.run_fetches_info)
     self.assertEqual(repr(None), dump.run_feed_keys_info)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingDebugHookWithStatefulWatchFnWorks(self):
     watch_fn_state = {"run_counter": 0}
 
@@ -322,6 +340,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
       self.assertEqual(repr(self.inc_v), dump.run_fetches_info)
       self.assertEqual(repr(None), dump.run_feed_keys_info)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingDebugHookWithStatefulLegacyWatchFnWorks(self):
     watch_fn_state = {"run_counter": 0}
 
@@ -358,6 +378,8 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
       self.assertEqual(repr(self.inc_v), dump.run_fetches_info)
       self.assertEqual(repr(None), dump.run_feed_keys_info)
 
+  # TFDML #25509707
+  @test_util.skip_dml
   def testDumpingFromMultipleThreadsObeysThreadNameFilter(self):
     sess = dumping_wrapper.DumpingDebugWrapperSession(
         self.sess, session_root=self.session_root, log_usage=False,

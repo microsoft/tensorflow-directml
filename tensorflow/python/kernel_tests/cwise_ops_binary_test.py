@@ -180,7 +180,10 @@ class BinaryOpTest(test.TestCase):
       iny = ops.convert_to_tensor(y)
       out = tf_func(inx, iny)
       tf_gpu = self.evaluate(out)
-    self.assertAllClose(np_ans, tf_gpu)
+    if test_util.gpu_device_type() == "DML" and x.dtype == np.float16:
+      self.assertAllClose(np_ans, tf_gpu, rtol=2e-3)
+    else:
+      self.assertAllClose(np_ans, tf_gpu)
     self.assertShapeEqual(np_ans, out)
     # TODO(zhifengc/ke): make gradient checker work on GPU.
 
@@ -483,6 +486,11 @@ class BinaryOpTest(test.TestCase):
         (np.true_divide, _TRUEDIV),
         (np.floor_divide, _FLOORDIV),
     ]
+    # Some hardware in DML doesn't guarantee x/x=1, so skip FloorDiv testing when
+    # doing broadcast ops; this op is covered elsewhere with values that aren't identical.
+    if test_util.gpu_device_type() == "DML":
+      funcs.remove(funcs[3])
+      funcs.remove(funcs[1])
     self._testBCastByFunc(funcs, xs, ys)
 
   @test_util.run_deprecated_v1
@@ -677,18 +685,22 @@ class BinaryOpTest(test.TestCase):
   def testBCast_11D(self):
     self._testBCastD([1, 3, 2], [1, 3, 2])
 
+  @test_util.skip_dml # DML only supports up to 5D
   @test_util.run_deprecated_v1
   def testBCast_12A(self):
     self._testBCastA([1, 1, 1, 1, 3, 2], [1, 3, 2])
 
+  @test_util.skip_dml # DML only supports up to 5D
   @test_util.run_deprecated_v1
   def testBCast_12B(self):
     self._testBCastB([1, 1, 1, 1, 3, 2], [1, 3, 2])
 
+  @test_util.skip_dml # DML only supports up to 5D
   @test_util.run_deprecated_v1
   def testBCast_12C(self):
     self._testBCastC([1, 1, 1, 1, 3, 2], [1, 3, 2])
 
+  @test_util.skip_dml # DML only supports up to 5D
   @test_util.run_deprecated_v1
   def testBCast_12D(self):
     self._testBCastD([1, 1, 1, 1, 3, 2], [1, 3, 2])
@@ -697,6 +709,7 @@ class BinaryOpTest(test.TestCase):
   def testBCast_13A(self):
     self._testBCastA([1, 3, 2, 1, 1], [1])
 
+  @test_util.skip_dml # DML subtract only supports up to 4D
   @test_util.run_deprecated_v1
   def testBCast_13B(self):
     self._testBCastB([1, 3, 2, 1, 1], [1])
@@ -705,6 +718,7 @@ class BinaryOpTest(test.TestCase):
   def testBCast_13C(self):
     self._testBCastC([1, 3, 2, 1, 1], [1])
 
+  @test_util.skip_dml # DML divide only supports up to 4D
   @test_util.run_deprecated_v1
   def testBCast_13D(self):
     self._testBCastD([1, 3, 2, 1, 1], [1])
@@ -713,6 +727,7 @@ class BinaryOpTest(test.TestCase):
   def testBCast_14A(self):
     self._testBCastA([2, 3, 1, 1, 5], [1])
 
+  @test_util.skip_dml # DML subtract only supports up to 4D
   @test_util.run_deprecated_v1
   def testBCast_14B(self):
     self._testBCastB([2, 3, 1, 1, 5], [1])
@@ -721,6 +736,7 @@ class BinaryOpTest(test.TestCase):
   def testBCast_14C(self):
     self._testBCastC([2, 3, 1, 1, 5], [1])
 
+  @test_util.skip_dml # DML divide only supports up to 4D
   @test_util.run_deprecated_v1
   def testBCast_14D(self):
     self._testBCastD([2, 3, 1, 1, 5], [1])

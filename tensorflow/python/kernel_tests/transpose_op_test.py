@@ -71,6 +71,9 @@ class TransposeTest(test.TestCase):
       return tf_ans, jacob_t
 
   def _compareGpu(self, x, p, conjugate=False):
+    if test_util.gpu_device_type() == "DML" and x.ndim > 5:
+      return
+
     if p is None:
       rank = x.ndim
       perm = (rank - 1) - np.arange(rank)
@@ -120,6 +123,9 @@ class TransposeTest(test.TestCase):
         self._compareGpu(x, None, conjugate=c)
 
   def _compare_cpu_gpu(self, x):
+    if test_util.gpu_device_type() == "DML" and x.ndim > 5:
+      return
+
     n = np.ndim(x)
     # generate all permutation of [0, 1, ... n-1] in random order,
     # choose the first two.
@@ -152,7 +158,7 @@ class TransposeTest(test.TestCase):
 
   def test5DGPU(self):
     # If no GPU available, skip the test
-    if not test.is_gpu_available(cuda_only=True):
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     large_shapes = [[4, 10, 10, 10, 3], [4, 10, 10, 10, 8], [4, 10, 10, 10, 13],
                     [4, 3, 10, 10, 10], [4, 8, 10, 10, 10], [4, 13, 10, 10,
@@ -176,7 +182,7 @@ class TransposeTest(test.TestCase):
 
   def test4DGPU(self):
     # If no GPU available, skip the test
-    if not test.is_gpu_available(cuda_only=True):
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     large_shapes = [[4, 10, 10, 3], [4, 10, 10, 8], [4, 10, 10, 13],
                     [4, 3, 10, 10], [4, 8, 10, 10], [4, 13, 10, 10]] * 3
@@ -232,7 +238,7 @@ class TransposeTest(test.TestCase):
 
   def test3DGPU(self):
     # If no GPU available, skip the test
-    if not test.is_gpu_available(cuda_only=True):
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
 
     datatypes = [np.int8, np.float16, np.float32, np.float64, np.complex128]
@@ -254,7 +260,7 @@ class TransposeTest(test.TestCase):
 
   def testLargeSizeGPU(self):
     # If no GPU available, skip the test
-    if not test.is_gpu_available(cuda_only=True):
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
 
     large_shapes = [[1000000, 31, 3], [3, 1000000, 31], [3, 31, 1000000],
@@ -275,7 +281,7 @@ class TransposeTest(test.TestCase):
 
   def testRandomizedSmallDimLargeSizeGPU(self):
     # If no GPU available, skip the test
-    if not test.is_gpu_available(cuda_only=True):
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
 
     # Draw 10 random shapes with large dimension sizes.

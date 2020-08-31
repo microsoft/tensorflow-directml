@@ -109,6 +109,10 @@ class GatherTest(test.TestCase, parameterized.TestCase):
     shape = (2, 1, 3, 2)
     for indices_shape in (), (0,), (2, 0), (2, 3):
       for dtype in _TEST_TYPES:
+        # DML doesn't support negative values for int64
+        if dtype == dtypes.int64 and test_util.gpu_device_type() == "DML":
+          continue
+
         for axis in range(len(shape)):
           params = self._buildParams(np.random.randn(*shape), dtype)
           indices = np.random.randint(shape[axis], size=indices_shape)

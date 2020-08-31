@@ -252,15 +252,27 @@ Status RingAlg::InitializeCollectiveContext(CollectiveContext* col_ctx) {
 string RingAlg::TensorDebugString(const Tensor& tensor) {
   const DeviceBase::GpuDeviceInfo* gpu_device_info =
       col_ctx_->op_ctx->device()->tensorflow_gpu_device_info();
+
+  DeviceContext* device_context = nullptr;
+
   if (gpu_device_info) {
+    device_context = gpu_device_info->default_context;
+  }
+#ifdef TENSORFLOW_USE_DIRECTML
+  else {
+    device_context = col_ctx_->op_ctx->device()->dml_device_context();
+  }
+#endif
+
+  if (device_context) {
     Tensor cpu_tensor(tensor.dtype(), tensor.shape());
     Notification note;
-    gpu_device_info->default_context->CopyDeviceTensorToCPU(
-        &tensor, "" /*tensor_name*/, col_ctx_->device, &cpu_tensor,
-        [&note](const Status& s) {
-          DCHECK(s.ok());
-          note.Notify();
-        });
+    device_context->CopyDeviceTensorToCPU(&tensor, "" /*tensor_name*/,
+                                          col_ctx_->device, &cpu_tensor,
+                                          [&note](const Status& s) {
+                                            DCHECK(s.ok());
+                                            note.Notify();
+                                          });
     note.WaitForNotification();
     return cpu_tensor.SummarizeValue(64);
   } else {

@@ -70,6 +70,12 @@ struct PyCall {
 };
 
 bool IsCPUDevice(const Device* d) {
+#if TENSORFLOW_USE_DIRECTML
+  if (d != nullptr && d->dml_device_context() != nullptr) {
+    return false;
+  }
+#endif
+
   return d == nullptr || d->tensorflow_gpu_device_info() == nullptr;
 }
 

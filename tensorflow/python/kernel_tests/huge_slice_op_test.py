@@ -24,6 +24,7 @@ from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
 from tensorflow.python.ops import array_ops
 from tensorflow.python.platform import test
+from tensorflow.python.framework import test_util
 
 
 class SliceTest(test.TestCase):

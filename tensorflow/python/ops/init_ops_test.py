@@ -183,7 +183,7 @@ class InitializersTest(test.TestCase):
       self.skipTest('Disable subtest on ROCm due to missing QR op support')
 
     with ops.Graph().as_default() as g:
-      with ops.device('gpu:0'):
+      with ops.device(test_util.gpu_device_name()):
         variable_scope.get_variable(
             name='v', shape=[8, 2], initializer=init_ops.Orthogonal)
         variable_scope.get_variable(
@@ -209,8 +209,8 @@ class InitializersTest(test.TestCase):
           name='v', shape=[8, 2], initializer=init_ops.Orthogonal)
       w = variable_scope.get_variable(
           name='w', shape=[8, 2], initializer=init_ops.RandomNormal)
-      self.assertTrue('GPU' in v.handle.device)
-      self.assertTrue('GPU' in w.handle.device)
+      self.assertTrue(test_util.gpu_device_type() in v.handle.device)
+      self.assertTrue(test_util.gpu_device_type() in w.handle.device)
 
   def test_Identity(self):
     with self.cached_session():

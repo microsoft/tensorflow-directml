@@ -72,6 +72,8 @@ def variable_scoped_function_with_local_variable():
 
 class TemplateTest(test.TestCase):
 
+  # TFDML #25564673
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def test_end_to_end(self):
     """This test shows a very simple line model with test_loss.

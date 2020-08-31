@@ -177,6 +177,8 @@ class BernoulliTest(test.TestCase):
     with self.assertRaisesOpError("Elements cannot exceed 1."):
       self.evaluate(dist.prob([2, 0, 1]))
 
+  # TFDML #25561790
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testPmfWithP(self):
     p = [[0.2, 0.4], [0.3, 0.6]]

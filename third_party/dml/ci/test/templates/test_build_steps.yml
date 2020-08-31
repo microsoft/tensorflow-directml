@@ -1,0 +1,93 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
+# This template adds steps to test an entire build. Should run on a controller.
+
+parameters:
+  TimeoutInMinutes: 60
+  TestArtifactsPath: $(System.ArtifactsDirectory)/test_results
+  SkipSlowRingAgents: 0
+
+steps:
+- task: PowerShell@2
+  displayName: Dispatch Tests
+  inputs:
+    targetType: filePath
+    filePath: third_party/dml/ci/test/DispatchTestJobs.ps1
+    arguments: >
+      -Artifacts "$(Artifacts)"
+      -BuildID $(BuildID) 
+      -TestGroups "$(TestGroups)"
+      -TestArtifactsPath ${{parameters.TestArtifactsPath}}
+      -TestPoolName $(TestPool)
+      -TimeoutMinutes ${{parameters.TimeoutInMinutes}}
+      -AccessToken $(AccessToken)
+      -SkipSlowRingAgents ${{parameters.SkipSlowRingAgents}}
+
+- task: PowerShell@2
+  displayName: Create Test Summary (JSON)
+  inputs:
+    targetType: filePath
+    filePath: third_party/dml/ci/test/CreateTestSummaryJson.ps1
+    arguments: -TestArtifactsPath ${{parameters.TestArtifactsPath}}
+
+- task: PowerShell@2
+  displayName: Create Test Summary (XML)
+  inputs:
+    targetType: filePath
+    filePath: third_party/dml/ci/test/CreateTestSummaryXml.ps1
+    arguments: -TestArtifactsPath ${{parameters.TestArtifactsPath}}
+
+- task: PowerShell@2
+  displayName: Create Agent Summary
+  inputs:
+    targetType: filePath
+    filePath: third_party/dml/ci/test/CreateAgentSummary.ps1
+    arguments: -TestArtifactsPath ${{parameters.TestArtifactsPath}}
+
+- task: PublishTestResults@2
+  displayName: Publish Test Results
+  inputs:
+    testResultsFormat: XUnit
+    testResultsFiles: test_summary.xml
+    searchFolder: ${{parameters.TestArtifactsPath}}
+    mergeTestResults: true
+    testRunTitle: 'test.$(Build.BuildNumber)'
+    failTaskOnFailedTests: true
+
+- task: PublishBuildArtifacts@1
+  condition: succeededOrFailed()
+  displayName: Upload Test Results
+  continueOnError: true
+  inputs:
+    pathToPublish: ${{parameters.TestArtifactsPath}}
+    artifactName: test_results
+
+- task: PowerShell@2
+  displayName: Create Test Email
+  condition: succeededOrFailed()
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+  inputs:
+    targetType: filePath
+    filePath: third_party/dml/ci/test/CreateTestEmail.ps1
+    arguments: >
+      -TestArtifactsPath ${{parameters.TestArtifactsPath}}
+      -BuildArtifacts $(Artifacts)
+      -TestGroups "$(TestGroups)"
+      -BuildRunID $(BuildID) 
+      -TestRunID $(Build.BuildId)
+      -AccessToken $(System.AccessToken)
+      -EmailTo $(EmailTo)
+
+- task: PowerShell@2
+  displayName: Cleanup Test Jobs
+  condition: canceled()
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+  inputs:
+    targetType: filePath
+    filePath: third_party/dml/ci/test/CancelTestJobs.ps1
+    arguments: >
+      -DispatchJsonPath "${{parameters.TestArtifactsPath}}/dispatch.json"
+      -AccessToken $(System.AccessToken)

@@ -33,6 +33,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_shape
 from tensorflow.python.framework import test_ops  # pylint: disable=unused-import
 from tensorflow.python.framework import versions
+from tensorflow.python.framework import test_util
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.ops import gradients_impl
@@ -1234,6 +1235,8 @@ class ImportGraphDefTest(test.TestCase):
         self.assertEqual(sess.run("external:0"), 11)
         self.assertEqual(sess.run("outer:0"), 21)
 
+  # TFDML #25562813
+  @test_util.skip_dml
   def testImportInsideDefun(self):
     g = ops.Graph()
     with g.as_default():

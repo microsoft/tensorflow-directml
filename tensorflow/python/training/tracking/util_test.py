@@ -543,6 +543,8 @@ class CheckpointingTests(parameterized.TestCase, test.TestCase):
             self.assertEqual(training_continuation + 1,
                              session.run(root.save_counter))
 
+  # TFDML #25654451
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testAgnosticUsage(self):
     """Graph/eager agnostic usage."""
@@ -577,6 +579,8 @@ class CheckpointingTests(parameterized.TestCase, test.TestCase):
         self.assertEqual(training_continuation + 1,
                          self.evaluate(root.save_counter))
 
+  # TFDML #25654465
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testFreezing(self):
     with test_util.use_gpu():
@@ -712,6 +716,8 @@ class CheckpointingTests(parameterized.TestCase, test.TestCase):
         self.assertEmpty(mock_log.call_args_list)
 
   # pylint: disable=cell-var-from-loop
+  # TFDML #25654431
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   @test_util.run_v1_only("b/120545219")
   def testWithDefun(self):
@@ -1250,6 +1256,8 @@ class CheckpointingTests(parameterized.TestCase, test.TestCase):
     self.assertAllEqual([1., 2., 3., 4., 5.],
                         self.evaluate(deferred_second_dense.bias))
 
+  # TFDML #25654413
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_initialize_if_not_restoring(self):
     checkpoint_directory = self.get_temp_dir()
@@ -1551,6 +1559,8 @@ class CheckpointCompatibilityTests(test.TestCase):
             sess=session, save_path=checkpoint_prefix,
             global_step=root.optimizer.iterations)
 
+  # TFDML #25654722
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testLoadFromNameBasedSaver(self):
     """Save a name-based checkpoint, load it using the object-based API."""

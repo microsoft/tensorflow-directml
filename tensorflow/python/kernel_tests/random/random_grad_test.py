@@ -219,6 +219,8 @@ class RandomGammaGradTest(test.TestCase):
     dsample_dalpha_val = self.evaluate(dsample_dalpha)
     self.assertAllClose(dsample_dalpha_val, [1.0] * 3, atol=1e-1, rtol=1e-1)
 
+  # TFDML #25564470
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testQuadraticLoss(self):
     """Statistical test for the gradient.

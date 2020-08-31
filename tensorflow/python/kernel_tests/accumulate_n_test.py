@@ -60,6 +60,8 @@ class AccumulateNV2Test(test_util.TensorFlowTestCase):
       acc = math_ops.accumulate_n([x0, x0], shape=[None])
       self.assertAllEqual([2, 4], acc.eval(feed_dict={x0: [1, 2]}))
 
+  # TFDML #25508691
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testGrad(self):
     np.random.seed(42)

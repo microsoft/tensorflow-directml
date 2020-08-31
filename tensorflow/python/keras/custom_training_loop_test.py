@@ -25,6 +25,7 @@ from tensorflow.python import keras
 from tensorflow.python.eager import backprop
 from tensorflow.python.eager import def_function
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import test_util
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.ops import array_ops
@@ -144,6 +145,8 @@ def add_metric_step(defun):
 @keras_parameterized.run_with_all_model_types
 class CustomTrainingLoopTest(keras_parameterized.TestCase):
 
+  # TFDML #25654490
+  @test_util.skip_dml
   @parameterized.named_parameters(('add_loss_step', add_loss_step),
                                   ('add_metric_step', add_metric_step),
                                   ('batch_norm_step', batch_norm_step))
@@ -152,6 +155,8 @@ class CustomTrainingLoopTest(keras_parameterized.TestCase):
     fn_result = train_step(defun=True)
     self.assertAllClose(eager_result, fn_result)
 
+  # TFDML #25654490
+  @test_util.skip_dml
   @parameterized.named_parameters(('eager', False), ('defun', True))
   def test_training_arg_propagation(self, defun):
 
@@ -170,6 +175,8 @@ class CustomTrainingLoopTest(keras_parameterized.TestCase):
     self.assertAllClose(results[1], array_ops.zeros((1, 1)))
     self.assertAllClose(results[2], array_ops.ones((1, 1)))
 
+  # TFDML #25654490
+  @test_util.skip_dml
   @parameterized.named_parameters(('eager', False), ('defun', True))
   def test_learning_phase_propagation(self, defun):
 
@@ -207,6 +214,8 @@ class CustomTrainingLoopTest(keras_parameterized.TestCase):
     self.assertAllClose(results[1], array_ops.zeros((1, 1)))
     self.assertAllClose(results[2], array_ops.ones((1, 1)))
 
+  # TFDML #25654490
+  @test_util.skip_dml
   @parameterized.named_parameters(('eager', False), ('defun', True))
   def test_training_arg_priorities(self, defun):
 

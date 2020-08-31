@@ -331,6 +331,8 @@ class IdentifyGradientTest(test_util.TensorFlowTestCase):
     self.assertAllClose(2.0 * 5.0, self.sess.run(dz1_dy))
     self.assertAllClose(0.5 * (5.0**-0.5), self.sess.run(dz2_dy))
 
+  # TFDML #25509611
+  @test_util.skip_dml
   def testGradientsValuesFromDumpWorks(self):
     y = math_ops.add(self.w, -1.0, name="y")
     z = math_ops.square(y, name="z")

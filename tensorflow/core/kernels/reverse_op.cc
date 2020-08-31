@@ -457,4 +457,30 @@ REGISTER_KERNEL_BUILDER(Name("ReverseV2")
                             .HostMemory("output"),
                         ReverseV2Op<CPUDevice, int32, int64>);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Reverse")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("tensor")
+                            .HostMemory("dims")
+                            .HostMemory("output"),
+                        ReverseOp<CPUDevice, int32>);
+REGISTER_KERNEL_BUILDER(Name("ReverseV2")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("Tidx")
+                            .HostMemory("tensor")
+                            .HostMemory("axis")
+                            .HostMemory("output"),
+                        ReverseV2Op<CPUDevice, int32, int32>);
+REGISTER_KERNEL_BUILDER(Name("ReverseV2")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int64>("Tidx")
+                            .HostMemory("tensor")
+                            .HostMemory("axis")
+                            .HostMemory("output"),
+                        ReverseV2Op<CPUDevice, int32, int64>);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

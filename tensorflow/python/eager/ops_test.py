@@ -51,10 +51,11 @@ class OpsTest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testMatMulGPU(self):
-    three = constant_op.constant([[3.]]).gpu()
-    five = constant_op.constant([[5.]]).gpu()
-    product = math_ops.matmul(three, five)
-    self.assertEqual([[15.0]], product.numpy())
+    with context.device(test_util.gpu_device_type()):
+      three = constant_op.constant([[3.]])
+      five = constant_op.constant([[5.]])
+      product = math_ops.matmul(three, five)
+      self.assertEqual([[15.0]], product.numpy())
 
   def testExecuteStringAttr(self):
     three = constant_op.constant(3.0)
@@ -212,11 +213,14 @@ class OpsTest(test_util.TensorFlowTestCase):
     self.assertAllEqual(npt[::, ::, ::], t[::, ::, ::])
     self.assertAllEqual(npt[::1, ::1, ::1], t[::1, ::1, ::1])
     self.assertAllEqual(npt[::1, ::5, ::2], t[::1, ::5, ::2])
-    self.assertAllEqual(npt[::-1, :, :], t[::-1, :, :])
-    self.assertAllEqual(npt[:, ::-1, :], t[:, ::-1, :])
-    self.assertAllEqual(npt[:, :, ::-1], t[:, :, ::-1])
-    self.assertAllEqual(npt[-2::-1, :, ::1], t[-2::-1, :, ::1])
-    self.assertAllEqual(npt[-2::-1, :, ::2], t[-2::-1, :, ::2])
+
+    # TFDML #25681907
+    if test_util.gpu_device_type() != "DML":
+      self.assertAllEqual(npt[::-1, :, :], t[::-1, :, :])
+      self.assertAllEqual(npt[:, ::-1, :], t[:, ::-1, :])
+      self.assertAllEqual(npt[:, :, ::-1], t[:, :, ::-1])
+      self.assertAllEqual(npt[-2::-1, :, ::1], t[-2::-1, :, ::1])
+      self.assertAllEqual(npt[-2::-1, :, ::2], t[-2::-1, :, ::2])
 
   def testDegenerateSlices(self):
     npt = np.arange(1, 19, dtype=np.float32).reshape(3, 2, 3)
@@ -258,7 +262,8 @@ class OpsTest(test_util.TensorFlowTestCase):
   def testOpWithInputsOnDifferentDevices(self):
     # The GPU kernel for the Reshape op requires that the
     # shape input be on CPU.
-    value = constant_op.constant([1., 2.]).gpu()
+    with context.device(test_util.gpu_device_type()):
+      value = constant_op.constant([1., 2.])
     shape = constant_op.constant([2, 1])
     reshaped = array_ops.reshape(value, shape)
     self.assertAllEqual([[1], [2]], reshaped.cpu())
@@ -273,7 +278,8 @@ class OpsTest(test_util.TensorFlowTestCase):
   @test_util.run_gpu_only
   def testOutputOnHostMemory(self):
     # The Shape op kernel on GPU places the output in host memory.
-    value = constant_op.constant([1.]).gpu()
+    with context.device(test_util.gpu_device_type()):
+      value = constant_op.constant([1.])
     shape = array_ops.shape(value)
     self.assertEqual([1], shape.numpy())
 
@@ -286,7 +292,8 @@ class OpsTest(test_util.TensorFlowTestCase):
     try:
       config.set_device_policy('silent')
       cpu_tensor = constant_op.constant(1.0)
-      gpu_tensor = cpu_tensor.gpu()
+      with context.device(test_util.gpu_device_type()):
+        gpu_tensor = array_ops.identity(cpu_tensor)
       self.assertAllEqual(cpu_tensor + gpu_tensor, 2.0)
     finally:
       context._set_context(old_context)
@@ -303,8 +310,8 @@ class OpsTest(test_util.TensorFlowTestCase):
       config.set_soft_device_placement(True)
       cpu_tensor = constant_op.constant(1.0)
       result = cpu_tensor + cpu_tensor
-      self.assertEqual(result.device,
-                       '/job:localhost/replica:0/task:0/device:GPU:0')
+      expected_device = '/job:localhost/replica:0/task:0/device:%s:0' % test_util.gpu_device_type()
+      self.assertEqual(result.device, expected_device)
     finally:
       context._set_context(old_context)
     # pylint: enable=protected-access
@@ -348,7 +355,7 @@ class OpsTest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testIdentityOnVariable(self):
-    with context.device('/gpu:0'):
+    with context.device(test_util.gpu_device_name()):
       v = resource_variable_ops.ResourceVariable(True)
     self.assertAllEqual(True, array_ops.identity(v))
 

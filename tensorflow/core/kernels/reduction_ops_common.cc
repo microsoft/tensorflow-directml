@@ -58,7 +58,7 @@ gtl::InlinedVector<int32, 8> ReductionHelper::permutation() {
 }
 
 template <typename Tperm>
-Status SimplifyHelper(const Tensor& data, const Tensor& axis,
+Status SimplifyHelper(const TensorShape& data, const Tensor& axis,
                       gtl::InlinedVector<bool, 4>& bitmap) {
   auto axis_vec = axis.flat<Tperm>();
   for (int64 i = 0; i < axis.NumElements(); ++i) {
@@ -75,6 +75,11 @@ Status SimplifyHelper(const Tensor& data, const Tensor& axis,
 }
 
 Status ReductionHelper::Simplify(const Tensor& data, const Tensor& axis,
+                                 const bool keep_dims) {
+  return Simplify(data.shape(), axis, keep_dims);
+}
+
+Status ReductionHelper::Simplify(const TensorShape& data, const Tensor& axis,
                                  const bool keep_dims) {
   // bitmap[i] indicates whether to reduce data along i-th axis.
   gtl::InlinedVector<bool, 4> bitmap(data.dims(), false);

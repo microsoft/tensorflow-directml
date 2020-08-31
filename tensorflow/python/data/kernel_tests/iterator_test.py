@@ -729,7 +729,7 @@ class IteratorTest(test_base.DatasetTestBase, parameterized.TestCase):
           dataset_ops.get_legacy_output_shapes(dataset_3))
       return remote_iterator.get_next()
 
-    with ops.device("/job:localhost/replica:0/task:0/device:GPU:0"):
+    with ops.device(test_util.gpu_device_name()):
       target_placeholder = array_ops.placeholder(dtypes.string, shape=[])
       iterator_3_handle_uint8 = parsing_ops.decode_raw(
           input_bytes=iterator_3_handle, out_type=dtypes.uint8)

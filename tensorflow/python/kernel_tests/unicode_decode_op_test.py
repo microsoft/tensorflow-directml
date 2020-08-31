@@ -192,6 +192,8 @@ class UnicodeDecodeTest(test_util.TensorFlowTestCase,
     self.assertAllEqual(expected.values, result.values)
     self.assertAllEqual(expected.dense_shape, result.dense_shape)
 
+  # TFDML #25510701
+  @test_util.skip_dml
   @parameterized.parameters([
       dict(
           texts=["Hello", "world", "", u"👍"],
@@ -451,6 +453,8 @@ class UnicodeSplitTest(test_util.TensorFlowTestCase,
     self.assertAllEqual(chars, expected_chars)
     self.assertAllEqual(starts, [[0, 3, 6, 9], [0, 1, 2, 3, 4]])
 
+  # TFDML #25510701
+  @test_util.skip_dml
   @parameterized.parameters([
       {"texts": u"仅今年前"},
       {"texts": [u"G\xf6\xf6dnight", u"\U0001f60a"]},
@@ -467,6 +471,8 @@ class UnicodeSplitTest(test_util.TensorFlowTestCase,
     expected = _nested_splitchars(texts, "UTF-8")
     self.assertAllEqual(expected, result)
 
+  # TFDML #25510701
+  @test_util.skip_dml
   @parameterized.parameters([
       {"texts": u"仅今年前"},
       {"texts": [u"G\xf6\xf6dnight", u"\U0001f60a"]},
@@ -500,6 +506,8 @@ class UnicodeSplitTest(test_util.TensorFlowTestCase,
          [b"\xf0\x9f\x98\x8a"]])
     self.assertAllEqual(offsets, [[0, 1, 3, 5, 6, 7, 8, 9, 10], [0]])
 
+  # TFDML #25510701
+  @test_util.skip_dml
   @parameterized.parameters([
       dict(
           texts=["Hello", "world", "", u"👍"],

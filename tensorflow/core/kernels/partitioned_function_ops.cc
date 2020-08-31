@@ -299,4 +299,11 @@ REGISTER_KERNEL_BUILDER(Name("StatefulPartitionedCall").Device(DEVICE_SYCL),
                         PartitionedCallOp);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("PartitionedCall").Device(DEVICE_DML),
+                        PartitionedCallOp);
+REGISTER_KERNEL_BUILDER(Name("StatefulPartitionedCall").Device(DEVICE_DML),
+                        PartitionedCallOp);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace tensorflow

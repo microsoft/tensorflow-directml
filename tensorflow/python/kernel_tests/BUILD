@@ -68,7 +68,9 @@ tf_py_test(
         "//tensorflow/python:framework_test_lib",
         "//tensorflow/python:string_ops",
     ],
-    tags = ["nomac"],  # b/35468214
+    tags = [
+        "nomac",  # b/35468214
+    ],
 )
 
 tf_py_test(
@@ -860,8 +862,6 @@ cuda_py_test(
         "//tensorflow/python:resource_variable_ops",
         "//tensorflow/python:variables",
     ],
-    # TODO(b/128347673): Re-enable.
-    tags = ["no_windows"],
     xla_enable_strict_auto_jit = True,
 )
 
@@ -2596,7 +2596,6 @@ cuda_py_test(
         "//tensorflow/python:math_ops",
     ],
     tags = [
-        "no_windows",
         "no_windows_gpu",
     ],
     xla_enable_strict_auto_jit = True,
@@ -3166,7 +3165,6 @@ cuda_py_test(
         "//tensorflow/python:framework_for_generated_wrappers",
         "//tensorflow/python:gradients",
     ],
-    tags = ["no_windows"],  # b/126916429
     xla_enable_strict_auto_jit = True,
 )
 
@@ -3275,6 +3273,7 @@ cuda_py_test(
         "//tensorflow/python:framework_for_generated_wrappers",
     ],
     tags = [
+        "no_mac",  # timeouts on GPU
         "no_pip",
         "notap",  # http://b/31080670
     ],

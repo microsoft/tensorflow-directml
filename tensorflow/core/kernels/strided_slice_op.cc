@@ -626,4 +626,50 @@ REGISTER_KERNEL_BUILDER(Name("TensorStridedSliceUpdate")
                         StridedSliceAssignOp<CPUDevice, int32, true>)
 #undef REGISTER_SYCL
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("StridedSlice")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("input")
+                            .HostMemory("begin")
+                            .HostMemory("end")
+                            .HostMemory("strides")
+                            .HostMemory("output"),
+                        StridedSliceOp<CPUDevice, int32>);
+REGISTER_KERNEL_BUILDER(Name("StridedSliceGrad")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("shape")
+                            .HostMemory("begin")
+                            .HostMemory("end")
+                            .HostMemory("strides")
+                            .HostMemory("dy")
+                            .HostMemory("output"),
+                        StridedSliceGradOp<CPUDevice, int32>);
+REGISTER_KERNEL_BUILDER(Name("StridedSliceAssign")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("ref")
+                            .HostMemory("begin")
+                            .HostMemory("end")
+                            .HostMemory("strides"),
+                        StridedSliceAssignOp<CPUDevice, int32, false>);
+REGISTER_KERNEL_BUILDER(Name("ResourceStridedSliceAssign")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("ref")
+                            .HostMemory("begin")
+                            .HostMemory("end")
+                            .HostMemory("strides"),
+                        StridedSliceAssignOp<CPUDevice, int32, false>);
+REGISTER_KERNEL_BUILDER(Name("TensorStridedSliceUpdate")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("begin")
+                            .HostMemory("end")
+                            .HostMemory("strides"),
+                        StridedSliceAssignOp<CPUDevice, int32, true>)
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace tensorflow

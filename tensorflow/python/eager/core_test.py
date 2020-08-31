@@ -353,8 +353,10 @@ class TFETest(test_util.TensorFlowTestCase):
 
     self.assertEqual('', ctx.device_name)
     self.assertEqual(ctx.device_name, ctx.device_spec.to_string())
-    with ctx.device('GPU:0'):
-      self.assertEqual('/job:localhost/replica:0/task:0/device:GPU:0',
+
+    gpu_type = test_util.gpu_device_type()
+    with ctx.device('%s:0' % gpu_type):
+      self.assertEqual('/job:localhost/replica:0/task:0/device:%s:0' % gpu_type,
                        ctx.device_name)
       self.assertEqual(ctx.device_name, ctx.device_spec.to_string())
       with ctx.device(None):
@@ -389,7 +391,7 @@ class TFETest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testShouldCopy(self):
-    with ops.device('gpu:0'):
+    with ops.device('%s:0' % test_util.gpu_device_type()):
       x = constant_op.constant(1.0)
     y = array_ops.identity(x)
     # The value we're testing y.device against will depend on what the behavior
@@ -413,7 +415,7 @@ class TFETest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testInt32GPU(self):
-    with ops.device('gpu:0'):
+    with ops.device('%s:0' % test_util.gpu_device_type()):
       xent = nn_ops.sparse_softmax_cross_entropy_with_logits(
           logits=[[0.0, 0.0]], labels=[0])
     self.assertAllClose(xent, [0.69314718])
@@ -451,8 +453,9 @@ class TFETest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testContextConfig(self):
+    gpu_type = test_util.gpu_device_type()
     ctx = context.Context(config=config_pb2.ConfigProto(
-        device_count={'GPU': 0}))
+        device_count={gpu_type: 0}))
     self.assertEquals(0, ctx.num_gpus())
 
   def testPickle(self):
@@ -468,36 +471,46 @@ class TFETest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testDevicePlacementEnforcesConsistency(self):
+    gpu_suffix = '%s:0' % test_util.gpu_device_type()
+
     cpu = context.device('cpu:0')
-    gpu = context.device('gpu:0')
+    gpu = context.device(gpu_suffix)
     cpu.__enter__()
     self.assertEndsWith(current_device(), 'CPU:0')
     gpu.__enter__()
-    self.assertEndsWith(current_device(), 'GPU:0')
+    self.assertEndsWith(current_device(), gpu_suffix)
     with self.assertRaisesRegexp(
         RuntimeError, 'Exiting device scope without proper scope nesting'):
       cpu.__exit__()
-      self.assertEndsWith(current_device(), 'GPU:0')
+      self.assertEndsWith(current_device(), gpu_suffix)
     gpu.__exit__()
     self.assertEndsWith(current_device(), 'CPU:0')
 
   @test_util.run_gpu_only
   def testReEntrant(self):
+    gpu_suffix = '%s:0' % test_util.gpu_device_type()
+
     cpu = context.device('cpu:0')
-    gpu = context.device('gpu:0')
+    gpu = context.device(gpu_suffix)
     with cpu:
       with gpu:
         with gpu:
-          self.assertEndsWith(current_device(), 'GPU:0')
-        self.assertEndsWith(current_device(), 'GPU:0')
+          self.assertEndsWith(current_device(), gpu_suffix)
+        self.assertEndsWith(current_device(), gpu_suffix)
       self.assertEndsWith(current_device(), 'CPU:0')
       with gpu:
-        self.assertEndsWith(current_device(), 'GPU:0')
+        self.assertEndsWith(current_device(), gpu_suffix)
 
-  @test_util.run_gpu_only
+  @test_util.run_gpu_only(skip_devices=["SYCL"])
   def testTensorPlacement(self):
-    x = constant_op.constant(1.).gpu()
-    with context.device('gpu:0'):
+    gpu_type = test_util.gpu_device_type()
+
+    if gpu_type == "DML":
+      x = constant_op.constant(1.).dml()
+    else:
+      x = constant_op.constant(1.).gpu()
+
+    with context.device('%s:0' % gpu_type):
       y = constant_op.constant(2.)
     # Add would fail if t2 were not on GPU
     result = execute(
@@ -507,7 +520,7 @@ class TFETest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testResourceTensorPlacement(self):
-    with context.device('gpu:0'):
+    with context.device('%s:0' % test_util.gpu_device_type()):
       v = resource_variable_ops.ResourceVariable(1.0)
     with context.device('cpu:0'):
       # Check that even though we specified the cpu device we'll run the read op
@@ -515,38 +528,49 @@ class TFETest(test_util.TensorFlowTestCase):
       self.assertAllEqual(
           gen_resource_variable_ops.read_variable_op(v.handle, v.dtype), 1.0)
 
-  @test_util.run_gpu_only
+  @test_util.run_gpu_only(skip_devices=["SYCL"])
   def testCopyBetweenDevices(self):
+    gpu_type = test_util.gpu_device_type()
+
     x = constant_op.constant([[1., 2.], [3., 4.]])
     x = x.cpu()
-    x = x.gpu()
-    x = x.gpu()
+    x = x.dml() if gpu_type == "DML" else x.gpu()
+    x = x.dml() if gpu_type == "DML" else x.gpu()
     x = x.cpu()
 
     # Invalid device
     with self.assertRaises(RuntimeError):
-      x.gpu(context.context().num_gpus() + 1)
+      if gpu_type == "DML":
+        x.dml(context.context().num_gpus() + 1)
+      else:
+        x.gpu(context.context().num_gpus() + 1)
 
-  @test_util.run_gpu_only
+  @test_util.run_gpu_only(skip_devices=["SYCL"])
   def testCopyBetweenDevicesAsync(self):
+    gpu_type = test_util.gpu_device_type()
+
     with context.execution_mode(context.ASYNC):
       x = constant_op.constant([[1., 2.], [3., 4.]])
       x = x.cpu()
-      x = x.gpu()
-      x = x.gpu()
+      x = x.dml() if gpu_type == "DML" else x.gpu()
+      x = x.dml() if gpu_type == "DML" else x.gpu()
       x = x.cpu()
       context.context().executor.wait()
 
     # Invalid device
     with self.assertRaises(RuntimeError):
-      x.gpu(context.context().num_gpus() + 1)
+      if gpu_type == "DML":
+        x.dml(context.context().num_gpus() + 1)
+      else:
+        x.gpu(context.context().num_gpus() + 1)
+
       context.context().executor.wait()
     context.context().executor.clear_error()
 
   @test_util.run_gpu_only
   def testCopyScope(self):
     constant = constant_op.constant(1.0)
-    with ops.device('gpu:0'):
+    with ops.device('%s:0' % test_util.gpu_device_type()):
       with context.device_policy(context.DEVICE_PLACEMENT_SILENT):
         c = constant + 1.0
     self.assertAllEqual(c, 2.0)
@@ -579,10 +603,10 @@ class TFETest(test_util.TensorFlowTestCase):
       self.assertAllEqual(test_fn(test_var), 3.0)
     async_executor.wait()
 
-  @test_util.run_gpu_only
+  @test_util.run_gpu_only(skip_devices=["SYCL"])
   def testNumpyForceCPU(self):
     cpu = constant_op.constant([[1., 2.], [3., 4.]])
-    c2g = cpu.gpu()
+    c2g = cpu.dml() if test_util.gpu_device_type() == "DML" else cpu.gpu()
     self.assertAllEqual(c2g, cpu.numpy())
 
   def testCopyFromCPUToCPU(self):
@@ -651,10 +675,14 @@ class TFETest(test_util.TensorFlowTestCase):
                   constant_op.constant(5)],
           attrs=('T', dtypes.int32.as_datatype_enum))[0]
 
-  @test_util.run_gpu_only
+  @test_util.run_gpu_only(skip_devices=["SYCL"])
   def testMatMulGPU(self):
-    three = constant_op.constant([[3.]]).gpu()
-    five = constant_op.constant([[5.]]).gpu()
+    if test_util.gpu_device_type() == "DML":
+      three = constant_op.constant([[3.]]).dml()
+      five = constant_op.constant([[5.]]).dml()
+    else:
+      three = constant_op.constant([[3.]]).gpu()
+      five = constant_op.constant([[5.]]).gpu()
     product = execute(
         b'MatMul',
         num_outputs=1,
@@ -910,12 +938,16 @@ class TFETest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testOperationWithNoInputsRunsOnDevice(self):
+    gpu_type = test_util.gpu_device_type()
     shape = constant_op.constant([], dtype=dtypes.int32)
 
     # x: Run the "TruncatedNormal" op CPU and copy result to GPU.
-    x = truncated_normal(shape).gpu()
+    if gpu_type == "DML":
+      x = truncated_normal(shape).dml()
+    else:
+      x = truncated_normal(shape).gpu()
     # y: Explicitly run the "TruncatedNormal" op on GPU.
-    with context.device('gpu:0'):
+    with context.device('%s:0' % gpu_type):
       y = truncated_normal(shape)
     # Add would fail if x and y were not on the same device.
     execute(
@@ -946,9 +978,10 @@ class TFETest(test_util.TensorFlowTestCase):
   # TODO(b/123637108): re-enable
   @test_util.run_gpu_only
   def disabled_testSmallIntegerOpsForcedToCPU(self):
+    gpu_type = test_util.gpu_device_type()
     a = constant_op.constant((1, 2, 3, 4, 5), dtype=dtypes.int64)
     b = constant_op.constant((2, 3, 4, 5, 6), dtype=dtypes.int64)
-    with context.device('gpu:0'):
+    with context.device('%s:0' % gpu_type):
       c = a + b
 
     # Op forced to CPU since all constants are integers and small.
@@ -957,19 +990,21 @@ class TFETest(test_util.TensorFlowTestCase):
     a = array_ops.zeros((8, 10), dtype=dtypes.int64)
     b = array_ops.ones((8, 10), dtype=dtypes.int64)
 
-    with context.device('gpu:0'):
+    with context.device('%s:0' % gpu_type):
       c = a + b
 
     # Op not forced to CPU since the tensors are larger than 64 elements.
-    self.assertEqual(c.device, '/job:localhost/replica:0/task:0/device:GPU:0')
+    self.assertEqual(c.device,
+                     '/job:localhost/replica:0/task:0/device:%s:0' % gpu_type)
 
     a = constant_op.constant((1, 2, 3, 4, 5), dtype=dtypes.float32)
     b = constant_op.constant((2, 3, 4, 5, 6), dtype=dtypes.float32)
-    with context.device('gpu:0'):
+    with context.device('%s:0' % gpu_type):
       c = a + b
 
     # Op not forced to CPU since the constants are not integers.
-    self.assertEqual(c.device, '/job:localhost/replica:0/task:0/device:GPU:0')
+    self.assertEqual(c.device,
+                     '/job:localhost/replica:0/task:0/device:%s:0' % gpu_type)
 
   def testExecutionModeIsStoredThreadLocal(self):
     cv = threading.Condition()
@@ -1049,8 +1084,9 @@ class SendRecvTest(test_util.TensorFlowTestCase):
 
   @test_util.run_gpu_only
   def testLocalCrossDevice(self):
-    gpu_device_name = '/job:localhost/replica:0/task:0/device:GPU:0'
-    with ops.device('GPU:0'):
+    gpu_type = test_util.gpu_device_type()
+    gpu_device_name = '/job:localhost/replica:0/task:0/device:%s:0' % gpu_type
+    with ops.device('%s:0' % gpu_type):
       t0 = constant_op.constant(1.0)
       self._send(t0, 't0', self.cpu_device)
     with ops.device('cpu:0'):
@@ -1058,7 +1094,7 @@ class SendRecvTest(test_util.TensorFlowTestCase):
           self._recv(dtypes.float32, 't0', gpu_device_name),
           1.0)
       self._send(constant_op.constant(2.0), 't1', gpu_device_name)
-    with ops.device('GPU:0'):
+    with ops.device('%s:0' % gpu_type):
       self.assertAllEqual(
           self._recv(dtypes.float32, 't1', self.cpu_device),
           2.0)

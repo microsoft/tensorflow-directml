@@ -155,7 +155,7 @@ class SummaryOpsCoreTest(test_util.TensorFlowTestCase):
     logdir = self.get_temp_dir()
     with context.eager_mode():
       with summary_ops.create_file_writer(logdir).as_default():
-        with ops.device('/GPU:0'):
+        with ops.device(test_util.gpu_device_name()):
           value = constant_op.constant(42.0)
           step = constant_op.constant(12, dtype=dtypes.int64)
           summary_ops.write('tag', value, step=step).numpy()

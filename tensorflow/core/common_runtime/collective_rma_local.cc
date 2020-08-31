@@ -129,18 +129,34 @@ void CollectiveRemoteAccessLocal::MemCpyAsync(
   // For GPU devices when only one compute stream is used (the default)
   // the OpKernelContext does not supply a DeviceContext.  It's assumed
   // that all nodes use the default context.
-  if (src_dev_ctx == nullptr && src_device_type == DEVICE_GPU) {
-    const DeviceBase::GpuDeviceInfo* dev_info =
-        src_dev->tensorflow_gpu_device_info();
-    CHECK(dev_info);
-    src_dev_ctx = dev_info->default_context;
+  if (src_dev_ctx == nullptr) {
+    if (src_device_type == DEVICE_GPU) {
+      const DeviceBase::GpuDeviceInfo* dev_info =
+          src_dev->tensorflow_gpu_device_info();
+      CHECK(dev_info);
+      src_dev_ctx = dev_info->default_context;
+    }
+#ifdef TENSORFLOW_USE_DIRECTML
+    else if (src_device_type == DEVICE_DML) {
+      src_dev_ctx = src_dev->dml_device_context();
+    }
+#endif
   }
-  if (dst_dev_ctx == nullptr && dst_device_type == DEVICE_GPU) {
-    const DeviceBase::GpuDeviceInfo* dev_info =
-        src_dev->tensorflow_gpu_device_info();
-    CHECK(dev_info);
-    dst_dev_ctx = dev_info->default_context;
+
+  if (dst_dev_ctx == nullptr) {
+    if (dst_device_type == DEVICE_GPU) {
+      const DeviceBase::GpuDeviceInfo* dev_info =
+          src_dev->tensorflow_gpu_device_info();
+      CHECK(dev_info);
+      dst_dev_ctx = dev_info->default_context;
+    }
+#ifdef TENSORFLOW_USE_DIRECTML
+    else if (dst_device_type == DEVICE_DML) {
+      dst_dev_ctx = dst_dev->dml_device_context();
+    }
+#endif
   }
+
   if (non_cpu_src) CHECK(src_dev_ctx);
   if (non_cpu_dst) CHECK(dst_dev_ctx);
   if (non_cpu_src || non_cpu_dst) {

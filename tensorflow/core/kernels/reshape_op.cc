@@ -109,4 +109,42 @@ REGISTER_KERNEL_BUILDER(Name("Reshape")
                         ReshapeOp);
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                               \
+  REGISTER_KERNEL_BUILDER(Name("Reshape")                       \
+                              .Device(DEVICE_DML)               \
+                              .HostMemory("shape")              \
+                              .TypeConstraint<type>("T")        \
+                              .TypeConstraint<int32>("Tshape"), \
+                          ReshapeOp);                           \
+  REGISTER_KERNEL_BUILDER(Name("Reshape")                       \
+                              .Device(DEVICE_DML)               \
+                              .HostMemory("shape")              \
+                              .TypeConstraint<type>("T")        \
+                              .TypeConstraint<int64>("Tshape"), \
+                          ReshapeOp);
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+REGISTER_KERNEL_BUILDER(Name("Reshape")
+                            .Device(DEVICE_DML)
+                            .HostMemory("tensor")
+                            .HostMemory("shape")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("Tshape"),
+                        ReshapeOp);
+REGISTER_KERNEL_BUILDER(Name("Reshape")
+                            .Device(DEVICE_DML)
+                            .HostMemory("tensor")
+                            .HostMemory("shape")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int64>("Tshape"),
+                        ReshapeOp);
+#undef REGISTER_DML_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // namespace tensorflow

@@ -25,6 +25,7 @@ from tensorflow.python.eager import context
 from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_spec
+from tensorflow.python.framework import test_util
 from tensorflow.python.keras import keras_parameterized
 from tensorflow.python.keras import testing_utils
 from tensorflow.python.keras.mixed_precision.experimental import policy
@@ -274,6 +275,9 @@ class LambdaLayerTest(keras_parameterized.TestCase):
 
 class TestStatefulLambda(keras_parameterized.TestCase):
 
+  # This test uses Maximum on int32 data internally, which isn't supported by
+  # DML
+  @test_util.skip_dml
   @keras_parameterized.run_all_keras_modes
   @keras_parameterized.run_with_all_model_types
   def test_lambda_with_variable_in_model(self):
@@ -410,6 +414,9 @@ class CoreLayersTest(keras_parameterized.TestCase):
     testing_utils.layer_test(
         keras.layers.RepeatVector, kwargs={'n': 3}, input_shape=(3, 2))
 
+  # This test uses Maximum on int32 data internally, which isn't supported by
+  # DML
+  @test_util.skip_dml
   def test_dense(self):
     testing_utils.layer_test(
         keras.layers.Dense, kwargs={'units': 3}, input_shape=(3, 2))

@@ -153,6 +153,45 @@ REGISTER_KERNEL_BUILDER(Name(kRetOp)
                         RetvalOp);
 #undef REGISTER
 
+#if TENSORFLOW_USE_DIRECTML
+
+// We deliberately register the same types for these kernels that CUDA does
+
+#define DML_REGISTER_KERNEL(type)                                        \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name(kArgOp).Device(DEVICE_DML).TypeConstraint<type>("T"), ArgOp); \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name(kRetOp).Device(DEVICE_DML).TypeConstraint<type>("T"), RetvalOp);
+
+TF_CALL_NUMBER_TYPES_NO_INT32(DML_REGISTER_KERNEL);
+TF_CALL_QUANTIZED_TYPES(DML_REGISTER_KERNEL);
+TF_CALL_bool(DML_REGISTER_KERNEL);
+TF_CALL_variant(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+REGISTER_KERNEL_BUILDER(
+    Name(kDeviceArgOp).Device(DEVICE_DML).TypeConstraint<int32>("T"), ArgOp);
+REGISTER_KERNEL_BUILDER(
+    Name(kDeviceRetOp).Device(DEVICE_DML).TypeConstraint<int32>("T"), RetvalOp);
+
+#define DML_REGISTER_KERNEL(type)                                              \
+  REGISTER_KERNEL_BUILDER(Name(kArgOp)                                         \
+                              .Device(DEVICE_DML)                              \
+                              .HostMemory("output")                            \
+                              .TypeConstraint<type>("T"),                      \
+                          ArgOp);                                              \
+  REGISTER_KERNEL_BUILDER(Name(kRetOp)                                         \
+                              .Device(DEVICE_DML)                              \
+                              .HostMemory("input")                             \
+                              .TypeConstraint<type>("T"),                      \
+                          RetvalOp);                                           \
+
+TF_CALL_resource(DML_REGISTER_KERNEL);
+TF_CALL_string(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 class PassOn : public OpKernel {
  public:
   explicit PassOn(OpKernelConstruction* ctx) : OpKernel(ctx) {
@@ -233,6 +272,37 @@ REGISTER_KERNEL_BUILDER(Name("_ArrayToList")
                         PassOn);
 #endif  // TENSORFLOW_USE_SYCL
 
+#if TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_DML_KERNELS(type)                                       \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("_ListToArray").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      PassOn);                                                           \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("_ArrayToList").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      PassOn);
+
+REGISTER_DML_KERNELS(Eigen::half);
+REGISTER_DML_KERNELS(float);
+REGISTER_DML_KERNELS(double);
+
+#undef REGISTER_DML_KERNELS
+
+REGISTER_KERNEL_BUILDER(Name("_ListToArray")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T"),
+                        PassOn);
+REGISTER_KERNEL_BUILDER(Name("_ArrayToList")
+                            .Device(DEVICE_DML)
+                            .HostMemory("input")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T"),
+                        PassOn);
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 class SymbolicGradientOp : public AsyncOpKernel {
  public:
   explicit SymbolicGradientOp(OpKernelConstruction* ctx) : AsyncOpKernel(ctx) {}
@@ -299,6 +369,11 @@ REGISTER_KERNEL_BUILDER(Name(kGradientOp).Device(DEVICE_SYCL),
                         SymbolicGradientOp);
 
 #endif  // TENSORFLOW_USE_SYCL
+
+#if TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name(kGradientOp).Device(DEVICE_DML),
+                        SymbolicGradientOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 RemoteCallOp::RemoteCallOp(OpKernelConstruction* ctx) : AsyncOpKernel(ctx) {
   OP_REQUIRES_OK(ctx,
@@ -422,4 +497,8 @@ REGISTER_KERNEL_BUILDER(
     Name("RemoteCall").Device(DEVICE_SYCL).HostMemory("target"), RemoteCallOp);
 
 #endif  // TENSORFLOW_USE_SYCL
+#if TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(
+    Name("RemoteCall").Device(DEVICE_DML).HostMemory("target"), RemoteCallOp);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

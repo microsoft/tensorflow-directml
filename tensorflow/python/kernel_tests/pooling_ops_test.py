@@ -43,7 +43,7 @@ from tensorflow.python.platform import tf_logging
 def GetDeviceScope(self, use_gpu=False):
   if context.executing_eagerly():
     if use_gpu and test.is_gpu_available():
-      return ops.device("GPU:0")
+      return ops.device(test_util.gpu_device_name())
     return ops.device("CPU:0")
   else:
     return self.session(use_gpu=use_gpu)
@@ -59,15 +59,14 @@ def GetTestConfigs(include_nchw_vect_c=False):
     all the valid test configs as tuples of data_format and use_gpu.
   """
   test_configs = [("NHWC", False), ("NHWC", True)]
-  if not test.is_gpu_available(cuda_only=True):
+  if not test.is_gpu_available(skip_devices=["SYCL"]):
     tf_logging.info("NCHW and NCHW_VECT_C tests skipped because not run with "
                     "--config=cuda or no GPUs available.")
     return test_configs
-  # "NCHW" format is currently supported exclusively on CUDA GPUs.
+  # "NCHW" format is currently not supported on SYCL GPUs.
   test_configs += [("NCHW", True)]
   if include_nchw_vect_c:
-    if test.is_gpu_available(
-        cuda_only=True, min_cuda_compute_capability=(6, 1)):
+    if test.is_gpu_available(cuda_only=True, min_cuda_compute_capability=(6, 1)):
       test_configs += [("NCHW_VECT_C", True)]
     else:
       tf_logging.info("NCHW_VECT_C test skipped because no GPUs with "
@@ -206,8 +205,8 @@ class PoolingTest(test.TestCase):
 
     self._VerifyOneType(pool_func, input_sizes, ksize, strides, padding,
                         data_format, dtypes.float32, expected, use_gpu, v2)
-    if not test.is_built_with_rocm():
-      # double datatype is not supported for pooling ops on the ROCm platform
+    if not test.is_built_with_rocm() and test_util.gpu_device_type() != "DML":
+      # double datatype is not supported for pooling ops on the ROCm platform or DML
       self._VerifyOneType(pool_func, input_sizes, ksize, strides, padding,
                           data_format, dtypes.float64, expected, use_gpu, v2)
 
@@ -732,6 +731,8 @@ class PoolingTest(test.TestCase):
             use_gpu=use_gpu,
             v2=v2)
 
+  # DML only supports 2D maxpooling right now
+  @test_util.skip_dml
   def _testDepthwiseMaxPoolInvalidConfig(self,
                                          in_size,
                                          ksize,
@@ -905,9 +906,11 @@ class PoolingTest(test.TestCase):
             0.0, 0.0, 0.0, 23.0, 0.0, 24.0
         ])
 
+  # MaxPoolGradGrad not implemented yet
+  @test_util.skip_dml
   def testMaxPoolingGradGradWithArgmax(self):
-    # MaxPoolWithArgMax is implemented only on CUDA.
-    if not test.is_gpu_available(cuda_only=True):
+    # MaxPoolWithArgMax is not implemented on SYCL.
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     orig_input = [
         1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0,
@@ -1414,6 +1417,8 @@ class PoolingTest(test.TestCase):
             use_gpu=use_gpu,
             v2=v2)
 
+  # This test purposefully produces NaN's, which is undefined behavior in DML
+  @test_util.skip_dml()
   @test_util.no_xla_auto_jit("b/123923733")  # NaNs handled differently
   def _testMaxPoolGradDirectWithNans2_1(self):
     input_data = [float("nan")] * 16
@@ -1496,6 +1501,8 @@ class PoolingTest(test.TestCase):
     else:
       del os.environ["TF_ENABLE_MAXPOOL_NANPROP"]
 
+  # This test purposefully produces NaN's, which is undefined behavior in DML
+  @test_util.skip_dml()
   @test_util.no_xla_auto_jit("b/123923733")  # NaNs handled differently
   def _testMaxPoolGradDirectWithNans2_2(self):
     input_data = [float("nan")] * 16
@@ -1703,6 +1710,8 @@ class PoolingTest(test.TestCase):
           data_format=data_format,
           use_gpu=use_gpu)
 
+  # MaxPoolGradGrad not implemented yet
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMaxPoolGradGrad(self):
     for (data_format, use_gpu) in GetTestConfigs():
@@ -1899,7 +1908,8 @@ class PoolingTest(test.TestCase):
   @test_util.run_deprecated_v1
   @test_util.disable_xla("b/123337890")  # Error messages differ
   def testOpEdgeCases(self):
-    with self.session(use_gpu=test.is_gpu_available()) as sess:
+    # Error messages differ on DML
+    with self.session(use_gpu=test.is_gpu_available(skip_devices=["DML"])) as sess:
       pool_funcs = [nn_ops.max_pool, nn_ops.avg_pool]
       if test.is_gpu_available():
         pool_funcs.append(nn_ops.max_pool_with_argmax)
@@ -1935,8 +1945,8 @@ class PoolingTest(test.TestCase):
 def GetMaxPoolFwdTest(input_size, filter_size, strides, padding):
 
   def Test(self):
-    # MaxPoolWithArgMax is implemented only on CUDA.
-    if not test.is_gpu_available(cuda_only=True):
+    # MaxPoolWithArgMax is not implemented on SYCL.
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     self._CompareMaxPoolingFwd(input_size, filter_size, strides, padding)
 
@@ -1946,21 +1956,23 @@ def GetMaxPoolFwdTest(input_size, filter_size, strides, padding):
 def GetMaxPoolGradTest(input_size, filter_size, output_size, strides, padding):
 
   def Test(self):
-    # MaxPoolWithArgMax is implemented only on CUDA.
-    if not test.is_gpu_available(cuda_only=True):
+    # MaxPoolWithArgMax is not implemented on SYCL.
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     self._CompareMaxPoolingBk(input_size, output_size, filter_size, strides,
                               padding)
 
   return Test
 
-
 def GetMaxPoolGradGradTest(input_size, filter_size, output_size, strides,
                            padding):
 
   def Test(self):
-    # MaxPoolWithArgMax is implemented only on CUDA.
-    if not test.is_gpu_available(cuda_only=True):
+    # MaxPoolWithArgMax is not implemented on DML.
+    if not test.is_gpu_available(skip_devices=["DML"]):
+      return
+    # MaxPoolWithArgMax is not implemented on SYCL.
+    if not test.is_gpu_available(skip_devices=["SYCL"]):
       return
     self._CompareMaxPoolingGradBk(input_size, output_size, filter_size, strides,
                                   padding)

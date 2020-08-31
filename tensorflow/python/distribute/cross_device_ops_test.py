@@ -36,6 +36,7 @@ from tensorflow.python.eager import test
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import kernels
 from tensorflow.python.framework import ops
+from tensorflow.python.framework import test_util
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import math_ops
 
@@ -428,6 +429,8 @@ class MultiWorkerCrossDeviceOpsTest(multi_worker_test_base.MultiWorkerTestBase,
       ],
       mode=["graph"])
 
+  # TFDML #25509335
+  @test_util.skip_dml
   @combinations.generate(multi_worker_allreduce_combinations)
   def testReductionAndBroadcast(self, cross_device_ops, devices):
     # Mimic the default device of multi-worker strategies.

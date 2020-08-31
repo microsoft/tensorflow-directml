@@ -75,6 +75,43 @@ function is_windows() {
   fi
 }
 
+function copy_dml_redist_files() {
+  # Dirs under ${TMPDIR} starting with _solib_ are special: setup.py will include any files under those dirs in package_data.
+  dml_redist_dir=${TMPDIR}/_solib_directml
+  mkdir -p ${dml_redist_dir}
+
+  if is_windows; then
+    runfiles_manifest_path=bazel-bin/tensorflow/tools/pip_package/build_pip_package.exe.runfiles_manifest
+  else
+    runfiles_manifest_path=bazel-bin/tensorflow/tools/pip_package/build_pip_package.runfiles_manifest
+  fi
+
+  # Locate path to DirectMLConfig.h in the runfiles manifest
+  dml_config_path=$(awk '/^dml_redist\/.*\/DirectMLConfig\.h/ {print $2}' $runfiles_manifest_path)
+  if [ -z "$dml_config_path" ]; then
+    echo "Could not find DirectMLConfig.h in runfiles"
+    exit 1
+  fi
+
+  # Locate path to root of DirectML redist files
+  dml_redist_root=$(echo $dml_config_path | sed 's/\/include\/DirectMLConfig\.h//')
+
+  # Copy library and licenses
+  if is_windows; then
+    dml_version=$(awk '/^#define DIRECTML_SOURCE_VERSION "([abcdef0-9]+)"/ { gsub("\"","",$3); print $3 }' $dml_config_path)
+    echo "DML Version = '$dml_version'"
+    dml_dll=$(find "${dml_redist_root}/bin/x64-win/" -type f -name "*.dll" ! -name DirectML.Debug.dll)
+    cp "$dml_dll" "${dml_redist_dir}"/DirectML${dml_version}.dll
+  else
+    dml_version=$(awk -v RS='\r\n' '/^#define DIRECTML_SOURCE_VERSION "([abcdef0-9]+)"/ { gsub("\"","",$3); print $3 }' $dml_config_path)
+    echo "DML Version = '$dml_version'"
+    dml_so=$(find "$dml_redist_root/bin/x64-linux/" -type f)
+    cp "$dml_so" "${dml_redist_dir}"/libdirectml.so.${dml_version}
+  fi
+  cp "${dml_redist_root}/LICENSE.txt" ${dml_redist_dir}
+  cp "${dml_redist_root}/ThirdPartyNotices.txt" ${dml_redist_dir}
+}
+
 function prepare_src() {
   if [ $# -lt 1 ] ; then
     echo "No destination dir provided"
@@ -91,6 +128,8 @@ function prepare_src() {
     echo "Could not find bazel-bin.  Did you run from the root of the build tree?"
     exit 1
   fi
+
+  copy_dml_redist_files
 
   if is_windows; then
     rm -rf ./bazel-bin/tensorflow/tools/pip_package/simple_console_for_window_unzip
@@ -240,6 +279,7 @@ function usage() {
   echo "    --gpu                 build tensorflow_gpu"
   echo "    --gpudirect           build tensorflow_gpudirect"
   echo "    --rocm                build tensorflow_rocm"
+  echo "    --directml            build tensorflow_directml"
   echo "    --nightly_flag        build tensorflow nightly"
   echo ""
   exit 1
@@ -251,6 +291,7 @@ function main() {
   GPU_BUILD=0
   PROJECT_NAME_CPU=0
   ROCM_BUILD=0
+  DIRECTML_BUILD=0
   NIGHTLY_BUILD=0
   SRCDIR=""
   DSTDIR=""
@@ -276,6 +317,8 @@ function main() {
       PKG_NAME_FLAG="--project_name tensorflow_gpudirect"
     elif [[ "$1" == "--rocm" ]]; then
       ROCM_BUILD=1
+    elif [[ "$1" == "--directml" ]]; then
+      DIRECTML_BUILD=1
     elif [[ "$1" == "--project_name" ]]; then
       shift
       if [[ -z "$1" ]]; then
@@ -323,6 +366,8 @@ function main() {
     PKG_NAME_FLAG="--project_name tf_nightly_gpu"
   elif [[ ${NIGHTLY_BUILD} == "1" && ${ROCM_BUILD} == "1" ]]; then
     PKG_NAME_FLAG="--project_name tf_nightly_rocm"
+  elif [[ ${NIGHTLY_BUILD} == "1" && ${DIRECTML_BUILD} == "1" ]]; then
+    PKG_NAME_FLAG="--project_name tf_nightly_directml"
   elif [[ ${NIGHTLY_BUILD} == "1" && ${PROJECT_NAME_CPU} == "1" ]]; then
     PKG_NAME_FLAG="--project_name tf_nightly_cpu"
   elif [[ ${NIGHTLY_BUILD} == "1" ]]; then
@@ -331,6 +376,8 @@ function main() {
     PKG_NAME_FLAG="--project_name tensorflow_gpu"
   elif [[ ${ROCM_BUILD} == "1" ]]; then
     PKG_NAME_FLAG="--project_name tensorflow_rocm"
+  elif [[ ${DIRECTML_BUILD} == "1" ]]; then
+    PKG_NAME_FLAG="--project_name tensorflow_directml"
   elif [[ ${PROJECT_NAME_CPU} == "1" ]]; then
     PKG_NAME_FLAG="--project_name tensorflow_cpu"
   fi

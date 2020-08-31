@@ -42,6 +42,8 @@ class GradientDescentOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testBasic(self):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       var0 = resource_variable_ops.ResourceVariable([1.0, 2.0], dtype=dtype)
       var1 = resource_variable_ops.ResourceVariable([3.0, 4.0], dtype=dtype)
       grads0 = constant_op.constant([0.1, 0.1], dtype=dtype)
@@ -91,6 +93,8 @@ class GradientDescentOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testBasicWithLearningRateDecay(self):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       learning_rate = 3.0
       decay = 0.5
       sgd = gradient_descent.SGD(learning_rate=learning_rate, decay=decay)
@@ -99,6 +103,8 @@ class GradientDescentOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testBasicWithLearningRateInverseTimeDecay(self):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       learning_rate = learning_rate_schedule.InverseTimeDecay(
           3.0, decay_steps=1.0, decay_rate=0.5)
       sgd = gradient_descent.SGD(learning_rate=learning_rate)
@@ -107,6 +113,8 @@ class GradientDescentOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testBasicWithLearningRateInverseTimeDecaySerializeAndDeserialize(self):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       learning_rate = learning_rate_schedule.InverseTimeDecay(
           3.0, decay_steps=1.0, decay_rate=0.5)
       sgd = gradient_descent.SGD(learning_rate=learning_rate)
@@ -116,6 +124,8 @@ class GradientDescentOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testBasicCallableParams(self):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       var0 = resource_variable_ops.ResourceVariable([1.0, 2.0], dtype=dtype)
       var1 = resource_variable_ops.ResourceVariable([3.0, 4.0], dtype=dtype)
       grads0 = constant_op.constant([0.1, 0.1], dtype=dtype)
@@ -135,6 +145,8 @@ class GradientDescentOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testMinimizeResourceVariable(self):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       var0 = resource_variable_ops.ResourceVariable([[1.0, 2.0]], dtype=dtype)
       var1 = resource_variable_ops.ResourceVariable([3.0], dtype=dtype)
       x = constant_op.constant([[4.0], [5.0]], dtype=dtype)
@@ -298,6 +310,8 @@ class MomentumOptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testBasic(self):
     for _, dtype in enumerate([dtypes.half, dtypes.float32, dtypes.float64]):
+      if test_util.gpu_device_type() == "DML" and dtype == dtypes.float64:
+        continue # DML doesn't support double
       var0 = resource_variable_ops.ResourceVariable([1.0, 2.0],
                                                     dtype=dtype,
                                                     name="var0")

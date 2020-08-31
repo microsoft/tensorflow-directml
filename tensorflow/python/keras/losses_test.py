@@ -132,6 +132,8 @@ class KerasLossesTest(test.TestCase):
     result = f([t_val, p_val])
     self.assertArrayNear(result, [.002, 0, .17], 1e-3)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_sparse_categorical_crossentropy_loss(self):
     target = keras.backend.variable(np.random.randint(0, 1, (5, 1)))
@@ -145,6 +147,8 @@ class KerasLossesTest(test.TestCase):
         keras.backend.eval(output_from_logit),
         keras.backend.eval(output_from_softmax), atol=1e-5)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_sparse_categorical_crossentropy_loss_with_unknown_rank_tensor(self):
     t = keras.backend.placeholder()
@@ -527,6 +531,8 @@ class MeanSquaredLogarithmicErrorTest(test.TestCase):
     self.assertEqual(msle_obj.name, 'mape_1')
     self.assertEqual(msle_obj.reduction, losses_utils.ReductionV2.SUM)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_unweighted(self):
     msle_obj = keras.losses.MeanSquaredLogarithmicError()
     y_true = constant_op.constant([1, 9, 2, -5, -2, 6], shape=(2, 3))
@@ -536,6 +542,8 @@ class MeanSquaredLogarithmicErrorTest(test.TestCase):
     loss = msle_obj(y_true, y_pred)
     self.assertAlmostEqual(self.evaluate(loss), 1.4370, 3)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_scalar_weighted(self):
     msle_obj = keras.losses.MeanSquaredLogarithmicError()
     y_true = constant_op.constant([1, 9, 2, -5, -2, 6], shape=(2, 3))
@@ -545,6 +553,8 @@ class MeanSquaredLogarithmicErrorTest(test.TestCase):
     loss = msle_obj(y_true, y_pred, sample_weight=2.3)
     self.assertAlmostEqual(self.evaluate(loss), 3.3051, 3)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_sample_weighted(self):
     msle_obj = keras.losses.MeanSquaredLogarithmicError()
     y_true = constant_op.constant([1, 9, 2, -5, -2, 6], shape=(2, 3))
@@ -555,6 +565,8 @@ class MeanSquaredLogarithmicErrorTest(test.TestCase):
     loss = msle_obj(y_true, y_pred, sample_weight=sample_weight)
     self.assertAlmostEqual(self.evaluate(loss), 3.7856, 3)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_timestep_weighted(self):
     msle_obj = keras.losses.MeanSquaredLogarithmicError()
     y_true = constant_op.constant([1, 9, 2, -5, -2, 6], shape=(2, 3, 1))
@@ -565,6 +577,8 @@ class MeanSquaredLogarithmicErrorTest(test.TestCase):
     loss = msle_obj(y_true, y_pred, sample_weight=sample_weight)
     self.assertAlmostEqual(self.evaluate(loss), 2.6473, 3)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_zero_weighted(self):
     msle_obj = keras.losses.MeanSquaredLogarithmicError()
     y_true = constant_op.constant([1, 9, 2, -5, -2, 6], shape=(2, 3))
@@ -933,6 +947,8 @@ class SparseCategoricalCrossentropyTest(test.TestCase):
     self.assertEqual(cce_obj.name, 'scc')
     self.assertEqual(cce_obj.reduction, losses_utils.ReductionV2.SUM)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_all_correct_unweighted(self):
     y_true = constant_op.constant([[0], [1], [2]], dtype=dtypes.int64)
     y_pred = constant_op.constant([[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
@@ -947,6 +963,8 @@ class SparseCategoricalCrossentropyTest(test.TestCase):
     loss = cce_obj(y_true, logits)
     self.assertAlmostEqual(self.evaluate(loss), 0.0, 3)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_unweighted(self):
     cce_obj = keras.losses.SparseCategoricalCrossentropy()
     y_true = constant_op.constant([0, 1, 2])
@@ -961,6 +979,8 @@ class SparseCategoricalCrossentropyTest(test.TestCase):
     loss = cce_obj(y_true, logits)
     self.assertAlmostEqual(self.evaluate(loss), .0573, 3)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_scalar_weighted(self):
     cce_obj = keras.losses.SparseCategoricalCrossentropy()
     y_true = constant_op.constant([[0], [1], [2]])
@@ -975,6 +995,8 @@ class SparseCategoricalCrossentropyTest(test.TestCase):
     loss = cce_obj(y_true, logits, sample_weight=2.3)
     self.assertAlmostEqual(self.evaluate(loss), .1317, 3)
 
+  # TFDML #25563651
+  @test_util.skip_dml
   def test_sample_weighted(self):
     cce_obj = keras.losses.SparseCategoricalCrossentropy()
     y_true = constant_op.constant([[0], [1], [2]])

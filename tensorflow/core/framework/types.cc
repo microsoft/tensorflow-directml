@@ -39,6 +39,7 @@ const char* const DEVICE_DEFAULT = "DEFAULT";
 const char* const DEVICE_CPU = "CPU";
 const char* const DEVICE_GPU = "GPU";
 const char* const DEVICE_SYCL = "SYCL";
+const char* const DEVICE_DML = "DML";
 
 const std::string DeviceName<Eigen::ThreadPoolDevice>::value = DEVICE_CPU;
 #if (defined(GOOGLE_CUDA) && GOOGLE_CUDA) || \

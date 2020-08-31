@@ -153,6 +153,21 @@ REGISTER_KERNEL_BUILDER(Name("ExperimentalSleepDataset")
                             .HostMemory("handle"),
                         SleepDatasetOp);
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("SleepDataset")
+                            .Device(DEVICE_DML)
+                            .HostMemory("sleep_microseconds")
+                            .HostMemory("input_dataset")
+                            .HostMemory("handle"),
+                        SleepDatasetOp);
+REGISTER_KERNEL_BUILDER(Name("ExperimentalSleepDataset")
+                            .Device(DEVICE_DML)
+                            .HostMemory("sleep_microseconds")
+                            .HostMemory("input_dataset")
+                            .HostMemory("handle"),
+                        SleepDatasetOp);
+#endif
+
 }  // namespace
 }  // namespace experimental
 }  // namespace data

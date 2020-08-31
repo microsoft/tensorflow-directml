@@ -61,6 +61,8 @@ class TraceModelCallTest(keras_parameterized.TestCase):
     else:
       self.assertAllClose(expected, actual)
 
+  # TFDML #25564574
+  @test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @test_util.run_in_graph_and_eager_modes
   def test_trace_model_outputs(self):
@@ -80,6 +82,8 @@ class TraceModelCallTest(keras_parameterized.TestCase):
 
     self._assert_all_close(expected_outputs, signature_outputs)
 
+  # TFDML #25564574
+  @test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   @keras_parameterized.run_all_keras_modes
   def test_trace_model_outputs_after_fitting(self):
@@ -166,6 +170,8 @@ class TraceModelCallTest(keras_parameterized.TestCase):
     self.assertAllClose({'output_1': [[1., 2.]]},
                         fn({'x': [[1.]], 'y': [[2.]]}))
 
+  # TFDML #25564574
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_specify_input_signature(self):
     model = testing_utils.get_small_sequential_mlp(10, 3, None)
@@ -180,6 +186,8 @@ class TraceModelCallTest(keras_parameterized.TestCase):
     expected_outputs = {model.output_names[0]: model(inputs)}
     self._assert_all_close(expected_outputs, signature_outputs)
 
+  # TFDML #25564574
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_subclassed_model_with_input_signature(self):
 

@@ -31,6 +31,7 @@ import re
 import tempfile
 import threading
 import unittest
+import sys
 
 from absl.testing import parameterized
 import numpy as np
@@ -100,11 +101,22 @@ except:
 
 
 @tf_export("test.gpu_device_name")
-def gpu_device_name():
+def gpu_device_name(skip_devices=()):
   """Returns the name of a GPU device if available or the empty string."""
   for x in device_lib.list_local_devices():
-    if x.device_type == "GPU" or x.device_type == "SYCL":
+    if (x.device_type in ["GPU", "SYCL", "DML"]
+        and x.device_type not in skip_devices):
       return compat.as_str(x.name)
+  return ""
+
+
+@tf_export("test.gpu_device_type")
+def gpu_device_type(skip_devices=()):
+  """Returns the type of a GPU device if available or the empty string."""
+  for x in device_lib.list_local_devices():
+    if (x.device_type in ["GPU", "SYCL", "DML"]
+        and x.device_type not in skip_devices):
+      return x.device_type
   return ""
 
 
@@ -1316,11 +1328,45 @@ def run_v2_only(func=None):
   return decorator
 
 
-def run_gpu_only(func=None):
+def run_gpu_only(func=None, skip_devices=()):
   """Execute the decorated test only if a GPU is available.
 
   This function is intended to be applied to tests that require the presence
   of a GPU. If a GPU is absent, it will simply be skipped.
+
+  Args:
+    func: function to be annotated. If `func` is None, this method returns a
+      decorator the can be applied to a function. If `func` is not None this
+      returns the decorator applied to `func`.
+    skip_devices: the devices to ignore when looking for GPU devices.
+
+  Returns:
+    Returns a decorator that will conditionally skip the decorated test method.
+  """
+
+  def decorator(f):
+    if tf_inspect.isclass(f):
+      raise ValueError("`run_gpu_only` only supports test methods.")
+
+    def decorated(self, *args, **kwargs):
+      if not is_gpu_available(skip_devices=skip_devices):
+        if skip_devices:
+          self.skipTest("Test requires a GPU not in {}".format(skip_devices))
+        else:
+          self.skipTest("Test requires a GPU")
+
+      return f(self, *args, **kwargs)
+
+    return decorated
+
+  if func is not None:
+    return decorator(func)
+
+  return decorator
+
+
+def skip_dml(func=None):
+  """Skip the test if the GPU device is a DML device.
 
   Args:
     func: function to be annotated. If `func` is None, this method returns a
@@ -1333,11 +1379,41 @@ def run_gpu_only(func=None):
 
   def decorator(f):
     if tf_inspect.isclass(f):
-      raise ValueError("`run_gpu_only` only supports test methods.")
+      raise ValueError("`skip_dml` only supports test methods.")
 
     def decorated(self, *args, **kwargs):
-      if not is_gpu_available():
-        self.skipTest("Test requires GPU")
+      if gpu_device_type() == "DML":
+        self.skipTest("Test requires a non-DML device")
+
+      return f(self, *args, **kwargs)
+
+    return decorated
+
+  if func is not None:
+    return decorator(func)
+
+  return decorator
+
+
+def skip_dml_linux(func=None):
+  """Skip the test if the GPU device is a DML device.
+
+  Args:
+    func: function to be annotated. If `func` is None, this method returns a
+      decorator the can be applied to a function. If `func` is not None this
+      returns the decorator applied to `func`.
+
+  Returns:
+    Returns a decorator that will conditionally skip the decorated test method.
+  """
+
+  def decorator(f):
+    if tf_inspect.isclass(f):
+      raise ValueError("`skip_dml_linux` only supports test methods.")
+
+    def decorated(self, *args, **kwargs):
+      if gpu_device_type() == "DML" and sys.platform.startswith("linux"):
+        self.skipTest("Test requires a non-DML device")
 
       return f(self, *args, **kwargs)
 
@@ -1383,7 +1459,9 @@ def run_cuda_only(func=None):
 
 
 @tf_export("test.is_gpu_available")
-def is_gpu_available(cuda_only=False, min_cuda_compute_capability=None):
+def is_gpu_available(cuda_only=False,
+                     min_cuda_compute_capability=None,
+                     skip_devices=()):
   """Returns whether TensorFlow can access a GPU.
 
   Warning: if a non-GPU version of the package is installed, the function would
@@ -1394,6 +1472,7 @@ def is_gpu_available(cuda_only=False, min_cuda_compute_capability=None):
     cuda_only: limit the search to CUDA GPUs.
     min_cuda_compute_capability: a (major,minor) pair that indicates the minimum
       CUDA compute capability required, or None if no requirement.
+    skip_devices: the devices to ignore.
 
   Note that the keyword arg name "cuda_only" is misleading (since routine will
   return true when a GPU device is available irrespective of whether TF was
@@ -1430,14 +1509,17 @@ def is_gpu_available(cuda_only=False, min_cuda_compute_capability=None):
 
   try:
     for local_device in device_lib.list_local_devices():
-      if local_device.device_type == "GPU":
-        if (min_cuda_compute_capability is None or
-            compute_capability_from_device_desc(
-                local_device.physical_device_desc) >=
-            min_cuda_compute_capability):
+      if local_device.device_type not in skip_devices:
+        if local_device.device_type == "GPU":
+          if (min_cuda_compute_capability is None or
+              compute_capability_from_device_desc(
+                  local_device.physical_device_desc) >=
+              min_cuda_compute_capability):
+            return True
+        if local_device.device_type == "SYCL" and not cuda_only:
           return True
-      if local_device.device_type == "SYCL" and not cuda_only:
-        return True
+        if local_device.device_type == "DML" and not cuda_only:
+          return True
     return False
   except errors_impl.NotFoundError as e:
     if not all(x in str(e) for x in ["CUDA", "not find"]):
@@ -1448,10 +1530,10 @@ def is_gpu_available(cuda_only=False, min_cuda_compute_capability=None):
 
 
 @contextlib.contextmanager
-def device(use_gpu):
+def device(use_gpu, skip_devices=()):
   """Uses gpu when requested and available."""
-  if use_gpu and is_gpu_available():
-    dev = "/device:GPU:0"
+  if use_gpu and is_gpu_available(skip_devices=skip_devices):
+    dev = gpu_device_name(skip_devices=skip_devices)
   else:
     dev = "/device:CPU:0"
   with ops.device(dev):
@@ -1459,16 +1541,19 @@ def device(use_gpu):
 
 
 @contextlib.contextmanager
-def use_gpu():
+def use_gpu(skip_devices=()):
   """Uses gpu when requested and available."""
-  with device(use_gpu=True):
+  with device(use_gpu=True, skip_devices=skip_devices):
     yield
 
 
 @contextlib.contextmanager
-def force_gpu():
+def force_gpu(skip_devices=()):
   """Force the gpu to be used."""
-  with ops.device("/device:GPU:0"):
+
+  gpu_name = gpu_device_name(skip_devices=skip_devices)
+
+  with ops.device(gpu_name or "/device:GPU:0"):
     yield
 
 

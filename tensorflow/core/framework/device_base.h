@@ -178,6 +178,12 @@ class DeviceBase {
   void set_eigen_sycl_device(Eigen::SyclDevice* d) { eigen_sycl_device_ = d; }
 #endif
 
+#ifdef TENSORFLOW_USE_DIRECTML
+  virtual DeviceContext* dml_device_context() const {
+    return dml_device_context_;
+  }
+#endif
+
   // Return the Allocator implementation to use based on the allocator
   // attributes requested.  See allocator.h for more details.
   virtual Allocator* GetAllocator(AllocatorAttributes /*attr*/) {
@@ -280,6 +286,10 @@ class DeviceBase {
     device_thread_pool_ = thread_pool;
   }
 
+#ifdef TENSORFLOW_USE_DIRECTML
+  void set_dml_device_context(DeviceContext* d) { dml_device_context_ = d; }
+#endif
+
  private:
   Env* const env_;
   CpuWorkerThreads* cpu_worker_threads_ = nullptr;
@@ -289,6 +299,10 @@ class DeviceBase {
   std::vector<Eigen::ThreadPoolDevice*> eigen_cpu_devices_;
 #ifdef TENSORFLOW_USE_SYCL
   Eigen::SyclDevice* eigen_sycl_device_ = nullptr;
+#endif
+
+#ifdef TENSORFLOW_USE_DIRECTML
+  DeviceContext* dml_device_context_ = nullptr;
 #endif
 };
 

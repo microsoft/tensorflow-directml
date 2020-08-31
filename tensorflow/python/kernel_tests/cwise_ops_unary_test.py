@@ -136,13 +136,15 @@ class UnaryOpTest(test.TestCase):
     with test_util.force_cpu():
       self._check(tf_func(x_sp), res_np, x_sp, tol)
 
-  def _compareGpu(self, x, np_func, tf_func):
+  def _compareGpu(self, x, np_func, tf_func, atol=None):
     np_ans = np_func(x)
     with test_util.use_gpu():
       result = tf_func(ops.convert_to_tensor(x))
       tf_gpu = self.evaluate(result)
     if x.dtype == np.float16:
       self.assertAllClose(np_ans, tf_gpu, rtol=1e-3, atol=1e-3)
+    elif atol:
+      self.assertAllClose(np_ans, tf_gpu, atol=atol)
     else:
       self.assertAllClose(np_ans, tf_gpu)
     # TODO(zhifengc/ke): make gradient checker work on GPU.
@@ -153,9 +155,9 @@ class UnaryOpTest(test.TestCase):
     with test_util.use_gpu():
       self._check(tf_func(x_sp), res_np, x_sp, tol)
 
-  def _compareBoth(self, x, np_func, tf_func):
+  def _compareBoth(self, x, np_func, tf_func, gpu_atol=None):
     self._compareCpu(x, np_func, tf_func)
-    self._compareGpu(x, np_func, tf_func)
+    self._compareGpu(x, np_func, tf_func, gpu_atol)
 
   def _compareBothSparse(self, x, np_func, tf_func, tol=None):
     self._compareSparseCpu(x, np_func, tf_func, tol)
@@ -216,11 +218,16 @@ class UnaryOpTest(test.TestCase):
     self._compareBoth(x, self._log_sigmoid, math_ops.log_sigmoid)
     self._compareBoth(y, np.sign, math_ops.sign)
     self._compareBoth(x, np.sin, math_ops.sin)
-    self._compareBoth(x, np.cos, math_ops.cos)
-    self._compareBoth(k, np.arcsin, math_ops.asin)
-    self._compareBoth(k, np.arccos, math_ops.acos)
-    self._compareBoth(x, np.arctan, math_ops.atan)
-    self._compareBoth(x, np.tan, math_ops.tan)
+    self._compareBoth(x, np.cos, math_ops.cos,
+      gpu_atol=(0, 2e-5)[test_util.gpu_device_type() == "DML"])
+    self._compareBoth(k, np.arcsin, math_ops.asin, 
+      gpu_atol=(0, 8e-5)[test_util.gpu_device_type() == "DML"])
+    self._compareBoth(k, np.arccos, math_ops.acos,
+      gpu_atol=(0, 8e-5)[test_util.gpu_device_type() == "DML"])
+    self._compareBoth(x, np.arctan, math_ops.atan, 
+      gpu_atol=(0, 8e-5)[test_util.gpu_device_type() == "DML"])
+    self._compareBoth(x, np.tan, math_ops.tan,
+      gpu_atol=(0, 3e-5)[test_util.gpu_device_type() == "DML"])
     self._compareBoth(
         y, np.vectorize(self._replace_domain_error_with_inf(math.lgamma)),
         math_ops.lgamma)
@@ -386,7 +393,8 @@ class UnaryOpTest(test.TestCase):
     self._compareBothSparse(x, np.negative, math_ops.negative)
     self._compareBothSparse(x, np.square, math_ops.square)
     self._compareBothSparse(z, np.sqrt, math_ops.sqrt, tol=1e-3)
-    self._compareBothSparse(x, np.tanh, math_ops.tanh)
+    self._compareBothSparse(x, np.tanh, math_ops.tanh, 
+      tol=(None, 1e-3)[test_util.gpu_device_type() == "DML"])
     self._compareBothSparse(y, np.sign, math_ops.sign)
     self._compareBothSparse(x, np.vectorize(math.erf), math_ops.erf, tol=1e-3)
 
@@ -406,6 +414,7 @@ class UnaryOpTest(test.TestCase):
     self._compareCpu(x, np.abs, math_ops.abs)
     self._compareCpu(x, np.abs, _ABS)
 
+  @test_util.skip_dml # DML element-wise ops don't support INT32
   def testInt32Basic(self):
     x = np.arange(-6, 6, 2).reshape(1, 3, 2).astype(np.int32)
     self._compareCpu(x, np.abs, math_ops.abs)
@@ -560,6 +569,8 @@ class UnaryOpTest(test.TestCase):
           for analytical, numerical in grads:
             self.assertAllClose(analytical, numerical, rtol=tol, atol=tol)
 
+  # TFDML #25509545
+  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testComplexAbsGradGrad(self):
 

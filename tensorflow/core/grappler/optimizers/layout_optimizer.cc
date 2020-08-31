@@ -589,8 +589,10 @@ class NodeProcessor : public GraphProcessor {
     string device;
     string not_used;
     if (DeviceNameUtils::SplitDeviceName(device_name, &not_used, &device) &&
-        absl::StrContains(absl::AsciiStrToLower(device),
-                          absl::AsciiStrToLower(DEVICE_GPU))) {
+        (absl::StrContains(absl::AsciiStrToLower(device),
+                           absl::AsciiStrToLower(DEVICE_GPU)) ||
+         absl::StrContains(absl::AsciiStrToLower(device),
+                           absl::AsciiStrToLower(DEVICE_DML)))) {
       return true;
     }
     return false;
@@ -2215,7 +2217,7 @@ int GetNumGPUs(const Cluster& cluster) {
   auto devices = cluster.GetDevices();
   int num_gpus = 0;
   for (const auto& device : devices) {
-    if (device.second.type() == "GPU") {
+    if (device.second.type() == "GPU" || device.second.type() == "DML") {
       num_gpus++;
     }
   }

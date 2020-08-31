@@ -125,6 +125,67 @@ REGISTER_GPU_KERNEL(Variant);
 
 #undef REGISTER_GPU_KERNEL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                                           \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("Identity").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
+      IdentityOp);                                                          \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("PreventGradient").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      IdentityOp);                                                          \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("RefIdentity").Device(DEVICE_DML).TypeConstraint<type>("T"),     \
+      IdentityOp);                                                          \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("StopGradient").Device(DEVICE_DML).TypeConstraint<type>("T"),    \
+      IdentityOp);                                                          \
+  REGISTER_KERNEL_BUILDER(Name("DebugGradientIdentity")                     \
+                              .Device(DEVICE_DML)                           \
+                              .TypeConstraint<type>("T"),                   \
+                          IdentityOp);                                      \
+  REGISTER_KERNEL_BUILDER(Name("PlaceholderWithDefault")                    \
+                              .Device(DEVICE_DML)                           \
+                              .TypeConstraint<type>("dtype"),               \
+                          IdentityOp)
+
+TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
+REGISTER_DML_KERNEL(Variant);
+#undef REGISTER_DML_KERNEL
+
+#define REGISTER_DML_HOST_KERNEL(type)                        \
+  REGISTER_KERNEL_BUILDER(Name("Identity")                    \
+                              .Device(DEVICE_DML)             \
+                              .HostMemory("input")            \
+                              .HostMemory("output")           \
+                              .TypeConstraint<type>("T"),     \
+                          IdentityOp);                        \
+  REGISTER_KERNEL_BUILDER(Name("RefIdentity")                 \
+                              .Device(DEVICE_DML)             \
+                              .HostMemory("input")            \
+                              .HostMemory("output")           \
+                              .TypeConstraint<type>("T"),     \
+                          IdentityOp);                        \
+  REGISTER_KERNEL_BUILDER(Name("StopGradient")                \
+                              .Device(DEVICE_DML)             \
+                              .HostMemory("input")            \
+                              .HostMemory("output")           \
+                              .TypeConstraint<type>("T"),     \
+                          IdentityOp);                        \
+  REGISTER_KERNEL_BUILDER(Name("PlaceholderWithDefault")      \
+                              .Device(DEVICE_DML)             \
+                              .HostMemory("input")            \
+                              .HostMemory("output")           \
+                              .TypeConstraint<type>("dtype"), \
+                          IdentityOp)
+
+REGISTER_DML_HOST_KERNEL(int32);
+REGISTER_DML_HOST_KERNEL(bool);
+REGISTER_DML_HOST_KERNEL(tstring);
+REGISTER_DML_HOST_KERNEL(ResourceHandle);
+
+#undef REGISTER_DML_HOST_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
+
 #if (defined(GOOGLE_CUDA) && GOOGLE_CUDA) || \
     (defined(TENSORFLOW_USE_ROCM) && TENSORFLOW_USE_ROCM)
 // A special GPU kernel for int32 and bool.

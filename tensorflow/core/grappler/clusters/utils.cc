@@ -31,6 +31,11 @@ limitations under the License.
 #include "include/libxsmm.h"
 #endif
 
+#if TENSORFLOW_USE_DIRECTML
+#include "tensorflow/core/common_runtime/dml/dml_adapter.h"
+#include "tensorflow/core/common_runtime/dml/dml_adapter_heuristics.h"
+#endif
+
 #include "tensorflow/core/common_runtime/gpu/gpu_id.h"
 #include "tensorflow/core/common_runtime/gpu/gpu_id_manager.h"
 #include "tensorflow/core/lib/core/status.h"
@@ -148,6 +153,44 @@ DeviceProperties GetLocalGPUInfo(PlatformGpuId platform_gpu_id) {
   return device;
 }
 
+DeviceProperties GetLocalDMLInfo(int device_id) {
+  DeviceProperties device;
+  device.set_type("DML");
+
+#if TENSORFLOW_USE_DIRECTML
+  auto adapters = EnumerateAdapters();
+  CHECK(device_id >= 0 && device_id < adapters.size());
+
+  const auto& adapter = adapters[device_id];
+  device.set_model(adapter.Name());
+  device.set_vendor(GetVendorName(adapter.VendorID()));
+
+  device.set_frequency(DmlAdapterArchetype::kFrequency * 1e-6);
+  device.set_num_cores(DmlAdapterArchetype::kNumCores);
+  device.set_num_registers(DmlAdapterArchetype::kNumRegisters);
+  device.set_l1_cache_size(DmlAdapterArchetype::kL1CacheSize);
+  device.set_l2_cache_size(DmlAdapterArchetype::kL2CacheSize);
+  device.set_l3_cache_size(DmlAdapterArchetype::kL3CacheSize);
+  device.set_shared_memory_size_per_multiprocessor(
+      DmlAdapterArchetype::kSharedMemorySizePerMultiprocessor);
+  device.set_memory_size(DmlAdapterArchetype::kMemorySize);
+  device.set_bandwidth(DmlAdapterArchetype::kBandwidth * 1e-3);
+
+  uint32_t vendor_id = (uint32_t)adapter.VendorID();
+  auto driver_ver = adapter.DriverVersion().parts;
+
+  auto& device_env = *device.mutable_environment();
+  device_env["vendor_id"] =
+      strings::StrCat(strings::Hex(vendor_id, strings::kZeroPad4));
+  device_env["device_id"] =
+      strings::StrCat(strings::Hex(adapter.DeviceID(), strings::kZeroPad4));
+  device_env["driver_version"] = strings::StrCat(
+      driver_ver.a, ".", driver_ver.b, ".", driver_ver.c, ".", driver_ver.d);
+#endif  // TENSORFLOW_USE_DIRECTML
+
+  return device;
+}
+
 DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
   DeviceProperties unknown;
   unknown.set_type("UNKNOWN");
@@ -167,6 +210,8 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
     } else {
       return GetLocalGPUInfo(PlatformGpuId(0));
     }
+  } else if (device.type == "DML") {
+    return GetLocalDMLInfo(device.has_id ? device.id : 0);
   }
   return unknown;
 }

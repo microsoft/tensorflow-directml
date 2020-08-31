@@ -18,13 +18,14 @@ limitations under the License.
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "third_party/gpus/cuda/cuda_config.h"
 #include "tensorflow/stream_executor/lib/env.h"
 #include "tensorflow/stream_executor/lib/error.h"
 #include "tensorflow/stream_executor/lib/path.h"
 #include "tensorflow/stream_executor/platform/logging.h"
 #include "tensorflow/stream_executor/platform/port.h"
+#include "third_party/gpus/cuda/cuda_config.h"
 #include "third_party/tensorrt/tensorrt_config.h"
+#include "DirectMLConfig.h"
 
 namespace stream_executor {
 namespace internal {
@@ -35,8 +36,23 @@ string GetCudaLibVersion() { return TF_CUDA_LIB_VERSION; }
 string GetCudnnVersion() { return TF_CUDNN_VERSION; }
 string GetTensorRTVersion() { return TF_TENSORRT_VERSION; }
 
-port::StatusOr<void*> GetDsoHandle(const string& name, const string& version) {
+string GetDirectMLPath() {
+  const char* path = getenv("TF_DIRECTML_PATH");
+  return (path != nullptr ? path : "");
+}
+
+string GetDirectMLVersion() {
+  // If TF_DIRECTML_PATH is set, use DirectML.dll / libdirectml.so.
+  // Otherwise, use DirectML<ver>.dll / libdirectml.so.<ver>.
+  return GetDirectMLPath().empty() ? DIRECTML_SOURCE_VERSION : "";
+}
+
+port::StatusOr<void*> GetDsoHandle(const string& name, const string& version,
+                                   const string& search_path = "") {
   auto filename = port::Env::Default()->FormatLibraryFileName(name, version);
+  if (!search_path.empty()) {
+    filename = port::JoinPath(search_path, filename);
+  }
   void* dso_handle;
   port::Status status =
       port::Env::Default()->LoadLibrary(filename.c_str(), &dso_handle);
@@ -136,6 +152,19 @@ port::StatusOr<void*> GetRocrandDsoHandle() {
 
 port::StatusOr<void*> GetHipDsoHandle() { return GetDsoHandle("hip_hcc", ""); }
 
+port::StatusOr<void*> GetDirectMLDsoHandle() {
+#ifdef _WIN32
+  return GetDsoHandle("DirectML", GetDirectMLVersion(), GetDirectMLPath());
+#else
+  return GetDsoHandle("directml", GetDirectMLVersion(), GetDirectMLPath());
+#endif
+}
+
+port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
+  return GetDsoHandle("DirectML.Debug", GetDirectMLVersion(),
+                      GetDirectMLPath());
+}
+
 }  // namespace DsoLoader
 
 namespace CachedDsoLoader {
@@ -206,6 +235,16 @@ port::StatusOr<void*> GetRocrandDsoHandle() {
 
 port::StatusOr<void*> GetHipDsoHandle() {
   static auto result = new auto(DsoLoader::GetHipDsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetDirectMLDsoHandle() {
+  static auto result = new auto(DsoLoader::GetDirectMLDsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
+  static auto result = new auto(DsoLoader::GetDirectMLDebugDsoHandle());
   return *result;
 }
 

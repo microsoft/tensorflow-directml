@@ -138,6 +138,8 @@ class AutoCastVariableTest(test.TestCase, parameterized.TestCase):
         self.assertEqual(x.true_dtype, dtypes.float32)
         self.assertIsInstance(x.true_dtype, dtypes.DType)
 
+  # TFDML #25561684
+  @test_util.skip_dml
   @parameterized.named_parameters(*TESTCASES)
   def test_operator_overloads(self, distribute):
     with get_distribute_scope(distribute):

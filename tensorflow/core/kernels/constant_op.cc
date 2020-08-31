@@ -143,6 +143,33 @@ REGISTER_SYCL_KERNEL(SYCL, bool);
 #undef REGISTER_SYCL_KERNEL
 #endif
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(TYPE)                                     \
+  REGISTER_KERNEL_BUILDER(                                            \
+      Name("Const").Device(DEVICE_DML).TypeConstraint<TYPE>("dtype"), \
+      ConstantOp);
+REGISTER_DML_KERNEL(Eigen::half);
+REGISTER_DML_KERNEL(bfloat16);
+REGISTER_DML_KERNEL(float);
+REGISTER_DML_KERNEL(double);
+REGISTER_DML_KERNEL(uint8);
+REGISTER_DML_KERNEL(int8);
+REGISTER_DML_KERNEL(qint8);
+REGISTER_DML_KERNEL(uint16);
+REGISTER_DML_KERNEL(int16);
+REGISTER_DML_KERNEL(qint16);
+REGISTER_DML_KERNEL(quint16);
+REGISTER_DML_KERNEL(uint32);
+REGISTER_DML_KERNEL(qint32);
+REGISTER_DML_KERNEL(int64);
+REGISTER_DML_KERNEL(uint64);
+REGISTER_DML_KERNEL(complex64);
+REGISTER_DML_KERNEL(complex128);
+REGISTER_DML_KERNEL(bool);
+REGISTER_DML_KERNEL(Variant);
+#undef REGISTER_DML_KERNEL
+#endif
+
 typedef Eigen::ThreadPoolDevice CPUDevice;
 typedef Eigen::GpuDevice GPUDevice;
 #ifdef TENSORFLOW_USE_SYCL
@@ -218,6 +245,17 @@ REGISTER_KERNEL_BUILDER(Name("Fill")
                         FillOp<CPUDevice, int32, int32>);
 #undef REGISTER_KERNEL_SYCL
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Fill")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("index_type")
+                            .HostMemory("dims")
+                            .HostMemory("value")
+                            .HostMemory("output"),
+                        FillOp<CPUDevice, int32, int32>);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 #if (defined(GOOGLE_CUDA) && GOOGLE_CUDA) || \
     (defined(TENSORFLOW_USE_ROCM) && TENSORFLOW_USE_ROCM)
@@ -304,6 +342,14 @@ REGISTER_KERNEL_BUILDER(Name("ZerosLike")
                         ZerosLikeOp<CPUDevice, int32>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("ZerosLike")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("y"),
+                        ZerosLikeOp<CPUDevice, int32>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 #if (defined(GOOGLE_CUDA) && GOOGLE_CUDA) || \
     (defined(TENSORFLOW_USE_ROCM) && TENSORFLOW_USE_ROCM)
 REGISTER_KERNEL(bool, GPU);
@@ -357,6 +403,14 @@ REGISTER_KERNEL_BUILDER(Name("OnesLike")
                             .HostMemory("y"),
                         OnesLikeOp<CPUDevice, int32>);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("OnesLike")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("y"),
+                        OnesLikeOp<CPUDevice, int32>);
+#endif  // TENSORFLOW_USE_DIRECTML
 
 #if (defined(GOOGLE_CUDA) && GOOGLE_CUDA) || \
     (defined(TENSORFLOW_USE_ROCM) && TENSORFLOW_USE_ROCM)

@@ -74,6 +74,9 @@ NodeDef* AutoParallel::AddNodeControl(const string& name,
 }
 
 Status AutoParallel::Initialize(const GrapplerItem& item) {
+  // TODO #26543729: Investigate whether to enable Autoparallel grappler
+  // optimization for DML
+  //TFDML #26543729
   num_gpus_ = GetNumAvailableGPUs();
   LOG(INFO) << "Number of GPUs: " << num_gpus_;
   item_ = &item;
@@ -222,6 +225,9 @@ void AutoParallel::AddOneReplica(GraphDef* graph, int number) {
     *new_node = *all_nodes_[node];
     if (NotSharedNode(new_node->name())) {
       new_node->set_name(AddPrefixToNodeName(new_node->name(), prefix));
+      // TODO #26543729: Investigate whether to enable Autoparallel grappler
+      // optimization for DML
+      // TFDML #26543729
       if (num_gpus_ > 0) {
         new_node->set_device(strings::StrCat("/gpu:", number % num_gpus_));
       }

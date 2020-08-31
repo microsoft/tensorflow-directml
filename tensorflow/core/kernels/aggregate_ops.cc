@@ -248,6 +248,18 @@ REGISTER_KERNEL_BUILDER(Name("AddN")
                         AddNOp<CPUDevice, int32>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+// A special GPU kernel for int32.
+// TODO(b/25387198): Also enable int32 in device memory. This kernel
+// registration requires all int32 inputs and outputs to be in host memory.
+REGISTER_KERNEL_BUILDER(Name("AddN")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("inputs")
+                            .HostMemory("sum"),
+                        AddNOp<CPUDevice, int32>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 #undef REGISTER_ADDN
 
 }  // namespace tensorflow

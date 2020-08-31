@@ -129,6 +129,8 @@ class FalseNegativesTest(test.TestCase):
     self.assertEqual(len(fn_obj2.variables), 1)
     self.assertEqual(fn_obj2.thresholds, [0.4, 0.9])
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_unweighted(self):
     fn_obj = metrics.FalseNegatives()
     self.evaluate(variables.variables_initializer(fn_obj.variables))
@@ -143,6 +145,8 @@ class FalseNegativesTest(test.TestCase):
     result = fn_obj.result()
     self.assertAllClose(3., result)
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_weighted(self):
     fn_obj = metrics.FalseNegatives()
     self.evaluate(variables.variables_initializer(fn_obj.variables))
@@ -154,6 +158,8 @@ class FalseNegativesTest(test.TestCase):
     result = fn_obj(y_true, y_pred, sample_weight=sample_weight)
     self.assertAllClose(5., self.evaluate(result))
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_unweighted_with_thresholds(self):
     fn_obj = metrics.FalseNegatives(thresholds=[0.15, 0.5, 0.85])
     self.evaluate(variables.variables_initializer(fn_obj.variables))
@@ -168,6 +174,8 @@ class FalseNegativesTest(test.TestCase):
     result = fn_obj.result()
     self.assertAllClose([1., 4., 6.], result)
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_weighted_with_thresholds(self):
     fn_obj = metrics.FalseNegatives(thresholds=[0.15, 0.5, 0.85])
     self.evaluate(variables.variables_initializer(fn_obj.variables))
@@ -197,6 +205,8 @@ class TrueNegativesTest(test.TestCase):
     self.assertEqual(len(tn_obj2.variables), 1)
     self.assertEqual(tn_obj2.thresholds, [0.4, 0.9])
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_unweighted(self):
     tn_obj = metrics.TrueNegatives()
     self.evaluate(variables.variables_initializer(tn_obj.variables))
@@ -211,6 +221,8 @@ class TrueNegativesTest(test.TestCase):
     result = tn_obj.result()
     self.assertAllClose(3., result)
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_weighted(self):
     tn_obj = metrics.TrueNegatives()
     self.evaluate(variables.variables_initializer(tn_obj.variables))
@@ -222,6 +234,8 @@ class TrueNegativesTest(test.TestCase):
     result = tn_obj(y_true, y_pred, sample_weight=sample_weight)
     self.assertAllClose(4., self.evaluate(result))
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_unweighted_with_thresholds(self):
     tn_obj = metrics.TrueNegatives(thresholds=[0.15, 0.5, 0.85])
     self.evaluate(variables.variables_initializer(tn_obj.variables))
@@ -236,6 +250,8 @@ class TrueNegativesTest(test.TestCase):
     result = tn_obj.result()
     self.assertAllClose([2., 5., 7.], result)
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_weighted_with_thresholds(self):
     tn_obj = metrics.TrueNegatives(thresholds=[0.15, 0.5, 0.85])
     self.evaluate(variables.variables_initializer(tn_obj.variables))
@@ -767,6 +783,8 @@ class SensitivityAtSpecificityTest(test.TestCase, parameterized.TestCase):
       self.assertAlmostEqual(initial_sensitivity, self.evaluate(s_obj.result()),
                              1e-3)
 
+  # TFDML #25563987
+  @test_util.skip_dml
   def test_unweighted_all_correct(self):
     s_obj = metrics.SensitivityAtSpecificity(0.7)
     inputs = np.random.randint(0, 2, size=(100, 1))

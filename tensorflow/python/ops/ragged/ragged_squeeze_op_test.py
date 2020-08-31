@@ -113,6 +113,8 @@ class RaggedSqueezeTest(test_util.TensorFlowTestCase,
     dt = array_ops.squeeze(constant_op.constant(input_list), squeeze_ranks)
     self.assertAllEqual(ragged_conversion_ops.to_tensor(rt), dt)
 
+  # TFDML #25510471
+  @test_util.skip_dml
   @parameterized.parameters([
       # ragged_conversion_ops.from_tensor does not work for this
       # {'input_list': [1]},

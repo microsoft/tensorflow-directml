@@ -154,6 +154,8 @@ class BNTest(test.TestCase):
 
     self.assertEqual(len(ref_vars), 5)
 
+    rtol = 1.e-2 if test_util.gpu_device_type() == "DML" else 1.e-3
+
     for train1_use_gpu in [True, False]:
       for train2_use_gpu in [True, False]:
         for infer_use_gpu in [True, False]:
@@ -161,8 +163,8 @@ class BNTest(test.TestCase):
               dtypes.float16, train1_use_gpu, train2_use_gpu, infer_use_gpu)
           self.assertEqual(len(test_vars), 5)
           for test_var, ref_var in zip(test_vars, ref_vars):
-            self.assertAllClose(test_var, ref_var, rtol=1.e-3, atol=1.e-3)
-          self.assertAllClose(test_loss, ref_loss, rtol=1.e-3, atol=1.e-3)
+            self.assertAllClose(test_var, ref_var, rtol=rtol, atol=1.e-3)
+          self.assertAllClose(test_loss, ref_loss, rtol=rtol, atol=1.e-3)
 
   def _testCheckpoint(self, is_fused_checkpoint_a, is_fused_checkpoint_b,
                       use_gpu_checkpoint_a, use_gpu_checkpoint_b,

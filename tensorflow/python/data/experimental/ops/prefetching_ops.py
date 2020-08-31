@@ -97,7 +97,7 @@ class _CopyToDeviceDataset(dataset_ops.UnaryUnchangedStructureDataset):
     self._input_dataset = input_dataset
     self._target_device = target_device
     spec = framework_device.DeviceSpec().from_string(self._target_device)
-    self._is_gpu_target = (spec.device_type == "GPU")
+    self._is_gpu_target = (spec.device_type in ["GPU", "DML"])
     self._source_device_string = source_device
     self._source_device = ops.convert_to_tensor(source_device)
 

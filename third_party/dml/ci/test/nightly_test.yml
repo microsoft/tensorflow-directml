@@ -1,0 +1,33 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
+# This pipeline dispatches tests to all agents in a pool for a specific CI build.
+
+# The following variables are set in the pipeline web UI:
+# - (required) ControlPool : name of the ADO agent pool that runs the dispatch/report job in this pipeline.
+# - (required) TestPool : name of the ADO agent pool to test. All active agents in this pool will be tested.
+# - (required) BuildID : ID of the build to test.
+# - (required) TestGroups : comma-separated list of test groups to test. e.g. 'python,core'
+# - (required) Artifacts : comma-separated list of build artifacts to test. e.g. 'x64-win-release-cp36'
+# - (required) AccessToken : personal access token to use REST API for dispatching tests.
+# - (optional) EmailTo : email address to receive generated HTML report. If empty, no email is sent.
+
+name: $(Date:yyMMdd-HHmm)$(Rev:.r).$(SourceBranchName)
+
+resources:
+- repo: self
+
+# No CI trigger; run manually only.
+trigger: none
+
+variables:
+  skipComponentGovernanceDetection: true
+
+jobs:
+- job: test
+  pool: $(ControlPool)
+  timeoutInMinutes: 300
+  cancelTimeoutInMinutes: 1
+  steps:
+  - template: templates/test_build_steps.yml
+    parameters: { TimeoutInMinutes: 280 }

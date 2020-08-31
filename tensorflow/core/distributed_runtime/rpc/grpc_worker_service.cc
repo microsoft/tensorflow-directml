@@ -524,17 +524,29 @@ void GrpcWorker::GrpcRecvTensorAsync(CallOptions* opts,
           // device type*.
           const bool on_host = send_args.alloc_attrs.on_host();
           {
+            bool is_cpu_device =
+                src_dev->tensorflow_gpu_device_info() == nullptr;
+
+#ifdef TENSORFLOW_USE_DIRECTML
+            is_cpu_device &= src_dev->dml_device_context() == nullptr;
+#endif
             // Non-DMA cases.
-            if (src_dev->tensorflow_gpu_device_info() && (!on_host)) {
+            if (!is_cpu_device && (!on_host)) {
               DeviceContext* send_dev_context = send_args.device_context;
               AllocatorAttributes alloc_attrs;
               alloc_attrs.set_gpu_compatible(true);
               alloc_attrs.set_on_host(true);
               Allocator* alloc = src_dev->GetAllocator(alloc_attrs);
               Tensor* copy = new Tensor(alloc, val.dtype(), val.shape());
+#ifdef TENSORFLOW_USE_DIRECTML
+              CHECK(send_dev_context)
+                  << "send dev name: " << src_dev->name()
+                  << " dml_device_context: " << src_dev->dml_device_context();
+#else
               CHECK(send_dev_context)
                   << "send dev name: " << src_dev->name()
                   << " gpu_info: " << src_dev->tensorflow_gpu_device_info();
+#endif
               // "val" is on an accelerator device. Uses the device_context to
               // fill the copy on host.
               StatusCallback copy_ready = [rendezvous_done, copy,
