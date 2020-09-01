@@ -8095,6 +8095,7 @@ tf_kernel_library(
         "dml_data_format_dim_map.cc",
         "dml_reverse_op.cc",
         "dml_lrn_op.cc",
+        "dml_deepcopy_op.cc",
         "dml_space_depth_ops.cc",
         "dml_batch_to_space_op.cc",
         "dml_resource_variable_ops.cc",
