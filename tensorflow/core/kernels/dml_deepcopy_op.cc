@@ -36,17 +36,18 @@ class DmlDeepCopyKernel : public OpKernel {
     DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
     const auto& execution_context = device->GetExecutionContext();
 
-    ID3D12Resource* input_buffer = dml_util::GetBufferFromTensor(device, input);
+    D3D12BufferRegion input_buffer =
+        dml_util::CreateBufferForTensor(device, input);
 
-    ID3D12Resource* output_buffer =
-        dml_util::GetBufferFromTensor(device, *output);
+    D3D12BufferRegion output_buffer =
+        dml_util::CreateBufferForTensor(device, *output);
 
     std::array<D3D12_RESOURCE_BARRIER, 2> barriers = {
         CD3DX12_RESOURCE_BARRIER::Transition(
-            input_buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            input_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
             D3D12_RESOURCE_STATE_COPY_SOURCE),
         CD3DX12_RESOURCE_BARRIER::Transition(
-            output_buffer, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+            output_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
             D3D12_RESOURCE_STATE_COPY_DEST),
     };
 
@@ -56,9 +57,9 @@ class DmlDeepCopyKernel : public OpKernel {
     constexpr uint64_t src_offset = 0;
 
     execution_context->CopyBufferRegion(
-            output_buffer, dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
-            input_buffer, src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
-            input.TotalBytes());
+        output_buffer.Resource(), dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
+        input_buffer.Resource(), src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
+        input.TotalBytes());
 
     for (auto& barrier : barriers) {
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
