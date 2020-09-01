@@ -170,14 +170,14 @@ if ($Commits.Count -gt 0)
 
     foreach ($Commit in $Commits)
     {
-        $Url = "https://dev.azure.com/$($Ado.Account)/$($Ado.Project)/_git/tensorflow/commit/$($Commit.id)"
+        $Url = "https://github.com/microsoft/tensorflow-directml/commit/$($Commit.id)"
         $Timestamp = ([datetime]$Commit.timestamp).ToString("yyyy-MM-dd HH:mm:ss")
 
         $Style = "padding:1px 3px; border-bottom:1px solid gray; border-left:1px solid gray"
         $Html += "<tr style=`"text-align:left;`">"
         $Html += "<td style=`"$Style; font-family:monospace;`"><a target=`"_blank`" href=`"$($Url)`">$($Commit.id.substring(0,8))</a></td>"
         $Html += "<td style=`"$Style;`">$Timestamp</td>"
-        $Html += "<td style=`"$Style; border-right:1px solid gray;`"><b>$($Commit.author.uniqueName)</b> : $($Commit.message)</td>"
+        $Html += "<td style=`"$Style; border-right:1px solid gray;`"><b>$($Commit.author.displayName)</b> : $($Commit.message)</td>"
         $Html += "</tr>"
     }
 
