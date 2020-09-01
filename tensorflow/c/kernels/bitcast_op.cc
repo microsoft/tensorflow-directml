@@ -158,6 +158,17 @@ void RegisterBitcastOpKernel() {
   }
 #endif
 
+#if TENSORFLOW_USE_DIRECTML
+  {
+    auto* builder = TF_NewKernelBuilder("Bitcast", tensorflow::DEVICE_DML,
+                                        &BitcastOp_Create, &BitcastOp_Compute,
+                                        &BitcastOp_Delete);
+    TF_RegisterKernelBuilder("BitcastOp", builder, status);
+    CHECK_EQ(TF_OK, TF_GetCode(status))
+        << "Error while registering DML bitcast kernel";
+  }
+#endif
+
   TF_DeleteStatus(status);
 }
 
