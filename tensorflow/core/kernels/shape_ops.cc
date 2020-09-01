@@ -743,17 +743,17 @@ REGISTER_GPU_HOST_KERNEL(ResourceHandle);
 #undef REGISTER_GPU_HOST_KERNEL
 
 #ifdef TENSORFLOW_USE_DIRECTML
-#define REGISTER_DML_KERNEL(type)                         \
-  REGISTER_KERNEL_BUILDER(Name("EnsureShape")             \
-                              .Device(DEVICE_DML)         \
-                              .HostMemory("input")        \
-                              .HostMemory("output")       \
-                              .TypeConstraint<type>("T"), \
-                          EnsureShapeOp)
+#define REGISTER_DML_KERNEL(type)                                       \
+  REGISTER_KERNEL_BUILDER(                                              \
+      Name("EnsureShape").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      EnsureShapeOp)
 TF_CALL_NUMBER_TYPES_NO_INT32(REGISTER_DML_KERNEL);
 REGISTER_DML_KERNEL(Variant);
 #undef REGISTER_DML_KERNEL
 
+// A special DML kernel for int32 and bool.
+// TODO(b/25387198): Also enable int32 in device memory. This kernel
+// registration requires all int32 inputs and outputs to be in host memory.
 #define REGISTER_DML_HOST_KERNEL(type)                    \
   REGISTER_KERNEL_BUILDER(Name("EnsureShape")             \
                               .Device(DEVICE_DML)         \
@@ -766,6 +766,8 @@ REGISTER_DML_HOST_KERNEL(int32);
 REGISTER_DML_HOST_KERNEL(bool);
 REGISTER_DML_HOST_KERNEL(tstring);
 REGISTER_DML_HOST_KERNEL(ResourceHandle);
+
+#undef REGISTER_DML_HOST_KERNEL
 
 #endif  // TENSORFLOW_USE_DIRECTML
 
