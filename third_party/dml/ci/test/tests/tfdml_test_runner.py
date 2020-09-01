@@ -79,6 +79,8 @@ def _run_test(
   else:
     raise Exception("Unsupported test framework.")
 
+  env_copy["TF_FORCE_GPU_ALLOW_GROWTH"] = "true"
+
   try:
     with tempfile.TemporaryFile(mode="w+", encoding="iso-8859-1") as stdout, \
          tempfile.TemporaryFile(mode="w+", encoding="iso-8859-1") as stderr:
