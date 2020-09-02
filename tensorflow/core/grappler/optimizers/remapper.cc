@@ -1112,6 +1112,19 @@ void SetFusedOpAttributes(NodeDef* fused,
   SetAttrValue(epsilon, &(*attr)["epsilon"]);  // required only for BatchNorm
 }
 
+static void FuseConv2DExplicitPaddings(const PadWithConv2D& matched,
+                                       NodeDef& fused_op) {
+  fused_op.mutable_attr()->at("padding").set_s("EXPLICIT");
+
+  auto* paddings =
+      (*fused_op.mutable_attr())["explicit_paddings"].mutable_list();
+  paddings->Clear();
+
+  for (int i = 0; i < 8; ++i) {
+    paddings->add_i(matched.new_padding_values[i]);
+  }
+}
+
 Status AddFusedContractionNode(RemapperContext* ctx,
                                const ContractionWithBiasAdd& matched,
                                std::vector<bool>* invalidated_nodes,
@@ -1135,6 +1148,14 @@ Status AddFusedContractionNode(RemapperContext* ctx,
   if (IsConv2D(contraction)) {
     fused_op.set_op(kFusedConv2D);
     CopyConv2DAttributes(contraction, &fused_op);
+
+    // Optionally, look for a preceding "Pad" node that can be merged into
+    // Conv2D
+    PadWithConv2D pad_with_conv2d;
+    if (FindPadWithConv2D(*ctx, matched.contraction, &pad_with_conv2d)) {
+      FuseConv2DExplicitPaddings(pad_with_conv2d, fused_op);
+      (*nodes_to_delete)[pad_with_conv2d.pad] = true;
+    }
   } else if (IsMatMul(contraction)) {
     fused_op.set_op(kFusedMatMul);
     CopyMatMulAttributes(contraction, &fused_op);
@@ -1179,6 +1200,14 @@ Status AddFusedContractionNode(
   if (IsConv2D(contraction)) {
     fused_op.set_op(kFusedConv2D);
     CopyConv2DAttributes(contraction, &fused_op);
+
+    // Optionally, look for a preceding "Pad" node that can be merged into
+    // Conv2D
+    PadWithConv2D pad_with_conv2d;
+    if (FindPadWithConv2D(*ctx, matched.contraction, &pad_with_conv2d)) {
+      FuseConv2DExplicitPaddings(pad_with_conv2d, fused_op);
+      (*nodes_to_delete)[pad_with_conv2d.pad] = true;
+    }
   } else if (IsMatMul(contraction)) {
     fused_op.set_op(kFusedMatMul);
     CopyMatMulAttributes(contraction, &fused_op);
@@ -1217,15 +1246,7 @@ Status AddFusedContractionNode(RemapperContext* ctx,
   fused_op.set_op(conv_2d.op());
   CopyConv2DAttributes(conv_2d, &fused_op);
 
-  fused_op.mutable_attr()->at("padding").set_s("EXPLICIT");
-
-  auto* paddings =
-      (*fused_op.mutable_attr())["explicit_paddings"].mutable_list();
-  paddings->Clear();
-
-  for (int i = 0; i < 8; ++i) {
-    paddings->add_i(matched.new_padding_values[i]);
-  }
+  FuseConv2DExplicitPaddings(matched, fused_op);
 
   utils::Mutation* mutation = ctx->graph_view.GetMutationBuilder();
   Status status;
@@ -1811,19 +1832,13 @@ Status Remapper::Optimize(Cluster* cluster, const GrapplerItem& item,
     }
 #endif  //! INTEL_MKL
 
-    // TODO (pavignol): Remove after perf testing is done
-    bool enable_pad_conv_fusion;
-    if (ReadBoolFromEnvVar("TF_DIRECTML_ENABLE_PAD_CONV_FUSION", false,
-                           &enable_pad_conv_fusion)
-            .ok() &&
-        enable_pad_conv_fusion) {
-      PadWithConv2D pad_with_conv_2d;
-      if (allow_non_differentiable_rewrites &&
-          FindPadWithConv2D(ctx, i, &pad_with_conv_2d)) {
-        TF_RETURN_IF_ERROR(AddFusedContractionNode(
-            &ctx, pad_with_conv_2d, &invalidated_nodes, &nodes_to_delete));
-        continue;
-      }
+    // Remap Pad + Conv2D into Conv2D with explicit padding
+    PadWithConv2D pad_with_conv_2d;
+    if (allow_non_differentiable_rewrites &&
+        FindPadWithConv2D(ctx, i, &pad_with_conv_2d)) {
+      TF_RETURN_IF_ERROR(AddFusedContractionNode(
+          &ctx, pad_with_conv_2d, &invalidated_nodes, &nodes_to_delete));
+      continue;
     }
 
     // Remap {Conv2D,MatMul}+BiasAdd into the _Fused{Conv2D,MatMul}
