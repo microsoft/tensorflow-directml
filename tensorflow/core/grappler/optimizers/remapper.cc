@@ -1141,9 +1141,6 @@ Status AddFusedContractionNode(RemapperContext* ctx,
   NodeDef fused_op;
   fused_op.set_name(bias_add.name());
   fused_op.set_device(contraction.device());
-  fused_op.add_input(contraction.input(0));  // 0: input
-  fused_op.add_input(contraction.input(1));  // 1: filter
-  fused_op.add_input(bias_add.input(1));     // 2: bias
 
   if (IsConv2D(contraction)) {
     fused_op.set_op(kFusedConv2D);
@@ -1153,13 +1150,21 @@ Status AddFusedContractionNode(RemapperContext* ctx,
     // Conv2D
     PadWithConv2D pad_with_conv2d;
     if (FindPadWithConv2D(*ctx, matched.contraction, &pad_with_conv2d)) {
+      const NodeDef& pad = graph->node(pad_with_conv2d.pad);
+      fused_op.add_input(pad.input(0));  // 0: input
       FuseConv2DExplicitPaddings(pad_with_conv2d, fused_op);
       (*nodes_to_delete)[pad_with_conv2d.pad] = true;
+    } else {
+      fused_op.add_input(contraction.input(0));  // 0: input
     }
   } else if (IsMatMul(contraction)) {
+    fused_op.add_input(contraction.input(0));  // 0: input
     fused_op.set_op(kFusedMatMul);
     CopyMatMulAttributes(contraction, &fused_op);
   }
+
+  fused_op.add_input(contraction.input(1));  // 1: filter
+  fused_op.add_input(bias_add.input(1));     // 2: bias
 
   SetFusedOpAttributes(&fused_op, {"BiasAdd"});
 
@@ -1193,9 +1198,6 @@ Status AddFusedContractionNode(
   NodeDef fused_op;
   fused_op.set_name(activation.name());
   fused_op.set_device(contraction.device());
-  fused_op.add_input(contraction.input(0));  // 0: input
-  fused_op.add_input(contraction.input(1));  // 1: filter
-  fused_op.add_input(bias_add.input(1));     // 2: bias
 
   if (IsConv2D(contraction)) {
     fused_op.set_op(kFusedConv2D);
@@ -1205,13 +1207,21 @@ Status AddFusedContractionNode(
     // Conv2D
     PadWithConv2D pad_with_conv2d;
     if (FindPadWithConv2D(*ctx, matched.contraction, &pad_with_conv2d)) {
+      const NodeDef& pad = graph->node(pad_with_conv2d.pad);
+      fused_op.add_input(pad.input(0));  // 0: input
       FuseConv2DExplicitPaddings(pad_with_conv2d, fused_op);
       (*nodes_to_delete)[pad_with_conv2d.pad] = true;
+    } else {
+      fused_op.add_input(contraction.input(0));  // 0: input
     }
   } else if (IsMatMul(contraction)) {
+    fused_op.add_input(contraction.input(0));  // 0: input
     fused_op.set_op(kFusedMatMul);
     CopyMatMulAttributes(contraction, &fused_op);
   }
+
+  fused_op.add_input(contraction.input(1));  // 1: filter
+  fused_op.add_input(bias_add.input(1));     // 2: bias
 
   SetFusedOpAttributes(&fused_op, {"BiasAdd", activation.op()});
 
