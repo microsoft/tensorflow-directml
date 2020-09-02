@@ -91,6 +91,10 @@ class DmlDynamicStitchKernel : public OpKernel {
     Tensor* output_tensor = nullptr;
     OP_REQUIRES_OK(ctx, ctx->allocate_output(0, output_shape, &output_tensor));
 
+    if (output_shape.num_elements() == 0) {
+      return;
+    }
+
     DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
 
     const uint64_t data_type_size = DataTypeSize(ctx->expected_output_dtype(0));
@@ -99,12 +103,17 @@ class DmlDynamicStitchKernel : public OpKernel {
         output_shape.num_elements() / output_shape.dim_size(0) * data_type_size;
 
     std::vector<D3D12BufferRegion> input_buffers;
-    input_buffers.reserve(data_inputs.size() + 1);
+    input_buffers.reserve(data_inputs.size());
 
     std::vector<D3D12_RESOURCE_BARRIER> barriers;
     barriers.reserve(data_inputs.size() + 1);
 
     for (const Tensor& data_tensor : data_inputs) {
+      if (data_tensor.NumElements() == 0) {
+        input_buffers.push_back({});
+        continue;
+      }
+
       D3D12BufferRegion input_buffer =
           dml_util::CreateBufferForTensor(device, data_tensor);
 
@@ -130,6 +139,11 @@ class DmlDynamicStitchKernel : public OpKernel {
       const Tensor& data_tensor = data_inputs[tensor_idx];
 
       const D3D12BufferRegion& input_buffer = input_buffers[tensor_idx];
+
+      if (!input_buffer) {
+        DCHECK(indices_tensor.NumElements() == 0);
+        continue;
+      }
 
       const auto& indices = indices_tensor.flat<int32>();
       for (int i = 0; i < indices_tensor.NumElements(); ++i) {
