@@ -133,7 +133,7 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     // Since we gather uint8 values with strides of 4 or 8, we always need to
     // zero the buffer
     Tensor* output = ctx->GetOutputTensor(0);
-    ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    ctx->ZeroTensor(*output);
     return DmlKernel::Compute(ctx);
   }
 };

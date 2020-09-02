@@ -249,8 +249,14 @@ DmlGpuEvent DmlKernelContext::ZeroBuffer(ID3D12Resource* dst, uint64_t offset,
       dst, offset, size_in_bytes, pattern);
 }
 
-DmlGpuEvent DmlKernelContext::ZeroBuffer(const D3D12BufferRegion& dst) const {
-  return ZeroBuffer(dst.Resource(), dst.Offset(), dst.SizeInBytes());
+DmlGpuEvent DmlKernelContext::ZeroTensor(const Tensor& dst) const {
+  if (dst.NumElements() == 0) {
+    // Nothing to do
+    return;
+  }
+
+  D3D12BufferRegion buffer = CreateBufferForTensor(dst);
+  return ZeroBuffer(buffer.Resource(), buffer.Offset(), buffer.SizeInBytes());
 }
 
 DmlGpuEvent DmlKernelContext::InsertUavBarrier() const {

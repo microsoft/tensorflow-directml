@@ -243,7 +243,7 @@ class DmlSplitKernel : public DmlKernel {
       for (uint32_t i = 0; i < ctx->GetOutputCount(); ++i) {
         if (ctx->GetOutputTensor(i)->NumElements() != 0) {
           Tensor* output = ctx->GetOutputTensor(i);
-          ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+          ctx->ZeroTensor(*output);
         }
       }
     }

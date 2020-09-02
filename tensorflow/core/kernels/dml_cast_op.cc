@@ -73,7 +73,7 @@ class DmlCastKernel : public DmlKernel {
   DmlGpuEvent Compute(DmlKernelContext* ctx) const {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);

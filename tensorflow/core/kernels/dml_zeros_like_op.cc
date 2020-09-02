@@ -31,7 +31,7 @@ class DmlZerosLikeKernel : public DmlKernel {
 
   DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
     Tensor* output = ctx->GetOutputTensor(0);
-    return ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    return ctx->ZeroTensor(*output);
   }
 };
 

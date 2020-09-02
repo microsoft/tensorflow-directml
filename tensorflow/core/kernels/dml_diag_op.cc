@@ -112,7 +112,7 @@ class DmlDiagKernel : public DmlKernel {
   DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
     // Zero the buffer since we use strides to skip over elements
     Tensor* output = ctx->GetOutputTensor(0);
-    ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    ctx->ZeroTensor(*output);
 
     return DmlKernel::Compute(ctx);
   }

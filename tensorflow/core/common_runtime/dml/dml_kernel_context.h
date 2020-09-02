@@ -157,7 +157,9 @@ class DmlKernelContext {
   // Sets a region of the destination buffer to zero.
   DmlGpuEvent ZeroBuffer(ID3D12Resource* dst, uint64_t offset,
                          uint64_t size_in_bytes) const;
-  DmlGpuEvent ZeroBuffer(const D3D12BufferRegion& dst) const;
+
+  // Effectively calls CreateBufferForTensor followed by ZeroBuffer.
+  DmlGpuEvent ZeroTensor(const Tensor& dst) const;
 
   template <typename T>
   DmlGpuEvent FillBufferWithValue(ID3D12Resource* dst, uint64_t offset,

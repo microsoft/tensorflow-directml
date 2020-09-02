@@ -162,7 +162,7 @@ class DmlBinaryKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);
@@ -208,7 +208,7 @@ class DmlCompositeBinaryKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);
@@ -247,7 +247,7 @@ class DmlUnaryKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);
@@ -347,7 +347,7 @@ class DmlCompositeUnaryKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);
@@ -391,7 +391,7 @@ class DmlUnaryScaleBiasKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);
@@ -768,7 +768,7 @@ class DmlClipByValueKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);
@@ -828,7 +828,7 @@ class DmlBinaryWithZeroKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);
@@ -936,7 +936,7 @@ class DmlSquaredDifferenceKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->ZeroTensor(*output);
     }
 
     return DmlKernel::Compute(ctx);
