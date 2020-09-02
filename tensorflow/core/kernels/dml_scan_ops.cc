@@ -136,7 +136,7 @@ class DmlCumsumKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroTensor(*output);
+      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
 
     return DmlKernel::Compute(ctx);

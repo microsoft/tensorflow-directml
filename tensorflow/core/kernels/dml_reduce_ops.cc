@@ -374,7 +374,7 @@ class DmlReduceKernel : public DmlKernel {
   DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
-      ctx->ZeroTensor(*output);
+      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
 
     return DmlKernel::Compute(ctx);
