@@ -147,11 +147,10 @@ class DmlOneHotKernel : public DmlKernel {
 
     // Use DmlTensorDesc::Create helper on indices to apply int64 magic.
     const DataType indices_type = ctx->GetInputDataType(0);
-    const DmlTensorLayout indices_layout = GetDmlTensorLayout(FORMAT_NCHW, 4);
     DmlTensorInfo indices_info = {};
     indices_info.kernel_index = 0;
-    indices_info.desc = DmlTensorDesc::Create(
-        indices_type, indices_shape_dml, indices_shape_dml, indices_layout);
+    indices_info.desc = DmlTensorDesc::Create(indices_type, indices_shape_dml,
+                                              indices_shape_dml);
 
     DmlTensorInfo on_value_info = {};
     on_value_info.kernel_index = 2;

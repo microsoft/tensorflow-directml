@@ -115,23 +115,20 @@ class DmlLUGradKernel : public DmlKernel {
         init_helper->GetInputGradientShape();
     const TensorShape& output_shape = init_helper->GetBroadcastedOutputShape();
 
-    auto tensor_layout = GetDmlTensorLayout(FORMAT_NCHW, feature_shape.dims());
-
     DmlTensorInfo feature_tensor;
     feature_tensor.kernel_index = 1;
-    feature_tensor.desc = DmlTensorDesc::Create(
-        ctx->GetInputDataType(1), feature_shape, feature_shape, tensor_layout);
+    feature_tensor.desc = DmlTensorDesc::Create(ctx->GetInputDataType(1),
+                                                feature_shape, feature_shape);
 
     DmlTensorInfo input_gradient_tensor;
     input_gradient_tensor.kernel_index = 0;
-    input_gradient_tensor.desc =
-        DmlTensorDesc::Create(ctx->GetInputDataType(0), input_gradient_shape,
-                              input_gradient_shape, tensor_layout);
+    input_gradient_tensor.desc = DmlTensorDesc::Create(
+        ctx->GetInputDataType(0), input_gradient_shape, input_gradient_shape);
 
     DmlTensorInfo output_tensor;
     output_tensor.kernel_index = 0;
-    output_tensor.desc = DmlTensorDesc::Create(
-        ctx->GetOutputDataType(0), output_shape, output_shape, tensor_layout);
+    output_tensor.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0),
+                                               output_shape, output_shape);
 
     DmlKernelTensors tensors = {};
     tensors.inputs = {feature_tensor, input_gradient_tensor};

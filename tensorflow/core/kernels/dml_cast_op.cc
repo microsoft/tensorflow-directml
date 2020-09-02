@@ -43,17 +43,15 @@ class DmlCastKernel : public DmlKernel {
     // restrictions
     TensorShape tensor_shape({ctx->GetOutputTensorShape(0).num_elements()});
 
-    auto tensor_layout = GetDmlTensorLayout(FORMAT_NCHW, tensor_shape.dims());
-
     DmlTensorInfo input;
     input.kernel_index = 0;
     input.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0), tensor_shape,
-                                       tensor_shape, tensor_layout);
+                                       tensor_shape);
 
     DmlTensorInfo output;
     output.kernel_index = 0;
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), tensor_shape,
-                                        tensor_shape, tensor_layout);
+                                        tensor_shape);
 
     DmlKernelTensors tensors;
     tensors.outputs = {output};
