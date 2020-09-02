@@ -1,5 +1,9 @@
 # TensorFlow-DirectML <!-- omit in toc -->
 
+| PyPI Release                                                                                                      | Build (directml branch)                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [![PyPI version](https://badge.fury.io/py/tensorflow-directml.svg)](https://badge.fury.io/py/tensorflow-directml) | [![Build Status](https://dev.azure.com/microsoft/WindowsAI/_apis/build/status/TensorFlow/TF%20-%20Nightly%20Build?branchName=directml)](https://dev.azure.com/microsoft/WindowsAI/_build/latest?definitionId=56563&branchName=directml) |
+
 [TensorFlow](https://www.tensorflow.org/) is an end-to-end open source platform for machine learning. This repository is a fork of [tensorflow](https://github.com/tensorflow/tensorflow) that leverages [DirectML](https://github.com/microsoft/DirectML) to provide cross-vendor hardware acceleration on Windows 10 and the Windows Subsystem for Linux (WSL). TensorFlow with DirectML enables training and inference of complex machine learning models on a wide range of DirectX 12-compatible hardware.
 
 ## Getting Started

@@ -106,6 +106,21 @@ REGISTER_KERNEL_BUILDER(Name("InvertPermutation")
                         InvertPermutationOp<int64>);
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("InvertPermutation")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .HostMemory("x")
+                            .HostMemory("y"),
+                        InvertPermutationOp<int32>);
+REGISTER_KERNEL_BUILDER(Name("InvertPermutation")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int64>("T")
+                            .HostMemory("x")
+                            .HostMemory("y"),
+                        InvertPermutationOp<int64>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 namespace {
 template <typename Tperm>
 Status PermutationHelper(const Tensor& perm, const int dims,
