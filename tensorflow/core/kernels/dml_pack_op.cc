@@ -118,15 +118,14 @@ class DmlPackKernel : public DmlKernel {
     }
 
     TensorShape input_shape({left_dim_size, 1, right_dim_size});
-    auto tensor_layout = GetDmlTensorLayout(FORMAT_NCHW, input_shape.dims());
 
     DmlKernelTensors tensors;
 
     for (uint32_t i = 0; i < ctx->GetInputCount(); ++i) {
       DmlTensorInfo input_info;
       input_info.kernel_index = i;
-      input_info.desc = DmlTensorDesc::Create(
-          ctx->GetInputDataType(i), input_shape, input_shape, tensor_layout);
+      input_info.desc = DmlTensorDesc::Create(ctx->GetInputDataType(i),
+                                              input_shape, input_shape);
 
       tensors.inputs.push_back(std::move(input_info));
     }
@@ -137,7 +136,7 @@ class DmlPackKernel : public DmlKernel {
     DmlTensorInfo output;
     output.kernel_index = 0;
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), output_shape,
-                                        output_shape, tensor_layout);
+                                        output_shape);
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);

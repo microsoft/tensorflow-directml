@@ -56,26 +56,52 @@ static uint32_t GetDmlOutputTensorCount(DmlKernelConstruction* ctx,
     DmlKernelConstruction* ctx, uint32_t kernel_index,
     absl::Span<const DmlTensorAxis> tensor_layout,
     const absl::optional<TensorShape>& tensor_shape) {
+  CHECK(!tensor_layout.empty());
+
   DataType data_type = ctx->GetInputDataType(kernel_index);
   TensorShape actual_tensor_shape = ctx->GetInputTensorShape(kernel_index);
   TensorShape desired_shape =
       tensor_shape ? *tensor_shape : actual_tensor_shape;
 
   return DmlTensorDesc::Create(data_type, desired_shape, actual_tensor_shape,
-                               tensor_layout, /*base offset alignment*/ 0);
+                               tensor_layout);
 }
 
 /*static*/ DmlTensorDesc DmlKernel::CreateTensorDescFromOutput(
     DmlKernelConstruction* ctx, uint32_t kernel_index,
     absl::Span<const DmlTensorAxis> tensor_layout,
     const absl::optional<TensorShape>& tensor_shape) {
+  CHECK(!tensor_layout.empty());
+
   DataType data_type = ctx->GetOutputDataType(kernel_index);
   TensorShape actual_tensor_shape = ctx->GetOutputTensorShape(kernel_index);
   TensorShape desired_shape =
       tensor_shape ? *tensor_shape : actual_tensor_shape;
 
   return DmlTensorDesc::Create(data_type, desired_shape, actual_tensor_shape,
-                               tensor_layout, /*base offset alignment*/ 0);
+                               tensor_layout);
+}
+
+/*static*/ DmlTensorDesc DmlKernel::CreateTensorDescFromInput(
+    DmlKernelConstruction* ctx, uint32_t kernel_index,
+    const absl::optional<TensorShape>& tensor_shape) {
+  DataType data_type = ctx->GetInputDataType(kernel_index);
+  TensorShape actual_tensor_shape = ctx->GetInputTensorShape(kernel_index);
+  TensorShape desired_shape =
+      tensor_shape ? *tensor_shape : actual_tensor_shape;
+
+  return DmlTensorDesc::Create(data_type, desired_shape, actual_tensor_shape);
+}
+
+/*static*/ DmlTensorDesc DmlKernel::CreateTensorDescFromOutput(
+    DmlKernelConstruction* ctx, uint32_t kernel_index,
+    const absl::optional<TensorShape>& tensor_shape) {
+  DataType data_type = ctx->GetOutputDataType(kernel_index);
+  TensorShape actual_tensor_shape = ctx->GetOutputTensorShape(kernel_index);
+  TensorShape desired_shape =
+      tensor_shape ? *tensor_shape : actual_tensor_shape;
+
+  return DmlTensorDesc::Create(data_type, desired_shape, actual_tensor_shape);
 }
 
 /*static*/ DmlKernelTensors DmlKernel::GetTensorInfos(
@@ -106,7 +132,7 @@ static uint32_t GetDmlOutputTensorCount(DmlKernelConstruction* ctx,
 
     DmlTensorInfo tensor_info = {};
     tensor_info.desc =
-        CreateTensorDescFromInput(ctx, *kernel_index, {}, params.input_shape);
+        CreateTensorDescFromInput(ctx, *kernel_index, params.input_shape);
     tensor_info.kernel_index = *kernel_index;
 
     tensor_descs.inputs.push_back(std::move(tensor_info));
@@ -131,7 +157,7 @@ static uint32_t GetDmlOutputTensorCount(DmlKernelConstruction* ctx,
 
     DmlTensorInfo tensor_info = {};
     tensor_info.desc =
-        CreateTensorDescFromOutput(ctx, *kernel_index, {}, params.output_shape);
+        CreateTensorDescFromOutput(ctx, *kernel_index, params.output_shape);
     tensor_info.kernel_index = *kernel_index;
 
     tensor_descs.outputs.push_back(std::move(tensor_info));

@@ -192,12 +192,11 @@ class DmlConcatKernel : public DmlKernel {
 
     int axis_size = output_shape.dim_size(concat_axis);
     output_shape = TensorShape({left_dim_size, axis_size, right_dim_size});
-    auto tensor_layout = GetDmlTensorLayout(FORMAT_NCHW, output_shape.dims());
 
     DmlTensorInfo output;
     output.kernel_index = 0;
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), output_shape,
-                                        output_shape, tensor_layout);
+                                        output_shape);
     tensors.outputs = {output};
 
     // DML doesn't support empty tensors, so filter them out when generating the
@@ -218,8 +217,8 @@ class DmlConcatKernel : public DmlKernel {
 
       DmlTensorInfo input_info;
       input_info.kernel_index = i;
-      input_info.desc = DmlTensorDesc::Create(
-          ctx->GetInputDataType(i), tensor_shape, tensor_shape, tensor_layout);
+      input_info.desc = DmlTensorDesc::Create(ctx->GetInputDataType(i),
+                                              tensor_shape, tensor_shape);
       tensors.inputs.push_back(std::move(input_info));
     }
 

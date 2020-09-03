@@ -63,18 +63,32 @@ class DmlTensorDesc {
   // guaranteed_base_offset_alignment:
   //   The value of DML_TENSOR_DESC::GuaranteedBaseOffsetAlignment to set, or 0
   //   for the default.
-  static DmlTensorDesc Create(
-      DataType data_type, const TensorShape& shape,
-      const TensorShape& non_broadcast_shape,
-      absl::Span<const DmlTensorAxis> tensor_layout = {},
-      uint32_t guaranteed_base_offset_alignment = 0);
+  static DmlTensorDesc Create(DataType data_type, const TensorShape& shape,
+                              const TensorShape& non_broadcast_shape,
+                              absl::Span<const DmlTensorAxis> tensor_layout,
+                              uint32_t guaranteed_base_offset_alignment = 0);
 
   // Same as above, but takes shapes as a span of uint32_t instead of
   // TensorShape.
   static DmlTensorDesc Create(
       DataType data_type, absl::Span<const uint32_t> dimensions,
       absl::Span<const uint32_t> non_broadcast_dimensions,
-      absl::Span<const DmlTensorAxis> tensor_layout = {},
+      absl::Span<const DmlTensorAxis> tensor_layout,
+      uint32_t guaranteed_base_offset_alignment = 0);
+
+  // Same as the tensor_layout version, but for tensors that don't need any
+  // special layout (i.e. null strides). This overload accepts up to 8
+  // dimensions (inclusive), while the tensor_layout overload only accepts up to
+  // 5 dimensions.
+  static DmlTensorDesc Create(DataType data_type, const TensorShape& shape,
+                              const TensorShape& non_broadcast_shape,
+                              uint32_t guaranteed_base_offset_alignment = 0);
+
+  // Same as above, but takes shapes as a span of uint32_t instead of
+  // TensorShape.
+  static DmlTensorDesc Create(
+      DataType data_type, absl::Span<const uint32_t> dimensions,
+      absl::Span<const uint32_t> non_broadcast_dimensions,
       uint32_t guaranteed_base_offset_alignment = 0);
 
   DML_TENSOR_DESC GetDmlDesc();
@@ -106,8 +120,8 @@ class DmlTensorDesc {
  private:
   DML_TENSOR_TYPE tensor_type_ = DML_TENSOR_TYPE_INVALID;
   DataType tf_tensor_type_ = DT_INVALID;
-  uint32_t sizes_[DML_TENSOR_DIMENSION_COUNT_MAX] = {};
-  uint32_t strides_[DML_TENSOR_DIMENSION_COUNT_MAX] = {};
+  uint32_t sizes_[DML_TENSOR_DIMENSION_COUNT_MAX1] = {};
+  uint32_t strides_[DML_TENSOR_DIMENSION_COUNT_MAX1] = {};
   DML_BUFFER_TENSOR_DESC buffer_tensor_desc_ = {};
 };
 

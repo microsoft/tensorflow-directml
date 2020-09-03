@@ -159,11 +159,6 @@ class DmlGatherNdKernel : public DmlKernel {
       indices_leading_dims *= indices_shape.dim_size(i);
     }
 
-    const TensorShape flat_indices_shape({
-        indices_leading_dims,
-        last_indices_dim,
-    });
-
     // Flatten the params into a tensor of rank last_indices_dim + 1
     TensorShape flat_params_shape;
 
@@ -182,11 +177,23 @@ class DmlGatherNdKernel : public DmlKernel {
 
     flat_params_shape.AddDim(last_params_dim);
 
+    TensorShape flat_indices_shape({
+        indices_leading_dims,
+        last_indices_dim,
+    });
+
     // Flatten the output shape
-    const TensorShape flat_output_shape({
-        flat_indices_shape.dim_size(0),
+    TensorShape flat_output_shape({
+        indices_leading_dims,
         last_params_dim,
     });
+
+    int missing_dims = flat_params_shape.dims() - flat_output_shape.dims();
+
+    for (int i = 0; i < missing_dims; ++i) {
+      flat_indices_shape.InsertDim(0, 1);
+      flat_output_shape.InsertDim(0, 1);
+    }
 
     DmlTensorInfo params_tensor;
     params_tensor.kernel_index = 0;
