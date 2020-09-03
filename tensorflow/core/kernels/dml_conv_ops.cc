@@ -272,12 +272,6 @@ class Conv2DGradInitHelper : public InitializationHelper {
                        std::shared_ptr<const Attributes> attr)
       : attr_(attr) {}
 
-  bool IsNoOpKernel(
-      OpKernelContext* ctx,
-      absl::Span<const TensorShape> output_shapes) const override {
-    return output_shapes[0].num_elements() == 0;
-  }
-
   const Conv2DParameters& GetParams() const { return attr_->params; }
 
  private:
@@ -687,93 +681,71 @@ class DmlConv2DBackpropInputKernel : public DmlKernel {
     TF_CHECK_OK(
         TensorShapeUtils::MakeShape(input_sizes.vec<int32>(), &input_shape));
 
-    if (ctx->GetInputTensorShape(1).num_elements() == 0) {
-      // set all elements of  backprop_input_gradient to zero 0
-      DmlKernelParams params;
-      DmlKernelTensors tensors = GetTensorInfos(ctx, params);
-      auto outputs = GetDmlTensorDescs(tensors.outputs);
+    DmlKernelParams params;
+    params.kernel_input_indices = {
+        2, 1,
+        absl::nullopt  // We don't use the DML bias tensor
+    };
 
-      DML_SCALE_BIAS scale_bias = {0, 0};
-      DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC op;
-      op.InputTensor = &outputs[0];
-      op.OutputTensor = &outputs[0];
-      op.ScaleBias = &scale_bias;
+    DmlKernelTensors tensors = GetTensorInfos(ctx, params);
+    const Conv2DParameters& conv_params = init_helper->GetParams();
 
-      DmlKernelTensors elementWiseKernelTensors;
-      elementWiseKernelTensors.inputs.push_back(tensors.outputs[0]);
-      elementWiseKernelTensors.outputs = std::move(tensors.outputs);
-      elementWiseKernelTensors.output_refs_forwarding =
-          std::move(tensors.output_refs_forwarding);
+    Conv2DDimensions conv_dims;
+    TF_CHECK_OK(ComputeConv2DDimension(
+        conv_params, input_shape, ctx->GetInputTensorShape(1), &conv_dims));
 
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY, &op};
-      Initialize(ctx, std::move(elementWiseKernelTensors), op_desc);
-    } else {
-      DmlKernelParams params;
-      params.kernel_input_indices = {
-          2, 1,
-          absl::nullopt  // We don't use the DML bias tensor
-      };
+    uint32_t strides[] = {conv_dims.stride_rows, conv_dims.stride_cols};
+    uint32_t dilations[] = {conv_dims.dilation_rows, conv_dims.dilation_cols};
+    uint32_t start_padding[] = {conv_dims.pad_rows_before,
+                                conv_dims.pad_cols_before};
+    uint32_t end_padding[] = {conv_dims.pad_rows_after,
+                              conv_dims.pad_cols_after};
+    uint32_t output_padding[] = {0, 0};
+    uint32_t group_count = conv_dims.in_depth / conv_dims.patch_depth;
 
-      DmlKernelTensors tensors = GetTensorInfos(ctx, params);
-      const Conv2DParameters& conv_params = init_helper->GetParams();
+    using namespace DmlTensorAxes;
 
-      Conv2DDimensions conv_dims;
-      TF_CHECK_OK(ComputeConv2DDimension(
-          conv_params, input_shape, ctx->GetInputTensorShape(1), &conv_dims));
+    // The dimensions of the filter tensor are laid out a little differently
+    // than what DML expects.
+    auto filter_layout = {H, W, C, N};
 
-      uint32_t strides[] = {conv_dims.stride_rows, conv_dims.stride_cols};
-      uint32_t dilations[] = {conv_dims.dilation_rows, conv_dims.dilation_cols};
-      uint32_t start_padding[] = {conv_dims.pad_rows_before,
-                                  conv_dims.pad_cols_before};
-      uint32_t end_padding[] = {conv_dims.pad_rows_after,
-                                conv_dims.pad_cols_after};
-      uint32_t output_padding[] = {0, 0};
-      uint32_t group_count = conv_dims.in_depth / conv_dims.patch_depth;
+    // The layout of the input/output tensors is determined by the
+    // "data_format" attribute
+    auto input_output_layout =
+        GetDmlTensorLayout(conv_params.data_format, kDimensionCount);
 
-      using namespace DmlTensorAxes;
+    tensors.inputs[0]->desc =
+        CreateTensorDescFromInput(ctx, 2, input_output_layout);
+    tensors.inputs[1]->desc =
+        CreateTensorDescFromInput(ctx, 1, filter_layout);
+    tensors.outputs[0]->desc =
+        CreateTensorDescFromOutput(ctx, 0, input_output_layout);
 
-      // The dimensions of the filter tensor are laid out a little differently
-      // than what DML expects.
-      auto filter_layout = {H, W, C, N};
+    auto input_descs = GetDmlTensorDescs(tensors.inputs);
+    auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
-      // The layout of the input/output tensors is determined by the
-      // "data_format" attribute
-      auto input_output_layout =
-          GetDmlTensorLayout(conv_params.data_format, kDimensionCount);
+    DML_CONVOLUTION_OPERATOR_DESC conv_desc = {};
+    conv_desc.InputTensor = &input_descs[0];
+    conv_desc.FilterTensor = &input_descs[1];
+    conv_desc.BiasTensor = nullptr;
+    conv_desc.OutputTensor = &output_descs[0];
 
-      tensors.inputs[0]->desc =
-          CreateTensorDescFromInput(ctx, 2, input_output_layout);
-      tensors.inputs[1]->desc =
-          CreateTensorDescFromInput(ctx, 1, filter_layout);
-      tensors.outputs[0]->desc =
-          CreateTensorDescFromOutput(ctx, 0, input_output_layout);
+    // Note DML_CONVOLUTION_MODE_CROSS_CORRELATION automatically rotates
+    // filter 180 when operating in DML_CONVOLUTION_DIRECTION_BACKWARD.
+    // Hence we do not need to specify DML_CONVOLUTION_MODE_CONVOLUTION here.
+    conv_desc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
+    conv_desc.Direction = DML_CONVOLUTION_DIRECTION_BACKWARD;
+    conv_desc.DimensionCount = kSpatialDimensionCount;
+    conv_desc.Strides = strides;
+    conv_desc.Dilations = dilations;
+    conv_desc.StartPadding = start_padding;
+    conv_desc.EndPadding = end_padding;
+    conv_desc.OutputPadding = output_padding;
+    conv_desc.GroupCount = group_count;
+    conv_desc.FusedActivation = nullptr;
 
-      auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto output_descs = GetDmlTensorDescs(tensors.outputs);
-
-      DML_CONVOLUTION_OPERATOR_DESC conv_desc = {};
-      conv_desc.InputTensor = &input_descs[0];
-      conv_desc.FilterTensor = &input_descs[1];
-      conv_desc.BiasTensor = nullptr;
-      conv_desc.OutputTensor = &output_descs[0];
-
-      // Note DML_CONVOLUTION_MODE_CROSS_CORRELATION automatically rotates
-      // filter 180 when operating in DML_CONVOLUTION_DIRECTION_BACKWARD.
-      // Hence we do not need to specify DML_CONVOLUTION_MODE_CONVOLUTION here.
-      conv_desc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
-      conv_desc.Direction = DML_CONVOLUTION_DIRECTION_BACKWARD;
-      conv_desc.DimensionCount = kSpatialDimensionCount;
-      conv_desc.Strides = strides;
-      conv_desc.Dilations = dilations;
-      conv_desc.StartPadding = start_padding;
-      conv_desc.EndPadding = end_padding;
-      conv_desc.OutputPadding = output_padding;
-      conv_desc.GroupCount = group_count;
-      conv_desc.FusedActivation = nullptr;
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CONVOLUTION, &conv_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
-    }
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CONVOLUTION, &conv_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
   }
 };
 
@@ -811,114 +783,93 @@ class DmlConv2DBackpropFilterKernel : public DmlKernel {
     TF_CHECK_OK(
         TensorShapeUtils::MakeShape(filter_sizes.vec<int32>(), &filter_shape));
 
-    if (ctx->GetInputTensorShape(0).num_elements() == 0) {
-      DmlKernelParams params;
-      DmlKernelTensors tensors = GetTensorInfos(ctx, params);
-      auto outputs = GetDmlTensorDescs(tensors.outputs);
+    const Conv2DParameters& conv_params = init_helper->GetParams();
 
-      DML_SCALE_BIAS scale_bias = {0, 0};
-      DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC op;
-      op.InputTensor = &outputs[0];
-      op.OutputTensor = &outputs[0];
-      op.ScaleBias = &scale_bias;
+    Conv2DDimensions conv_dims;
+    TF_CHECK_OK(ComputeConv2DDimension(
+        conv_params, ctx->GetInputTensorShape(0), filter_shape, &conv_dims));
 
-      DmlKernelTensors element_wise_kernel_tensors;
-      element_wise_kernel_tensors.inputs.push_back(tensors.outputs[0]);
-      element_wise_kernel_tensors.outputs = std::move(tensors.outputs);
-      element_wise_kernel_tensors.output_refs_forwarding =
-          std::move(tensors.output_refs_forwarding);
+    uint32_t strides[] = {conv_dims.stride_rows, conv_dims.stride_cols};
+    uint32_t dilations[] = {conv_dims.dilation_rows, conv_dims.dilation_cols};
+    uint32_t start_padding[] = {conv_dims.pad_rows_before,
+                                conv_dims.pad_cols_before};
+    uint32_t end_padding[] = {conv_dims.pad_rows_after,
+                              conv_dims.pad_cols_after};
+    uint32_t output_padding[] = {0, 0};
+    uint32_t group_count = conv_dims.in_depth / conv_dims.patch_depth;
 
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY, &op};
-      Initialize(ctx, std::move(element_wise_kernel_tensors), op_desc);
-    } else {
-      const Conv2DParameters& conv_params = init_helper->GetParams();
+    DmlKernelParams params;
+    params.kernel_input_indices = {
+        0, 2,
+        absl::nullopt  // We don't use the DML bias tensor
+    };
 
-      Conv2DDimensions conv_dims;
-      TF_CHECK_OK(ComputeConv2DDimension(
-          conv_params, ctx->GetInputTensorShape(0), filter_shape, &conv_dims));
+    using namespace DmlTensorAxes;
 
-      uint32_t strides[] = {conv_dims.stride_rows, conv_dims.stride_cols};
-      uint32_t dilations[] = {conv_dims.dilation_rows, conv_dims.dilation_cols};
-      uint32_t start_padding[] = {conv_dims.pad_rows_before,
-                                  conv_dims.pad_cols_before};
-      uint32_t end_padding[] = {conv_dims.pad_rows_after,
-                                conv_dims.pad_cols_after};
-      uint32_t output_padding[] = {0, 0};
-      uint32_t group_count = conv_dims.in_depth / conv_dims.patch_depth;
+    // The dimensions of the filter tensor are laid out a little differently
+    // than what DML expects. Note order of C and N
+    // are reversed as we convolve with the backprop_output
+    // which has N channels, where N is the number of output
+    // feature maps in the forward conv2d case.
+    auto filter_layout = {H, W, N, C};
 
-      DmlKernelParams params;
-      params.kernel_input_indices = {
-          0, 2,
-          absl::nullopt  // We don't use the DML bias tensor
-      };
+    // The layout of the input/output tensors is determined by the
+    // "data_format" attribute
+    auto input_output_layout =
+        GetDmlTensorLayout(conv_params.data_format, kDimensionCount);
 
-      using namespace DmlTensorAxes;
+    // Swap N and C channels. Note: Channel 'N' of output
+    // contains the 'K' feature maps produced in the forward
+    // direction. Swapping is required because we
+    // convolve the incoming backprop_output gradient containing K
+    //  features with the 'K' channelled filter
+    DmlTensorAxis axis;
+    switch (conv_params.data_format) {
+      case FORMAT_NHWC:
+        axis = input_output_layout[0];
+        input_output_layout[0] = input_output_layout[3];
+        input_output_layout[3] = axis;
+        break;
 
-      // The dimensions of the filter tensor are laid out a little differently
-      // than what DML expects. Note order of C and N
-      // are reversed as we convolve with the backprop_output
-      // which has N channels, where N is the number of output
-      // feature maps in the forward conv2d case.
-      auto filter_layout = {H, W, N, C};
-
-      // The layout of the input/output tensors is determined by the
-      // "data_format" attribute
-      auto input_output_layout =
-          GetDmlTensorLayout(conv_params.data_format, kDimensionCount);
-
-      // Swap N and C channels. Note: Channel 'N' of output
-      // contains the 'K' feature maps produced in the forward
-      // direction. Swapping is required because we
-      // convolve the incoming backprop_output gradient containing K
-      //  features with the 'K' channelled filter
-      DmlTensorAxis axis;
-      switch (conv_params.data_format) {
-        case FORMAT_NHWC:
-          axis = input_output_layout[0];
-          input_output_layout[0] = input_output_layout[3];
-          input_output_layout[3] = axis;
-          break;
-
-        case FORMAT_NCHW:
-          axis = input_output_layout[0];
-          input_output_layout[0] = input_output_layout[1];
-          input_output_layout[1] = axis;
-          break;
-      }
-
-      DmlKernelTensors tensors = GetTensorInfos(ctx, params);
-      tensors.inputs[0]->desc =
-          CreateTensorDescFromInput(ctx, 0, input_output_layout);
-      tensors.inputs[1]->desc =
-          CreateTensorDescFromInput(ctx, 2, input_output_layout);
-
-      // The output tensor gets the filter_layout as we are computing the
-      // back-prop for the filter.
-      tensors.outputs[0]->desc =
-          CreateTensorDescFromOutput(ctx, 0, filter_layout);
-
-      auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto output_descs = GetDmlTensorDescs(tensors.outputs);
-
-      DML_CONVOLUTION_OPERATOR_DESC conv_desc = {};
-      conv_desc.InputTensor = &input_descs[0];
-      conv_desc.FilterTensor = &input_descs[1];
-      conv_desc.BiasTensor = nullptr;
-      conv_desc.OutputTensor = &output_descs[0];
-      conv_desc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
-      conv_desc.Direction = DML_CONVOLUTION_DIRECTION_FORWARD;
-      conv_desc.DimensionCount = kSpatialDimensionCount;
-      conv_desc.Strides = dilations;
-      conv_desc.Dilations = strides;
-      conv_desc.StartPadding = start_padding;
-      conv_desc.EndPadding = end_padding;
-      conv_desc.OutputPadding = output_padding;
-      conv_desc.GroupCount = group_count;
-      conv_desc.FusedActivation = nullptr;
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CONVOLUTION, &conv_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      case FORMAT_NCHW:
+        axis = input_output_layout[0];
+        input_output_layout[0] = input_output_layout[1];
+        input_output_layout[1] = axis;
+        break;
     }
+
+    DmlKernelTensors tensors = GetTensorInfos(ctx, params);
+    tensors.inputs[0]->desc =
+        CreateTensorDescFromInput(ctx, 0, input_output_layout);
+    tensors.inputs[1]->desc =
+        CreateTensorDescFromInput(ctx, 2, input_output_layout);
+
+    // The output tensor gets the filter_layout as we are computing the
+    // back-prop for the filter.
+    tensors.outputs[0]->desc =
+        CreateTensorDescFromOutput(ctx, 0, filter_layout);
+
+    auto input_descs = GetDmlTensorDescs(tensors.inputs);
+    auto output_descs = GetDmlTensorDescs(tensors.outputs);
+
+    DML_CONVOLUTION_OPERATOR_DESC conv_desc = {};
+    conv_desc.InputTensor = &input_descs[0];
+    conv_desc.FilterTensor = &input_descs[1];
+    conv_desc.BiasTensor = nullptr;
+    conv_desc.OutputTensor = &output_descs[0];
+    conv_desc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
+    conv_desc.Direction = DML_CONVOLUTION_DIRECTION_FORWARD;
+    conv_desc.DimensionCount = kSpatialDimensionCount;
+    conv_desc.Strides = dilations;
+    conv_desc.Dilations = strides;
+    conv_desc.StartPadding = start_padding;
+    conv_desc.EndPadding = end_padding;
+    conv_desc.OutputPadding = output_padding;
+    conv_desc.GroupCount = group_count;
+    conv_desc.FusedActivation = nullptr;
+
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CONVOLUTION, &conv_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
   }
 };
 

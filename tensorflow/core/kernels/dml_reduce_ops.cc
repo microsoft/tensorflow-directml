@@ -41,6 +41,10 @@ class ReduceInitializationHelper : public InitializationHelper {
       absl::Span<const TensorShape> output_shapes) const override {
     const Tensor& data_tensor = ctx->input(0);
 
+    if (output_shapes[0].num_elements() == 0) {
+      return true;
+    }
+
     // TF's Prod and All operators are different to the other reductions in that
     // reduction of an empty tensor is defined to return 1, not 0. Because of
     // this, reduction of empty tensors needs to be handled by the kernel to
