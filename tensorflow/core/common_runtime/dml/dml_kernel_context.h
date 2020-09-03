@@ -145,9 +145,11 @@ class DmlKernelContext {
       absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings);
 
   // Copies src to dst (dst needs to be at at least as big as src)
-  DmlGpuEvent CopyBufferToBuffer(ID3D12Resource* dst, uint64_t dst_offset,
-                                 ID3D12Resource* src, uint64_t src_offset,
-                                 uint64 size_in_bytes) const;
+  StatusOr<DmlGpuEvent> CopyBufferToBuffer(ID3D12Resource* dst,
+                                           uint64_t dst_offset,
+                                           ID3D12Resource* src,
+                                           uint64_t src_offset,
+                                           uint64 size_in_bytes) const;
 
   // Copies src (host memory) to dst (dst needs to be at least as big as src).
   StatusOr<DmlGpuEvent> CopyHostToBuffer(ID3D12Resource* dst,
@@ -155,13 +157,15 @@ class DmlKernelContext {
                                          absl::Span<const uint8_t> src) const;
 
   // Sets a region of the destination buffer to zero.
-  DmlGpuEvent ZeroBuffer(ID3D12Resource* dst, uint64_t offset,
-                         uint64_t size_in_bytes) const;
-  DmlGpuEvent ZeroBuffer(const D3D12BufferRegion& dst) const;
+  StatusOr<DmlGpuEvent> ZeroBuffer(ID3D12Resource* dst, uint64_t offset,
+                                   uint64_t size_in_bytes) const;
+  StatusOr<DmlGpuEvent> ZeroBuffer(const D3D12BufferRegion& dst) const;
 
   template <typename T>
-  DmlGpuEvent FillBufferWithValue(ID3D12Resource* dst, uint64_t offset,
-                                  uint64_t size_in_bytes, T value) const {
+  StatusOr<DmlGpuEvent> FillBufferWithValue(ID3D12Resource* dst,
+                                            uint64_t offset,
+                                            uint64_t size_in_bytes,
+                                            T value) const {
     static_assert(
         sizeof(value) <= 16,
         "FillBufferWithValue doesn't accept values bigger than 16 bytes.");
@@ -177,7 +181,8 @@ class DmlKernelContext {
   }
 
   template <typename T>
-  DmlGpuEvent FillBufferWithValue(const D3D12BufferRegion& dst, T value) const {
+  StatusOr<DmlGpuEvent> FillBufferWithValue(const D3D12BufferRegion& dst,
+                                            T value) const {
     return FillBufferWithValue(dst.Resource(), dst.Offset(), dst.SizeInBytes(),
                                value);
   }
@@ -196,9 +201,9 @@ class DmlKernelContext {
   uint32_t GetOutputCount() const { return op_ctx_->num_outputs(); }
 
  private:
-  DmlGpuEvent FillBufferWithPattern(ID3D12Resource* dst, uint64_t offset,
-                                    uint64_t size_in_bytes,
-                                    absl::Span<const uint8_t> pattern) const;
+  StatusOr<DmlGpuEvent> FillBufferWithPattern(
+      ID3D12Resource* dst, uint64_t offset, uint64_t size_in_bytes,
+      absl::Span<const uint8_t> pattern) const;
 
   const DmlDevice* device_;
   OpKernelContext* op_ctx_;

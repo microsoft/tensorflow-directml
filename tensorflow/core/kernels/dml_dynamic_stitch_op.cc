@@ -139,10 +139,12 @@ class DmlDynamicStitchKernel : public OpKernel {
         const uint64_t dst_offset =
             output_buffer.Offset() + byte_stride * output_idx;
 
-        device->GetExecutionContext()->CopyBufferRegion(
+        auto status_or_event = device->GetExecutionContext()->CopyBufferRegion(
             output_buffer.Resource(), dst_offset,
             D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
             D3D12_RESOURCE_STATE_COPY_SOURCE, byte_stride);
+
+        OP_REQUIRES_OK(ctx, status_or_event.status());
       }
     }
 

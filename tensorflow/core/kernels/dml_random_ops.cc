@@ -176,16 +176,15 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     DmlBuffer input_state_buffer =
         ctx->AllocateDefaultBuffer(6 * sizeof(uint32_t));
     D3D12BufferRegion output_buffer =
         ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
 
     if (!input_state_buffer) {
-      ctx->GetOpKernelContext()->SetStatus(errors::ResourceExhausted(
-          "OOM when allocating a buffer of ", 6 * sizeof(uint32_t), " bytes"));
-      return ctx->GetCurrentCompletionEvent();
+      return errors::ResourceExhausted("OOM when allocating a buffer of ",
+                                       6 * sizeof(uint32_t), " bytes");
     }
 
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 1> input_bindings;
@@ -202,21 +201,15 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     StatusOr<DmlGpuEvent> status_or_event = ctx->CopyHostToBuffer(
         input_state_buffer.Resource(), input_state_buffer.Offset(), byte_span);
 
-    if (!status_or_event.ok()) {
-      ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-      return ctx->GetCurrentCompletionEvent();
-    }
+    TF_RETURN_IF_ERROR(status_or_event.status());
 
     status_or_event =
         ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
                              input_bindings, output_bindings);
 
-    if (!status_or_event.ok()) {
-      ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-      return ctx->GetCurrentCompletionEvent();
-    }
+    TF_RETURN_IF_ERROR(status_or_event.status());
 
-    return status_or_event.ConsumeValueOrDie();
+    return status_or_event;
   }
 };
 
@@ -244,8 +237,8 @@ class DmlPhiloxWrapper
     OP_REQUIRES_OK(ctx, generator_.Init(ctx));
   }
 
-  DmlGpuEvent ComputeKernel(DmlKernel* kernel,
-                            DmlKernelContext* context) const override {
+  StatusOr<DmlGpuEvent> ComputeKernel(
+      DmlKernel* kernel, DmlKernelContext* context) const override {
     return static_cast<TKernel*>(kernel)->Compute(context, generator_);
   }
 
@@ -336,8 +329,8 @@ class DmlRandomUniformKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx,
-                      GuardedPhiloxRandom& generator) const {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx,
+                                GuardedPhiloxRandom& generator) const {
     D3D12BufferRegion output_buffer =
         ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
 
@@ -367,21 +360,15 @@ class DmlRandomUniformKernel : public DmlKernel {
     StatusOr<DmlGpuEvent> status_or_event = ctx->CopyHostToBuffer(
         state_buffer_->Resource(), state_buffer_->Offset(), byte_span);
 
-    if (!status_or_event.ok()) {
-      ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-      return ctx->GetCurrentCompletionEvent();
-    }
+    TF_RETURN_IF_ERROR(status_or_event.status());
 
     status_or_event =
         ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
                              input_bindings, output_bindings);
 
-    if (!status_or_event.ok()) {
-      ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-      return ctx->GetCurrentCompletionEvent();
-    }
+    TF_RETURN_IF_ERROR(status_or_event.status());
 
-    return status_or_event.ConsumeValueOrDie();
+    return status_or_event;
   }
 };
 

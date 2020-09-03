@@ -55,7 +55,10 @@ Status DmlDevice::Sync() {
   VLOG(2) << "DirectML device: performing GPU sync.";
 
   auto start_time = std::chrono::high_resolution_clock::now();
-  state_->execution_context->Flush().WaitForSignal();
+
+  auto status_or_event = state_->execution_context->Flush();
+  TF_RETURN_IF_ERROR(status_or_event.status());
+  status_or_event.ConsumeValueOrDie().WaitForSignal();
   auto end_time = std::chrono::high_resolution_clock::now();
 
   std::chrono::duration<double> wait_seconds = end_time - start_time;

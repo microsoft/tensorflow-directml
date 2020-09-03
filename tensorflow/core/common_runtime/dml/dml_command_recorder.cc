@@ -17,6 +17,7 @@ limitations under the License.
 
 #include "dml_bfc_allocator.h"
 #include "dml_buffer.h"
+#include "dml_util.h"
 
 namespace tensorflow {
 
@@ -104,7 +105,7 @@ Status DmlCommandRecorder::InitializeOperator(
   SetDescriptorHeap(descriptor_range.heap);
   recorder_->RecordDispatch(current_command_list_.Get(), initializer_.Get(),
                             binding_table.Get());
-  OnCommandRecorded();
+  TF_RETURN_IF_ERROR(OnCommandRecorded());
 
   // Barrier if there's an output (i.e. persistent resource), or if any temps
   // are used.
@@ -173,7 +174,7 @@ Status DmlCommandRecorder::ExecuteOperator(
   SetDescriptorHeap(descriptor_range.heap);
   recorder_->RecordDispatch(current_command_list_.Get(), op,
                             binding_table.Get());
-  OnCommandRecorded();
+  TF_RETURN_IF_ERROR(OnCommandRecorded());
 
   // Barrier all outputs.
   auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
@@ -182,17 +183,17 @@ Status DmlCommandRecorder::ExecuteOperator(
   return Status::OK();
 }
 
-void DmlCommandRecorder::CopyBufferRegion(ID3D12Resource* dst_buffer,
-                                          uint64_t dst_offset,
-                                          ID3D12Resource* src_buffer,
-                                          uint64_t src_offset,
-                                          uint64_t byte_count) {
+Status DmlCommandRecorder::CopyBufferRegion(ID3D12Resource* dst_buffer,
+                                            uint64_t dst_offset,
+                                            ID3D12Resource* src_buffer,
+                                            uint64_t src_offset,
+                                            uint64_t byte_count) {
   current_command_list_->CopyBufferRegion(dst_buffer, dst_offset, src_buffer,
                                           src_offset, byte_count);
-  OnCommandRecorded();
+  return OnCommandRecorded();
 }
 
-void DmlCommandRecorder::FillBufferWithPattern(
+Status DmlCommandRecorder::FillBufferWithPattern(
     ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
     absl::Span<const uint8_t>
         value /* Data type agnostic value, treated as raw bits */) {
@@ -253,14 +254,16 @@ void DmlCommandRecorder::FillBufferWithPattern(
   current_command_list_->ClearUnorderedAccessViewUint(
       descriptor_range_gpu.gpu_handle, descriptor_range_cpu.cpu_handle, dst,
       fillPattern.integers, 0, nullptr);
-  OnCommandRecorded();
+  TF_RETURN_IF_ERROR(OnCommandRecorded());
 
   // Barrier all outputs.
   auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
   current_command_list_->ResourceBarrier(1, &barrier);
+
+  return Status::OK();
 }
 
-void DmlCommandRecorder::ExecuteCommandList(
+Status DmlCommandRecorder::ExecuteCommandList(
     ID3D12GraphicsCommandList* command_list, _Outptr_ ID3D12Fence** fence,
     _Out_ uint64_t* completion_value) {
   DML_CHECK_SUCCEEDED(current_command_list_->Close());
@@ -293,30 +296,32 @@ void DmlCommandRecorder::ExecuteCommandList(
   // Trigger a flush of the command list, with the assumption that it contains
   // enough GPU work that this will help parallelize GPU work with subsequent
   // CPU work.
-  CloseAndExecute();
+  TF_RETURN_IF_ERROR(CloseAndExecute());
   Open();
 
   SetDescriptorHeap(heap);
+
+  return Status::OK();
 }
 
-Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>
+StatusOr<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>>
 DmlCommandRecorder::GetCommandList() {
   // Assume operations are added by the caller after this returns
-  OnCommandRecorded();
+  TF_RETURN_IF_ERROR(OnCommandRecorded());
   return current_command_list_;
 }
 
-void DmlCommandRecorder::ResourceBarrier(
+Status DmlCommandRecorder::ResourceBarrier(
     absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
   current_command_list_->ResourceBarrier(static_cast<uint32_t>(barriers.size()),
                                          barriers.data());
-  OnCommandRecorded();
+  return OnCommandRecorded();
 }
 
-void DmlCommandRecorder::AddUAVBarrier() {
+Status DmlCommandRecorder::AddUAVBarrier() {
   auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
   current_command_list_->ResourceBarrier(1, &barrier);
-  OnCommandRecorded();
+  return OnCommandRecorded();
 }
 
 void DmlCommandRecorder::Open() {
@@ -340,8 +345,14 @@ void DmlCommandRecorder::Open() {
   command_allocator_ring_.AdvanceAllocator(queue_->GetNextCompletionEvent());
 }
 
-void DmlCommandRecorder::CloseAndExecute() {
-  DML_CHECK_SUCCEEDED(current_command_list_->Close());
+Status DmlCommandRecorder::CloseAndExecute() {
+  HRESULT hr = current_command_list_->Close();
+
+  if (dml_util::HrIsOutOfMemory(hr)) {
+    return errors::ResourceExhausted("OOM when closing the command list");
+  }
+
+  DML_CHECK_SUCCEEDED(hr);
 
   if (operations_recorded_in_current_command_list_ != 0) {
     pending_command_lists_.push_back(current_command_list_.Get());
@@ -381,6 +392,8 @@ void DmlCommandRecorder::CloseAndExecute() {
 
   // Always keep the command recorder in an opened state
   Open();
+
+  return Status::OK();
 }
 
 void DmlCommandRecorder::SetDescriptorHeap(
@@ -395,13 +408,15 @@ void DmlCommandRecorder::SetDescriptorHeap(
   }
 }
 
-void DmlCommandRecorder::OnCommandRecorded() {
+Status DmlCommandRecorder::OnCommandRecorded() {
   ++operations_recorded_in_current_command_list_;
 
   if (operations_recorded_in_current_command_list_ >= 25) {
-    CloseAndExecute();
+    TF_RETURN_IF_ERROR(CloseAndExecute());
     assert(operations_recorded_in_current_command_list_ == 0);
   }
+
+  return Status::OK();
 }
 
 bool DmlCommandRecorder::HasUnflushedWork() const {

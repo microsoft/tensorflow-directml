@@ -1128,12 +1128,13 @@ class DmlBlockLstmOp : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     if (skip_) {
       uint32_t num_out = ctx->GetOutputCount();
       for (uint32_t i = 0; i < num_out; ++i) {
         Tensor* output = ctx->GetOutputTensor(i);
-        ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+        TF_RETURN_IF_ERROR(
+            ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output)).status());
       }
       return ctx->GetCurrentCompletionEvent();
     }
@@ -1687,9 +1688,11 @@ class DmlBlockLstmGradOp : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     for (int i = 0; i < ctx->GetOutputCount(); ++i) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*ctx->GetOutputTensor(i)));
+      TF_RETURN_IF_ERROR(
+          ctx->ZeroBuffer(ctx->CreateBufferForTensor(*ctx->GetOutputTensor(i)))
+              .status());
     }
     if (skip_) {
       return ctx->GetCurrentCompletionEvent();

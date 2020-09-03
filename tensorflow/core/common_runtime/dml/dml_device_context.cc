@@ -83,16 +83,16 @@ void DMLDeviceContext::CopyTensorInSameDevice(const Tensor* input_tensor,
       D3D12_RESOURCE_STATE_UNORDERED_ACCESS;  // GPU resources are always kept
                                               // in UAV state
 
-  (void)execution_context_->CopyBufferRegion(dst_data, dst_offset, dst_state,
-                                             src_data, src_offset, src_state,
-                                             total_bytes);
+  auto status_or_event = execution_context_->CopyBufferRegion(
+      dst_data, dst_offset, dst_state, src_data, src_offset, src_state,
+      total_bytes);
 
   // Immediately signal completion even though we haven't actually kicked off
   // the GPU, or waited for it to complete. This is because from the framework's
   // point of view, there's no way for it to observe this state (except when
   // copying a tensor back to CPU, at which point we correctly flush and queue a
   // callback)
-  done(Status::OK());
+  done(status_or_event.status());
 }
 
 void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
@@ -130,7 +130,11 @@ void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
 
   // We have to kick off the GPU now to prevent a potential deadlock, because
   // we don't know if TF is going to block waiting on this copy to complete.
-  execution_context_->Flush();
+  status_or_event = execution_context_->Flush();
+
+  if (!status_or_event.ok()) {
+    done(status_or_event.status());
+  }
 
   // Keep a ref on the source tensor to keep it alive until we're done with it
   TensorReference input_ref(*device_tensor);

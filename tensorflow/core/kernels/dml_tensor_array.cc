@@ -57,7 +57,7 @@ Status DmlAddToTensor(OpKernelContext* ctx, Tensor* sum, const Tensor* current,
   TensorValue out = op_ctx.release_output(0);
   ctx->device()->CopyTensorInSameDevice(
       out.tensor, sum, ctx->op_device_context(),
-      [](const Status& s) { TF_CHECK_OK(s); });
+      [ctx](const Status& s) { OP_REQUIRES_OK(ctx, s); });
 
   return op_ctx.status();
 }
@@ -67,16 +67,17 @@ Status DmlTensorSetZero(OpKernelContext* ctx, Tensor* value) {
   D3D12BufferRegion dst = dml_util::CreateBufferForTensor(device, *value);
 
   uint8_t pattern[] = {0};
-  (void)device->GetExecutionContext()->FillBufferWithPattern(
+  auto status_or_event = device->GetExecutionContext()->FillBufferWithPattern(
       dst.Resource(), dst.Offset(), dst.SizeInBytes(), pattern);
 
-  return Status::OK();
+  return status_or_event.status();
 }
 
 void DmlConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
                       absl::Span<PersistentTensor> values) {
   auto* device = static_cast<DmlDevice*>(ctx->device());
-  D3D12BufferRegion dst = dml_util::CreateBufferForTensor(device, *output_tensor);
+  D3D12BufferRegion dst =
+      dml_util::CreateBufferForTensor(device, *output_tensor);
   uint64_t dst_offset = dst.Offset();
 
   for (PersistentTensor& value : values) {
@@ -87,13 +88,17 @@ void DmlConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
     assert(input_tensor.NumElements() <= output_tensor->NumElements());
 
     uint64_t bytes_to_copy = input_tensor.TotalBytes();
-    D3D12BufferRegion src = dml_util::CreateBufferForTensor(device, input_tensor);
+    D3D12BufferRegion src =
+        dml_util::CreateBufferForTensor(device, input_tensor);
 
     // GPU resources are always kept in UAV state
     const auto barrier_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-    (void)device->GetExecutionContext()->CopyBufferRegion(
+
+    auto status_or_event = device->GetExecutionContext()->CopyBufferRegion(
         dst.Resource(), dst_offset, barrier_state, src.Resource(), src.Offset(),
         barrier_state, bytes_to_copy);
+
+    OP_REQUIRES_OK(ctx, status_or_event.status());
 
     dst_offset += bytes_to_copy;
     CHECK(dst_offset <= dst.Resource()->GetDesc().Width);
@@ -114,14 +119,18 @@ void DmlSplitTensor(OpKernelContext* ctx, Tensor* output_tensor,
   uint64_t src_offset = start_element * element_byte_size;
 
   auto* device = static_cast<DmlDevice*>(ctx->device());
-  D3D12BufferRegion dst = dml_util::CreateBufferForTensor(device, *output_tensor);
+  D3D12BufferRegion dst =
+      dml_util::CreateBufferForTensor(device, *output_tensor);
   D3D12BufferRegion src = dml_util::CreateBufferForTensor(device, input_tensor);
 
   // GPU resources are always kept in UAV state
   const auto barrier_state = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
-  (void)device->GetExecutionContext()->CopyBufferRegion(
+
+  auto status_or_event = device->GetExecutionContext()->CopyBufferRegion(
       dst.Resource(), dst.Offset(), barrier_state, src.Resource(),
       src.Offset() + src_offset, barrier_state, bytes_to_copy);
+
+  OP_REQUIRES_OK(ctx, status_or_event.status());
 }
 
 }  // namespace tensor_array

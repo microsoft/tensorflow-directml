@@ -234,7 +234,7 @@ class DmlSplitKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -243,7 +243,8 @@ class DmlSplitKernel : public DmlKernel {
       for (uint32_t i = 0; i < ctx->GetOutputCount(); ++i) {
         if (ctx->GetOutputTensor(i)->NumElements() != 0) {
           Tensor* output = ctx->GetOutputTensor(i);
-          ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+          TF_RETURN_IF_ERROR(
+              ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output)).status());
         }
       }
     }

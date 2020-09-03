@@ -129,11 +129,12 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Since we gather uint8 values with strides of 4 or 8, we always need to
     // zero the buffer
     Tensor* output = ctx->GetOutputTensor(0);
-    ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    TF_RETURN_IF_ERROR(
+        ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output)).status());
     return DmlKernel::Compute(ctx);
   }
 };

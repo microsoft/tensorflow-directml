@@ -306,13 +306,16 @@ class DmlMatrixDiagKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     if (use_fast_path_) {
       // Fill the buffer with the padding value since we use strides to skip
       // over elements
       Tensor* output = ctx->GetOutputTensor(0);
-      ctx->FillBufferWithValue(ctx->CreateBufferForTensor(*output),
-                               static_cast<float>(padding_value_));
+      auto status_or_event =
+          ctx->FillBufferWithValue(ctx->CreateBufferForTensor(*output),
+                                   static_cast<float>(padding_value_));
+
+      TF_RETURN_IF_ERROR(status_or_event.status());
     }
 
     return DmlKernel::Compute(ctx);

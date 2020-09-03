@@ -58,15 +58,18 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
   chunk->resource->Unmap(0, nullptr);
 
   // Copy from the upload heap into the destination resource
-  DmlGpuEvent done_event = execution_context_->CopyBufferRegion(
+  auto status_or_event = execution_context_->CopyBufferRegion(
       dst, dst_offset, dst_state, chunk->resource.Get(), offset_in_chunk,
       D3D12_RESOURCE_STATE_GENERIC_READ, src.size());
 
+  TF_RETURN_IF_ERROR(status_or_event.status());
+
   // Add an allocation entry to the chunk
   chunk->allocations.push_back(Allocation{static_cast<uint64_t>(src.size()),
-                                          offset_in_chunk, done_event});
+                                          offset_in_chunk,
+                                          status_or_event.ValueOrDie()});
 
-  return done_event;
+  return status_or_event;
 }
 
 }  // namespace tensorflow

@@ -80,7 +80,7 @@ class DmlAddNKernel : public DmlKernel {
     }
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -88,7 +88,8 @@ class DmlAddNKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      TF_RETURN_IF_ERROR(
+          ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output)).status());
     }
 
     return DmlKernel::Compute(ctx);

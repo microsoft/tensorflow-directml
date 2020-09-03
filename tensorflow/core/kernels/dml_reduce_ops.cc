@@ -371,10 +371,11 @@ class DmlReduceKernel : public DmlKernel {
     }
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      TF_RETURN_IF_ERROR(
+          ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output)).status());
     }
 
     return DmlKernel::Compute(ctx);

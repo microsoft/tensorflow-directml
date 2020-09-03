@@ -225,11 +225,9 @@ DmlGpuEvent DmlKernelContext::GetCurrentCompletionEvent() const {
   return device_->GetExecutionContext()->GetCurrentCompletionEvent();
 }
 
-DmlGpuEvent DmlKernelContext::CopyBufferToBuffer(ID3D12Resource* dst,
-                                                 uint64_t dst_offset,
-                                                 ID3D12Resource* src,
-                                                 uint64_t src_offset,
-                                                 uint64 size_in_bytes) const {
+StatusOr<DmlGpuEvent> DmlKernelContext::CopyBufferToBuffer(
+    ID3D12Resource* dst, uint64_t dst_offset, ID3D12Resource* src,
+    uint64_t src_offset, uint64 size_in_bytes) const {
   return device_->GetExecutionContext()->CopyBufferRegion(
       dst, dst_offset, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, src, src_offset,
       D3D12_RESOURCE_STATE_UNORDERED_ACCESS, size_in_bytes);
@@ -242,14 +240,15 @@ StatusOr<DmlGpuEvent> DmlKernelContext::CopyHostToBuffer(
       dst, dst_offset, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, src);
 }
 
-DmlGpuEvent DmlKernelContext::ZeroBuffer(ID3D12Resource* dst, uint64_t offset,
-                                         uint64_t size_in_bytes) const {
+StatusOr<DmlGpuEvent> DmlKernelContext::ZeroBuffer(
+    ID3D12Resource* dst, uint64_t offset, uint64_t size_in_bytes) const {
   uint8_t pattern[] = {0};
   return device_->GetExecutionContext()->FillBufferWithPattern(
       dst, offset, size_in_bytes, pattern);
 }
 
-DmlGpuEvent DmlKernelContext::ZeroBuffer(const D3D12BufferRegion& dst) const {
+StatusOr<DmlGpuEvent> DmlKernelContext::ZeroBuffer(
+    const D3D12BufferRegion& dst) const {
   return ZeroBuffer(dst.Resource(), dst.Offset(), dst.SizeInBytes());
 }
 
@@ -260,7 +259,7 @@ DmlGpuEvent DmlKernelContext::InsertUavBarrier() const {
       absl::Span<D3D12_RESOURCE_BARRIER>(&barrier, 1));
 }
 
-DmlGpuEvent DmlKernelContext::FillBufferWithPattern(
+StatusOr<DmlGpuEvent> DmlKernelContext::FillBufferWithPattern(
     ID3D12Resource* dst, uint64_t offset, uint64_t size_in_bytes,
     absl::Span<const uint8_t> pattern) const {
   return device_->GetExecutionContext()->FillBufferWithPattern(

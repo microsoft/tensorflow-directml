@@ -44,13 +44,15 @@ class DmlExecutionContextImpl {
   // for execution. Transition barriers are automatically inserted to transition
   // the source and destination resources to COPY_SOURCE and COPY_DEST if
   // necessary.
-  DmlGpuEvent CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
-                               D3D12_RESOURCE_STATES dst_state,
-                               ID3D12Resource* src_buffer, uint64_t src_offset,
-                               D3D12_RESOURCE_STATES src_state,
-                               uint64_t byte_count);
+  StatusOr<DmlGpuEvent> CopyBufferRegion(ID3D12Resource* dst_buffer,
+                                         uint64_t dst_offset,
+                                         D3D12_RESOURCE_STATES dst_state,
+                                         ID3D12Resource* src_buffer,
+                                         uint64_t src_offset,
+                                         D3D12_RESOURCE_STATES src_state,
+                                         uint64_t byte_count);
 
-  DmlGpuEvent FillBufferWithPattern(
+  StatusOr<DmlGpuEvent> FillBufferWithPattern(
       ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
       absl::Span<const uint8_t>
           value /* Data type agnostic value, treated as raw bits */);
@@ -75,12 +77,12 @@ class DmlExecutionContextImpl {
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
   // See ID3D12CommandQueue::Wait
-  void Wait(ID3D12Fence* fence, uint64_t value);
+  Status Wait(ID3D12Fence* fence, uint64_t value);
 
   // Forces all queued work to begin executing on the GPU. This method returns
   // immediately and does not wait for the submitted work to complete execution
   // on the GPU.
-  DmlGpuEvent Flush();
+  StatusOr<DmlGpuEvent> Flush();
 
   // Returns an event which will become signaled when everything submitted to
   // the execution context thus far has completed execution on the GPU,
@@ -92,7 +94,7 @@ class DmlExecutionContextImpl {
  private:
   Microsoft::WRL::ComPtr<ID3D12Device> d3d_device_;
 
-  void SetCommandRecorder(DmlCommandRecorder* new_recorder);
+  Status SetCommandRecorder(DmlCommandRecorder* new_recorder);
 
   std::shared_ptr<DmlCommandQueue> queue_;
 
@@ -115,20 +117,23 @@ class DmlExecutionContext {
     impl_->Close();
   }
 
-  DmlGpuEvent CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
-                               D3D12_RESOURCE_STATES dst_state,
-                               ID3D12Resource* src_buffer, uint64_t src_offset,
-                               D3D12_RESOURCE_STATES src_state,
-                               uint64_t byte_count) {
+  StatusOr<DmlGpuEvent> CopyBufferRegion(ID3D12Resource* dst_buffer,
+                                         uint64_t dst_offset,
+                                         D3D12_RESOURCE_STATES dst_state,
+                                         ID3D12Resource* src_buffer,
+                                         uint64_t src_offset,
+                                         D3D12_RESOURCE_STATES src_state,
+                                         uint64_t byte_count) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->CopyBufferRegion(dst_buffer, dst_offset, dst_state,
                                    src_buffer, src_offset, src_state,
                                    byte_count);
   }
 
-  DmlGpuEvent FillBufferWithPattern(ID3D12Resource* dst, uint64_t dst_offset,
-                                    uint64_t dst_size_in_bytes,
-                                    absl::Span<const uint8_t> value) {
+  StatusOr<DmlGpuEvent> FillBufferWithPattern(ID3D12Resource* dst,
+                                              uint64_t dst_offset,
+                                              uint64_t dst_size_in_bytes,
+                                              absl::Span<const uint8_t> value) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->FillBufferWithPattern(dst, dst_offset, dst_size_in_bytes,
                                         value);
@@ -176,7 +181,7 @@ class DmlExecutionContext {
     impl_->Wait(fence, value);
   }
 
-  DmlGpuEvent Flush() {
+  StatusOr<DmlGpuEvent> Flush() {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->Flush();
   }

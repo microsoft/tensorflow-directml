@@ -22,14 +22,6 @@ limitations under the License.
 
 namespace tensorflow {
 
-static void AllocateTempResult(OpKernelContext* ctx, Tensor* result) {
-  // Copy the result to the CPU
-  AllocatorAttributes attr;
-  attr.set_on_host(true);
-  OP_REQUIRES_OK(ctx, ctx->allocate_temp(ctx->input(0).dtype(), TensorShape({}),
-                                         result, attr));
-}
-
 class CheckNumericsInitHelper : public InitializationHelper {
  public:
   struct Attributes {
@@ -103,31 +95,33 @@ class DmlCheckNumericsKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     DmlKernel::Compute(ctx);
 
     OpKernelContext* op_ctx = ctx->GetOpKernelContext();
 
+    // Copy the result to the CPU
+    AllocatorAttributes attr;
     Tensor is_error_tensor;
-    AllocateTempResult(op_ctx, &is_error_tensor);
-
-    if (!op_ctx->status().ok()) {
-      return ctx->GetCurrentCompletionEvent();
-    }
+    attr.set_on_host(true);
+    TF_RETURN_IF_ERROR(op_ctx->allocate_temp(
+        op_ctx->input(0).dtype(), TensorShape({}), &is_error_tensor, attr));
 
     auto device = static_cast<DmlDevice*>(op_ctx->device());
     Tensor* output_tensor = ctx->GetOutputTensor(0);
 
     // Copy the Inf and NaN bits from the GPU to the CPU
     Notification note;
+    Status status;
     op_ctx->op_device_context()->CopyDeviceTensorToCPU(
         output_tensor, "", device, &is_error_tensor,
-        [&note](const Status& copy_status) {
-          CHECK(copy_status.ok());
+        [&note, &status](const Status& copy_status) {
           note.Notify();
+          status = copy_status;
         });
 
     note.WaitForNotification();
+    TF_RETURN_IF_ERROR(status);
 
     uint8_t nan_inf_bits = is_error_tensor.scalar<uint8_t>()();
 
@@ -145,8 +139,8 @@ class DmlCheckNumericsKernel : public DmlKernel {
         status = "Inf";
       }
 
-      op_ctx->SetStatus(errors::InvalidArgument(message_, " : Tensor had ",
-                                                status, " values"));
+      return errors::InvalidArgument(message_, " : Tensor had ", status,
+                                     " values");
     } else {
       // If everything is fine, we simply copy the input to the output
       D3D12BufferRegion input_buffer =
@@ -155,9 +149,12 @@ class DmlCheckNumericsKernel : public DmlKernel {
       D3D12BufferRegion output_buffer =
           dml_util::CreateBufferForTensor(device, *output_tensor);
 
-      ctx->CopyBufferToBuffer(output_buffer.Resource(), output_buffer.Offset(),
-                              input_buffer.Resource(), input_buffer.Offset(),
-                              output_tensor->TotalBytes());
+      auto status_or_event = ctx->CopyBufferToBuffer(
+          output_buffer.Resource(), output_buffer.Offset(),
+          input_buffer.Resource(), input_buffer.Offset(),
+          output_tensor->TotalBytes());
+
+      TF_RETURN_IF_ERROR(status_or_event.status());
     }
 
     return ctx->GetCurrentCompletionEvent();

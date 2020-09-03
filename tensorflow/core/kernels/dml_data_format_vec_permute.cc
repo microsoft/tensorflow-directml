@@ -81,7 +81,8 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
     DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
     const auto& execution_context = device->GetExecutionContext();
 
-    D3D12BufferRegion input_buffer = dml_util::CreateBufferForTensor(device, input);
+    D3D12BufferRegion input_buffer =
+        dml_util::CreateBufferForTensor(device, input);
 
     D3D12BufferRegion output_buffer =
         dml_util::CreateBufferForTensor(device, *output);
@@ -109,9 +110,11 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
     // most likely garbage data
     if (is_64_bit_int) {
       const uint8_t pattern[] = {0};
-      execution_context->FillBufferWithPattern(
+      auto status_or_event = execution_context->FillBufferWithPattern(
           output_buffer.Resource(), output_buffer.Offset(),
           output_buffer.SizeInBytes(), pattern);
+
+      OP_REQUIRES_OK(ctx, status_or_event.status());
     }
 
     for (uint32_t i = 0; i < permutations_.size(); ++i) {
@@ -122,21 +125,27 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
       // For int64 data types, we need to do 2 to separate copies for 2D tensors
       // in order to skip the garbage data between elements
       if (is_64_bit_int && input.dims() == 2) {
-        execution_context->CopyBufferRegion(
+        auto status_or_event = execution_context->CopyBufferRegion(
             output_buffer.Resource(), dst_offset,
             D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
             D3D12_RESOURCE_STATE_COPY_SOURCE, permutation_size / 2);
 
-        execution_context->CopyBufferRegion(
+        OP_REQUIRES_OK(ctx, status_or_event.status());
+
+        status_or_event = execution_context->CopyBufferRegion(
             output_buffer.Resource(), dst_offset + permutation_size,
             D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(),
             src_offset + permutation_size, D3D12_RESOURCE_STATE_COPY_SOURCE,
             permutation_size / 2);
+
+        OP_REQUIRES_OK(ctx, status_or_event.status());
       } else {
-        execution_context->CopyBufferRegion(
+        auto status_or_event = execution_context->CopyBufferRegion(
             output_buffer.Resource(), dst_offset,
             D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
             D3D12_RESOURCE_STATE_COPY_SOURCE, permutation_size);
+
+        OP_REQUIRES_OK(ctx, status_or_event.status());
       }
     }
 

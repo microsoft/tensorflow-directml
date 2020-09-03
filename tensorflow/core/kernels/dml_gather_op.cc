@@ -306,7 +306,7 @@ class DmlGatherKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -324,7 +324,7 @@ class DmlGatherKernel : public DmlKernel {
     D3D12BufferRegion output_buffers[] = {ctx->CreateBufferForTensor(*output)};
 
     if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(output_buffers[0]);
+      TF_RETURN_IF_ERROR(ctx->ZeroBuffer(output_buffers[0]).status());
     }
 
     // Create bindings
@@ -336,12 +336,7 @@ class DmlGatherKernel : public DmlKernel {
                              input_bindings, output_bindings);
 
     init_helper->Unlock();
-
-    if (!status_or_event.ok()) {
-      ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-      return ctx->GetCurrentCompletionEvent();
-    }
-
+    TF_RETURN_IF_ERROR(status_or_event.status());
     return status_or_event.ConsumeValueOrDie();
   }
 };

@@ -19,6 +19,7 @@ limitations under the License.
 #include "dml_command_queue.h"
 #include "dml_common.h"
 #include "dml_descriptor_pool.h"
+#include "dml_status.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace tensorflow {
@@ -41,25 +42,25 @@ class DmlCommandRecorder {
                          absl::Span<const DML_BINDING_DESC> input_bindings,
                          absl::Span<const DML_BINDING_DESC> output_bindings);
 
-  void CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
-                        ID3D12Resource* src_buffer, uint64_t src_offset,
-                        uint64_t byte_count);
+  Status CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
+                          ID3D12Resource* src_buffer, uint64_t src_offset,
+                          uint64_t byte_count);
 
-  void FillBufferWithPattern(
+  Status FillBufferWithPattern(
       ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
       absl::Span<const uint8_t>
           value /* Data type agnostic value, treated as raw bits */);
 
-  void ExecuteCommandList(ID3D12GraphicsCommandList* command_list,
-                          _Outptr_ ID3D12Fence** fence,
-                          _Out_ uint64_t* completion_value);
+  Status ExecuteCommandList(ID3D12GraphicsCommandList* command_list,
+                            _Outptr_ ID3D12Fence** fence,
+                            _Out_ uint64_t* completion_value);
 
-  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandList();
+  StatusOr<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>> GetCommandList();
 
-  void ResourceBarrier(absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
-  void AddUAVBarrier();
+  Status ResourceBarrier(absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
+  Status AddUAVBarrier();
 
-  void CloseAndExecute();
+  Status CloseAndExecute();
 
   // If false, there are no pending commands to be submitted which indicates
   // that CloseAndExecute() would be a no-op.
@@ -104,7 +105,7 @@ class DmlCommandRecorder {
   // Increments operations_recorded_in_current_command_list_. If the size of the
   // current command list exceeds a certain value (based on heuristic), the
   // command list is flushed.
-  void OnCommandRecorded();
+  Status OnCommandRecorded();
 };
 
 }  // namespace tensorflow
