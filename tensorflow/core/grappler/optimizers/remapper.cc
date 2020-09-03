@@ -155,7 +155,7 @@ struct PadWithConv2D {
 
   int pad = kMissingIndex;
   int conv_2d = kMissingIndex;
-  int32 new_padding_values[8];
+  int32 new_padding_values[8] = {0};
 };
 
 // Contraction node followed by a FusedBatchNorm and Activation.
@@ -585,10 +585,6 @@ bool FindPadWithConv2D(const RemapperContext& ctx, int node_index,
   const auto* conv_node_def = conv_node_view->node();
   // Root of the pattern must be a Conv2D.
   if (!IsConv2D(*conv_node_def)) return false;
-
-  // Check that Conv2D is in inference mode.
-  const auto* training_attr = conv_node_view->GetAttr(kIsTraining);
-  if (training_attr != nullptr && training_attr->b()) return false;
 
   // TODO(lyandy): Forward controls for patterns with control dependencies.
   if (HasControlFaninOrFanout(*conv_node_view)) return false;
