@@ -339,8 +339,6 @@ Status DmlCommandRecorder::CloseAndExecute() {
     return errors::ResourceExhausted("OOM when closing the command list");
   }
 
-  printf("HRESULT: %X\n", hr);
-
   DML_CHECK_SUCCEEDED(hr);
 
   if (operations_recorded_in_current_command_list_ != 0) {
