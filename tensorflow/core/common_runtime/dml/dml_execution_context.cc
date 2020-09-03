@@ -130,13 +130,6 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::ResourceBarrier(
   return GetCurrentCompletionEvent();
 }
 
-Status DmlExecutionContextImpl::Wait(ID3D12Fence* fence, uint64_t value) {
-  assert(!closed_);
-  TF_RETURN_IF_ERROR(Flush().status());
-  queue_->Wait(fence, value);
-  return Status::OK();
-}
-
 Status DmlExecutionContextImpl::SetCommandRecorder(
     DmlCommandRecorder* new_recorder) {
   assert(!closed_);

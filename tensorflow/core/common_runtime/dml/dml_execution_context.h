@@ -75,9 +75,6 @@ class DmlExecutionContextImpl {
   StatusOr<DmlGpuEvent> ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
-  // See ID3D12CommandQueue::Wait
-  Status Wait(ID3D12Fence* fence, uint64_t value);
-
   // Forces all queued work to begin executing on the GPU. This method returns
   // immediately and does not wait for the submitted work to complete execution
   // on the GPU.
@@ -168,11 +165,6 @@ class DmlExecutionContext {
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->ResourceBarrier(barriers);
-  }
-
-  void Wait(ID3D12Fence* fence, uint64_t value) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    impl_->Wait(fence, value);
   }
 
   StatusOr<DmlGpuEvent> Flush() {

@@ -36,10 +36,6 @@ class DmlCommandQueue {
   void ExecuteCommandList(ID3D12CommandList* command_list);
   void ExecuteCommandLists(absl::Span<ID3D12CommandList*> command_lists);
 
-  // Queues a wait to block the GPU until the specified fence is signaled to a
-  // given value.
-  void Wait(ID3D12Fence* fence, uint64_t value);
-
   // Returns an event that will become signaled when everything submitted to the
   // queue thus far has completed execution on the GPU.
   DmlGpuEvent GetCurrentCompletionEvent();

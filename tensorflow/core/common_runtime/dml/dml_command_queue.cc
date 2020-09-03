@@ -39,13 +39,6 @@ void DmlCommandQueue::ExecuteCommandLists(
   DML_CHECK_SUCCEEDED(queue_->Signal(fence_.Get(), last_fence_value_));
 }
 
-void DmlCommandQueue::Wait(ID3D12Fence* fence, uint64_t value) {
-  DML_CHECK_SUCCEEDED(queue_->Wait(fence, value));
-
-  ++last_fence_value_;
-  DML_CHECK_SUCCEEDED(queue_->Signal(fence_.Get(), last_fence_value_));
-}
-
 DmlGpuEvent DmlCommandQueue::GetCurrentCompletionEvent() {
   return DmlGpuEvent{last_fence_value_, fence_};
 }
