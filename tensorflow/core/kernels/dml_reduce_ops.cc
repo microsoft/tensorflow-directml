@@ -316,20 +316,15 @@ class DmlReduceKernel : public DmlKernel {
 
     assert(input_shape.dims() == output_shape.dims());
 
-    // This doesn't actually matter for this kernel, so just use DML's default
-    // (NCHW)
-    const auto tensor_layout =
-        GetDmlTensorLayout(FORMAT_NCHW, input_shape.dims());
-
     DmlTensorInfo input;
     input.kernel_index = 0;
     input.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0), input_shape,
-                                       input_shape, tensor_layout);
+                                       input_shape);
 
     DmlTensorInfo output;
     output.kernel_index = 0;
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), output_shape,
-                                        output_shape, tensor_layout);
+                                        output_shape);
 
     // Coerce the output datatype to unsigned, for argmin/argmax
     if (DataTypeIsInteger(output.desc.GetTfDataType())) {
