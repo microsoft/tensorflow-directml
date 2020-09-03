@@ -77,9 +77,9 @@ class DmlTensorDesc {
       uint32_t guaranteed_base_offset_alignment = 0);
 
   // Same as the tensor_layout version, but for tensors that don't need any
-  // special layout (i.e. null strides). This overload accepts up 8 dimensions
-  // (inclusive), while the tensor_layout overload only accepts up to 5
-  // dimensions.
+  // special layout (i.e. null strides). This overload accepts up to 8
+  // dimensions (inclusive), while the tensor_layout overload only accepts up to
+  // 5 dimensions.
   static DmlTensorDesc Create(DataType data_type, const TensorShape& shape,
                               const TensorShape& non_broadcast_shape,
                               uint32_t guaranteed_base_offset_alignment = 0);
