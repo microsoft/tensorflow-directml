@@ -244,8 +244,6 @@ class DmlTrainingKernel : public DmlKernel {
 
     TF_RETURN_IF_ERROR(status_or_event.status());
 
-    DmlGpuEvent gpu_event = status_or_event.ConsumeValueOrDie();
-
     if (!inplace_allowed_) {
       // Copy the intermediate buffers back to their respective inputs.
       // ExecuteOperator already inserts a barrier at the end, so we don't need
@@ -261,15 +259,18 @@ class DmlTrainingKernel : public DmlKernel {
             output_bindings[output_index]->Buffer;
         uint64_t intermediate_offset = output_bindings[output_index]->Offset;
 
-        ctx->CopyBufferToBuffer(input_buffer, input_offset, intermediate_buffer,
-                                intermediate_offset,
-                                output_bindings[output_index]->SizeInBytes);
+        status_or_event = ctx->CopyBufferToBuffer(
+            input_buffer, input_offset, intermediate_buffer,
+            intermediate_offset, output_bindings[output_index]->SizeInBytes);
+
+        TF_RETURN_IF_ERROR(status_or_event.status());
       }
 
-      gpu_event = ctx->InsertUavBarrier();
+      status_or_event = ctx->InsertUavBarrier();
+      TF_RETURN_IF_ERROR(status_or_event.status());
     }
 
-    return gpu_event;
+    return status_or_event;
   }
 
   StatusOr<DmlGpuEvent> ExecuteOperator(

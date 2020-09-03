@@ -55,10 +55,7 @@ class DmlCommandRecorder {
                             _Outptr_ ID3D12Fence** fence,
                             _Out_ uint64_t* completion_value);
 
-  StatusOr<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>> GetCommandList();
-
   Status ResourceBarrier(absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
-  Status AddUAVBarrier();
 
   Status CloseAndExecute();
 

@@ -72,8 +72,7 @@ class DmlExecutionContextImpl {
                                  _Outptr_ ID3D12Fence** fence,
                                  _Out_ uint64_t* completion_value);
 
-  DmlGpuEvent AddUAVBarrier();
-  DmlGpuEvent ResourceBarrier(
+  StatusOr<DmlGpuEvent> ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
   // See ID3D12CommandQueue::Wait
@@ -165,12 +164,7 @@ class DmlExecutionContext {
     return impl_->ExecuteCommandList(command_list, fence, completion_value);
   }
 
-  DmlGpuEvent AddUAVBarrier() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->AddUAVBarrier();
-  }
-
-  DmlGpuEvent ResourceBarrier(
+  StatusOr<DmlGpuEvent> ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->ResourceBarrier(barriers);

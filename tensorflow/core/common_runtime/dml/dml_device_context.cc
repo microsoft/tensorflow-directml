@@ -134,6 +134,7 @@ void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
 
   if (!status_or_event.ok()) {
     done(status_or_event.status());
+    return;
   }
 
   // Keep a ref on the source tensor to keep it alive until we're done with it

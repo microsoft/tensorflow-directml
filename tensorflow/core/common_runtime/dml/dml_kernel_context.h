@@ -187,7 +187,7 @@ class DmlKernelContext {
                                value);
   }
 
-  DmlGpuEvent InsertUavBarrier() const;
+  StatusOr<DmlGpuEvent> InsertUavBarrier() const;
 
   DmlGpuEvent GetCurrentCompletionEvent() const;
 

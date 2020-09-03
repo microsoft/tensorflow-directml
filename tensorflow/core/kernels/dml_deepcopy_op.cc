@@ -51,7 +51,7 @@ class DmlDeepCopyKernel : public OpKernel {
             D3D12_RESOURCE_STATE_COPY_DEST),
     };
 
-    execution_context->ResourceBarrier(barriers);
+    OP_REQUIRES_OK(ctx, execution_context->ResourceBarrier(barriers).status());
 
     constexpr uint64_t dst_offset = 0;
     constexpr uint64_t src_offset = 0;
@@ -67,7 +67,7 @@ class DmlDeepCopyKernel : public OpKernel {
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
     }
 
-    execution_context->ResourceBarrier(barriers);
+    OP_REQUIRES_OK(ctx, execution_context->ResourceBarrier(barriers).status());
   }
 };
 

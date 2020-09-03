@@ -56,7 +56,7 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::CopyBufferRegion(
   }
 
   if (!barriers.empty()) {
-    dml_recorder_.ResourceBarrier(barriers);
+    TF_RETURN_IF_ERROR(dml_recorder_.ResourceBarrier(barriers));
   }
 
   TF_RETURN_IF_ERROR(dml_recorder_.CopyBufferRegion(
@@ -68,7 +68,7 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::CopyBufferRegion(
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
     }
 
-    dml_recorder_.ResourceBarrier(barriers);
+    TF_RETURN_IF_ERROR(dml_recorder_.ResourceBarrier(barriers));
   }
 
   return GetCurrentCompletionEvent();
@@ -121,20 +121,12 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::ExecuteOperator(
   return GetCurrentCompletionEvent();
 }
 
-DmlGpuEvent DmlExecutionContextImpl::AddUAVBarrier() {
-  assert(!closed_);
-  SetCommandRecorder(&dml_recorder_);
-
-  dml_recorder_.AddUAVBarrier();
-  return GetCurrentCompletionEvent();
-}
-
-DmlGpuEvent DmlExecutionContextImpl::ResourceBarrier(
+StatusOr<DmlGpuEvent> DmlExecutionContextImpl::ResourceBarrier(
     absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
   assert(!closed_);
   SetCommandRecorder(&dml_recorder_);
 
-  dml_recorder_.ResourceBarrier(barriers);
+  TF_RETURN_IF_ERROR(dml_recorder_.ResourceBarrier(barriers));
   return GetCurrentCompletionEvent();
 }
 

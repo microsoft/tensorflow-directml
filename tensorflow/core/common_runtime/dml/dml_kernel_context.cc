@@ -252,7 +252,7 @@ StatusOr<DmlGpuEvent> DmlKernelContext::ZeroBuffer(
   return ZeroBuffer(dst.Resource(), dst.Offset(), dst.SizeInBytes());
 }
 
-DmlGpuEvent DmlKernelContext::InsertUavBarrier() const {
+StatusOr<DmlGpuEvent> DmlKernelContext::InsertUavBarrier() const {
   D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
 
   return device_->GetExecutionContext()->ResourceBarrier(

@@ -96,7 +96,7 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
             D3D12_RESOURCE_STATE_COPY_DEST),
     };
 
-    execution_context->ResourceBarrier(barriers);
+    OP_REQUIRES_OK(ctx, execution_context->ResourceBarrier(barriers).status());
 
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
@@ -153,7 +153,7 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
     }
 
-    execution_context->ResourceBarrier(barriers);
+    OP_REQUIRES_OK(ctx, execution_context->ResourceBarrier(barriers).status());
   }
 
  private:

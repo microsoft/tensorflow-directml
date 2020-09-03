@@ -122,7 +122,8 @@ class DmlDynamicStitchKernel : public OpKernel {
         output_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
         D3D12_RESOURCE_STATE_COPY_DEST));
 
-    device->GetExecutionContext()->ResourceBarrier(barriers);
+    OP_REQUIRES_OK(
+        ctx, device->GetExecutionContext()->ResourceBarrier(barriers).status());
 
     DCHECK(indices_inputs.size() == data_inputs.size());
     for (int tensor_idx = 0; tensor_idx < indices_inputs.size(); ++tensor_idx) {
@@ -152,7 +153,8 @@ class DmlDynamicStitchKernel : public OpKernel {
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
     }
 
-    device->GetExecutionContext()->ResourceBarrier(barriers);
+    OP_REQUIRES_OK(
+        ctx, device->GetExecutionContext()->ResourceBarrier(barriers).status());
   }
 };
 

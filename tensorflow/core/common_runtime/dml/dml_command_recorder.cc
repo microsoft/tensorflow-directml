@@ -304,23 +304,10 @@ Status DmlCommandRecorder::ExecuteCommandList(
   return Status::OK();
 }
 
-StatusOr<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>>
-DmlCommandRecorder::GetCommandList() {
-  // Assume operations are added by the caller after this returns
-  TF_RETURN_IF_ERROR(OnCommandRecorded());
-  return current_command_list_;
-}
-
 Status DmlCommandRecorder::ResourceBarrier(
     absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
   current_command_list_->ResourceBarrier(static_cast<uint32_t>(barriers.size()),
                                          barriers.data());
-  return OnCommandRecorded();
-}
-
-Status DmlCommandRecorder::AddUAVBarrier() {
-  auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-  current_command_list_->ResourceBarrier(1, &barrier);
   return OnCommandRecorded();
 }
 
@@ -351,6 +338,8 @@ Status DmlCommandRecorder::CloseAndExecute() {
   if (dml_util::HrIsOutOfMemory(hr)) {
     return errors::ResourceExhausted("OOM when closing the command list");
   }
+
+  printf("HRESULT: %X\n", hr);
 
   DML_CHECK_SUCCEEDED(hr);
 
