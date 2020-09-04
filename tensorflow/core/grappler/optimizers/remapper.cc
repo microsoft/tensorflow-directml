@@ -729,9 +729,9 @@ bool FindPadWithConv2D(const RemapperContext& ctx, int node_index,
     if (filter_shape.dim_size() != 4) return false;
 
     // Make sure that all filter dimensions are statically known
-    bool known_filter_shape =
-        std::all_of(filter_shape.dim().begin(), filter_shape.dim().end(),
-                    [](auto dim) { return dim.size() >= 0; });
+    bool known_filter_shape = std::all_of(
+        filter_shape.dim().begin(), filter_shape.dim().end(),
+        [](const TensorShapeProto::Dim& dim) { return dim.size() >= 0; });
 
     if (!known_filter_shape) {
       // The filter shape is not known, so check if it's a Placeholder op that
@@ -748,9 +748,9 @@ bool FindPadWithConv2D(const RemapperContext& ctx, int node_index,
       if (shape_iterator == filter_node_def->attr().end()) return false;
       filter_shape = shape_iterator->second.shape();
 
-      known_filter_shape =
-          std::all_of(filter_shape.dim().begin(), filter_shape.dim().end(),
-                      [](auto dim) { return dim.size() >= 0; });
+      known_filter_shape = std::all_of(
+          filter_shape.dim().begin(), filter_shape.dim().end(),
+          [](const TensorShapeProto::Dim& dim) { return dim.size() >= 0; });
 
       if (!known_filter_shape) return false;
     }
