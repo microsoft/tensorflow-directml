@@ -34,6 +34,10 @@ limitations under the License.
 #include <gtest/gtest.h>
 #endif
 
+#ifdef PLATFORM_WINDOWS
+#define setenv(envvar, value, dummy)  _putenv_s(envvar, value)
+#endif
+
 namespace tensorflow {
 namespace testing {
 
