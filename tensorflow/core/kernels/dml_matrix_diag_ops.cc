@@ -179,12 +179,16 @@ class DmlMatrixDiagKernel : public DmlKernel {
     const TensorShape& input_shape = ctx->GetInputTensorShape(0);
     const TensorShape& output_shape = ctx->GetOutputTensorShape(0);
 
-    int64 batch_size = input_shape.dims() == 2 ? input_shape.dim_size(0) : 1;
+    int64 batch_size = 1;
+    for (int i = 0; i < input_shape.dims() - 1; ++i) {
+      batch_size *= input_shape.dim_size(i);
+    }
+
     int64 elem_count_per_batch = input_shape.num_elements() / batch_size;
     int64 output_height = output_shape.dim_size(output_shape.dims() - 2);
     int64 output_width = output_shape.dim_size(output_shape.dims() - 1);
 
-    // Flatten the input batches of vectors
+    // Flatten the input into a batch of vectors
     TensorShape flattened_input_shape({batch_size, 1, 1, elem_count_per_batch});
 
     DmlTensorInfo input;
@@ -192,7 +196,8 @@ class DmlMatrixDiagKernel : public DmlKernel {
     input.desc = DmlTensorDesc::Create(
         ctx->GetInputDataType(0), flattened_input_shape, flattened_input_shape);
 
-    // Flatten the output into a vector and use strides to skip over zeros
+    // Flatten the output into a batch of vectors and use strides to skip over
+    // zeros
     uint32_t output_sizes[] = {batch_size, 1, 1, elem_count_per_batch};
     uint32_t output_strides[] = {
         output_height * output_width,

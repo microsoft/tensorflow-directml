@@ -113,12 +113,20 @@ class DmlKernel {
 
   static DmlTensorDesc CreateTensorDescFromInput(
       DmlKernelConstruction* ctx, uint32_t kernel_index,
-      absl::Span<const DmlTensorAxis> tensor_layout = {},
+      absl::Span<const DmlTensorAxis> tensor_layout,
       const absl::optional<TensorShape>& tensor_shape = absl::nullopt);
 
   static DmlTensorDesc CreateTensorDescFromOutput(
       DmlKernelConstruction* ctx, uint32_t kernel_index,
-      absl::Span<const DmlTensorAxis> tensor_layout = {},
+      absl::Span<const DmlTensorAxis> tensor_layout,
+      const absl::optional<TensorShape>& tensor_shape = absl::nullopt);
+
+  static DmlTensorDesc CreateTensorDescFromInput(
+      DmlKernelConstruction* ctx, uint32_t kernel_index,
+      const absl::optional<TensorShape>& tensor_shape = absl::nullopt);
+
+  static DmlTensorDesc CreateTensorDescFromOutput(
+      DmlKernelConstruction* ctx, uint32_t kernel_index,
       const absl::optional<TensorShape>& tensor_shape = absl::nullopt);
 
   static absl::InlinedVector<DML_TENSOR_DESC, 8> GetDmlTensorDescs(
