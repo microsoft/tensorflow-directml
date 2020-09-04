@@ -613,9 +613,6 @@ bool FindPadWithConv2D(const RemapperContext& ctx, int node_index,
 
   if (!valid_Data_format) return false;
 
-  const auto& conv_props =
-      ctx.graph_properties.GetInputProperties(conv_node_def->name());
-
   const auto& pad_props =
       ctx.graph_properties.GetInputProperties(pad_node_def->name());
 
@@ -661,9 +658,9 @@ bool FindPadWithConv2D(const RemapperContext& ctx, int node_index,
   }
 
   int n_index = GetTensorDimIndex(data_format, 'N', 4);
-  int c_index = GetTensorDimIndex(data_format, 'C', 4);
   int h_index = GetTensorDimIndex(data_format, 'H', 4);
   int w_index = GetTensorDimIndex(data_format, 'W', 4);
+  int c_index = GetTensorDimIndex(data_format, 'C', 4);
 
   if (pad_props.size() < 2) return false;
   if (!pad_props[1].has_value()) return false;
@@ -722,6 +719,9 @@ bool FindPadWithConv2D(const RemapperContext& ctx, int node_index,
       matched->new_padding_values[i] += paddings.i(i);
     }
   } else if (padding_type == Padding::SAME) {
+    const auto& conv_props =
+        ctx.graph_properties.GetInputProperties(conv_node_def->name());
+
     if (conv_props.size() != 2) return false;
     if (!conv_props[1].has_shape()) return false;
 
@@ -733,7 +733,27 @@ bool FindPadWithConv2D(const RemapperContext& ctx, int node_index,
         std::all_of(filter_shape.dim().begin(), filter_shape.dim().end(),
                     [](auto dim) { return dim.size() >= 0; });
 
-    if (!known_filter_shape) return false;
+    if (!known_filter_shape) {
+      // The filter shape is not known, so check if it's a Placeholder op that
+      // has a valid shape attribute instead
+      if (conv_node_view->NumRegularFanins() < 2) return false;
+      const auto& conv_fanin_1 = conv_node_view->GetRegularFanin(1);
+      const auto* filter_node_view = conv_fanin_1.node_view();
+      const auto* filter_node_def = filter_node_view->node();
+
+      if (!IsPlaceholder(*filter_node_def)) return false;
+
+      auto shape_iterator = filter_node_def->attr().find("shape");
+
+      if (shape_iterator == filter_node_def->attr().end()) return false;
+      filter_shape = shape_iterator->second.shape();
+
+      known_filter_shape =
+          std::all_of(filter_shape.dim().begin(), filter_shape.dim().end(),
+                      [](auto dim) { return dim.size() >= 0; });
+
+      if (!known_filter_shape) return false;
+    }
 
     auto dilations_attr = conv_node_def->attr().at(kDilations).list();
     if (dilations_attr.i_size() != 4) return false;
@@ -1735,6 +1755,7 @@ Status AddBatchNormNodes(RemapperContext* ctx, const FusedBatchNorm& matched) {
 // shapes:
 //   (1) Splitting FusedBatchNorm into primitives.
 //   (2) Fusing side input and/or activation into FusedBatchNorm.
+//   (3) Fusing Pad into Conv2D
 bool RequiresInferredShapes(const RemapperContext& ctx, int node_index) {
   // Candidate for a FusedBatchNorm splitting.
   const auto* node_view = ctx.graph_view.GetNode(node_index);
@@ -1780,7 +1801,40 @@ bool RequiresInferredShapes(const RemapperContext& ctx, int node_index) {
     return false;
   };
 
-  return is_batch_norm_candidate() || is_batch_norm_fusion_candidate();
+  const auto is_pad_conv2d_fusion_candidate = [&]() -> bool {
+    const auto* current_node_view = node_view;
+
+    if (IsSupportedActivation(*current_node_view->node())) {
+      // Pad + Conv2D + BiasAdd + Activation
+      if (current_node_view->NumRegularFanins() < 1) return false;
+
+      const auto& fanin_0 = current_node_view->GetRegularFanin(0);
+      current_node_view = fanin_0.node_view();
+    }
+
+    if (IsBiasAdd(*current_node_view->node())) {
+      // Pad + Conv2D + BiasAdd
+      if (current_node_view->NumRegularFanins() < 1) return false;
+
+      const auto& fanin_0 = current_node_view->GetRegularFanin(0);
+      current_node_view = fanin_0.node_view();
+    }
+
+    if (IsConv2D(*current_node_view->node())) {
+      // Pad + Conv2D
+      if (current_node_view->NumRegularFanins() < 1) return false;
+
+      const auto& fanin_0 = current_node_view->GetRegularFanin(0);
+      current_node_view = fanin_0.node_view();
+
+      return IsPad(*current_node_view->node());
+    }
+
+    return false;
+  };
+
+  return is_batch_norm_candidate() || is_batch_norm_fusion_candidate() ||
+         is_pad_conv2d_fusion_candidate();
 }
 
 }  // namespace
@@ -1837,6 +1891,17 @@ Status Remapper::Optimize(Cluster* cluster, const GrapplerItem& item,
       }
     }
 #endif  //! INTEL_MKL
+
+    // Infer properties lazily in case they are not needed.
+    if (!ctx.inferred_graph_properties && RequiresInferredShapes(ctx, i)) {
+      const bool assume_valid_feeds = opt_level_ == RewriterConfig::AGGRESSIVE;
+      TF_RETURN_IF_ERROR(ctx.graph_properties.InferStatically(
+          assume_valid_feeds,
+          /*aggressive_shape_inference=*/false,
+          /*include_input_tensor_values=*/true,
+          /*include_output_tensor_values=*/false));
+      ctx.inferred_graph_properties = true;
+    }
 
     // Remap Pad + Conv2D into Conv2D with explicit padding
     PadWithConv2D pad_with_conv_2d;
@@ -1906,17 +1971,6 @@ Status Remapper::Optimize(Cluster* cluster, const GrapplerItem& item,
       continue;
     }
 #endif  // !INTEL_MKL
-
-    // Infer properties lazily in case they are not needed.
-    if (!ctx.inferred_graph_properties && RequiresInferredShapes(ctx, i)) {
-      const bool assume_valid_feeds = opt_level_ == RewriterConfig::AGGRESSIVE;
-      TF_RETURN_IF_ERROR(ctx.graph_properties.InferStatically(
-          assume_valid_feeds,
-          /*aggressive_shape_inference=*/false,
-          /*include_input_tensor_values=*/true,
-          /*include_output_tensor_values=*/false));
-      ctx.inferred_graph_properties = true;
-    }
 
     // Remap FusedBatchNorm+<SideInput>+<Activation> into the _FusedBatchNormEx.
     FusedBatchNormEx fused_batch_norm_ex;

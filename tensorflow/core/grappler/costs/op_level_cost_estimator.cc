@@ -16,7 +16,10 @@ limitations under the License.
 
 #include "tensorflow/core/grappler/costs/op_level_cost_estimator.h"
 
+#if TENSORFLOW_USE_DIRECTML
 #include "tensorflow/core/common_runtime/dml/dml_adapter_heuristics.h"
+#endif
+
 #include "tensorflow/core/framework/attr_value.pb.h"
 #include "tensorflow/core/framework/attr_value_util.h"
 #include "tensorflow/core/framework/tensor.pb.h"
@@ -529,10 +532,13 @@ DeviceInfo OpLevelCostEstimator::GetDeviceInfo(
     } else {
       gb_per_sec = 100;
     }
-  } else if (device.type() == "DML") {
+  }
+#ifdef TENSORFLOW_USE_DIRECTML
+  else if (device.type() == "DML") {
     gflops = DmlAdapterArchetype::kComputeFlops / 1e9;
     gb_per_sec = device.bandwidth() / 1e6;
   }
+#endif
   VLOG(1) << "Device: " << device.type() << " gflops: " << gflops
           << " gb_per_sec: " << gb_per_sec;
 

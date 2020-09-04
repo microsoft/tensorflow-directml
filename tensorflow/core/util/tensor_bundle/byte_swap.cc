@@ -17,6 +17,10 @@ limitations under the License.
 
 #include "tensorflow/core/lib/core/status.h"
 
+#ifdef PLATFORM_WINDOWS
+#pragma comment(lib, "Ws2_32.lib")
+#endif
+
 namespace tensorflow {
 
 Status ByteSwapArray(char* array, size_t bytes_per_elem, int array_len) {
