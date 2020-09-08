@@ -110,8 +110,10 @@ Status DmlCommandRecorder::InitializeOperator(
   // are used.
   if ((persistent_resource_binding.Type != DML_BINDING_TYPE_NONE) ||
       (temporary_resource_size > 0)) {
-    auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-    current_command_list_->ResourceBarrier(1, &barrier);
+    D3D12_RESOURCE_BARRIER barriers[] = {
+        CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+        CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+    current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
   }
 
   return Status::OK();
@@ -176,8 +178,10 @@ Status DmlCommandRecorder::ExecuteOperator(
   OnCommandRecorded();
 
   // Barrier all outputs.
-  auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-  current_command_list_->ResourceBarrier(1, &barrier);
+  D3D12_RESOURCE_BARRIER barriers[] = {
+      CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+      CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+  current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
 
   return Status::OK();
 }
@@ -256,8 +260,10 @@ void DmlCommandRecorder::FillBufferWithPattern(
   OnCommandRecorded();
 
   // Barrier all outputs.
-  auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-  current_command_list_->ResourceBarrier(1, &barrier);
+  D3D12_RESOURCE_BARRIER barriers[] = {
+      CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+      CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+  current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
 }
 
 void DmlCommandRecorder::ExecuteCommandList(

@@ -44,7 +44,7 @@ DmlGpuEvent DmlExecutionContextImpl::CopyBufferRegion(
 
   SetCommandRecorder(&dml_recorder_);
 
-  std::vector<D3D12_RESOURCE_BARRIER> barriers;
+  absl::InlinedVector<D3D12_RESOURCE_BARRIER, 3> barriers;
 
   if (!(dst_state & D3D12_RESOURCE_STATE_COPY_DEST)) {
     barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
@@ -63,13 +63,14 @@ DmlGpuEvent DmlExecutionContextImpl::CopyBufferRegion(
                                  byte_count);
 
   // Reset barrier state
-  if (!barriers.empty()) {
-    for (auto& barrier : barriers) {
-      std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
-    }
-
-    dml_recorder_.ResourceBarrier(barriers);
+  for (auto& barrier : barriers) {
+    std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
   }
+
+  // Since we modified GPU memory, perform an aliasing barrier
+  barriers.push_back(CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr));
+
+  dml_recorder_.ResourceBarrier(barriers);
 
   return GetCurrentCompletionEvent();
 }
