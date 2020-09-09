@@ -104,15 +104,18 @@ Status DmlCommandRecorder::InitializeOperator(
   SetDescriptorHeap(descriptor_range.heap);
   recorder_->RecordDispatch(current_command_list_.Get(), initializer_.Get(),
                             binding_table.Get());
-  OnCommandRecorded();
 
   // Barrier if there's an output (i.e. persistent resource), or if any temps
   // are used.
   if ((persistent_resource_binding.Type != DML_BINDING_TYPE_NONE) ||
       (temporary_resource_size > 0)) {
-    auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-    current_command_list_->ResourceBarrier(1, &barrier);
+    D3D12_RESOURCE_BARRIER barriers[] = {
+        CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+        CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+    current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
   }
+
+  OnCommandRecorded();
 
   return Status::OK();
 }
@@ -173,22 +176,51 @@ Status DmlCommandRecorder::ExecuteOperator(
   SetDescriptorHeap(descriptor_range.heap);
   recorder_->RecordDispatch(current_command_list_.Get(), op,
                             binding_table.Get());
-  OnCommandRecorded();
 
   // Barrier all outputs.
-  auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-  current_command_list_->ResourceBarrier(1, &barrier);
+  D3D12_RESOURCE_BARRIER barriers[] = {
+      CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+      CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+  current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
+
+  OnCommandRecorded();
 
   return Status::OK();
 }
 
-void DmlCommandRecorder::CopyBufferRegion(ID3D12Resource* dst_buffer,
-                                          uint64_t dst_offset,
-                                          ID3D12Resource* src_buffer,
-                                          uint64_t src_offset,
-                                          uint64_t byte_count) {
+void DmlCommandRecorder::CopyBufferRegion(
+    ID3D12Resource* dst_buffer, uint64_t dst_offset,
+    D3D12_RESOURCE_STATES dst_state, ID3D12Resource* src_buffer,
+    uint64_t src_offset, D3D12_RESOURCE_STATES src_state, uint64_t byte_count) {
+  absl::InlinedVector<D3D12_RESOURCE_BARRIER, 3> barriers;
+
+  if (!(dst_state & D3D12_RESOURCE_STATE_COPY_DEST)) {
+    barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+        dst_buffer, dst_state, D3D12_RESOURCE_STATE_COPY_DEST));
+  }
+  if (!(src_state & D3D12_RESOURCE_STATE_COPY_SOURCE)) {
+    barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+        src_buffer, src_state, D3D12_RESOURCE_STATE_COPY_SOURCE));
+  }
+
+  if (!barriers.empty()) {
+    current_command_list_->ResourceBarrier(barriers.size(), barriers.data());
+  }
+
   current_command_list_->CopyBufferRegion(dst_buffer, dst_offset, src_buffer,
                                           src_offset, byte_count);
+
+  // Reset barrier state
+  for (auto& barrier : barriers) {
+    std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
+  }
+
+  // Since this copy may write to GPU memory, we also need to perform an
+  // aliasing barrier
+  barriers.push_back(CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr));
+
+  current_command_list_->ResourceBarrier(barriers.size(), barriers.data());
+
   OnCommandRecorded();
 }
 
@@ -253,11 +285,14 @@ void DmlCommandRecorder::FillBufferWithPattern(
   current_command_list_->ClearUnorderedAccessViewUint(
       descriptor_range_gpu.gpu_handle, descriptor_range_cpu.cpu_handle, dst,
       fillPattern.integers, 0, nullptr);
-  OnCommandRecorded();
 
   // Barrier all outputs.
-  auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-  current_command_list_->ResourceBarrier(1, &barrier);
+  D3D12_RESOURCE_BARRIER barriers[] = {
+      CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+      CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+  current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
+
+  OnCommandRecorded();
 }
 
 void DmlCommandRecorder::ExecuteCommandList(

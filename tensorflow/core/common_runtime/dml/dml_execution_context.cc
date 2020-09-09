@@ -43,34 +43,8 @@ DmlGpuEvent DmlExecutionContextImpl::CopyBufferRegion(
   assert(!closed_);
 
   SetCommandRecorder(&dml_recorder_);
-
-  std::vector<D3D12_RESOURCE_BARRIER> barriers;
-
-  if (!(dst_state & D3D12_RESOURCE_STATE_COPY_DEST)) {
-    barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
-        dst_buffer, dst_state, D3D12_RESOURCE_STATE_COPY_DEST));
-  }
-  if (!(src_state & D3D12_RESOURCE_STATE_COPY_SOURCE)) {
-    barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
-        src_buffer, src_state, D3D12_RESOURCE_STATE_COPY_SOURCE));
-  }
-
-  if (!barriers.empty()) {
-    dml_recorder_.ResourceBarrier(barriers);
-  }
-
-  dml_recorder_.CopyBufferRegion(dst_buffer, dst_offset, src_buffer, src_offset,
-                                 byte_count);
-
-  // Reset barrier state
-  if (!barriers.empty()) {
-    for (auto& barrier : barriers) {
-      std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
-    }
-
-    dml_recorder_.ResourceBarrier(barriers);
-  }
-
+  dml_recorder_.CopyBufferRegion(dst_buffer, dst_offset, dst_state, src_buffer,
+                                 src_offset, src_state, byte_count);
   return GetCurrentCompletionEvent();
 }
 
@@ -78,6 +52,7 @@ DmlGpuEvent DmlExecutionContextImpl::FillBufferWithPattern(
     ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
     absl::Span<const uint8_t>
         value /* Data type agnostic value, treated as raw bits */) {
+  assert(!closed_);
   SetCommandRecorder(&dml_recorder_);
   dml_recorder_.FillBufferWithPattern(dst, dst_offset, dst_size_in_bytes,
                                       value);
