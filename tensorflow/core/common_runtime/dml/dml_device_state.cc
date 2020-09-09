@@ -70,7 +70,7 @@ namespace tensorflow {
   D3D12_COMMAND_QUEUE_DESC command_queue_desc = {};
   command_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
   command_queue_desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
-  command_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+  command_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT;
   command_queue_desc.NodeMask = 0;
 
   ComPtr<ID3D12CommandQueue> command_queue;
