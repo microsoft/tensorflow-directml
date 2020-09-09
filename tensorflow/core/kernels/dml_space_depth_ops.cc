@@ -191,8 +191,7 @@ class DmlSpaceDepthKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     if (Is64BitIntegerType(output->dtype())) {
-      TF_RETURN_IF_ERROR(
-          ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output)).status());
+      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
 
     return DmlKernel::Compute(ctx);

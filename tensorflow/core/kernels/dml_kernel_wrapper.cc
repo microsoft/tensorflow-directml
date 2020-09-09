@@ -91,12 +91,9 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
               dml_util::CreateBufferForTensor(dml_device, *output_tensor);
 
           const uint8_t fill_pattern[] = {0};
-          auto status_or_event =
-              dml_device->GetExecutionContext()->FillBufferWithPattern(
-                  buffer.Resource(), buffer.Offset(), buffer.SizeInBytes(),
-                  fill_pattern);
-
-          OP_REQUIRES_OK(ctx, status_or_event.status());
+          dml_device->GetExecutionContext()->FillBufferWithPattern(
+              buffer.Resource(), buffer.Offset(), buffer.SizeInBytes(),
+              fill_pattern);
         }
       }
       return;

@@ -71,8 +71,7 @@ class DmlCastKernel : public DmlKernel {
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
-      TF_RETURN_IF_ERROR(
-          ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output)).status());
+      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
 
     return DmlKernel::Compute(ctx);

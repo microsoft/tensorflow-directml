@@ -83,16 +83,16 @@ void DMLDeviceContext::CopyTensorInSameDevice(const Tensor* input_tensor,
       D3D12_RESOURCE_STATE_UNORDERED_ACCESS;  // GPU resources are always kept
                                               // in UAV state
 
-  auto status_or_event = execution_context_->CopyBufferRegion(
-      dst_data, dst_offset, dst_state, src_data, src_offset, src_state,
-      total_bytes);
+  (void)execution_context_->CopyBufferRegion(dst_data, dst_offset, dst_state,
+                                             src_data, src_offset, src_state,
+                                             total_bytes);
 
   // Immediately signal completion even though we haven't actually kicked off
   // the GPU, or waited for it to complete. This is because from the framework's
   // point of view, there's no way for it to observe this state (except when
   // copying a tensor back to CPU, at which point we correctly flush and queue a
   // callback)
-  done(status_or_event.status());
+  done(Status::OK());
 }
 
 void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,

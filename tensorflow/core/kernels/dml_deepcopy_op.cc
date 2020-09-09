@@ -51,23 +51,21 @@ class DmlDeepCopyKernel : public OpKernel {
             D3D12_RESOURCE_STATE_COPY_DEST),
     };
 
-    OP_REQUIRES_OK(ctx, execution_context->ResourceBarrier(barriers).status());
+    execution_context->ResourceBarrier(barriers);
 
     constexpr uint64_t dst_offset = 0;
     constexpr uint64_t src_offset = 0;
 
-    auto status_or_event = execution_context->CopyBufferRegion(
+    execution_context->CopyBufferRegion(
         output_buffer.Resource(), dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
         input_buffer.Resource(), src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
         input.TotalBytes());
-
-    OP_REQUIRES_OK(ctx, status_or_event.status());
 
     for (auto& barrier : barriers) {
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
     }
 
-    OP_REQUIRES_OK(ctx, execution_context->ResourceBarrier(barriers).status());
+    execution_context->ResourceBarrier(barriers);
   }
 };
 

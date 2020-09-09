@@ -149,12 +149,9 @@ class DmlCheckNumericsKernel : public DmlKernel {
       D3D12BufferRegion output_buffer =
           dml_util::CreateBufferForTensor(device, *output_tensor);
 
-      auto status_or_event = ctx->CopyBufferToBuffer(
-          output_buffer.Resource(), output_buffer.Offset(),
-          input_buffer.Resource(), input_buffer.Offset(),
-          output_tensor->TotalBytes());
-
-      TF_RETURN_IF_ERROR(status_or_event.status());
+      ctx->CopyBufferToBuffer(output_buffer.Resource(), output_buffer.Offset(),
+                              input_buffer.Resource(), input_buffer.Offset(),
+                              output_tensor->TotalBytes());
     }
 
     return ctx->GetCurrentCompletionEvent();

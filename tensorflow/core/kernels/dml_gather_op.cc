@@ -324,20 +324,19 @@ class DmlGatherKernel : public DmlKernel {
     D3D12BufferRegion output_buffers[] = {ctx->CreateBufferForTensor(*output)};
 
     if (Is64BitIntegerType(output->dtype())) {
-      TF_RETURN_IF_ERROR(ctx->ZeroBuffer(output_buffers[0]).status());
+      ctx->ZeroBuffer(output_buffers[0]);
     }
 
     // Create bindings
     auto input_bindings = dml_util::GetBufferBindings(input_buffers);
     auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
-    StatusOr<DmlGpuEvent> status_or_event =
+    DmlGpuEvent gpu_event =
         ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
                              input_bindings, output_bindings);
 
     init_helper->Unlock();
-    TF_RETURN_IF_ERROR(status_or_event.status());
-    return status_or_event.ConsumeValueOrDie();
+    return gpu_event;
   }
 };
 

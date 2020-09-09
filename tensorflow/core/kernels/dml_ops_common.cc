@@ -233,10 +233,8 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   // We don't supply any input bindings, because we never set OWNED_BY_DML
   absl::Span<const DML_BUFFER_BINDING> input_init_bindings = {};
 
-  Status status = ctx->InitializeOperator(
-      compiled_op_.Get(), GetPersistentResourceBinding(), input_init_bindings);
-
-  OP_REQUIRES_OK(ctx->GetOpKernelContext(), status);
+  ctx->InitializeOperator(compiled_op_.Get(), GetPersistentResourceBinding(),
+                          input_init_bindings);
 }
 
 StatusOr<DmlGpuEvent> DmlKernel::Compute(DmlKernelContext* ctx) const {

@@ -44,25 +44,23 @@ class DmlExecutionContextImpl {
   // for execution. Transition barriers are automatically inserted to transition
   // the source and destination resources to COPY_SOURCE and COPY_DEST if
   // necessary.
-  StatusOr<DmlGpuEvent> CopyBufferRegion(ID3D12Resource* dst_buffer,
-                                         uint64_t dst_offset,
-                                         D3D12_RESOURCE_STATES dst_state,
-                                         ID3D12Resource* src_buffer,
-                                         uint64_t src_offset,
-                                         D3D12_RESOURCE_STATES src_state,
-                                         uint64_t byte_count);
+  DmlGpuEvent CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
+                               D3D12_RESOURCE_STATES dst_state,
+                               ID3D12Resource* src_buffer, uint64_t src_offset,
+                               D3D12_RESOURCE_STATES src_state,
+                               uint64_t byte_count);
 
-  StatusOr<DmlGpuEvent> FillBufferWithPattern(
+  DmlGpuEvent FillBufferWithPattern(
       ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
       absl::Span<const uint8_t>
           value /* Data type agnostic value, treated as raw bits */);
 
-  StatusOr<DmlGpuEvent> InitializeOperator(
+  DmlGpuEvent InitializeOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
       const DML_BINDING_DESC& input_array_binding);
 
-  StatusOr<DmlGpuEvent> ExecuteOperator(
+  DmlGpuEvent ExecuteOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
       absl::Span<const DML_BINDING_DESC> input_bindings,
@@ -72,7 +70,7 @@ class DmlExecutionContextImpl {
                                  _Outptr_ ID3D12Fence** fence,
                                  _Out_ uint64_t* completion_value);
 
-  StatusOr<DmlGpuEvent> ResourceBarrier(
+  DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
   // Forces all queued work to begin executing on the GPU. This method returns
@@ -90,7 +88,7 @@ class DmlExecutionContextImpl {
  private:
   Microsoft::WRL::ComPtr<ID3D12Device> d3d_device_;
 
-  Status SetCommandRecorder(DmlCommandRecorder* new_recorder);
+  void SetCommandRecorder(DmlCommandRecorder* new_recorder);
 
   std::shared_ptr<DmlCommandQueue> queue_;
 
@@ -113,29 +111,26 @@ class DmlExecutionContext {
     impl_->Close();
   }
 
-  StatusOr<DmlGpuEvent> CopyBufferRegion(ID3D12Resource* dst_buffer,
-                                         uint64_t dst_offset,
-                                         D3D12_RESOURCE_STATES dst_state,
-                                         ID3D12Resource* src_buffer,
-                                         uint64_t src_offset,
-                                         D3D12_RESOURCE_STATES src_state,
-                                         uint64_t byte_count) {
+  DmlGpuEvent CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
+                               D3D12_RESOURCE_STATES dst_state,
+                               ID3D12Resource* src_buffer, uint64_t src_offset,
+                               D3D12_RESOURCE_STATES src_state,
+                               uint64_t byte_count) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->CopyBufferRegion(dst_buffer, dst_offset, dst_state,
                                    src_buffer, src_offset, src_state,
                                    byte_count);
   }
 
-  StatusOr<DmlGpuEvent> FillBufferWithPattern(ID3D12Resource* dst,
-                                              uint64_t dst_offset,
-                                              uint64_t dst_size_in_bytes,
-                                              absl::Span<const uint8_t> value) {
+  DmlGpuEvent FillBufferWithPattern(ID3D12Resource* dst, uint64_t dst_offset,
+                                    uint64_t dst_size_in_bytes,
+                                    absl::Span<const uint8_t> value) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->FillBufferWithPattern(dst, dst_offset, dst_size_in_bytes,
                                         value);
   }
 
-  StatusOr<DmlGpuEvent> InitializeOperator(
+  DmlGpuEvent InitializeOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
       const DML_BINDING_DESC& input_array_binding) {
@@ -144,7 +139,7 @@ class DmlExecutionContext {
                                      input_array_binding);
   }
 
-  StatusOr<DmlGpuEvent> ExecuteOperator(
+  DmlGpuEvent ExecuteOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
       absl::Span<const DML_BINDING_DESC> input_bindings,
@@ -161,7 +156,7 @@ class DmlExecutionContext {
     return impl_->ExecuteCommandList(command_list, fence, completion_value);
   }
 
-  StatusOr<DmlGpuEvent> ResourceBarrier(
+  DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->ResourceBarrier(barriers);

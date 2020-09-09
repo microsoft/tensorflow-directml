@@ -198,18 +198,11 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     auto byte_span =
         absl::MakeSpan(byte_ptr, input_state_.size() * sizeof(input_state_[0]));
 
-    StatusOr<DmlGpuEvent> status_or_event = ctx->CopyHostToBuffer(
-        input_state_buffer.Resource(), input_state_buffer.Offset(), byte_span);
+    ctx->CopyHostToBuffer(input_state_buffer.Resource(),
+                          input_state_buffer.Offset(), byte_span);
 
-    TF_RETURN_IF_ERROR(status_or_event.status());
-
-    status_or_event =
-        ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                             input_bindings, output_bindings);
-
-    TF_RETURN_IF_ERROR(status_or_event.status());
-
-    return status_or_event;
+    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
+                                input_bindings, output_bindings);
   }
 };
 
@@ -357,18 +350,11 @@ class DmlRandomUniformKernel : public DmlKernel {
     auto byte_span =
         absl::MakeSpan(byte_ptr, state_buf.size() * sizeof(state_buf[0]));
 
-    StatusOr<DmlGpuEvent> status_or_event = ctx->CopyHostToBuffer(
-        state_buffer_->Resource(), state_buffer_->Offset(), byte_span);
+    ctx->CopyHostToBuffer(state_buffer_->Resource(), state_buffer_->Offset(),
+                          byte_span);
 
-    TF_RETURN_IF_ERROR(status_or_event.status());
-
-    status_or_event =
-        ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                             input_bindings, output_bindings);
-
-    TF_RETURN_IF_ERROR(status_or_event.status());
-
-    return status_or_event;
+    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
+                                input_bindings, output_bindings);
   }
 };
 

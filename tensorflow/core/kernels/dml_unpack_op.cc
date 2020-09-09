@@ -152,8 +152,7 @@ class DmlUnpackKernel : public DmlKernel {
       Tensor* output = ctx->GetOutputTensor(i);
 
       if (Is64BitIntegerType(output->dtype())) {
-        TF_RETURN_IF_ERROR(
-            ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output)).status());
+        ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
       }
     }
 

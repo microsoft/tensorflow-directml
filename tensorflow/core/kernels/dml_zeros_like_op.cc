@@ -38,11 +38,9 @@ class DmlZerosLikeKernel : public OpKernel {
 
     uint8_t pattern[] = {0};
 
-    auto status_or_event = device->GetExecutionContext()->FillBufferWithPattern(
+    device->GetExecutionContext()->FillBufferWithPattern(
         output_buffer.Resource(), output_buffer.Offset(),
         output_buffer.SizeInBytes(), pattern);
-
-    OP_REQUIRES_OK(ctx, status_or_event.status());
   }
 };
 

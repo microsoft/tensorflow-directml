@@ -131,8 +131,7 @@ class DmlDynamicStitchKernel : public OpKernel {
         output_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
         D3D12_RESOURCE_STATE_COPY_DEST));
 
-    OP_REQUIRES_OK(
-        ctx, device->GetExecutionContext()->ResourceBarrier(barriers).status());
+    device->GetExecutionContext()->ResourceBarrier(barriers);
 
     DCHECK(indices_inputs.size() == data_inputs.size());
     for (int tensor_idx = 0; tensor_idx < indices_inputs.size(); ++tensor_idx) {
@@ -154,12 +153,10 @@ class DmlDynamicStitchKernel : public OpKernel {
         const uint64_t dst_offset =
             output_buffer.Offset() + byte_stride * output_idx;
 
-        auto status_or_event = device->GetExecutionContext()->CopyBufferRegion(
+        device->GetExecutionContext()->CopyBufferRegion(
             output_buffer.Resource(), dst_offset,
             D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
             D3D12_RESOURCE_STATE_COPY_SOURCE, byte_stride);
-
-        OP_REQUIRES_OK(ctx, status_or_event.status());
       }
     }
 
@@ -167,8 +164,7 @@ class DmlDynamicStitchKernel : public OpKernel {
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
     }
 
-    OP_REQUIRES_OK(
-        ctx, device->GetExecutionContext()->ResourceBarrier(barriers).status());
+    device->GetExecutionContext()->ResourceBarrier(barriers);
   }
 };
 

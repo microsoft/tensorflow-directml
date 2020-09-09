@@ -61,11 +61,9 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
   // Copy from the source resource into the readback heap. `gpu_done_event` is
   // the event that will be signaled when the copy to the readback heap
   // completes on the GPU.
-  auto status_or_event = execution_context_->CopyBufferRegion(
+  DmlGpuEvent gpu_done_event = execution_context_->CopyBufferRegion(
       readback_heap, offset_in_chunk, D3D12_RESOURCE_STATE_COPY_DEST, src,
       src_offset, src_state, dst.size());
-
-  TF_RETURN_IF_ERROR(status_or_event.status());
 
   // Get the event which will become signaled once the readback into `dst` has
   // fully completed on the CPU.
@@ -93,7 +91,7 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
   // Enqueue the done_callback to fire once the copy from src -> readback_heap
   // completes on the GPU. The callback will then perform the copy
   // readback_heap -> dst.
-  event_queue_->Enqueue(status_or_event.ConsumeValueOrDie(), done_callback);
+  event_queue_->Enqueue(gpu_done_event, done_callback);
   return done_event;
 }
 

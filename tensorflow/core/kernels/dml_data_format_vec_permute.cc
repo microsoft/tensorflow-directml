@@ -96,7 +96,7 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
             D3D12_RESOURCE_STATE_COPY_DEST),
     };
 
-    OP_REQUIRES_OK(ctx, execution_context->ResourceBarrier(barriers).status());
+    execution_context->ResourceBarrier(barriers);
 
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
@@ -110,11 +110,9 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
     // most likely garbage data
     if (is_64_bit_int) {
       const uint8_t pattern[] = {0};
-      auto status_or_event = execution_context->FillBufferWithPattern(
+      execution_context->FillBufferWithPattern(
           output_buffer.Resource(), output_buffer.Offset(),
           output_buffer.SizeInBytes(), pattern);
-
-      OP_REQUIRES_OK(ctx, status_or_event.status());
     }
 
     for (uint32_t i = 0; i < permutations_.size(); ++i) {
@@ -125,27 +123,21 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
       // For int64 data types, we need to do 2 to separate copies for 2D tensors
       // in order to skip the garbage data between elements
       if (is_64_bit_int && input.dims() == 2) {
-        auto status_or_event = execution_context->CopyBufferRegion(
+        execution_context->CopyBufferRegion(
             output_buffer.Resource(), dst_offset,
             D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
             D3D12_RESOURCE_STATE_COPY_SOURCE, permutation_size / 2);
 
-        OP_REQUIRES_OK(ctx, status_or_event.status());
-
-        status_or_event = execution_context->CopyBufferRegion(
+        execution_context->CopyBufferRegion(
             output_buffer.Resource(), dst_offset + permutation_size,
             D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(),
             src_offset + permutation_size, D3D12_RESOURCE_STATE_COPY_SOURCE,
             permutation_size / 2);
-
-        OP_REQUIRES_OK(ctx, status_or_event.status());
       } else {
-        auto status_or_event = execution_context->CopyBufferRegion(
+        execution_context->CopyBufferRegion(
             output_buffer.Resource(), dst_offset,
             D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
             D3D12_RESOURCE_STATE_COPY_SOURCE, permutation_size);
-
-        OP_REQUIRES_OK(ctx, status_or_event.status());
       }
     }
 
@@ -153,7 +145,7 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
     }
 
-    OP_REQUIRES_OK(ctx, execution_context->ResourceBarrier(barriers).status());
+    execution_context->ResourceBarrier(barriers);
   }
 
  private:

@@ -239,10 +239,8 @@ class DmlTrainingKernel : public DmlKernel {
 
     assert(output_bindings.size() == variable_tensor_indices.size());
 
-    StatusOr<DmlGpuEvent> status_or_event =
+    DmlGpuEvent gpu_event =
         ExecuteOperator(ctx, input_bindings, output_bindings);
-
-    TF_RETURN_IF_ERROR(status_or_event.status());
 
     if (!inplace_allowed_) {
       // Copy the intermediate buffers back to their respective inputs.
@@ -259,21 +257,18 @@ class DmlTrainingKernel : public DmlKernel {
             output_bindings[output_index]->Buffer;
         uint64_t intermediate_offset = output_bindings[output_index]->Offset;
 
-        status_or_event = ctx->CopyBufferToBuffer(
-            input_buffer, input_offset, intermediate_buffer,
-            intermediate_offset, output_bindings[output_index]->SizeInBytes);
-
-        TF_RETURN_IF_ERROR(status_or_event.status());
+        ctx->CopyBufferToBuffer(input_buffer, input_offset, intermediate_buffer,
+                                intermediate_offset,
+                                output_bindings[output_index]->SizeInBytes);
       }
 
-      status_or_event = ctx->InsertUavBarrier();
-      TF_RETURN_IF_ERROR(status_or_event.status());
+      gpu_event = ctx->InsertUavBarrier();
     }
 
-    return status_or_event;
+    return gpu_event;
   }
 
-  StatusOr<DmlGpuEvent> ExecuteOperator(
+  DmlGpuEvent ExecuteOperator(
       DmlKernelContext* ctx,
       absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
       absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings)

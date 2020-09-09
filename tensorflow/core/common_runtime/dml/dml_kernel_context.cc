@@ -65,7 +65,7 @@ D3D12BufferRegion DmlKernelConstruction::CreateBufferForTensor(
   return dml_util::CreateBufferForTensor(device_, tensor);
 }
 
-Status DmlKernelConstruction::InitializeOperator(
+void DmlKernelConstruction::InitializeOperator(
     IDMLCompiledOperator* op,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
     absl::Span<const DML_BUFFER_BINDING> input_bindings) {
@@ -86,9 +86,8 @@ Status DmlKernelConstruction::InitializeOperator(
     input_binding_desc = {DML_BINDING_TYPE_BUFFER_ARRAY, &input_array_binding};
   }
 
-  return device_->GetExecutionContext()
-      ->InitializeOperator(op, persistent_binding_desc, input_binding_desc)
-      .status();
+  device_->GetExecutionContext()->InitializeOperator(
+      op, persistent_binding_desc, input_binding_desc);
 }
 
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {
@@ -183,7 +182,7 @@ D3D12BufferRegion DmlKernelContext::CreateBufferForTensor(
   return dml_util::CreateBufferForTensor(device_, tensor);
 }
 
-StatusOr<DmlGpuEvent> DmlKernelContext::ExecuteOperator(
+DmlGpuEvent DmlKernelContext::ExecuteOperator(
     IDMLCompiledOperator* op,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
     absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
@@ -225,9 +224,11 @@ DmlGpuEvent DmlKernelContext::GetCurrentCompletionEvent() const {
   return device_->GetExecutionContext()->GetCurrentCompletionEvent();
 }
 
-StatusOr<DmlGpuEvent> DmlKernelContext::CopyBufferToBuffer(
-    ID3D12Resource* dst, uint64_t dst_offset, ID3D12Resource* src,
-    uint64_t src_offset, uint64 size_in_bytes) const {
+DmlGpuEvent DmlKernelContext::CopyBufferToBuffer(ID3D12Resource* dst,
+                                                 uint64_t dst_offset,
+                                                 ID3D12Resource* src,
+                                                 uint64_t src_offset,
+                                                 uint64 size_in_bytes) const {
   return device_->GetExecutionContext()->CopyBufferRegion(
       dst, dst_offset, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, src, src_offset,
       D3D12_RESOURCE_STATE_UNORDERED_ACCESS, size_in_bytes);
@@ -240,26 +241,25 @@ StatusOr<DmlGpuEvent> DmlKernelContext::CopyHostToBuffer(
       dst, dst_offset, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, src);
 }
 
-StatusOr<DmlGpuEvent> DmlKernelContext::ZeroBuffer(
-    ID3D12Resource* dst, uint64_t offset, uint64_t size_in_bytes) const {
+DmlGpuEvent DmlKernelContext::ZeroBuffer(ID3D12Resource* dst, uint64_t offset,
+                                         uint64_t size_in_bytes) const {
   uint8_t pattern[] = {0};
   return device_->GetExecutionContext()->FillBufferWithPattern(
       dst, offset, size_in_bytes, pattern);
 }
 
-StatusOr<DmlGpuEvent> DmlKernelContext::ZeroBuffer(
-    const D3D12BufferRegion& dst) const {
+DmlGpuEvent DmlKernelContext::ZeroBuffer(const D3D12BufferRegion& dst) const {
   return ZeroBuffer(dst.Resource(), dst.Offset(), dst.SizeInBytes());
 }
 
-StatusOr<DmlGpuEvent> DmlKernelContext::InsertUavBarrier() const {
+DmlGpuEvent DmlKernelContext::InsertUavBarrier() const {
   D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
 
   return device_->GetExecutionContext()->ResourceBarrier(
       absl::Span<D3D12_RESOURCE_BARRIER>(&barrier, 1));
 }
 
-StatusOr<DmlGpuEvent> DmlKernelContext::FillBufferWithPattern(
+DmlGpuEvent DmlKernelContext::FillBufferWithPattern(
     ID3D12Resource* dst, uint64_t offset, uint64_t size_in_bytes,
     absl::Span<const uint8_t> pattern) const {
   return device_->GetExecutionContext()->FillBufferWithPattern(
