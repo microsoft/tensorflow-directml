@@ -2718,7 +2718,6 @@ tf_kernel_library(
         "@com_google_absl//absl/strings",
     ] + if_dml(["//tensorflow/core/common_runtime/dml:dml_runtime"]),
     copts = tf_copts() + if_not_windows([
-        "-fms-extensions", 
         "-Ithird_party/dml/winadapter",
     ]) + if_windows([
         "-DDML_BUILD_WINDOWS",
@@ -8144,7 +8143,6 @@ tf_kernel_library(
         ":fused_batch_norm_op",
     ],
     copts = tf_copts() + if_not_windows([
-        "-fms-extensions", 
         "-Ithird_party/dml/winadapter",
     ]) + if_windows([
         "-DDML_BUILD_WINDOWS",

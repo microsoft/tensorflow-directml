@@ -24,7 +24,6 @@ cc_library(
     visibility = ["//visibility:public"],
     
     copts = tf_copts() + if_not_windows([
-        "-fms-extensions", 
         "-Ithird_party/dml/winadapter",
     ]) + if_windows([
         "-DDML_BUILD_WINDOWS",
@@ -108,7 +107,6 @@ cc_library(
     visibility = ["//visibility:public"],
     
     copts = tf_copts() + if_not_windows([
-        "-fms-extensions", 
         "-Ithird_party/dml/winadapter",
     ]) + if_windows([
         "-DDML_BUILD_WINDOWS",
@@ -132,7 +130,6 @@ tf_dml_cc_test(
         "//tensorflow/core/kernels:stateless_random_ops",
     ],
     extra_copts = if_not_windows([
-        "-fms-extensions", 
         "-Ithird_party/dml/winadapter",
     ]) + if_windows([
         "-DDML_BUILD_WINDOWS",
