@@ -215,9 +215,6 @@ void DmlCommandRecorder::CopyBufferRegion(
     std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
   }
 
-  D3D12_HEAP_PROPERTIES dst_heap_props;
-  DML_CHECK_SUCCEEDED(dst_buffer->GetHeapProperties(&dst_heap_props, nullptr));
-
   // Since this copy may write to GPU memory, we also need to perform an
   // aliasing barrier
   barriers.push_back(CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr));
