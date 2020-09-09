@@ -278,6 +278,8 @@ void DmlCommandRecorder::ExecuteCommandList(
     return;
   }
 
+  DML_CHECK_SUCCEEDED(hr);
+
   if (operations_recorded_in_current_command_list_ != 0) {
     pending_command_lists_.push_back(current_command_list_.Get());
     pending_command_lists_cacheable_.push_back(true);
