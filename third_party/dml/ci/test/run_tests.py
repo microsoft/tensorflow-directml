@@ -8,6 +8,9 @@ import argparse
 import os
 import json
 import sys
+import glob
+from zipfile import ZipFile
+from tempfile import TemporaryDirectory
 from conda_helpers import CondaEnv
 
 def _parse_args():
@@ -69,7 +72,22 @@ def main():
         for flag in json_test_group["flags"]:
           command_line.append(flag)
 
-      conda_env.run(command_line)
+      if not is_python_test and args.tensorflow_wheel is not None:
+        # .whl files are simple zip files, so we can extract DirectML.dll from
+        # it
+        with TemporaryDirectory() as temp_dir:
+          with ZipFile(args.tensorflow_wheel, 'r') as zip_wheel:
+            zip_wheel.extractall(temp_dir)
+
+          # Rename the DLL to DirectML.dll since TF_DIRECTML_PATH only works
+          # with that name
+          dll_folder = f"{temp_dir}/_solib_directml"
+          old_dll_path = glob.glob(f"{dll_folder}/DirectML*.dll")[0]
+          new_dll_path = f"{dll_folder}/DirectML.dll"
+          os.rename(old_dll_path, new_dll_path)
+          conda_env.run(command_line, {"TF_DIRECTML_PATH": dll_folder})
+      else:
+        conda_env.run(command_line)
 
 if __name__ == "__main__":
   main()
