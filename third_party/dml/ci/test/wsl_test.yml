@@ -8,7 +8,7 @@
 # - (required) AgentPool : name of the ADO agent pool to test.
 # - (required) TestGroups : comma-separated list of test groups to test. e.g. 'python,core'
 # - (required) Artifacts : comma-separated list of build artifacts to test. e.g. 'x64-win-release-cp36'
-# - (required) BuildBranch : branch to fetch the build artifacts from. e.g. 'directml'
+# - (required) BuildArtifactsBranch : branch to fetch the build artifacts from. e.g. 'directml'
 # - (optional) EmailTo : email address to receive generated HTML report. If empty, no email is sent.
 
 name: $(Date:yyMMdd-HHmm)$(Rev:.r).$(SourceBranchName).wsl
@@ -44,7 +44,7 @@ jobs:
         -ArtifactDirectory "$(System.ArtifactsDirectory)"
         -TestGroups "$(TestGroups)"
         -TestArtifacts "$(Artifacts)"
-        -BuildArtifcatsBranch "$(BuildArtifcatsBranch)"
+        -BuildArtifactsBranch "$(BuildArtifactsBranch)"
 
   - task: PublishTestResults@2
     displayName: Publish Test Results
