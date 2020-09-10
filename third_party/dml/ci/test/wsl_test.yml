@@ -43,6 +43,7 @@ jobs:
         -ArtifactDirectory "$(System.ArtifactsDirectory)"
         -TestGroups "$(TestGroups)"
         -TestArtifacts "$(Artifacts)"
+        -BuildBranch "$(BuildBranch)"
 
   - task: PublishTestResults@2
     displayName: Publish Test Results
