@@ -101,18 +101,17 @@ foreach ($TestArtifact in $TestArtifacts)
 
         # This is the directory we'll be copying the test results back to at the end
         New-Item -Path $ArtifactDirectory -Name $TestArtifact -ItemType "directory"
-        $TestDirectory = wsl wslpath -w ("/tmp/$TestArtifact")
+        $WslArtifactFolderAsWin = wsl wslpath -w ("$WslArtifactFolder")
     }
     else
     {
         Expand-Archive $ArtifactDirectory\$TestArtifact.zip -DestinationPath $ArtifactDirectory
-        $TestDirectory = "$ArtifactDirectory\$TestArtifact"
     }
 
     # Run tests.
     try
     {
-        Push-Location "$TestDirectory"
+        Push-Location "$ArtifactDirectory\$TestArtifact"
 
         foreach ($TestGroup in $TestGroups)
         {
