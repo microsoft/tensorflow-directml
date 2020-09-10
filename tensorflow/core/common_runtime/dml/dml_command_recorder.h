@@ -43,8 +43,9 @@ class DmlCommandRecorder {
                        absl::Span<const DML_BINDING_DESC> output_bindings);
 
   void CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
+                        D3D12_RESOURCE_STATES dst_state,
                         ID3D12Resource* src_buffer, uint64_t src_offset,
-                        uint64_t byte_count);
+                        D3D12_RESOURCE_STATES src_state, uint64_t byte_count);
 
   void FillBufferWithPattern(
       ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
