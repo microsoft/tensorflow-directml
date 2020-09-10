@@ -7,7 +7,7 @@ param
     [string]$ArtifactDirectory = $env:System_ArtifactsDirectory,
     [Parameter(Mandatory=$true)][string[]]$TestGroups,
     [Parameter(Mandatory=$true)][string[]]$TestArtifacts,
-    [Parameter(Mandatory=$true)][string[]]$BuildBranch
+    [Parameter(Mandatory=$true)][string[]]$BuildArtifcatsBranch
 )
 
 # In case the caller passed in a single comma-separated string, such as 'models, python', instead of
@@ -31,7 +31,7 @@ $UriParameters = @(
     "`$top=1",
     "definitions=$BuildPipelineID",
     "queryOrder=queueTimeDescending",
-    "branchName=refs/heads/$BuildBranch",
+    "branchName=refs/heads/$BuildArtifcatsBranch",
     "statusFilter=completed",
     "resultFilter=succeeded",
     "api-version=5.0"
@@ -40,7 +40,7 @@ $UriParameters = @(
 $Build = $Ado.InvokeProjectApi("build/builds?$UriParameters", "GET", $null).Value
 if (!$Build)
 {
-    Write-Warning "Could not find last successful build of $BuildBranch branch."
+    Write-Warning "Could not find last successful build of $BuildArtifcatsBranch branch."
     exit 1
 }
 
