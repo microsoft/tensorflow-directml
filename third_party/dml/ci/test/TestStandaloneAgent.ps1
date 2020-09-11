@@ -5,8 +5,9 @@ param
 (
     [string]$AccessToken = $env:System_AccessToken,
     [string]$ArtifactDirectory = $env:System_ArtifactsDirectory,
-    [string[]]$TestGroups = @("models", "python", "core"),
-    [string[]]$TestArtifacts = "x64-linux-release"
+    [Parameter(Mandatory=$true)][string[]]$TestGroups,
+    [Parameter(Mandatory=$true)][string[]]$TestArtifacts,
+    [Parameter(Mandatory=$true)][string[]]$TestArtifactsBranch
 )
 
 # In case the caller passed in a single comma-separated string, such as 'models, python', instead of
@@ -30,7 +31,7 @@ $UriParameters = @(
     "`$top=1",
     "definitions=$BuildPipelineID",
     "queryOrder=queueTimeDescending",
-    "branchName=refs/heads/dml",
+    "branchName=refs/heads/$TestArtifactsBranch",
     "statusFilter=completed",
     "resultFilter=succeeded",
     "api-version=5.0"
@@ -39,7 +40,7 @@ $UriParameters = @(
 $Build = $Ado.InvokeProjectApi("build/builds?$UriParameters", "GET", $null).Value
 if (!$Build)
 {
-    Write-Warning "Could not find last successful build of dml branch."
+    Write-Warning "Could not find last successful build of $TestArtifactsBranch branch."
     exit 1
 }
 
@@ -100,6 +101,7 @@ foreach ($TestArtifact in $TestArtifacts)
 
         # This is the directory we'll be copying the test results back to at the end
         New-Item -Path $ArtifactDirectory -Name $TestArtifact -ItemType "directory"
+        $WslArtifactFolderAsWin = wsl wslpath -w ("$WslArtifactFolder")
     }
     else
     {
