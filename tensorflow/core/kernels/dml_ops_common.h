@@ -92,7 +92,7 @@ class DmlKernel {
   // Computes this kernel. By default, this simply submits the compiled DML
   // operator for execution. A DmlGpuEvent is returned which becomes signaled
   // when the kernel completes execution on the GPU. This method is thread-safe.
-  virtual DmlGpuEvent Compute(DmlKernelContext* ctx) const;
+  virtual StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const;
 
   absl::Span<const absl::optional<uint32_t>> GetOutputRefsForwarding() const {
     return output_refs_forwarding_;

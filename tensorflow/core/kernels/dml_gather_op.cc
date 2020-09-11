@@ -306,7 +306,7 @@ class DmlGatherKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -331,18 +331,12 @@ class DmlGatherKernel : public DmlKernel {
     auto input_bindings = dml_util::GetBufferBindings(input_buffers);
     auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
-    StatusOr<DmlGpuEvent> status_or_event =
+    DmlGpuEvent gpu_event =
         ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
                              input_bindings, output_bindings);
 
     init_helper->Unlock();
-
-    if (!status_or_event.ok()) {
-      ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-      return ctx->GetCurrentCompletionEvent();
-    }
-
-    return status_or_event.ConsumeValueOrDie();
+    return gpu_event;
   }
 };
 

@@ -233,13 +233,11 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   // We don't supply any input bindings, because we never set OWNED_BY_DML
   absl::Span<const DML_BUFFER_BINDING> input_init_bindings = {};
 
-  Status status = ctx->InitializeOperator(
-      compiled_op_.Get(), GetPersistentResourceBinding(), input_init_bindings);
-
-  OP_REQUIRES_OK(ctx->GetOpKernelContext(), status);
+  ctx->InitializeOperator(compiled_op_.Get(), GetPersistentResourceBinding(),
+                          input_init_bindings);
 }
 
-DmlGpuEvent DmlKernel::Compute(DmlKernelContext* ctx) const {
+StatusOr<DmlGpuEvent> DmlKernel::Compute(DmlKernelContext* ctx) const {
   auto input_buffers = CreateInputBuffers(ctx);
   auto output_buffers = CreateOutputBuffers(ctx);
 
@@ -247,16 +245,9 @@ DmlGpuEvent DmlKernel::Compute(DmlKernelContext* ctx) const {
   auto input_bindings = dml_util::GetBufferBindings(input_buffers);
   auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
-  StatusOr<DmlGpuEvent> status_or_event =
-      ctx->ExecuteOperator(compiled_op_.Get(), GetPersistentResourceBinding(),
-                           input_bindings, output_bindings);
-
-  if (!status_or_event.ok()) {
-    ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-    return ctx->GetCurrentCompletionEvent();
-  }
-
-  return status_or_event.ConsumeValueOrDie();
+  return ctx->ExecuteOperator(compiled_op_.Get(),
+                              GetPersistentResourceBinding(), input_bindings,
+                              output_bindings);
 }
 
 absl::InlinedVector<D3D12BufferRegion, 8> DmlKernel::CreateInputBuffers(

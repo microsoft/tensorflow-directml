@@ -22,23 +22,32 @@ limitations under the License.
 
 namespace tensorflow {
 
-class DmlZerosLikeKernel : public DmlKernel {
+class DmlZerosLikeKernel : public OpKernel {
  public:
-  using InitHelper = NoOpInitializationHelper;
+  explicit DmlZerosLikeKernel(OpKernelConstruction* ctx) : OpKernel(ctx) {}
 
-  explicit DmlZerosLikeKernel(DmlKernelConstruction* ctx,
-                              const InitHelper* init_helper) {}
+  void Compute(OpKernelContext* ctx) override {
+    Tensor* output_tensor = nullptr;
+    OP_REQUIRES_OK(
+        ctx, ctx->allocate_output(0, ctx->input(0).shape(), &output_tensor));
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
-    Tensor* output = ctx->GetOutputTensor(0);
-    return ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
+
+    D3D12BufferRegion output_buffer =
+        dml_util::CreateBufferForTensor(device, *output_tensor);
+
+    uint8_t pattern[] = {0};
+
+    device->GetExecutionContext()->FillBufferWithPattern(
+        output_buffer.Resource(), output_buffer.Offset(),
+        output_buffer.SizeInBytes(), pattern);
   }
 };
 
 #define REGISTER_DML_KERNEL(TYPE)                                     \
   REGISTER_KERNEL_BUILDER(                                            \
       Name("ZerosLike").Device(DEVICE_DML).TypeConstraint<TYPE>("T"), \
-      DmlKernelWrapper<DmlZerosLikeKernel, GetOutputShapeAsInputShapeHelper>);
+      DmlZerosLikeKernel);
 
 // TODO(b/25387198): A special kernel exists for int32 (see constant_op.cc).
 TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(REGISTER_DML_KERNEL)

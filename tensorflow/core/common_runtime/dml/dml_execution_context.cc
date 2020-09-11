@@ -59,30 +59,20 @@ DmlGpuEvent DmlExecutionContextImpl::FillBufferWithPattern(
   return GetCurrentCompletionEvent();
 }
 
-DmlGpuEvent DmlExecutionContextImpl::ExecuteCommandList(
-    ID3D12GraphicsCommandList* command_list, _Outptr_ ID3D12Fence** fence,
-    _Out_ uint64_t* completion_value) {
-  assert(!closed_);
-
-  SetCommandRecorder(&dml_recorder_);
-  dml_recorder_.ExecuteCommandList(command_list, fence, completion_value);
-  return GetCurrentCompletionEvent();
-}
-
-StatusOr<DmlGpuEvent> DmlExecutionContextImpl::InitializeOperator(
+DmlGpuEvent DmlExecutionContextImpl::InitializeOperator(
     IDMLCompiledOperator* op,
     const DML_BINDING_DESC& persistent_resource_binding,
     const DML_BINDING_DESC& input_array_binding) {
   assert(!closed_);
   SetCommandRecorder(&dml_recorder_);
 
-  TF_RETURN_IF_ERROR(dml_recorder_.InitializeOperator(
-      op, persistent_resource_binding, input_array_binding));
+  dml_recorder_.InitializeOperator(op, persistent_resource_binding,
+                                   input_array_binding);
 
   return GetCurrentCompletionEvent();
 }
 
-StatusOr<DmlGpuEvent> DmlExecutionContextImpl::ExecuteOperator(
+DmlGpuEvent DmlExecutionContextImpl::ExecuteOperator(
     IDMLCompiledOperator* op,
     const DML_BINDING_DESC& persistent_resource_binding,
     absl::Span<const DML_BINDING_DESC> input_bindings,
@@ -90,17 +80,9 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::ExecuteOperator(
   assert(!closed_);
   SetCommandRecorder(&dml_recorder_);
 
-  TF_RETURN_IF_ERROR(dml_recorder_.ExecuteOperator(
-      op, persistent_resource_binding, input_bindings, output_bindings));
+  dml_recorder_.ExecuteOperator(op, persistent_resource_binding, input_bindings,
+                                output_bindings);
 
-  return GetCurrentCompletionEvent();
-}
-
-DmlGpuEvent DmlExecutionContextImpl::AddUAVBarrier() {
-  assert(!closed_);
-  SetCommandRecorder(&dml_recorder_);
-
-  dml_recorder_.AddUAVBarrier();
   return GetCurrentCompletionEvent();
 }
 
@@ -113,31 +95,26 @@ DmlGpuEvent DmlExecutionContextImpl::ResourceBarrier(
   return GetCurrentCompletionEvent();
 }
 
-void DmlExecutionContextImpl::Wait(ID3D12Fence* fence, uint64_t value) {
-  assert(!closed_);
-  Flush();
-  queue_->Wait(fence, value);
-}
-
 void DmlExecutionContextImpl::SetCommandRecorder(
     DmlCommandRecorder* new_recorder) {
   assert(!closed_);
-
-  // If changing which recorder is the current one, we need to flush the old one
-  // first. This is to ensure correct ordering of operations on the command
-  // queue.
-  if (current_recorder_ != new_recorder) {
-    Flush();
-    current_recorder_ = new_recorder;
-  }
+  current_recorder_ = new_recorder;
 }
 
-DmlGpuEvent DmlExecutionContextImpl::Flush() {
+StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
   assert(!closed_);
 
   if (!current_recorder_) {
     // Nothing to flush
     return GetCurrentCompletionEvent();
+  }
+
+  Status recorder_status = current_recorder_->GetStatus();
+
+  if (!recorder_status.ok()) {
+    current_recorder_->ResetStatus();
+    current_recorder_ = nullptr;
+    return recorder_status;
   }
 
   current_recorder_->CloseAndExecute();
