@@ -287,7 +287,7 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
                                             : D3D_FEATURE_LEVEL_11_0;
 
       HRESULT hr = D3D12CreateDevice(adapter.Get(), feature_level,
-                                     __uuidof(ID3D12Device), nullptr);
+                                     uuidof<ID3D12Device>(), nullptr);
       if (SUCCEEDED(hr)) {
         adapter_infos.push_back(std::move(adapter_impl));
       }
