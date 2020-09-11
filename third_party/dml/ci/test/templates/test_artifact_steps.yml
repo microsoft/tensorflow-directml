@@ -8,6 +8,7 @@ parameters:
   PipelineBuildID: ''  # ID of the specific build from the named build pipeline to test (e.g. '15958541')
   Artifact: ''         # Name of the build artifact to test (e.g. 'x64-release')
   TestGroups: ''       # Comma-separated list of test groups to run
+  RunOnWsl: 0          # Whether we should run the tests on WSL or not
 
 steps:
 - task: DownloadBuildArtifacts@0
@@ -33,7 +34,7 @@ steps:
       -TestGroups ${{parameters.TestGroups}}
       -BuildArtifactsPath $(System.ArtifactsDirectory)/${{parameters.Artifact}}
       -TestArtifactsPath $(System.ArtifactsDirectory)/test/${{parameters.Artifact}}
-      -TensorFlowWheelPath $(System.ArtifactsDirectory)/${{parameters.Artifact}}/tensorflow_directml-*-win_amd64.whl
+      -RunOnWsl ${{parameters.RunOnWsl}}
     errorActionPreference: continue
 
 - task: PublishBuildArtifacts@1

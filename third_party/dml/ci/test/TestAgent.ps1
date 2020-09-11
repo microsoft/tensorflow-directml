@@ -12,16 +12,25 @@ Param
     # Path where output test artifacts should be stored.
     [string]$TestArtifactsPath,
 
-    # Absolute path to the tensorflow wheel file.
-    [string]$TensorFlowWheelPath
+    # Whether we should run the tests on WSL or not
+    [bool]$RunOnWsl
 )
-
-# Resolve path with wildcards
-$TensorFlowWheelPath = (Resolve-Path $TensorFlowWheelPath).Path
 
 if (!(Test-Path $TestArtifactsPath))
 {
     New-Item -ItemType Directory -Path $TestArtifactsPath | Out-Null
+}
+
+if ($RunOnWsl)
+{
+    $TestArtifact = Split-Path -Path $TestArtifactsPath -Leaf
+    $TestArtifactPathWinAsWsl = wsl wslpath -a $TestArtifactsPath
+    $WslArtifactFolder = "/tmp/$TestArtifact"
+    wsl rm -rf $WslArtifactFolder
+    wsl mkdir -p /tmp
+    wsl cp $ArtifactZipPathWinAsWsl /tmp/$TestArtifact.zip
+
+    $WslArtifactFolderAsWin = wsl wslpath -w $WslArtifactFolder
 }
 
 try
@@ -34,9 +43,28 @@ try
 
         Write-Host "Testing $TestGroup..."
         $Results.Time.Start = (Get-Date).ToString()
-        py run_tests.py --test_group $TestGroup --tensorflow_wheel $TensorFlowWheelPath | Out-File -FilePath "test_${TestGroup}_log.txt"
-        $Results.Time.End = (Get-Date).ToString()
 
+        if ($RunOnWsl)
+        {
+            Push-Location $WslArtifactFolderAsWin
+
+            $LoadLibraryPath = wsl echo $WslArtifactFolder`:`$LD_LIBRARY_PATH
+            $WslTensorFlowWheelPath = Get-ChildItem tensorflow_directml-*-linux_x86_64.whl | Select-Object -First 1 -ExpandProperty Name
+            Invoke-Expression "wsl export LD_LIBRARY_PATH='$LoadLibraryPath' '&&' python3 run_tests.py --test_group $TestGroup --tensorflow_wheel $WslTensorFlowWheelPath > test_${TestGroup}_log.txt"
+            wsl find . -name '*_test_result.xml' -exec cp '{}' $TestArtifactPathWinAsWsl --parents \`;
+            wsl find . -name '*_test_result.xml' -exec rm '{}' \`;
+            wsl mv ./test_${TestGroup}_log.txt $TestArtifactPathWinAsWsl
+
+            Pop-Location
+        }
+        else
+        {
+            # Resolve path with wildcards
+            $TensorFlowWheelPath = (Resolve-Path "$BuildArtifactsPath/tensorflow_directml-*-win_amd64.whl").Path
+            py run_tests.py --test_group $TestGroup --tensorflow_wheel $TensorFlowWheelPath | Out-File -FilePath "test_${TestGroup}_log.txt"
+        }
+
+        $Results.Time.End = (Get-Date).ToString()
         $TestResultFragments = (Get-ChildItem . -Filter '*_test_result.xml' -Recurse).FullName
 
         if ($TestResultFragments.Count -gt 0)

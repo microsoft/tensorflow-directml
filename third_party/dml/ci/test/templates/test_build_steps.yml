@@ -16,10 +16,12 @@ steps:
     filePath: third_party/dml/ci/test/DispatchTestJobs.ps1
     arguments: >
       -Artifacts "$(Artifacts)"
+      -WslArtifacts "$(WslArtifacts)"
       -BuildID $(BuildID) 
       -TestGroups "$(TestGroups)"
       -TestArtifactsPath ${{parameters.TestArtifactsPath}}
       -TestPoolName $(TestPool)
+      -WslTestPoolName $(WslTestPool)
       -TimeoutMinutes ${{parameters.TimeoutInMinutes}}
       -AccessToken $(AccessToken)
       -SkipSlowRingAgents ${{parameters.SkipSlowRingAgents}}

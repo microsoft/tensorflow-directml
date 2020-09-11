@@ -11,6 +11,7 @@
 # - (required) PipelineBuildID : ID of the build pipeline that produced artifacts to test
 # - (required) TestGroups : comma-separated list of test groups to test. e.g. 'python,core'
 # - (required) TimeoutMinutes : number of minutes allowed to test before the job is canceled
+# - (required) RunOnWsl : whether this agent should run the WSL tests or not
 
 name: 'test.$(AgentName)-$(PipelineBuildID)$(Rev:.r)'
 
@@ -52,7 +53,8 @@ jobs:
 
   - template: templates/test_artifact_steps.yml
     parameters:
-      Artifact: 'x64-win-release-cp36'
+      Artifact: $(Artifacts)
       TestGroups: $(TestGroups)
       Pipeline: $(Pipeline)
       PipelineBuildID: $(PipelineBuildID)
+      RunOnWsl: $(RunOnWsl)
