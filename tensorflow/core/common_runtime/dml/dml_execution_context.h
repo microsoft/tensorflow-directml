@@ -66,10 +66,6 @@ class DmlExecutionContextImpl {
       absl::Span<const DML_BINDING_DESC> input_bindings,
       absl::Span<const DML_BINDING_DESC> output_bindings);
 
-  DmlGpuEvent ExecuteCommandList(ID3D12GraphicsCommandList* command_list,
-                                 _Outptr_ ID3D12Fence** fence,
-                                 _Out_ uint64_t* completion_value);
-
   DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
@@ -147,13 +143,6 @@ class DmlExecutionContext {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->ExecuteOperator(op, persistent_resource_binding,
                                   input_bindings, output_bindings);
-  }
-
-  DmlGpuEvent ExecuteCommandList(ID3D12GraphicsCommandList* command_list,
-                                 _Outptr_ ID3D12Fence** fence,
-                                 _Out_ uint64_t* completion_value) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->ExecuteCommandList(command_list, fence, completion_value);
   }
 
   DmlGpuEvent ResourceBarrier(

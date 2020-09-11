@@ -26,10 +26,6 @@ DmlCommandQueue::DmlCommandQueue(ID3D12CommandQueue* existing_queue)
       device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_)));
 }
 
-void DmlCommandQueue::ExecuteCommandList(ID3D12CommandList* command_list) {
-  ExecuteCommandLists(absl::Span<ID3D12CommandList*>(&command_list, 1));
-}
-
 void DmlCommandQueue::ExecuteCommandLists(
     absl::Span<ID3D12CommandList*> command_lists) {
   queue_->ExecuteCommandLists(static_cast<uint32_t>(command_lists.size()),

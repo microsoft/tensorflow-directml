@@ -302,54 +302,6 @@ void DmlCommandRecorder::FillBufferWithPattern(
   OnCommandRecorded();
 }
 
-void DmlCommandRecorder::ExecuteCommandList(
-    ID3D12GraphicsCommandList* command_list, _Outptr_ ID3D12Fence** fence,
-    _Out_ uint64_t* completion_value) {
-  if (!status_.ok()) return;
-
-  HRESULT hr = current_command_list_->Close();
-
-  if (dml_util::HrIsOutOfMemory(hr)) {
-    status_ = errors::ResourceExhausted("OOM when closing the command list");
-    return;
-  }
-
-  DML_CHECK_SUCCEEDED(hr);
-
-  if (operations_recorded_in_current_command_list_ != 0) {
-    pending_command_lists_.push_back(current_command_list_.Get());
-    pending_command_lists_cacheable_.push_back(true);
-  } else {
-    cached_command_lists_.push_back(current_command_list_.Get());
-  }
-
-  current_command_list_ = nullptr;
-  operations_recorded_in_current_command_list_ = 0;
-
-  pending_command_lists_.push_back(command_list);
-  pending_command_lists_cacheable_.push_back(false);
-
-  // Remember the descriptor heap and apply it to the next command list
-  auto heap = current_descriptor_heap_;
-  current_descriptor_heap_ = nullptr;
-  Open();
-
-  // The caller can re-use relevent resources after the next set of work to be
-  // flushed has completed.  Its command list hasn't been executed yet, just
-  // batched.
-  DmlGpuEvent gpu_event = queue_->GetNextCompletionEvent();
-  gpu_event.fence.CopyTo(fence);
-  *completion_value = gpu_event.fence_value;
-
-  // Trigger a flush of the command list, with the assumption that it contains
-  // enough GPU work that this will help parallelize GPU work with subsequent
-  // CPU work.
-  CloseAndExecute();
-  Open();
-
-  SetDescriptorHeap(heap);
-}
-
 void DmlCommandRecorder::ResourceBarrier(
     absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
   if (!status_.ok()) return;
@@ -391,38 +343,20 @@ void DmlCommandRecorder::CloseAndExecute() {
 
   if (dml_util::HrIsOutOfMemory(hr)) {
     status_ = errors::ResourceExhausted("OOM when closing the command list");
-    return;
-  }
-
-  DML_CHECK_SUCCEEDED(hr);
-
-  if (operations_recorded_in_current_command_list_ != 0) {
-    pending_command_lists_.push_back(current_command_list_.Get());
-    pending_command_lists_cacheable_.push_back(true);
   } else {
+    DML_CHECK_SUCCEEDED(hr);
+
+    if (operations_recorded_in_current_command_list_ != 0) {
+      // Close and execute the command list
+      ID3D12CommandList* commandLists[] = {current_command_list_.Get()};
+      queue_->ExecuteCommandLists(commandLists);
+    }
+
     cached_command_lists_.push_back(current_command_list_.Get());
   }
 
   current_command_list_ = nullptr;
   operations_recorded_in_current_command_list_ = 0;
-
-  if (!pending_command_lists_.empty()) {
-    // Close and execute the command list
-    queue_->ExecuteCommandLists(absl::Span<ID3D12CommandList*>(
-        reinterpret_cast<ID3D12CommandList**>(pending_command_lists_.data()),
-        pending_command_lists_.size()));
-
-    assert(pending_command_lists_.size() ==
-           pending_command_lists_cacheable_.size());
-    for (size_t i = 0; i < pending_command_lists_.size(); ++i) {
-      if (pending_command_lists_cacheable_[i]) {
-        cached_command_lists_.push_back(pending_command_lists_[i]);
-      }
-    }
-
-    pending_command_lists_.clear();
-    pending_command_lists_cacheable_.clear();
-  }
 
   // The descriptor heap must be set on the command list the next time it's
   // opened.

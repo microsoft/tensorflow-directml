@@ -33,7 +33,6 @@ class DmlCommandQueue {
   Microsoft::WRL::ComPtr<ID3D12Fence> GetFence() const { return fence_; }
   uint64_t GetLastFenceValue() const { return last_fence_value_; }
 
-  void ExecuteCommandList(ID3D12CommandList* command_list);
   void ExecuteCommandLists(absl::Span<ID3D12CommandList*> command_lists);
 
   // Returns an event that will become signaled when everything submitted to the

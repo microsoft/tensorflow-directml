@@ -59,16 +59,6 @@ DmlGpuEvent DmlExecutionContextImpl::FillBufferWithPattern(
   return GetCurrentCompletionEvent();
 }
 
-DmlGpuEvent DmlExecutionContextImpl::ExecuteCommandList(
-    ID3D12GraphicsCommandList* command_list, _Outptr_ ID3D12Fence** fence,
-    _Out_ uint64_t* completion_value) {
-  assert(!closed_);
-
-  SetCommandRecorder(&dml_recorder_);
-  dml_recorder_.ExecuteCommandList(command_list, fence, completion_value);
-  return GetCurrentCompletionEvent();
-}
-
 DmlGpuEvent DmlExecutionContextImpl::InitializeOperator(
     IDMLCompiledOperator* op,
     const DML_BINDING_DESC& persistent_resource_binding,

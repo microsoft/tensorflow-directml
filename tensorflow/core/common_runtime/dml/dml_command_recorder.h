@@ -52,10 +52,6 @@ class DmlCommandRecorder {
       absl::Span<const uint8_t>
           value /* Data type agnostic value, treated as raw bits */);
 
-  void ExecuteCommandList(ID3D12GraphicsCommandList* command_list,
-                          _Outptr_ ID3D12Fence** fence,
-                          _Out_ uint64_t* completion_value);
-
   void ResourceBarrier(absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
   void CloseAndExecute();
@@ -87,14 +83,6 @@ class DmlCommandRecorder {
   // have been recorded yet.
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> current_command_list_;
   uint32_t operations_recorded_in_current_command_list_ = 0;
-
-  // Command lists which have been batched up for execution.  The values in
-  // pending_command_lists_cacheable_ indicate whether they can be moved into
-  // this class's cache after execution, versus if they belong to the caller and
-  // were passed to ExecuteCommandList.
-  std::vector<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>>
-      pending_command_lists_;
-  std::vector<bool> pending_command_lists_cacheable_;
 
   // A pool of cached command lists which may be re-used.
   std::deque<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>>
