@@ -163,7 +163,7 @@ class DmlMatrixDiagPartKernel : public DmlKernel {
     const TensorShape& input_shape = ctx->GetInputTensorShape(0);
     const TensorShape& output_shape = ctx->GetOutputTensorShape(0);
 
-    int64 batch_size = 1;
+    uint32_t batch_size = 1u;
     for (int i = 0; i < input_shape.dims() - 2; ++i) {
       batch_size *= input_shape.dim_size(i);
     }
