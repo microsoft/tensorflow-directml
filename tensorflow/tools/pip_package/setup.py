@@ -261,8 +261,8 @@ setup(
     version=_VERSION.replace('-', ''),
     description=DOCLINES[0],
     long_description='\n'.join(DOCLINES[2:]),
-    url='https://github.com/microsoft/DirectML',
-    download_url='https://github.com/microsoft/DirectML/releases',
+    url='https://github.com/microsoft/tensorflow-directml',
+    download_url='https://github.com/microsoft/tensorflow-directml/releases',
     author='Microsoft Corporation',
     author_email='askdirectml@microsoft.com',
     # Contained modules and scripts.
