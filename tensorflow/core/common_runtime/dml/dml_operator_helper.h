@@ -144,22 +144,6 @@ class BatchNormGradShapeHelper : public ShapeHelper {
       const InitializationHelper* initialization_helper) const override;
 };
 
-class SoftmaxXentWithLogitsShapeHelper : public ShapeHelper {
- public:
-  std::vector<TensorShape> GetOutputShapes(
-      OpKernelContext* ctx,
-      const InitializationHelper* initialization_helper) const override {
-    const Tensor& logits = ctx->input(0);
-    const Tensor& labels = ctx->input(1);
-    // logits must have the same shape as labels
-    CHECK(logits.shape() == labels.shape());
-
-    TensorShape outputShape({logits.dim_size(0), 1});
-
-    return {outputShape, logits.shape()};
-  }
-};
-
 class SparseXentShapeHelper : public ShapeHelper {
  public:
   std::vector<TensorShape> GetOutputShapes(

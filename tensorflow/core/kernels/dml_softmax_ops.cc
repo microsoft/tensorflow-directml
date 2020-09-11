@@ -22,11 +22,50 @@ limitations under the License.
 
 namespace tensorflow {
 
+class SoftmaxXentWithLogitsShapeHelper : public ShapeHelper {
+ public:
+  std::vector<TensorShape> GetOutputShapes(
+      OpKernelContext* ctx,
+      const InitializationHelper* initialization_helper) const override {
+    const Tensor& logits = ctx->input(0);
+    const Tensor& labels = ctx->input(1);
+    // logits must have the same shape as labels
+    CHECK(logits.shape() == labels.shape());
+
+    TensorShape outputShape({logits.dim_size(0), 1});
+
+    return {outputShape, logits.shape()};
+  }
+};
+
+class DmlSoftmaxXentWithLogitsInitHelper : public InitializationHelper {
+ public:
+  using Attributes = EmptyAttributes;
+
+  DmlSoftmaxXentWithLogitsInitHelper(OpKernelContext* ctx,
+                           std::shared_ptr<const Attributes> attr) {
+    const Tensor& logits_in = ctx->input(0);
+    const Tensor& labels_in = ctx->input(1);
+    TensorShape shape_in = logits_in.shape();
+
+    OP_REQUIRES(ctx, logits_in.IsSameSize(labels_in),
+                errors::InvalidArgument(
+                    "logits and labels must be broadcastable: logits_size=",
+                    logits_in.shape().DebugString(),
+                    " labels_size=", labels_in.shape().DebugString()));
+                    
+    OP_REQUIRES(ctx, TensorShapeUtils::IsMatrix(shape_in),
+                errors::InvalidArgument("logits and labels must be either "
+                                        "2-dimensional, or broadcasted to be "
+                                        "2-dimensional"));
+  }
+};
+
 class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
  public:
-  using InitHelper = NoOpInitializationHelper;
+  using InitHelper = DmlSoftmaxXentWithLogitsInitHelper;
   explicit DmlSoftmaxXentWithLogitsKernel(
-      DmlKernelConstruction* ctx, const NoOpInitializationHelper* init_helper) {
+      DmlKernelConstruction* ctx, const DmlSoftmaxXentWithLogitsInitHelper* init_helper) {
     CHECK(ctx->GetInputCount() == 2);
     CHECK(ctx->GetOutputCount() == 2);
 
@@ -78,8 +117,8 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
 
     // sum(-labels *
     //    ((logits - max_logits) - log(sum(exp(logits - max_logits)))))
-    auto sub = shifted_logits - log_sum_exp_bcast;
-    auto mul = -1.0f * labels * sub;
+    auto sub = log_sum_exp_bcast - shifted_logits;
+    auto mul = labels * sub;
     auto loss = dml::Reduce(mul, DML_REDUCE_FUNCTION_SUM, reduce_strides);
 
     // backprop: prob - labels, where
