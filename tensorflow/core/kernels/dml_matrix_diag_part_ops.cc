@@ -168,9 +168,12 @@ class DmlMatrixDiagPartKernel : public DmlKernel {
       batch_size *= input_shape.dim_size(i);
     }
 
-    int64 elem_count_per_batch = output_shape.num_elements() / batch_size;
-    int64 input_height = input_shape.dim_size(input_shape.dims() - 2);
-    int64 input_width = input_shape.dim_size(input_shape.dims() - 1);
+    auto elem_count_per_batch =
+        static_cast<uint32_t>(output_shape.num_elements() / batch_size);
+    auto input_height =
+        static_cast<uint32_t>(input_shape.dim_size(input_shape.dims() - 2));
+    auto input_width =
+        static_cast<uint32_t>(input_shape.dim_size(input_shape.dims() - 1));
 
     // Flatten the output batches of vectors
     TensorShape flattened_output_shape(

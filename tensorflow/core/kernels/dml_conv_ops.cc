@@ -308,15 +308,18 @@ class DmlDepthwiseConv2DNativeKernel : public DmlKernel {
     DCHECK(ctx->GetInputTensorShape(1).dims() == kNchwDimensionCount);
     DCHECK(ctx->GetOutputTensorShape(0).dims() == kNchwDimensionCount);
 
-    uint32_t strides[] = {init_helper->GetStrideH(), init_helper->GetStrideW()};
-    uint32_t dilations[] = {init_helper->GetDilationH(),
-                            init_helper->GetDilationW()};
-    uint32_t start_padding[] = {init_helper->GetPadRowsBefore(),
-                                init_helper->GetPadColsBefore()};
-    uint32_t end_padding[] = {init_helper->GetPadRowsAfter(),
-                              init_helper->GetPadColsAfter()};
+    uint32_t strides[] = {static_cast<uint32_t>(init_helper->GetStrideH()),
+                          static_cast<uint32_t>(init_helper->GetStrideW())};
+    uint32_t dilations[] = {static_cast<uint32_t>(init_helper->GetDilationH()),
+                            static_cast<uint32_t>(init_helper->GetDilationW())};
+    uint32_t start_padding[] = {
+        static_cast<uint32_t>(init_helper->GetPadRowsBefore()),
+        static_cast<uint32_t>(init_helper->GetPadColsBefore())};
+    uint32_t end_padding[] = {
+        static_cast<uint32_t>(init_helper->GetPadRowsAfter()),
+        static_cast<uint32_t>(init_helper->GetPadColsAfter())};
     uint32_t output_padding[] = {0, 0};
-    uint32_t group_count = init_helper->GetGroupCount();
+    uint32_t group_count = static_cast<uint32_t>(init_helper->GetGroupCount());
 
     DmlKernelParams params;
     params.kernel_input_indices = {
@@ -406,12 +409,15 @@ class DmlConv2DKernel : public DmlKernel {
                                        ctx->GetInputTensorShape(1),
                                        &conv_dims));
 
-    uint32_t strides[] = {conv_dims.stride_rows, conv_dims.stride_cols};
-    uint32_t dilations[] = {conv_dims.dilation_rows, conv_dims.dilation_cols};
-    uint32_t start_padding[] = {conv_dims.pad_rows_before,
-                                conv_dims.pad_cols_before};
-    uint32_t end_padding[] = {conv_dims.pad_rows_after,
-                              conv_dims.pad_cols_after};
+    uint32_t strides[] = {static_cast<uint32_t>(conv_dims.stride_rows),
+                          static_cast<uint32_t>(conv_dims.stride_cols)};
+    uint32_t dilations[] = {static_cast<uint32_t>(conv_dims.dilation_rows),
+                            static_cast<uint32_t>(conv_dims.dilation_cols)};
+    uint32_t start_padding[] = {
+        static_cast<uint32_t>(conv_dims.pad_rows_before),
+        static_cast<uint32_t>(conv_dims.pad_cols_before)};
+    uint32_t end_padding[] = {static_cast<uint32_t>(conv_dims.pad_rows_after),
+                              static_cast<uint32_t>(conv_dims.pad_cols_after)};
     uint32_t output_padding[] = {0, 0};
     uint32_t group_count = conv_dims.in_depth / conv_dims.patch_depth;
 
@@ -497,14 +503,18 @@ class DmlFusedConv2DKernel : public DmlKernel {
                                        ctx->GetInputTensorShape(1),
                                        &conv_dims));
 
-    uint32_t strides[] = {conv_dims.stride_rows, conv_dims.stride_cols};
-    uint32_t dilations[] = {conv_dims.dilation_rows, conv_dims.dilation_cols};
-    uint32_t start_padding[] = {conv_dims.pad_rows_before,
-                                conv_dims.pad_cols_before};
-    uint32_t end_padding[] = {conv_dims.pad_rows_after,
-                              conv_dims.pad_cols_after};
+    uint32_t strides[] = {static_cast<uint32_t>(conv_dims.stride_rows),
+                          static_cast<uint32_t>(conv_dims.stride_cols)};
+    uint32_t dilations[] = {static_cast<uint32_t>(conv_dims.dilation_rows),
+                            static_cast<uint32_t>(conv_dims.dilation_cols)};
+    uint32_t start_padding[] = {
+        static_cast<uint32_t>(conv_dims.pad_rows_before),
+        static_cast<uint32_t>(conv_dims.pad_cols_before)};
+    uint32_t end_padding[] = {static_cast<uint32_t>(conv_dims.pad_rows_after),
+                              static_cast<uint32_t>(conv_dims.pad_cols_after)};
     uint32_t output_padding[] = {0, 0};
-    uint32_t group_count = conv_dims.in_depth / conv_dims.patch_depth;
+    uint32_t group_count =
+        static_cast<uint32_t>(conv_dims.in_depth / conv_dims.patch_depth);
 
     DmlKernelParams params;
 
@@ -694,14 +704,18 @@ class DmlConv2DBackpropInputKernel : public DmlKernel {
     TF_CHECK_OK(ComputeConv2DDimension(
         conv_params, input_shape, ctx->GetInputTensorShape(1), &conv_dims));
 
-    uint32_t strides[] = {conv_dims.stride_rows, conv_dims.stride_cols};
-    uint32_t dilations[] = {conv_dims.dilation_rows, conv_dims.dilation_cols};
-    uint32_t start_padding[] = {conv_dims.pad_rows_before,
-                                conv_dims.pad_cols_before};
-    uint32_t end_padding[] = {conv_dims.pad_rows_after,
-                              conv_dims.pad_cols_after};
+    uint32_t strides[] = {static_cast<uint32_t>(conv_dims.stride_rows),
+                          static_cast<uint32_t>(conv_dims.stride_cols)};
+    uint32_t dilations[] = {static_cast<uint32_t>(conv_dims.dilation_rows),
+                            static_cast<uint32_t>(conv_dims.dilation_cols)};
+    uint32_t start_padding[] = {
+        static_cast<uint32_t>(conv_dims.pad_rows_before),
+        static_cast<uint32_t>(conv_dims.pad_cols_before)};
+    uint32_t end_padding[] = {static_cast<uint32_t>(conv_dims.pad_rows_after),
+                              static_cast<uint32_t>(conv_dims.pad_cols_after)};
     uint32_t output_padding[] = {0, 0};
-    uint32_t group_count = conv_dims.in_depth / conv_dims.patch_depth;
+    uint32_t group_count =
+        static_cast<uint32_t>(conv_dims.in_depth / conv_dims.patch_depth);
 
     using namespace DmlTensorAxes;
 
@@ -716,8 +730,7 @@ class DmlConv2DBackpropInputKernel : public DmlKernel {
 
     tensors.inputs[0]->desc =
         CreateTensorDescFromInput(ctx, 2, input_output_layout);
-    tensors.inputs[1]->desc =
-        CreateTensorDescFromInput(ctx, 1, filter_layout);
+    tensors.inputs[1]->desc = CreateTensorDescFromInput(ctx, 1, filter_layout);
     tensors.outputs[0]->desc =
         CreateTensorDescFromOutput(ctx, 0, input_output_layout);
 
@@ -786,17 +799,21 @@ class DmlConv2DBackpropFilterKernel : public DmlKernel {
     const Conv2DParameters& conv_params = init_helper->GetParams();
 
     Conv2DDimensions conv_dims;
-    TF_CHECK_OK(ComputeConv2DDimension(
-        conv_params, ctx->GetInputTensorShape(0), filter_shape, &conv_dims));
+    TF_CHECK_OK(ComputeConv2DDimension(conv_params, ctx->GetInputTensorShape(0),
+                                       filter_shape, &conv_dims));
 
-    uint32_t strides[] = {conv_dims.stride_rows, conv_dims.stride_cols};
-    uint32_t dilations[] = {conv_dims.dilation_rows, conv_dims.dilation_cols};
-    uint32_t start_padding[] = {conv_dims.pad_rows_before,
-                                conv_dims.pad_cols_before};
-    uint32_t end_padding[] = {conv_dims.pad_rows_after,
-                              conv_dims.pad_cols_after};
+    uint32_t strides[] = {static_cast<uint32_t>(conv_dims.stride_rows),
+                          static_cast<uint32_t>(conv_dims.stride_cols)};
+    uint32_t dilations[] = {static_cast<uint32_t>(conv_dims.dilation_rows),
+                            static_cast<uint32_t>(conv_dims.dilation_cols)};
+    uint32_t start_padding[] = {
+        static_cast<uint32_t>(conv_dims.pad_rows_before),
+        static_cast<uint32_t>(conv_dims.pad_cols_before)};
+    uint32_t end_padding[] = {static_cast<uint32_t>(conv_dims.pad_rows_after),
+                              static_cast<uint32_t>(conv_dims.pad_cols_after)};
     uint32_t output_padding[] = {0, 0};
-    uint32_t group_count = conv_dims.in_depth / conv_dims.patch_depth;
+    uint32_t group_count =
+        static_cast<uint32_t>(conv_dims.in_depth / conv_dims.patch_depth);
 
     DmlKernelParams params;
     params.kernel_input_indices = {
