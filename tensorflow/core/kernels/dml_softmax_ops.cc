@@ -43,7 +43,7 @@ class DmlSoftmaxXentWithLogitsInitHelper : public InitializationHelper {
   using Attributes = EmptyAttributes;
 
   DmlSoftmaxXentWithLogitsInitHelper(OpKernelContext* ctx,
-                           std::shared_ptr<const Attributes> attr) {
+                                     std::shared_ptr<const Attributes> attr) {
     const Tensor& logits_in = ctx->input(0);
     const Tensor& labels_in = ctx->input(1);
     TensorShape shape_in = logits_in.shape();
@@ -53,7 +53,7 @@ class DmlSoftmaxXentWithLogitsInitHelper : public InitializationHelper {
                     "logits and labels must be broadcastable: logits_size=",
                     logits_in.shape().DebugString(),
                     " labels_size=", labels_in.shape().DebugString()));
-                    
+
     OP_REQUIRES(ctx, TensorShapeUtils::IsMatrix(shape_in),
                 errors::InvalidArgument("logits and labels must be either "
                                         "2-dimensional, or broadcasted to be "
@@ -65,7 +65,8 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
  public:
   using InitHelper = DmlSoftmaxXentWithLogitsInitHelper;
   explicit DmlSoftmaxXentWithLogitsKernel(
-      DmlKernelConstruction* ctx, const DmlSoftmaxXentWithLogitsInitHelper* init_helper) {
+      DmlKernelConstruction* ctx,
+      const DmlSoftmaxXentWithLogitsInitHelper* init_helper) {
     CHECK(ctx->GetInputCount() == 2);
     CHECK(ctx->GetOutputCount() == 2);
 
