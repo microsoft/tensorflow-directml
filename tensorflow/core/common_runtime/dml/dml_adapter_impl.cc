@@ -224,7 +224,7 @@ void DmlAdapterImpl::Initialize(IDXCoreAdapter* adapter) {
       sizeof(dedicated_memory_in_bytes_), &dedicated_memory_in_bytes_));
 
   const bool is_graphics_supported =
-      adapter->IsAttributeSupported(DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS);
+      adapter->IsAttributeSupported(uuidof<DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS>());
 
   adapter_ = adapter;
   driver_version_ = tensorflow::DriverVersion(driver_version.QuadPart);
@@ -250,7 +250,7 @@ uint64_t DmlAdapterImpl::QueryAvailableDedicatedMemory() const {
 }
 
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
-  const GUID dxcore_adapter = DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE;
+  const GUID dxcore_adapter = uuidof<DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE>();
 
   ComPtr<IDXCoreAdapterFactory> adapter_factory;
   DML_CHECK_SUCCEEDED(
