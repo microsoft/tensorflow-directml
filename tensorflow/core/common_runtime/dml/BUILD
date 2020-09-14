@@ -19,7 +19,8 @@ cc_library(
         "//tensorflow/core:lib_internal",
         "//third_party/dml:dx_helpers",
         "@dml_redist//:headers",
-    ] + if_not_windows(["//third_party/dml:winadapter"]),
+        "//third_party/dml:winadapter",
+    ],
     alwayslink = 1,
     visibility = ["//visibility:public"],
     

@@ -56,7 +56,7 @@ limitations under the License.
 #include "third_party/dml/DirectMLX.h"
 #include "third_party/dml/d3dx12.h"
 
-#include "dxguids.h"
+#include "third_party/dml/winadapter/dxguids.h"
 
 // Drop-in C++11-compatible replacements for optional, variant, and small_vector
 // which are used by the external ApiHelpers.h header

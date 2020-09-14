@@ -145,7 +145,7 @@ void DmlAdapterImpl::Initialize(IDXGIAdapter* adapter) {
 
   LARGE_INTEGER driver_version;
   DML_CHECK_SUCCEEDED(
-      adapter->CheckInterfaceSupport(uuidof<IDXGIDevice>, &driver_version));
+      adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driver_version));
 
   adapter_ = adapter;
   driver_version_ = tensorflow::DriverVersion(driver_version.QuadPart);
