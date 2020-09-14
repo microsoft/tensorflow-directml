@@ -125,7 +125,6 @@ def build_tests(args):
                 "-no_dml",
                 "-no_oss",
                 "-benchmark-test",
-                "-manual",
                 "dml",
             ],
         )
