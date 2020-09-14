@@ -29,6 +29,8 @@ cc_library(
         "winadapter/stubs/wrl/client.h",
         "winadapter/stubs/wrl/implements.h",
     ],
+    srcs = ["winadapter/dxguids.cc"],
+    linkstatic = 1,
     includes = ["winadapter", "winadapter/stubs"],
     strip_include_prefix = "winadapter",
     visibility = ["//visibility:public"]
