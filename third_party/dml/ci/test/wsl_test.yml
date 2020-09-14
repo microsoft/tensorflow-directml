@@ -20,7 +20,7 @@ schedules:
   displayName: Nightly WSL Run
   branches:
     include:
-    - master
+    - directml
   always: false
 
 variables:
