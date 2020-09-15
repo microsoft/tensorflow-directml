@@ -53,7 +53,7 @@ jobs:
 
   - template: templates/test_artifact_steps.yml
     parameters:
-      Artifact: '$(Artifacts)'
+      Artifact: 'lalala'
       TestGroups: $(TestGroups)
       Pipeline: $(Pipeline)
       PipelineBuildID: $(PipelineBuildID)
