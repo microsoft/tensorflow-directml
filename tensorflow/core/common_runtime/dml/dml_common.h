@@ -58,7 +58,7 @@ limitations under the License.
 
 // When building for Windows, this include will statically assert that the declared IIDs
 // match those found in the Windows SDK.
-#include "third_party/dml/winadapter/dxguids.h"
+#include "dxguids.h"
 
 // Drop-in C++11-compatible replacements for optional, variant, and small_vector
 // which are used by the external ApiHelpers.h header

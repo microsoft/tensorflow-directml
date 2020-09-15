@@ -14,7 +14,7 @@ licenses(["notice"]) # MIT license
 # exposes portability helpers (e.g. uuidof<T>) and IID asserts.
 cc_library(
     name = "winadapter",
-    hdrs = ["winadapter/dxguids.h"] + if_not_windows([
+    hdrs = ["winadapter/dxguids/dxguids.h"] + if_not_windows([
         "winadapter/d3d12.h",
         "winadapter/d3d12sdklayers.h",
         "winadapter/d3dcommon.h",
@@ -25,7 +25,7 @@ cc_library(
         "winadapter/winadapter.h",
         "winadapter/wrladapter.h",
     ]),
-    srcs = ["winadapter/dxguids.cc"] + if_not_windows([
+    srcs = ["winadapter/dxguids/dxguids.cc"] + if_not_windows([
         "winadapter/stubs/oaidl.h",
         "winadapter/stubs/ocidl.h",
         "winadapter/stubs/rpc.h",
@@ -35,7 +35,7 @@ cc_library(
         "winadapter/stubs/wrl/implements.h",
     ]),
     linkstatic = 1,
-    includes = if_not_windows([
+    includes = ["winadapter/dxguids"] + if_not_windows([
         "winadapter",
         "winadapter/stubs",
     ]),
