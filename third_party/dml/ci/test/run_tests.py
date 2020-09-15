@@ -81,11 +81,15 @@ def main():
 
           # Rename the DLL to DirectML.dll since TF_DIRECTML_PATH only works
           # with that name
-          dll_folder = f"{temp_dir}/_solib_directml"
-          old_dll_path = glob.glob(f"{dll_folder}/DirectML*.dll")[0]
-          new_dll_path = f"{dll_folder}/DirectML.dll"
-          os.rename(old_dll_path, new_dll_path)
-          conda_env.run(command_line, {"TF_DIRECTML_PATH": dll_folder})
+          lib_folder = f"{temp_dir}/_solib_directml"
+
+          old_glob = "DirectML*.dll" if os.name == "nt" else "libdirectml.so.*"
+          new_name = "DirectML.dll" if os.name == "nt" else "libdirectml.so"
+
+          old_lib_path = glob.glob(f"{lib_folder}/{old_glob}")[0]
+          new_lib_path = f"{lib_folder}/{new_name}"
+          os.rename(old_lib_path, new_lib_path)
+          conda_env.run(command_line, {"TF_DIRECTML_PATH": lib_folder})
       else:
         conda_env.run(command_line)
 
