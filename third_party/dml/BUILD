@@ -25,8 +25,7 @@ cc_library(
         "winadapter/winadapter.h",
         "winadapter/wrladapter.h",
     ]),
-    srcs = if_not_windows([
-        "winadapter/dxguids.cc",
+    srcs = ["winadapter/dxguids.cc"] + if_not_windows([
         "winadapter/stubs/oaidl.h",
         "winadapter/stubs/ocidl.h",
         "winadapter/stubs/rpc.h",
