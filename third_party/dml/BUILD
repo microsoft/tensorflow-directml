@@ -10,10 +10,11 @@ config_setting(
 
 licenses(["notice"]) # MIT license
 
-# Adapter for compiling DirectX in Linux.
+# Adapter for compiling DirectX in Linux. For Windows, this library only
+# exposes portability helpers (e.g. uuidof<T>) and IID asserts.
 cc_library(
     name = "winadapter",
-    hdrs = if_not_windows([
+    hdrs = ["winadapter/dxguids.h"] + if_not_windows([
         "winadapter/d3d12.h",
         "winadapter/d3d12sdklayers.h",
         "winadapter/d3dcommon.h",
@@ -30,7 +31,7 @@ cc_library(
         "winadapter/stubs/winapifamily.h",
         "winadapter/stubs/wrl/client.h",
         "winadapter/stubs/wrl/implements.h",
-    ]) + if_windows(["winadapter/dxguids.h"]),
+    ]),
     srcs = if_not_windows(["winadapter/dxguids.cc"]),
     linkstatic = 1,
     # includes = ["winadapter", "winadapter/stubs"],

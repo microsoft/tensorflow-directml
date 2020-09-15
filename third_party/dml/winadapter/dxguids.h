@@ -1,11 +1,7 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-// Each COM interface (e.g. ID3D12Device) has a unique interface ID (IID) associated with it. With MSVC, the IID is defined 
-// along with the interface declaration using compiler intrinsics (__declspec(uuid(...)); the IID can then be retrieved 
-// using __uuidof. These intrinsics are not supported with GCC, so these helpers redefine IID values that can be used with
-// the various adapter COM helpers (ComPtr, IID_PPV_ARGS, etc.) for Linux. IIDs are stable and cannot change, but as a 
-// precaution we statically assert the values are as expected when compiling for Windows.
+#pragma once
 
 constexpr inline bool ConstexprIsEqualGUID(REFGUID a, REFGUID b)
 {
@@ -22,6 +18,11 @@ constexpr inline bool ConstexprIsEqualGUID(REFGUID a, REFGUID b)
         a.Data4[7] == b.Data4[7];
 }
 
+// Each COM interface (e.g. ID3D12Device) has a unique interface ID (IID) associated with it. With MSVC, the IID is defined 
+// along with the interface declaration using compiler intrinsics (__declspec(uuid(...)); the IID can then be retrieved 
+// using __uuidof. These intrinsics are not supported with all toolchains, so these helpers redefine IID values that can be 
+// used with the various adapter COM helpers (ComPtr, IID_PPV_ARGS, etc.) for Linux. IIDs are stable and cannot change, but as 
+// a precaution we statically assert the values are as expected when compiling for Windows.
 #ifdef _WIN32
 // winadapter.h isn't included when building for Windows, so the base function template needs to be declared.
 template <typename T> GUID uuidof() = delete;
