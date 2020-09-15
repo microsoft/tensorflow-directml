@@ -31,6 +31,7 @@ typedef size_t SIZE_T;
 typedef float FLOAT;
 typedef double DOUBLE;
 typedef unsigned char BYTE;
+typedef int HWND;
 
 // Note: WCHAR is not the same between Windows and Linux, to enable
 // string manipulation APIs to work with resulting strings.

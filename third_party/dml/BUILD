@@ -36,8 +36,10 @@ cc_library(
         "winadapter/stubs/wrl/implements.h",
     ]),
     linkstatic = 1,
-    includes = ["winadapter/stubs"],
-    # strip_include_prefix = "winadapter",
+    includes = if_not_windows([
+        "winadapter",
+        "winadapter/stubs",
+    ]),
     visibility = ["//visibility:public"]
 )
 
