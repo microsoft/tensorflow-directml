@@ -24,6 +24,9 @@ cc_library(
         "winadapter/dxgiformat.h",
         "winadapter/winadapter.h",
         "winadapter/wrladapter.h",
+    ]),
+    srcs = if_not_windows([
+        "winadapter/dxguids.cc",
         "winadapter/stubs/oaidl.h",
         "winadapter/stubs/ocidl.h",
         "winadapter/stubs/rpc.h",
@@ -32,9 +35,8 @@ cc_library(
         "winadapter/stubs/wrl/client.h",
         "winadapter/stubs/wrl/implements.h",
     ]),
-    srcs = if_not_windows(["winadapter/dxguids.cc"]),
     linkstatic = 1,
-    # includes = ["winadapter", "winadapter/stubs"],
+    includes = ["winadapter/stubs"],
     # strip_include_prefix = "winadapter",
     visibility = ["//visibility:public"]
 )
