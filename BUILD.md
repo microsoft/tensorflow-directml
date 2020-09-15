@@ -2,19 +2,17 @@
 
 This document contains instructions for producing private builds of tensorflow-directml.
 
-**Running packages built from a DirectML-enabled branch of this repo requires developer mode to be enabled. This is temporary! Read the section below.**
-
 ## DirectML and DirectML-Dev Branches
 
 This project is a fork of the official [tensorflow](https://github.com/tensorflow/tensorflow) repository that targets TensorFlow v1.15. This fork will not merge upstream, since TensorFlow does not accept new features for previous releases, so the `master` branch is based off v1.15.0 from the upstream repository. DirectML changes do not appear in the `master` branch.
 
-The `directml` branch is considered the the main branch for development in this repository, and it should be the most stable branch to test. Packages of [tensorflow-directml on PyPI](https://pypi.org/project/tensorflow-directml/) are produced from the `directml` branch. This branch contains changes related to DirectML as well as security fixes in the upstream branch (e.g. changes in 1.15.1, 1.15.2, 15.3., etc.).
+The `directml` branch is considered the main branch for development in this repository, and it should be the most stable branch to test. Packages of [tensorflow-directml on PyPI](https://pypi.org/project/tensorflow-directml/) are produced from the `directml` branch. This branch contains changes related to DirectML as well as security fixes in the upstream branch (e.g. changes in 1.15.1, 1.15.2, 1.15.3., etc.).
 
 The latest changes occur in the `directml-dev` branch. This branch is intended for rapid development, so builds of the `directml-dev` branch may reference unstable DirectML APIs that are subject to change over time; preview DirectML APIs are included in a special preview redistributable of DirectML that requires *developer mode*. 
 
 ## Developer Mode
 
-**The python packages produced from the `directml-dev` branch (and `directml`, temporarily) will not run unless you enable developer mode, since they are not intended to be shipped or distributed for mainstream use**. To enable developer mode:
+**The python packages produced from the `directml-dev` branch will not run unless you enable developer mode, since they are not intended to be shipped or distributed for mainstream use**. To enable developer mode:
 
 - **Windows**
   - [Toggle "Developer Mode" to "On"](https://docs.microsoft.com/en-us/windows/uwp/get-started/enable-your-device-for-development) in the "For developers" tab of the "Update & Security" section of the Settings app.

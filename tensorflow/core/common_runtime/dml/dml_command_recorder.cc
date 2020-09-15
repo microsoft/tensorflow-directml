@@ -17,6 +17,7 @@ limitations under the License.
 
 #include "dml_bfc_allocator.h"
 #include "dml_buffer.h"
+#include "dml_util.h"
 
 namespace tensorflow {
 
@@ -38,10 +39,12 @@ DmlCommandRecorder::DmlCommandRecorder(
   Open();
 }
 
-Status DmlCommandRecorder::InitializeOperator(
+void DmlCommandRecorder::InitializeOperator(
     IDMLCompiledOperator* op,
     const DML_BINDING_DESC& persistent_resource_binding,
     const DML_BINDING_DESC& input_array_binding) {
+  if (!status_.ok()) return;
+
   // Reset the initializer to reference the input operator.
   IDMLCompiledOperator* ops[] = {op};
   DML_CHECK_SUCCEEDED(initializer_->Reset(ABSL_ARRAYSIZE(ops), ops));
@@ -76,8 +79,9 @@ Status DmlCommandRecorder::InitializeOperator(
     // it until we're done with it locally to prevent the buffer being reused.
     temp_resource = DmlBuffer(allocator_, temporary_resource_size);
     if (!temp_resource) {
-      return errors::ResourceExhausted("OOM when allocating a buffer of ",
-                                       temporary_resource_size, " bytes");
+      status_ = errors::ResourceExhausted("OOM when allocating a buffer of ",
+                                          temporary_resource_size, " bytes");
+      return;
     }
 
     // Bind the temporary resource.
@@ -104,24 +108,27 @@ Status DmlCommandRecorder::InitializeOperator(
   SetDescriptorHeap(descriptor_range.heap);
   recorder_->RecordDispatch(current_command_list_.Get(), initializer_.Get(),
                             binding_table.Get());
-  OnCommandRecorded();
 
   // Barrier if there's an output (i.e. persistent resource), or if any temps
   // are used.
   if ((persistent_resource_binding.Type != DML_BINDING_TYPE_NONE) ||
       (temporary_resource_size > 0)) {
-    auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-    current_command_list_->ResourceBarrier(1, &barrier);
+    D3D12_RESOURCE_BARRIER barriers[] = {
+        CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+        CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+    current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
   }
 
-  return Status::OK();
+  OnCommandRecorded();
 }
 
-Status DmlCommandRecorder::ExecuteOperator(
+void DmlCommandRecorder::ExecuteOperator(
     IDMLCompiledOperator* op,
     const DML_BINDING_DESC& persistent_resource_binding,
     absl::Span<const DML_BINDING_DESC> input_bindings,
     absl::Span<const DML_BINDING_DESC> output_bindings) {
+  if (!status_.ok()) return;
+
   DML_BINDING_PROPERTIES exec_binding_props = op->GetBindingProperties();
 
   const uint32_t num_descriptors = exec_binding_props.RequiredDescriptorCount;
@@ -150,8 +157,9 @@ Status DmlCommandRecorder::ExecuteOperator(
     // it until we're done with it locally to prevent the buffer being reused.
     temp_resource = DmlBuffer(allocator_, temporary_resource_size);
     if (!temp_resource) {
-      return errors::ResourceExhausted("OOM when allocating a buffer of ",
-                                       temporary_resource_size, " bytes");
+      status_ = errors::ResourceExhausted("OOM when allocating a buffer of ",
+                                          temporary_resource_size, " bytes");
+      return;
     }
 
     // Bind the temporary resource.
@@ -173,22 +181,51 @@ Status DmlCommandRecorder::ExecuteOperator(
   SetDescriptorHeap(descriptor_range.heap);
   recorder_->RecordDispatch(current_command_list_.Get(), op,
                             binding_table.Get());
-  OnCommandRecorded();
 
   // Barrier all outputs.
-  auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-  current_command_list_->ResourceBarrier(1, &barrier);
+  D3D12_RESOURCE_BARRIER barriers[] = {
+      CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+      CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+  current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
 
-  return Status::OK();
+  OnCommandRecorded();
 }
 
-void DmlCommandRecorder::CopyBufferRegion(ID3D12Resource* dst_buffer,
-                                          uint64_t dst_offset,
-                                          ID3D12Resource* src_buffer,
-                                          uint64_t src_offset,
-                                          uint64_t byte_count) {
+void DmlCommandRecorder::CopyBufferRegion(
+    ID3D12Resource* dst_buffer, uint64_t dst_offset,
+    D3D12_RESOURCE_STATES dst_state, ID3D12Resource* src_buffer,
+    uint64_t src_offset, D3D12_RESOURCE_STATES src_state, uint64_t byte_count) {
+  if (!status_.ok()) return;
+
+  absl::InlinedVector<D3D12_RESOURCE_BARRIER, 3> barriers;
+
+  if (!(dst_state & D3D12_RESOURCE_STATE_COPY_DEST)) {
+    barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+        dst_buffer, dst_state, D3D12_RESOURCE_STATE_COPY_DEST));
+  }
+  if (!(src_state & D3D12_RESOURCE_STATE_COPY_SOURCE)) {
+    barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
+        src_buffer, src_state, D3D12_RESOURCE_STATE_COPY_SOURCE));
+  }
+
+  if (!barriers.empty()) {
+    current_command_list_->ResourceBarrier(barriers.size(), barriers.data());
+  }
+
   current_command_list_->CopyBufferRegion(dst_buffer, dst_offset, src_buffer,
                                           src_offset, byte_count);
+
+  // Reset barrier state
+  for (auto& barrier : barriers) {
+    std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
+  }
+
+  // Since this copy may write to GPU memory, we also need to perform an
+  // aliasing barrier
+  barriers.push_back(CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr));
+
+  current_command_list_->ResourceBarrier(barriers.size(), barriers.data());
+
   OnCommandRecorded();
 }
 
@@ -196,6 +233,8 @@ void DmlCommandRecorder::FillBufferWithPattern(
     ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
     absl::Span<const uint8_t>
         value /* Data type agnostic value, treated as raw bits */) {
+  if (!status_.ok()) return;
+
   // The fill pattern for ClearUnorderedAccessViewUint is 16 bytes.
   union {
     uint32_t integers[4];
@@ -253,73 +292,30 @@ void DmlCommandRecorder::FillBufferWithPattern(
   current_command_list_->ClearUnorderedAccessViewUint(
       descriptor_range_gpu.gpu_handle, descriptor_range_cpu.cpu_handle, dst,
       fillPattern.integers, 0, nullptr);
-  OnCommandRecorded();
 
   // Barrier all outputs.
-  auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-  current_command_list_->ResourceBarrier(1, &barrier);
-}
+  D3D12_RESOURCE_BARRIER barriers[] = {
+      CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+      CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+  current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
 
-void DmlCommandRecorder::ExecuteCommandList(
-    ID3D12GraphicsCommandList* command_list, _Outptr_ ID3D12Fence** fence,
-    _Out_ uint64_t* completion_value) {
-  DML_CHECK_SUCCEEDED(current_command_list_->Close());
-
-  if (operations_recorded_in_current_command_list_ != 0) {
-    pending_command_lists_.push_back(current_command_list_.Get());
-    pending_command_lists_cacheable_.push_back(true);
-  } else {
-    cached_command_lists_.push_back(current_command_list_.Get());
-  }
-
-  current_command_list_ = nullptr;
-  operations_recorded_in_current_command_list_ = 0;
-
-  pending_command_lists_.push_back(command_list);
-  pending_command_lists_cacheable_.push_back(false);
-
-  // Remember the descriptor heap and apply it to the next command list
-  auto heap = current_descriptor_heap_;
-  current_descriptor_heap_ = nullptr;
-  Open();
-
-  // The caller can re-use relevent resources after the next set of work to be
-  // flushed has completed.  Its command list hasn't been executed yet, just
-  // batched.
-  DmlGpuEvent gpu_event = queue_->GetNextCompletionEvent();
-  gpu_event.fence.CopyTo(fence);
-  *completion_value = gpu_event.fence_value;
-
-  // Trigger a flush of the command list, with the assumption that it contains
-  // enough GPU work that this will help parallelize GPU work with subsequent
-  // CPU work.
-  CloseAndExecute();
-  Open();
-
-  SetDescriptorHeap(heap);
-}
-
-Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>
-DmlCommandRecorder::GetCommandList() {
-  // Assume operations are added by the caller after this returns
   OnCommandRecorded();
-  return current_command_list_;
 }
 
 void DmlCommandRecorder::ResourceBarrier(
     absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
+  if (!status_.ok()) return;
+
   current_command_list_->ResourceBarrier(static_cast<uint32_t>(barriers.size()),
                                          barriers.data());
   OnCommandRecorded();
 }
 
-void DmlCommandRecorder::AddUAVBarrier() {
-  auto barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-  current_command_list_->ResourceBarrier(1, &barrier);
-  OnCommandRecorded();
-}
-
 void DmlCommandRecorder::Open() {
+  // This should have been checked in one of the public functions before calling
+  // Open()
+  DCHECK(status_.ok());
+
   assert(current_descriptor_heap_ == nullptr);
 
   ID3D12CommandAllocator* allocator =
@@ -341,35 +337,26 @@ void DmlCommandRecorder::Open() {
 }
 
 void DmlCommandRecorder::CloseAndExecute() {
-  DML_CHECK_SUCCEEDED(current_command_list_->Close());
+  if (!status_.ok()) return;
 
-  if (operations_recorded_in_current_command_list_ != 0) {
-    pending_command_lists_.push_back(current_command_list_.Get());
-    pending_command_lists_cacheable_.push_back(true);
+  HRESULT hr = current_command_list_->Close();
+
+  if (dml_util::HrIsOutOfMemory(hr)) {
+    status_ = errors::ResourceExhausted("OOM when closing the command list");
   } else {
+    DML_CHECK_SUCCEEDED(hr);
+
+    if (operations_recorded_in_current_command_list_ != 0) {
+      // Close and execute the command list
+      ID3D12CommandList* commandLists[] = {current_command_list_.Get()};
+      queue_->ExecuteCommandLists(commandLists);
+    }
+
     cached_command_lists_.push_back(current_command_list_.Get());
   }
 
   current_command_list_ = nullptr;
   operations_recorded_in_current_command_list_ = 0;
-
-  if (!pending_command_lists_.empty()) {
-    // Close and execute the command list
-    queue_->ExecuteCommandLists(absl::Span<ID3D12CommandList*>(
-        reinterpret_cast<ID3D12CommandList**>(pending_command_lists_.data()),
-        pending_command_lists_.size()));
-
-    assert(pending_command_lists_.size() ==
-           pending_command_lists_cacheable_.size());
-    for (size_t i = 0; i < pending_command_lists_.size(); ++i) {
-      if (pending_command_lists_cacheable_[i]) {
-        cached_command_lists_.push_back(pending_command_lists_[i]);
-      }
-    }
-
-    pending_command_lists_.clear();
-    pending_command_lists_cacheable_.clear();
-  }
 
   // The descriptor heap must be set on the command list the next time it's
   // opened.
@@ -385,6 +372,10 @@ void DmlCommandRecorder::CloseAndExecute() {
 
 void DmlCommandRecorder::SetDescriptorHeap(
     ID3D12DescriptorHeap* descriptor_heap) {
+  // This should have been checked in one of the public functions before calling
+  // SetDescriptorHeap()
+  DCHECK(status_.ok());
+
   if (descriptor_heap != nullptr &&
       descriptor_heap != current_descriptor_heap_) {
     current_descriptor_heap_ = descriptor_heap;
@@ -396,6 +387,10 @@ void DmlCommandRecorder::SetDescriptorHeap(
 }
 
 void DmlCommandRecorder::OnCommandRecorded() {
+  // This should have been checked in one of the public functions before calling
+  // OnCommandRecorded()
+  DCHECK(status_.ok());
+
   ++operations_recorded_in_current_command_list_;
 
   if (operations_recorded_in_current_command_list_ >= 25) {

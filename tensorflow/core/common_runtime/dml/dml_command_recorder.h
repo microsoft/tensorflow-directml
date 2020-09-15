@@ -19,6 +19,7 @@ limitations under the License.
 #include "dml_command_queue.h"
 #include "dml_common.h"
 #include "dml_descriptor_pool.h"
+#include "dml_status.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace tensorflow {
@@ -32,38 +33,35 @@ class DmlCommandRecorder {
                      std::shared_ptr<DmlCommandQueue> command_queue,
                      DmlAllocator* allocator);
 
-  Status InitializeOperator(IDMLCompiledOperator* op,
+  void InitializeOperator(IDMLCompiledOperator* op,
                             const DML_BINDING_DESC& persistent_resource_binding,
                             const DML_BINDING_DESC& input_array_binding);
 
-  Status ExecuteOperator(IDMLCompiledOperator* op,
-                         const DML_BINDING_DESC& persistent_resource_binding,
-                         absl::Span<const DML_BINDING_DESC> input_bindings,
-                         absl::Span<const DML_BINDING_DESC> output_bindings);
+  void ExecuteOperator(IDMLCompiledOperator* op,
+                       const DML_BINDING_DESC& persistent_resource_binding,
+                       absl::Span<const DML_BINDING_DESC> input_bindings,
+                       absl::Span<const DML_BINDING_DESC> output_bindings);
 
   void CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
+                        D3D12_RESOURCE_STATES dst_state,
                         ID3D12Resource* src_buffer, uint64_t src_offset,
-                        uint64_t byte_count);
+                        D3D12_RESOURCE_STATES src_state, uint64_t byte_count);
 
   void FillBufferWithPattern(
       ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
       absl::Span<const uint8_t>
           value /* Data type agnostic value, treated as raw bits */);
 
-  void ExecuteCommandList(ID3D12GraphicsCommandList* command_list,
-                          _Outptr_ ID3D12Fence** fence,
-                          _Out_ uint64_t* completion_value);
-
-  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandList();
-
   void ResourceBarrier(absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
-  void AddUAVBarrier();
 
   void CloseAndExecute();
 
   // If false, there are no pending commands to be submitted which indicates
   // that CloseAndExecute() would be a no-op.
   bool HasUnflushedWork() const;
+
+  Status GetStatus() const { return status_; }
+  void ResetStatus() { status_ = Status::OK(); }
 
  private:
   std::shared_ptr<DmlCommandQueue> queue_;
@@ -86,17 +84,14 @@ class DmlCommandRecorder {
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> current_command_list_;
   uint32_t operations_recorded_in_current_command_list_ = 0;
 
-  // Command lists which have been batched up for execution.  The values in
-  // pending_command_lists_cacheable_ indicate whether they can be moved into
-  // this class's cache after execution, versus if they belong to the caller and
-  // were passed to ExecuteCommandList.
-  std::vector<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>>
-      pending_command_lists_;
-  std::vector<bool> pending_command_lists_cacheable_;
-
   // A pool of cached command lists which may be re-used.
   std::deque<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>>
       cached_command_lists_;
+
+  // Status of the first error encountered when closing the command list.
+  // Operations that flush the command list or readback from the GPU should make
+  // sure that this status doesn't contain an error before doing so.
+  Status status_ = Status::OK();
 
   void SetDescriptorHeap(ID3D12DescriptorHeap* descriptor_heap);
   void Open();

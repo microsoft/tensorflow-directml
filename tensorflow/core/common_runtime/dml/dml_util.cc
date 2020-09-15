@@ -218,7 +218,8 @@ void CopyTensorInSameDevice(OpKernelContext* op_ctx, Tensor* dst,
                             const Tensor& src) {
   auto* device = static_cast<Device*>(op_ctx->device());
   op_ctx->op_device_context()->CopyTensorInSameDevice(
-      &src, device, dst, [](const Status& s) { TF_CHECK_OK(s); });
+      &src, device, dst,
+      [op_ctx](const Status& s) { OP_REQUIRES_OK(op_ctx, s); });
 }
 
 D3D12BufferRegion CreateBufferForTensor(const DmlDevice* device,

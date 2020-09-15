@@ -311,7 +311,7 @@ class DmlMatrixDiagKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     if (use_fast_path_) {
       // Fill the buffer with the padding value since we use strides to skip
       // over elements

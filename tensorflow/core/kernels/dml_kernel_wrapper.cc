@@ -130,15 +130,11 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
     return;
   }
 
-  DmlGpuEvent completion_event = ComputeKernel(kernel.get(), &dml_ctx);
-
-  // Check for validation done during kernel compute
-  if (!ctx->status().ok()) {
-    return;
-  }
+  auto status_or_event = ComputeKernel(kernel.get(), &dml_ctx);
+  OP_REQUIRES_OK(ctx, status_or_event.status());
 
   // Keep this kernel alive at least until it's completed execution on the GPU
-  kernel_manager.QueueReference(kernel, completion_event);
+  kernel_manager.QueueReference(kernel, status_or_event.ConsumeValueOrDie());
 }
 
 DmlKernelKey DmlKernelWrapperBase::CreateKernelKey(OpKernelContext* ctx) const {
@@ -163,11 +159,11 @@ DmlKernelKey DmlKernelWrapperBase::CreateKernelKey(OpKernelContext* ctx) const {
     DmlInputTensorKey tensor_key = {};
     tensor_key.is_constant_cpu_input =
         (memory_type == HOST_MEMORY && !is_resource_type);
-    
+
     if (tensor_key.is_constant_cpu_input) {
       tensor_key.tensor = std::move(tensor);
     } else {
-      tensor_key.tensor = TensorShapeAndType{ tensor.shape(), tensor.dtype() };
+      tensor_key.tensor = TensorShapeAndType{tensor.shape(), tensor.dtype()};
     }
 
     key.input_tensors.push_back(std::move(tensor_key));

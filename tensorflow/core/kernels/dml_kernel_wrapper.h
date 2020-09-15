@@ -62,8 +62,8 @@ class DmlKernelWrapperBase : public OpKernel {
       DmlKernelConstruction* ctx,
       const InitializationHelper* initialized_helper) const = 0;
 
-  virtual DmlGpuEvent ComputeKernel(DmlKernel* kernel,
-                                    DmlKernelContext* context) const = 0;
+  virtual StatusOr<DmlGpuEvent> ComputeKernel(
+      DmlKernel* kernel, DmlKernelContext* context) const = 0;
 
  protected:
   // Creates a key which uniquely identifies the kernel instance we need. The
@@ -143,8 +143,8 @@ class DmlKernelWrapper : public DmlKernelWrapperBase {
     return std::make_shared<const typename TKernel::InitHelper>(ctx, attr_);
   }
 
-  DmlGpuEvent ComputeKernel(DmlKernel* kernel,
-                            DmlKernelContext* context) const override {
+  StatusOr<DmlGpuEvent> ComputeKernel(
+      DmlKernel* kernel, DmlKernelContext* context) const override {
     return kernel->Compute(context);
   }
 

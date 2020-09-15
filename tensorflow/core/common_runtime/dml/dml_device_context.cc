@@ -130,7 +130,12 @@ void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
 
   // We have to kick off the GPU now to prevent a potential deadlock, because
   // we don't know if TF is going to block waiting on this copy to complete.
-  execution_context_->Flush();
+  status_or_event = execution_context_->Flush();
+
+  if (!status_or_event.ok()) {
+    done(status_or_event.status());
+    return;
+  }
 
   // Keep a ref on the source tensor to keep it alive until we're done with it
   TensorReference input_ref(*device_tensor);

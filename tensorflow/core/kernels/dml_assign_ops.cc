@@ -32,7 +32,8 @@ class DmlAssignOp : public AssignOp {
     Device* device = static_cast<Device*>(context->device());
 
     device_context->CopyTensorInSameDevice(
-        &rhs, device, lhs, [](const Status& s) { TF_CHECK_OK(s); });
+        &rhs, device, lhs,
+        [context](const Status& s) { OP_REQUIRES_OK(context, s); });
   }
 };
 

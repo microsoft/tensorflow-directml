@@ -151,7 +151,7 @@ class DmlBinaryKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -197,7 +197,7 @@ class DmlCompositeBinaryKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -236,7 +236,7 @@ class DmlUnaryKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -331,7 +331,7 @@ class DmlCompositeUnaryKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -375,7 +375,7 @@ class DmlUnaryScaleBiasKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -752,7 +752,7 @@ class DmlClipByValueKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -812,7 +812,7 @@ class DmlBinaryWithZeroKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -920,7 +920,7 @@ class DmlSquaredDifferenceKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
