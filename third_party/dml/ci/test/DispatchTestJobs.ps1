@@ -144,7 +144,7 @@ foreach ($AgentInfo in $AgentsInfo)
             'RunOnWsl' = $AgentInfo.RunOnWsl;
         }
 
-        Write-Host $Params
+        Write-Host $Params.Artifacts
 
         $Build = $Ado.QueuePipeline(
             $Pipeline.id, 
