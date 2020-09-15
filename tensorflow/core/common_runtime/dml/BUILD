@@ -24,9 +24,7 @@ cc_library(
     alwayslink = 1,
     visibility = ["//visibility:public"],
     
-    copts = tf_copts() + if_not_windows([
-        "-Ithird_party/dml/winadapter",
-    ]) + if_windows([
+    copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
     ]),
@@ -107,9 +105,7 @@ cc_library(
     alwayslink = 1,
     visibility = ["//visibility:public"],
     
-    copts = tf_copts() + if_not_windows([
-        "-Ithird_party/dml/winadapter",
-    ]) + if_windows([
+    copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
     ]),
@@ -130,9 +126,7 @@ tf_dml_cc_test(
         "//tensorflow/core/kernels:dml_ops",
         "//tensorflow/core/kernels:stateless_random_ops",
     ],
-    extra_copts = if_not_windows([
-        "-Ithird_party/dml/winadapter",
-    ]) + if_windows([
+    extra_copts = if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
     ]),
