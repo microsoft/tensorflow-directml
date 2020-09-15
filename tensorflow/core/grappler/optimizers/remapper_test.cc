@@ -58,7 +58,7 @@ class RemapperTest : public GrapplerTest {
 
     auto pad = ops::Pad(s.WithOpName("pad"), input, paddings);
 
-    constexpr auto explicit_paddings = {0, 0, 7, 10, 8, 2, 0, 0};
+    constexpr int explicit_paddings[] = {0, 0, 7, 10, 8, 2, 0, 0};
     ops::Conv2D::Attrs attrs;
 
     if (padding_type == "EXPLICIT") {
