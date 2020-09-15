@@ -83,19 +83,19 @@ foreach ($Agent in $Agents)
 
 foreach ($WslAgent in $WslAgents)
 {
-    $AgentInfo = 
+    $WslAgentInfo = 
     @{
-        'Name' = $Agent.Name;
-        'Status' = $Agent.Status;
-        'Enabled' = $Agent.Enabled;
-        'UserCapabilities' = $Agent.UserCapabilities;
+        'Name' = $WslAgent.Name;
+        'Status' = $WslAgent.Status;
+        'Enabled' = $WslAgent.Enabled;
+        'UserCapabilities' = $WslAgent.UserCapabilities;
         'RunOnWsl' = 1;
         'TestPoolName' = $WslTestPoolName;
         'AgentQueueId' = $WslAgentQueue.id;
         'Artifacts' = $WslArtifacts;
     }
 
-    $AgentsInfo.Add($AgentInfo)
+    $AgentsInfo.Add($WslAgentInfo)
 }
 
 $DispatchedJobs = [System.Collections.ArrayList]::new()
