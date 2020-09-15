@@ -1,3 +1,5 @@
+load("//tensorflow:tensorflow.bzl", "if_windows", "if_not_windows")
+
 config_setting(
     name = "using_dml",
     define_values = {
@@ -8,10 +10,11 @@ config_setting(
 
 licenses(["notice"]) # MIT license
 
-# Adapter for compiling DirectX in Linux.
+# Adapter for compiling DirectX in Linux. For Windows, this library only
+# exposes portability helpers (e.g. uuidof<T>) and IID asserts.
 cc_library(
     name = "winadapter",
-    hdrs = [
+    hdrs = ["winadapter/dxguids/dxguids.h"] + if_not_windows([
         "winadapter/d3d12.h",
         "winadapter/d3d12sdklayers.h",
         "winadapter/d3dcommon.h",
@@ -21,6 +24,8 @@ cc_library(
         "winadapter/dxgiformat.h",
         "winadapter/winadapter.h",
         "winadapter/wrladapter.h",
+    ]),
+    srcs = ["winadapter/dxguids/dxguids.cc"] + if_not_windows([
         "winadapter/stubs/oaidl.h",
         "winadapter/stubs/ocidl.h",
         "winadapter/stubs/rpc.h",
@@ -28,9 +33,12 @@ cc_library(
         "winadapter/stubs/winapifamily.h",
         "winadapter/stubs/wrl/client.h",
         "winadapter/stubs/wrl/implements.h",
-    ],
-    includes = ["winadapter", "winadapter/stubs"],
-    strip_include_prefix = "winadapter",
+    ]),
+    linkstatic = 1,
+    includes = ["winadapter/dxguids"] + if_not_windows([
+        "winadapter",
+        "winadapter/stubs",
+    ]),
     visibility = ["//visibility:public"]
 )
 

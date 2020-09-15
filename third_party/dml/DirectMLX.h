@@ -98,7 +98,7 @@ inline UINT64 DMLCalcBufferTensorSize(
     }
 
     // Round up to the nearest 4 bytes.
-    minimumImpliedSizeInBytes = (minimumImpliedSizeInBytes + 3) & ~3ui64;
+    minimumImpliedSizeInBytes = (minimumImpliedSizeInBytes + 3) & ~3ull;
 
     return minimumImpliedSizeInBytes;
 }

@@ -28,8 +28,11 @@ limitations under the License.
 
 using Microsoft::WRL::ComPtr;
 
-MIDL_INTERFACE("cb7490ac-8a0f-44ec-9b7b-6f4cafe8e9ab")
-DirectMLTensorFlowCreatorID : IUnknown{};
+static constexpr GUID kTensorflowDirectmlCreatorId = {
+    0xcb7490ac,
+    0x8a0f,
+    0x44ec,
+    {0x9b, 0x7b, 0x6f, 0x4c, 0xaf, 0xe8, 0xe9, 0xab}};
 
 namespace tensorflow {
 
@@ -81,7 +84,7 @@ namespace tensorflow {
     // If ID3D12Device9 is available, create with the DMLTF CreatorID for
     // telemetry. This call should succeed even if the ID is unrecognized.
     DML_CHECK_SUCCEEDED(d3d_device9->CreateCommandQueue1(
-        &command_queue_desc, __uuidof(DirectMLTensorFlowCreatorID),
+        &command_queue_desc, kTensorflowDirectmlCreatorId,
         IID_PPV_ARGS(&command_queue)));
   }
 #endif
@@ -108,7 +111,8 @@ namespace tensorflow {
       heap_allocator.get(), memory_limit_in_bytes, gpu_options, "DmlAllocator");
 
   auto execution_context = absl::make_unique<DmlExecutionContext>(
-      d3d_device.Get(), dml_device.Get(), command_queue.Get(), dml_allocator.get());
+      d3d_device.Get(), dml_device.Get(), command_queue.Get(),
+      dml_allocator.get());
 
   auto event_queue = absl::make_unique<DmlEventQueue>();
 

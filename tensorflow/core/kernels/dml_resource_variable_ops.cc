@@ -30,8 +30,9 @@ class DmlUpdateVariableOp : public DmlKernel {
 
   explicit DmlUpdateVariableOp(DmlKernelConstruction* ctx,
                                const InitHelper* init_helper) {
-    uint32_t tensor_sizes[] = {1, 1, 1,
-                               ctx->GetInputTensorShape(1).num_elements()};
+    uint32_t tensor_sizes[] = {
+        1, 1, 1,
+        static_cast<uint32_t>(ctx->GetInputTensorShape(1).num_elements())};
 
     auto tensor_desc = DmlTensorDesc::Create(ctx->GetInputDataType(1),
                                              tensor_sizes, tensor_sizes);
