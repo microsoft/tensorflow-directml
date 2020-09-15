@@ -13,7 +13,7 @@ parameters:
 steps:
 - task: DownloadBuildArtifacts@0
   displayName: Download ${{parameters.Artifact}}
-  condition: contains(variables.Artifacts, '${{parameters.Artifact}}')
+  condition: contains(variables.Artifacts, '$[parameters.Artifact]')
   inputs:
     buildType: specific
     project: WindowsAI
@@ -26,7 +26,7 @@ steps:
 
 - task: PowerShell@2
   displayName: Test ${{parameters.Artifact}}
-  condition: contains(variables.Artifacts, '${{parameters.Artifact}}')
+  condition: contains(variables.Artifacts, '$[parameters.Artifact]')
   inputs:
     targetType: filePath
     filePath: $(System.ArtifactsDirectory)/${{parameters.Artifact}}/TestAgent.ps1
@@ -39,11 +39,11 @@ steps:
 
 - task: PublishBuildArtifacts@1
   displayName: Upload ${{parameters.Artifact}} Test Results
-  condition: contains(variables.Artifacts, '${{parameters.Artifact}}')
+  condition: contains(variables.Artifacts, '$[parameters.Artifact]')
   inputs:
     pathToPublish: $(System.ArtifactsDirectory)/test
     artifactName: $(AgentName)
 
 - powershell: Remove-Item -Path "$(System.ArtifactsDirectory)/test/${{parameters.Artifact}}" -Recurse -Force
-  condition: contains(variables.Artifacts, '${{parameters.Artifact}}')
+  condition: contains(variables.Artifacts, '$[parameters.Artifact]')
   displayName: Cleanup Artifacts
