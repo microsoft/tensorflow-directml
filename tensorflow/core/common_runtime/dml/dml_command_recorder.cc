@@ -362,9 +362,20 @@ void DmlCommandRecorder::CloseAndExecute() {
   // opened.
   current_descriptor_heap_ = nullptr;
 
+  HRESULT dml_reason = dml_device_->GetDeviceRemovedReason();
+  HRESULT d3d12_reason = d3d_device_->GetDeviceRemovedReason();
+
+  if (dml_reason == DXGI_ERROR_DEVICE_HUNG ||
+      d3d12_reason == DXGI_ERROR_DEVICE_HUNG) {
+    status_ = errors::Unknown(
+        "Device hung while executing a command. This can happen when the GPU "
+        "times out or when there's a problem in the driver.");
+    return;
+  }
+
   // Fail early if something horrifying happens
-  DML_CHECK_SUCCEEDED(dml_device_->GetDeviceRemovedReason());
-  DML_CHECK_SUCCEEDED(d3d_device_->GetDeviceRemovedReason());
+  DML_CHECK_SUCCEEDED(dml_reason);
+  DML_CHECK_SUCCEEDED(d3d12_reason);
 
   // Always keep the command recorder in an opened state
   Open();
