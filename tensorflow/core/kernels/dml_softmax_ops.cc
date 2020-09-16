@@ -23,26 +23,6 @@ limitations under the License.
 
 namespace tensorflow {
 
-class SoftmaxXentWithLogitsShapeHelper : public ShapeHelper {
- public:
-  std::vector<TensorShape> GetOutputShapes(
-      OpKernelContext* ctx,
-      const InitializationHelper* initialization_helper) const override {
-    const Tensor& logits_in = ctx->input(0);
-    const Tensor& labels_in = ctx->input(1);
-
-    BCast bcast(BCast::FromShape(logits_in.shape()),
-                BCast::FromShape(labels_in.shape()));
-
-    // logits must have the same shape as labels or can be broadcasted
-    CHECK(logits_in.IsSameSize(labels_in) || bcast.IsValid());
-    TensorShape shape_in = BCast::ToShape(bcast.output_shape());
-    TensorShape outputShape({shape_in.dim_size(0)});
-
-    return {outputShape, shape_in};
-  }
-};
-
 class DmlSoftmaxXentWithLogitsInitHelper : public InitializationHelper {
  public:
   using Attributes = EmptyAttributes;
@@ -77,12 +57,25 @@ class DmlSoftmaxXentWithLogitsInitHelper : public InitializationHelper {
   TensorShape shape_in_;
 };
 
+class SoftmaxXentWithLogitsShapeHelper : public ShapeHelper {
+ public:
+  std::vector<TensorShape> GetOutputShapes(
+      OpKernelContext* ctx,
+      const InitializationHelper* initialization_helper) const override {
+    auto init_helper = static_cast<const DmlSoftmaxXentWithLogitsInitHelper*>(
+        initialization_helper);
+    TensorShape shape_in = init_helper->GetShapeIn();
+    TensorShape outputShape({shape_in.dim_size(0)});
+
+    return {outputShape, shape_in};
+  }
+};
+
 class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
  public:
   using InitHelper = DmlSoftmaxXentWithLogitsInitHelper;
-  explicit DmlSoftmaxXentWithLogitsKernel(
-      DmlKernelConstruction* ctx,
-      const DmlSoftmaxXentWithLogitsInitHelper* init_helper) {
+  explicit DmlSoftmaxXentWithLogitsKernel(DmlKernelConstruction* ctx,
+                                          const InitHelper* init_helper) {
     CHECK(ctx->GetInputCount() == 2);
     CHECK(ctx->GetOutputCount() == 2);
 
@@ -123,38 +116,32 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
         logits_shape.dim_size(0) == shape_in.dim_size(0) ? 0 : 1;
     uint32_t toBCastClassDim =
         logits_shape.dim_size(1) == shape_in.dim_size(1) ? 0 : 1;
-    dml::Expression logits_bcast;
     if (toBCastBatchDim || toBCastClassDim) {
-      logits_bcast = dml::Reinterpret(
+      logits = dml::Reinterpret(
           logits, input_sizes,
           dml::TensorDesc::Dimensions(
               {0, 0, 1 - toBCastBatchDim, 1 - toBCastClassDim}));
-    } else {
-      logits_bcast = dml::Reinterpret(logits, input_sizes, {});
     }
 
     // broadcast labels if the shape do not match
-    dml::Expression labels_bcast;
     toBCastBatchDim = labels_shape.dim_size(0) == shape_in.dim_size(0) ? 0 : 1;
     toBCastClassDim = labels_shape.dim_size(1) == shape_in.dim_size(1) ? 0 : 1;
 
     if (toBCastBatchDim || toBCastClassDim) {
-      labels_bcast = dml::Reinterpret(
+      labels = dml::Reinterpret(
           labels, input_sizes,
           dml::TensorDesc::Dimensions(
               {0, 0, 1 - toBCastBatchDim, 1 - toBCastClassDim}));
-    } else {
-      labels_bcast = dml::Reinterpret(labels, input_sizes, {});
     }
 
     // max_logits along classes.
     auto logits_max =
-        dml::Reduce(logits_bcast, DML_REDUCE_FUNCTION_MAX, reduce_strides);
+        dml::Reduce(logits, DML_REDUCE_FUNCTION_MAX, reduce_strides);
     auto logits_max_bcast =
         dml::Reinterpret(logits_max, input_sizes, broadcast_c_strides);
 
     // logits - max_logits.
-    auto shifted_logits = logits_bcast - logits_max_bcast;
+    auto shifted_logits = logits - logits_max_bcast;
 
     // exp(logits - max_logits)
     auto exp_shifted_logits = dml::Exp(shifted_logits);
@@ -163,7 +150,7 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
     auto sum_exp = dml::Reduce(exp_shifted_logits, DML_REDUCE_FUNCTION_SUM,
                                reduce_strides);
 
-    //// log(sum(exp(logits - max_logits)))
+    // log(sum(exp(logits - max_logits)))
     auto log_sum_exp = dml::Log(sum_exp);
     auto log_sum_exp_bcast =
         dml::Reinterpret(log_sum_exp, input_sizes, broadcast_c_strides);
@@ -171,7 +158,7 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
     // sum(-labels *
     //    ((logits - max_logits) - log(sum(exp(logits - max_logits)))))
     auto sub = log_sum_exp_bcast - shifted_logits;
-    auto mul = labels_bcast * sub;
+    auto mul = labels * sub;
     auto loss = dml::Reduce(mul, DML_REDUCE_FUNCTION_SUM, reduce_strides);
 
     // backprop: prob - labels, where
@@ -179,7 +166,7 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
     //     (where the division broadcasts along the batch dimension)
     auto sum_exp_bcast =
         dml::Reinterpret(sum_exp, input_sizes, broadcast_c_strides);
-    auto backprop = exp_shifted_logits / sum_exp_bcast - labels_bcast;
+    auto backprop = exp_shifted_logits / sum_exp_bcast - labels;
 
     // loss: output tensor for the loss, dims: batch_size.
     // backprop: output tensor for the backprop, dims: batch_size, num_classes.
