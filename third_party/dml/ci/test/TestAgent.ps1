@@ -50,7 +50,7 @@ try
             Push-Location $WslArtifactFolderAsWin
 
             $LoadLibraryPath = wsl echo $WslArtifactFolder`:`$LD_LIBRARY_PATH
-            $WslTensorFlowWheelPath = Get-ChildItem tensorflow_directml-*-linux_x86_64.whl | Select-Object -First 1 -ExpandProperty Name
+            $WslTensorFlowWheelPath = Get-ChildItem tensorflow_directml-*linux_x86_64.whl | Select-Object -First 1 -ExpandProperty Name
             Invoke-Expression "wsl export LD_LIBRARY_PATH='$LoadLibraryPath' '&&' python3 run_tests.py --test_group $TestGroup --tensorflow_wheel $WslTensorFlowWheelPath > test_${TestGroup}_log.txt"
             wsl find . -name '*_test_result.xml' -exec cp '{}' $TestArtifactPathWinAsWsl --parents \`;
             wsl find . -name '*_test_result.xml' -exec rm '{}' \`;
