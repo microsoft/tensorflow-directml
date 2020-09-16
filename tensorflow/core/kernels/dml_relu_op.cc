@@ -68,8 +68,9 @@ class DmlReluKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 1);
     CHECK(ctx->GetOutputCount() == 1);
 
-    uint32_t tensor_sizes[4] = {1, 1, 1,
-                                ctx->GetInputTensorShape(0).num_elements()};
+    auto num_elements =
+        static_cast<uint32_t>(ctx->GetInputTensorShape(0).num_elements());
+    uint32_t tensor_sizes[4] = {1, 1, 1, num_elements};
 
     auto data_type = GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));
     DmlTensorInfo tensor_info = {};

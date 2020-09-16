@@ -179,14 +179,14 @@ class DmlMatrixDiagKernel : public DmlKernel {
     const TensorShape& input_shape = ctx->GetInputTensorShape(0);
     const TensorShape& output_shape = ctx->GetOutputTensorShape(0);
 
-    int64 batch_size = 1;
+    uint32_t batch_size = 1u;
     for (int i = 0; i < input_shape.dims() - 1; ++i) {
       batch_size *= input_shape.dim_size(i);
     }
 
-    int64 elem_count_per_batch = input_shape.num_elements() / batch_size;
-    int64 output_height = output_shape.dim_size(output_shape.dims() - 2);
-    int64 output_width = output_shape.dim_size(output_shape.dims() - 1);
+    auto elem_count_per_batch = static_cast<uint32_t>(input_shape.num_elements() / batch_size);
+    auto output_height = static_cast<uint32_t>(output_shape.dim_size(output_shape.dims() - 2));
+    auto output_width = static_cast<uint32_t>(output_shape.dim_size(output_shape.dims() - 1));
 
     // Flatten the input into a batch of vectors
     TensorShape flattened_input_shape({batch_size, 1, 1, elem_count_per_batch});

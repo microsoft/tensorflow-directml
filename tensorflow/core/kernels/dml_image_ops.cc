@@ -198,8 +198,8 @@ class DmlColorConversionKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 1);
     CHECK(ctx->GetOutputCount() == 1);
 
-    int64 num_channels = init_helper->GetNumChannels();
-    int64 num_pixels = init_helper->GetNumPixels();
+    auto num_channels = static_cast<uint32_t>(init_helper->GetNumChannels());
+    auto num_pixels = static_cast<uint32_t>(init_helper->GetNumPixels());
 
     uint32_t tensor_sizes[4] = {1, 1, num_pixels, num_channels};
     auto data_type = GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));
@@ -266,13 +266,14 @@ class DmlAdjustImageKernel : public DmlKernel {
     CHECK(ctx->GetOutputCount() == 1);
 
     const TensorShape& input_shape = ctx->GetInputTensorShape(0);
-    int64 width = init_helper->GetWidth();
-    int64 height = init_helper->GetHeight();
-    int64 channels = init_helper->GetChannels();
+    auto width = static_cast<uint32_t>(init_helper->GetWidth());
+    auto height = static_cast<uint32_t>(init_helper->GetHeight());
+    auto channels = static_cast<uint32_t>(init_helper->GetChannels());
 
     // Conversion helpers and DML require 4D input, but the leading dimensions
     // may be coalsced into N.
-    int64 num_images = input_shape.num_elements() / (width * height * channels);
+    auto num_images = static_cast<uint32_t>(input_shape.num_elements() /
+                                            (width * height * channels));
     uint32_t input_shape_dml[4] = {num_images, height, width, channels};
     uint32_t zero_strides[4] = {0, 0, 0, 0};
     auto data_type = GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));

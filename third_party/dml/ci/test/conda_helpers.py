@@ -61,11 +61,18 @@ class CondaEnv:
         shell=True,
         check=True)
 
-  def run(self, args):
+  def run(self, args, variables=None):
     args_string = " ".join(args)
+
+    env = None
+
+    if variables is not None:
+      env = {**os.environ, **variables}
+
     subprocess.run(
         f"{self.hook_command}"
         f" && conda activate {self.env_name}"
         f" && python {args_string}",
         shell=True,
-        check=True)
+        check=True,
+        env=env)

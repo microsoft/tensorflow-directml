@@ -23,7 +23,7 @@ def _directml_nuget_repository_impl(repository_ctx):
     install_directory = "{}\\tfdml_redist".format(result.stdout.strip())
     
     # Convert path to Linux path
-    cmd = ["wsl.exe", "wslpath", "'{}'".format(install_directory)]
+    cmd = ["wslpath", "{}".format(install_directory)]
     result = repository_ctx.execute(cmd)
     if result.return_code != 0:
       fail("Converting install_directory path failed: %s (%s)" % (result.stderr, " ".join(cmd)))

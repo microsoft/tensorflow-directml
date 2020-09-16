@@ -2012,7 +2012,7 @@ def tf_py_wrap_cc(
             "-Wno-sign-compare",
             "-Wno-write-strings",
         ]),
-        linkopts = extra_linkopts + if_dml(["-Wl,-L/mnt/c/Windows/System32/lxss/lib"]),
+        linkopts = extra_linkopts + if_dml(["-Wl,-L/usr/lib/wsl/lib"]),
         linkstatic = 1,
         deps = deps + extra_deps,
         **kwargs

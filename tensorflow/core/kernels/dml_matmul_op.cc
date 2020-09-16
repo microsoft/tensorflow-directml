@@ -185,7 +185,7 @@ class BatchMatMulV2InitHelper : public BaseBatchMatMulInitHelper {
 
 class MatMulShapeHelper : public ShapeHelper {
  public:
-  std::vector<TensorShape> MatMulShapeHelper::GetOutputShapes(
+  std::vector<TensorShape> GetOutputShapes(
       OpKernelContext* ctx,
       const InitializationHelper* initialization_helper) const override {
     const TensorShape& a_shape = ctx->input(0).shape();
