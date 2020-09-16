@@ -75,7 +75,7 @@ steps:
     filePath: third_party/dml/ci/test/CreateTestEmail.ps1
     arguments: >
       -TestArtifactsPath ${{parameters.TestArtifactsPath}}
-      -BuildArtifacts $(Artifacts)
+      -BuildArtifacts "$(Artifacts),$(WslArtifacts)"
       -TestGroups "$(TestGroups)"
       -BuildRunID $(BuildID) 
       -TestRunID $(Build.BuildId)

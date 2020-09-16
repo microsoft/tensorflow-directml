@@ -25,7 +25,6 @@ if ($RunOnWsl)
 {
     $TestArtifact = Split-Path -Path $BuildArtifactsPath -Leaf
     $BuildArtifactPathWinAsWsl = wsl wslpath -a ($BuildArtifactsPath -replace '\\','/')
-    $TestArtifactPathWinAsWsl = wsl wslpath -a ($TestArtifactsPath -replace '\\','/')
     $WslArtifactFolder = "/tmp/$TestArtifact"
     wsl rm -rf $WslArtifactFolder
     wsl mkdir -p /tmp
@@ -52,9 +51,9 @@ try
             $LoadLibraryPath = wsl echo $WslArtifactFolder`:`$LD_LIBRARY_PATH
             $WslTensorFlowWheelPath = Get-ChildItem tensorflow_directml-*linux_x86_64.whl | Select-Object -First 1 -ExpandProperty Name
             Invoke-Expression "wsl export LD_LIBRARY_PATH='$LoadLibraryPath' '&&' python3 run_tests.py --test_group $TestGroup --tensorflow_wheel $WslTensorFlowWheelPath > test_${TestGroup}_log.txt"
-            wsl find . -name '*_test_result.xml' -exec cp '{}' $TestArtifactPathWinAsWsl --parents \`;
+            wsl find . -name '*_test_result.xml' -exec cp '{}' $BuildArtifactPathWinAsWsl --parents \`;
             wsl find . -name '*_test_result.xml' -exec rm '{}' \`;
-            wsl mv ./test_${TestGroup}_log.txt $TestArtifactPathWinAsWsl
+            wsl mv ./test_${TestGroup}_log.txt $BuildArtifactPathWinAsWsl
 
             Pop-Location
         }
