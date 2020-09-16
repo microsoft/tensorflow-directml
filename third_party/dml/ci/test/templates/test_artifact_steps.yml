@@ -37,6 +37,7 @@ steps:
 
 - task: PublishBuildArtifacts@1
   displayName: Upload ${{parameters.Artifact}} Test Results
+  condition: always()
   inputs:
     pathToPublish: $(System.ArtifactsDirectory)/test
     artifactName: $(AgentName)
