@@ -19,24 +19,9 @@ limitations under the License.
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
+#include "tensorflow/core/util/bcast.h"
 
 namespace tensorflow {
-
-class SoftmaxXentWithLogitsShapeHelper : public ShapeHelper {
- public:
-  std::vector<TensorShape> GetOutputShapes(
-      OpKernelContext* ctx,
-      const InitializationHelper* initialization_helper) const override {
-    const Tensor& logits = ctx->input(0);
-    const Tensor& labels = ctx->input(1);
-    // logits must have the same shape as labels
-    CHECK(logits.shape() == labels.shape());
-
-    TensorShape outputShape({logits.dim_size(0), 1});
-
-    return {outputShape, logits.shape()};
-  }
-};
 
 class DmlSoftmaxXentWithLogitsInitHelper : public InitializationHelper {
  public:
@@ -46,27 +31,51 @@ class DmlSoftmaxXentWithLogitsInitHelper : public InitializationHelper {
                                      std::shared_ptr<const Attributes> attr) {
     const Tensor& logits_in = ctx->input(0);
     const Tensor& labels_in = ctx->input(1);
-    TensorShape shape_in = logits_in.shape();
 
-    OP_REQUIRES(ctx, logits_in.IsSameSize(labels_in),
-                errors::InvalidArgument(
-                    "logits and labels must be broadcastable: logits_size=",
-                    logits_in.shape().DebugString(),
-                    " labels_size=", labels_in.shape().DebugString()));
+    BCast bcast(BCast::FromShape(logits_in.shape()),
+                BCast::FromShape(labels_in.shape()));
 
-    OP_REQUIRES(ctx, TensorShapeUtils::IsMatrix(shape_in),
+    shape_in_ = logits_in.shape();
+
+    if (!logits_in.IsSameSize(labels_in)) {
+      OP_REQUIRES(ctx, bcast.IsValid(),
+                  errors::InvalidArgument(
+                      "logits and labels must be broadcastable: logits_size=",
+                      logits_in.shape().DebugString(),
+                      " labels_size=", labels_in.shape().DebugString()));
+      shape_in_ = BCast::ToShape(bcast.output_shape());
+    }
+
+    OP_REQUIRES(ctx, TensorShapeUtils::IsMatrix(shape_in_),
                 errors::InvalidArgument("logits and labels must be either "
                                         "2-dimensional, or broadcasted to be "
                                         "2-dimensional"));
+  }
+  TensorShape GetShapeIn() const { return shape_in_; }
+
+ private:
+  TensorShape shape_in_;
+};
+
+class SoftmaxXentWithLogitsShapeHelper : public ShapeHelper {
+ public:
+  std::vector<TensorShape> GetOutputShapes(
+      OpKernelContext* ctx,
+      const InitializationHelper* initialization_helper) const override {
+    auto init_helper = static_cast<const DmlSoftmaxXentWithLogitsInitHelper*>(
+        initialization_helper);
+    TensorShape shape_in = init_helper->GetShapeIn();
+    TensorShape outputShape({shape_in.dim_size(0)});
+
+    return {outputShape, shape_in};
   }
 };
 
 class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
  public:
   using InitHelper = DmlSoftmaxXentWithLogitsInitHelper;
-  explicit DmlSoftmaxXentWithLogitsKernel(
-      DmlKernelConstruction* ctx,
-      const DmlSoftmaxXentWithLogitsInitHelper* init_helper) {
+  explicit DmlSoftmaxXentWithLogitsKernel(DmlKernelConstruction* ctx,
+                                          const InitHelper* init_helper) {
     CHECK(ctx->GetInputCount() == 2);
     CHECK(ctx->GetOutputCount() == 2);
 
@@ -84,7 +93,14 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
     auto logits = dml::InputTensor(scope, 0, input_descs[0]);
     auto labels = dml::InputTensor(scope, 1, input_descs[1]);
 
-    auto input_sizes = labels.GetOutputDesc().sizes;
+    // target shape after broadcast
+    TensorShape shape_in = init_helper->GetShapeIn();
+    TensorShape logits_shape = ctx->GetInputTensorShape(0);
+    TensorShape labels_shape = ctx->GetInputTensorShape(1);
+
+    dml::TensorDesc::Dimensions input_sizes = {
+        1, 1, static_cast<uint32_t>(shape_in.dim_size(0)),
+        static_cast<uint32_t>(shape_in.dim_size(1))};
 
     // The strides we need to set to broadcast class across an entire tensor
     dml::TensorDesc::Dimensions broadcast_c_strides = {/*NoSense*/ 0,
@@ -94,6 +110,29 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
 
     // The strides we need to set to broadcast class across an entire tensor
     dml::TensorDesc::Dimensions reduce_strides = {0, 1, 3};
+
+    // broadcast logits if the shape do not match
+    uint32_t toBCastBatchDim =
+        logits_shape.dim_size(0) == shape_in.dim_size(0) ? 0 : 1;
+    uint32_t toBCastClassDim =
+        logits_shape.dim_size(1) == shape_in.dim_size(1) ? 0 : 1;
+    if (toBCastBatchDim || toBCastClassDim) {
+      logits = dml::Reinterpret(
+          logits, input_sizes,
+          dml::TensorDesc::Dimensions(
+              {0, 0, 1 - toBCastBatchDim, 1 - toBCastClassDim}));
+    }
+
+    // broadcast labels if the shape do not match
+    toBCastBatchDim = labels_shape.dim_size(0) == shape_in.dim_size(0) ? 0 : 1;
+    toBCastClassDim = labels_shape.dim_size(1) == shape_in.dim_size(1) ? 0 : 1;
+
+    if (toBCastBatchDim || toBCastClassDim) {
+      labels = dml::Reinterpret(
+          labels, input_sizes,
+          dml::TensorDesc::Dimensions(
+              {0, 0, 1 - toBCastBatchDim, 1 - toBCastClassDim}));
+    }
 
     // max_logits along classes.
     auto logits_max =
