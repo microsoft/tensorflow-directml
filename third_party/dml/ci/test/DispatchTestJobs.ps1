@@ -19,6 +19,9 @@ Param
     # Comma-separated list of build artifacts to test.
     [string]$Artifacts,
 
+    # Comma-separated list of WSL build artifacts to test.
+    [string]$WslArtifacts,
+
     # Comma-separated list of test groups to run on each agent.
     [string]$TestGroups,
 
@@ -27,6 +30,9 @@ Param
 
     # Name of the agent pool to receive dispatched jobs.
     [string]$TestPoolName = 'DirectML',
+
+    # Name of the agent pool to receive dispatched jobs for WSL.
+    [string]$WslTestPoolName = 'DirectML-WSL',
 
     # Path to store test artifacts from dispatched jobs.
     [string]$TestArtifactsPath = 'dispatch_artifacts',
@@ -47,36 +53,78 @@ $Ado = [ADOHelper]::CreateFromPipeline($AccessToken)
 $TriggerPipeline = $Ado.GetBuild($BuildID)
 
 $Pipeline = $Ado.GetBuildDefinition($TestPipelineName)
+
 $AgentPool = $Ado.GetAgentPool($TestPoolName)
 $AgentQueue = $Ado.GetAgentQueue($TestPoolName)
 $Agents = $Ado.GetAgents($AgentPool.id)
-$DispatchedJobs = [System.Collections.ArrayList]::new()
+
+$WslAgentPool = $Ado.GetAgentPool($WslTestPoolName)
+$WslAgentQueue = $Ado.GetAgentQueue($WslTestPoolName)
+$WslAgents = $Ado.GetAgents($WslAgentPool.id)
+
+$AgentsInfo = [System.Collections.ArrayList]::new()
 
 foreach ($Agent in $Agents)
 {
+    $AgentInfo = 
+    @{
+        'Name' = $Agent.Name;
+        'Status' = $Agent.Status;
+        'Enabled' = $Agent.Enabled;
+        'UserCapabilities' = $Agent.UserCapabilities;
+        'RunOnWsl' = 0;
+        'TestPoolName' = $TestPoolName;
+        'AgentQueueId' = $AgentQueue.id;
+        'Artifacts' = $Artifacts;
+    }
+
+    $AgentsInfo.Add($AgentInfo)
+}
+
+foreach ($WslAgent in $WslAgents)
+{
+    $WslAgentInfo = 
+    @{
+        'Name' = $WslAgent.Name;
+        'Status' = $WslAgent.Status;
+        'Enabled' = $WslAgent.Enabled;
+        'UserCapabilities' = $WslAgent.UserCapabilities;
+        'RunOnWsl' = 1;
+        'TestPoolName' = $WslTestPoolName;
+        'AgentQueueId' = $WslAgentQueue.id;
+        'Artifacts' = $WslArtifacts;
+    }
+
+    $AgentsInfo.Add($WslAgentInfo)
+}
+
+$DispatchedJobs = [System.Collections.ArrayList]::new()
+
+foreach ($AgentInfo in $AgentsInfo)
+{
     $JobInfo = 
     @{
-        'AgentName' = $Agent.Name; 
-        'AgentStatus' = $Agent.Status; 
-        'AgentEnabled' = $Agent.Enabled; 
+        'AgentName' = $AgentInfo.Name; 
+        'AgentStatus' = $AgentInfo.Status; 
+        'AgentEnabled' = $AgentInfo.Enabled; 
         'IsSlowRing' = $false;
     }
 
-    if (!$Agent.Enabled)
+    if (!$AgentInfo.Enabled)
     {
         Write-Host "Agent $($JobInfo.AgentName) is disabled. Skipping."
     }
-    elseif ($Agent.Status -ne 'online')
+    elseif ($AgentInfo.Status -ne 'online')
     {
         Write-Host "Agent $($JobInfo.AgentName) is offline. Skipping."
     }
-    elseif ($SkipSlowRingAgents -and $Agent.UserCapabilities.'AP.SlowRing')
+    elseif ($SkipSlowRingAgents -and $AgentInfo.UserCapabilities.'AP.SlowRing')
     {
-        Write-Host "Agent $($Agent.Name) is in the slow ring. Skipping."
+        Write-Host "Agent $($AgentInfo.Name) is in the slow ring. Skipping."
         $JobInfo.AgentEnabled = $false
         $JobInfo.IsSlowRing = $true
     }
-    elseif ($Agent.UserCapabilities.'AP.TargetXbox')
+    elseif ($AgentInfo.UserCapabilities.'AP.TargetXbox')
     {
         # TensorFlow does not run on Xbox. Skip any agents that have the AP.TargetXbox capability
         # set, which indicates a proxy agent that deploys tests to an Xbox device.
@@ -86,18 +134,19 @@ foreach ($Agent in $Agents)
     {
         $Params = 
         @{
-            'Artifacts' = $Artifacts;
+            'Artifacts' = $AgentInfo.Artifacts;
             'TestGroups' = $TestGroups;
             'Pipeline' = $TriggerPipeline.Definition.Name;
             'PipelineBuildID' = $BuildID;
-            'AgentName' = $Agent.Name;
-            'AgentPool' = $TestPoolName;
+            'AgentName' = $AgentInfo.Name;
+            'AgentPool' = $AgentInfo.TestPoolName;
             'TimeoutMinutes' = ($TimeoutMinutes - 5);
+            'RunOnWsl' = $AgentInfo.RunOnWsl;
         }
 
         $Build = $Ado.QueuePipeline(
             $Pipeline.id, 
-            $AgentQueue.id,
+            $AgentInfo.AgentQueueId,
             $Params, 
             $env:Build_SourceBranch, 
             $env:Build_SourceVersion)

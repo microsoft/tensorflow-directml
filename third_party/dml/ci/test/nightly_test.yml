@@ -6,9 +6,11 @@
 # The following variables are set in the pipeline web UI:
 # - (required) ControlPool : name of the ADO agent pool that runs the dispatch/report job in this pipeline.
 # - (required) TestPool : name of the ADO agent pool to test. All active agents in this pool will be tested.
+# - (required) WslTestPool : name of the ADO agent pool to test for WSL. All active agents in this pool will be tested.
 # - (required) BuildID : ID of the build to test.
 # - (required) TestGroups : comma-separated list of test groups to test. e.g. 'python,core'
 # - (required) Artifacts : comma-separated list of build artifacts to test. e.g. 'x64-win-release-cp36'
+# - (required) WslArtifacts : comma-separated list of WSL build artifacts to test. e.g. 'x64-linux-release-cp36'
 # - (required) AccessToken : personal access token to use REST API for dispatching tests.
 # - (optional) EmailTo : email address to receive generated HTML report. If empty, no email is sent.
 
