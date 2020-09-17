@@ -885,6 +885,28 @@ namespace dml
             return output;
         }
 
+        template <DML_OPERATOR_TYPE OperatorType, typename TDesc>
+        Expression ElementWiseComparison(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
+        {
+            assert(detail::HasSameOwner({ a, b }));
+            detail::GraphBuilder* builder = a.Impl()->GetGraphBuilder();
+
+            TensorDesc aTensor = a.Impl()->GetOutputDesc();
+            TensorDesc bTensor = b.Impl()->GetOutputDesc();
+            TensorDesc outputTensor(outputDataType, aTensor.sizes, builder->GetOutputLayout());
+
+            TDesc desc = {};
+            desc.ATensor = aTensor.AsPtr<DML_TENSOR_DESC>();
+            desc.BTensor = bTensor.AsPtr<DML_TENSOR_DESC>();
+            desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
+
+            detail::NodeOutput* const inputs[] = { a.Impl(), b.Impl() };
+            detail::NodeID node = builder->CreateOperatorNode(OperatorType, &desc, inputs);
+            detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
+
+            return output;
+        }
+
         // Used to reserve some space on the stack for setting up fused activation operator descs.
         struct FusedActivationStorage
         {
@@ -1038,76 +1060,40 @@ namespace dml
         return detail::ElementWiseBinary<DML_OPERATOR_ELEMENT_WISE_LOGICAL_AND, DML_ELEMENT_WISE_LOGICAL_AND_OPERATOR_DESC>(a, b);
     }
 
-    inline Expression LogicalEquals(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
+    inline Expression Equals(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
     {
-        assert(detail::HasSameOwner({ a, b }));
-        detail::GraphBuilder* builder = a.Impl()->GetGraphBuilder();
-
-        TensorDesc aTensor = a.Impl()->GetOutputDesc();
-        TensorDesc bTensor = b.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(outputDataType, aTensor.sizes, builder->GetOutputLayout());
-
-        DML_ELEMENT_WISE_LOGICAL_EQUALS_OPERATOR_DESC desc = {};
-        desc.ATensor = aTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.BTensor = bTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-
-        detail::NodeOutput* const inputs[] = { a.Impl(), b.Impl() };
-        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_ELEMENT_WISE_LOGICAL_EQUALS, &desc, inputs);
-        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
-
-        return output;
+        return detail::ElementWiseComparison<
+            DML_OPERATOR_ELEMENT_WISE_LOGICAL_EQUALS,
+            DML_ELEMENT_WISE_LOGICAL_EQUALS_OPERATOR_DESC>(a, b, outputDataType);
     }
 
-    inline Expression LogicalGreaterThan(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
+    inline Expression GreaterThan(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
     {
-        assert(detail::HasSameOwner({ a, b }));
-        detail::GraphBuilder* builder = a.Impl()->GetGraphBuilder();
-
-        TensorDesc aTensor = a.Impl()->GetOutputDesc();
-        TensorDesc bTensor = b.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(outputDataType, aTensor.sizes, builder->GetOutputLayout());
-
-        DML_ELEMENT_WISE_LOGICAL_GREATER_THAN_OPERATOR_DESC desc = {};
-        desc.ATensor = aTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.BTensor = bTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-
-        detail::NodeOutput* const inputs[] = { a.Impl(), b.Impl() };
-        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_ELEMENT_WISE_LOGICAL_GREATER_THAN, &desc, inputs);
-        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
-
-        return output;
+        return detail::ElementWiseComparison<
+            DML_OPERATOR_ELEMENT_WISE_LOGICAL_GREATER_THAN,
+            DML_ELEMENT_WISE_LOGICAL_GREATER_THAN_OPERATOR_DESC>(a, b, outputDataType);
     }
 
-    // 
-    // TODO: LogicalGreaterThanOrEqual
-    // 
-
-    inline Expression LogicalLessThan(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
+    inline Expression GreaterThanOrEqual(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
     {
-        assert(detail::HasSameOwner({ a, b }));
-        detail::GraphBuilder* builder = a.Impl()->GetGraphBuilder();
-
-        TensorDesc aTensor = a.Impl()->GetOutputDesc();
-        TensorDesc bTensor = b.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(outputDataType, aTensor.sizes, builder->GetOutputLayout());
-
-        DML_ELEMENT_WISE_LOGICAL_LESS_THAN_OPERATOR_DESC desc = {};
-        desc.ATensor = aTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.BTensor = bTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-
-        detail::NodeOutput* const inputs[] = { a.Impl(), b.Impl() };
-        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_ELEMENT_WISE_LOGICAL_LESS_THAN, &desc, inputs);
-        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
-
-        return output;
+        return detail::ElementWiseComparison<
+            DML_OPERATOR_ELEMENT_WISE_LOGICAL_GREATER_THAN_OR_EQUAL,
+            DML_ELEMENT_WISE_LOGICAL_GREATER_THAN_OR_EQUAL_OPERATOR_DESC>(a, b, outputDataType);
     }
 
-    // 
-    // TODO: LogicalLessThanOrEqual
-    // 
+    inline Expression LessThan(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
+    {
+        return detail::ElementWiseComparison<
+            DML_OPERATOR_ELEMENT_WISE_LOGICAL_LESS_THAN,
+            DML_ELEMENT_WISE_LOGICAL_LESS_THAN_OPERATOR_DESC>(a, b, outputDataType);
+    }
+
+    inline Expression LessThanOrEqual(Expression a, Expression b, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
+    {
+        return detail::ElementWiseComparison<
+            DML_OPERATOR_ELEMENT_WISE_LOGICAL_LESS_THAN_OR_EQUAL,
+            DML_ELEMENT_WISE_LOGICAL_LESS_THAN_OR_EQUAL_OPERATOR_DESC>(a, b, outputDataType);
+    }
 
     inline Expression LogicalNot(Expression input)
     {
@@ -3036,12 +3022,12 @@ namespace dml
     inline Expression operator!(Expression a) { return dml::LogicalNot(a); }
     inline Expression operator&&(Expression a, Expression b) { return dml::LogicalAnd(a, b); }
     inline Expression operator||(Expression a, Expression b) { return dml::LogicalOr(a, b); }
-    inline Expression operator>(Expression a, Expression b) { return dml::LogicalGreaterThan(a, b); }
-    inline Expression operator<(Expression a, Expression b) { return dml::LogicalLessThan(a, b); }
-    inline Expression operator==(Expression a, Expression b) { return dml::LogicalEquals(a, b); }
+    inline Expression operator>(Expression a, Expression b) { return dml::GreaterThan(a, b); }
+    inline Expression operator<(Expression a, Expression b) { return dml::LessThan(a, b); }
+    inline Expression operator==(Expression a, Expression b) { return dml::Equals(a, b); }
     inline Expression operator!=(Expression a, Expression b) { return !(a == b); }
-    inline Expression operator>=(Expression a, Expression b) { return a > b || a == b; }
-    inline Expression operator<=(Expression a, Expression b) { return a < b || a == b; }
+    inline Expression operator>=(Expression a, Expression b) { return dml::GreaterThanOrEqual(a, b); }
+    inline Expression operator<=(Expression a, Expression b) { return dml::LessThanOrEqual(a, b); }
 
     // GraphBuilder implementation details
     namespace detail
