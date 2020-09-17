@@ -8116,6 +8116,7 @@ tf_kernel_library(
         "dml_extract_patches_helpers.cc",
         "dml_extract_image_patches_op.cc",
         "dml_extract_volume_patches_op.cc",
+        "dml_empty_op.cc",
     ],
     hdrs = [
         "dml_kernel_wrapper.h",
