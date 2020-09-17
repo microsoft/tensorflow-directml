@@ -111,13 +111,14 @@ std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
                                                  img_n * img_h * img_w};
 
   const uint32_t window_size_and_strides[2] = {1, 3};
-  std::vector<dml::Expression> max_pool_out =
-      dml::MaxPoolingExpression(input, window_size_and_strides)
+  auto max_pool_out =
+      dml::MaxPoolingBuilder(input, window_size_and_strides)
           .Strides(window_size_and_strides)
-          .OutputIndices(true);
+          .OutputIndices(true)
+          .Build();
 
-  auto& c_max = max_pool_out[0];
-  auto& c_max_indices = max_pool_out[1];
+  auto& c_max = max_pool_out.output;
+  auto& c_max_indices = max_pool_out.outputIndices;
 
   auto c_min = dml::Reduce(input, DML_REDUCE_FUNCTION_MIN, {3});
   auto delta = c_max - c_min;

@@ -566,14 +566,14 @@ class DmlFusedConv2DKernel : public DmlKernel {
           auto conv2d = dml::Convolution(
               input, filter, bias, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
               DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations,
-              start_padding, end_padding, output_padding, {}, group_count);
+              start_padding, end_padding, output_padding, group_count);
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {conv2d});
         } break;
         case FusedComputationType::kBiasAddWithRelu: {
           auto conv2d = dml::Convolution(
               input, filter, bias, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
               DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations,
-              start_padding, end_padding, output_padding, {}, group_count,
+              start_padding, end_padding, output_padding, group_count,
               dml::FusedActivation::Relu());
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {conv2d});
         } break;
@@ -581,7 +581,7 @@ class DmlFusedConv2DKernel : public DmlKernel {
           auto conv2d = dml::Convolution(
               input, filter, bias, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
               DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations,
-              start_padding, end_padding, output_padding, {}, group_count);
+              start_padding, end_padding, output_padding, group_count);
           auto relu6 = dml::ActivationRelu6(conv2d);
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {relu6});
         } break;
@@ -589,7 +589,7 @@ class DmlFusedConv2DKernel : public DmlKernel {
           auto conv2d = dml::Convolution(
               input, filter, bias, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
               DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations,
-              start_padding, end_padding, output_padding, {}, group_count,
+              start_padding, end_padding, output_padding, group_count,
               dml::FusedActivation::Elu(1.0f));
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {conv2d});
         } break;
@@ -622,7 +622,7 @@ class DmlFusedConv2DKernel : public DmlKernel {
       auto conv2d = dml::Convolution(
           input, filter, absl::nullopt, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
           DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations, start_padding,
-          end_padding, output_padding, {}, group_count);
+          end_padding, output_padding, group_count);
       switch (fused_computation_type) {
         case FusedComputationType::kFusedBatchNorm: {
           auto batch_norm =

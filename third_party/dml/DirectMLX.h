@@ -718,12 +718,12 @@ namespace dml
             return FusedActivation(DML_OPERATOR_ACTIVATION_RELU);
         }
 
-        static FusedActivation ScaledElu(float alpha, float gamma)
+        static FusedActivation ScaledElu(float alpha = 1.67326319217681884765625f, float gamma = 1.05070102214813232421875f)
         {
             return FusedActivation(DML_OPERATOR_ACTIVATION_SCALED_ELU, alpha, gamma);
         }
 
-        static FusedActivation ScaledTanh(float alpha, float beta)
+        static FusedActivation ScaledTanh(float alpha = 1.0f, float beta = 0.5f)
         {
             return FusedActivation(DML_OPERATOR_ACTIVATION_SCALED_TANH, alpha, beta);
         }
@@ -1556,12 +1556,12 @@ namespace dml
         DMLX_ACTIVATION_IMPL(ACTIVATION_RELU);
     }
 
-    inline Expression ActivationScaledElu(Expression input, float alpha, float gamma)
+    inline Expression ActivationScaledElu(Expression input, float alpha = 1.67326319217681884765625f, float gamma = 1.05070102214813232421875f)
     {
         DMLX_ACTIVATION_IMPL_2(ACTIVATION_SCALED_ELU, Alpha, alpha, Gamma, gamma);
     }
 
-    inline Expression ActivationScaledTanh(Expression input, float alpha, float beta)
+    inline Expression ActivationScaledTanh(Expression input, float alpha = 1.0f, float beta = 0.5f)
     {
         DMLX_ACTIVATION_IMPL_2(ACTIVATION_SCALED_TANH, Alpha, alpha, Beta, beta);
     }
@@ -1608,8 +1608,9 @@ namespace dml
 #undef DMLX_ACTIVATION_IMPL_1
 #undef DMLX_ACTIVATION_IMPL_2
 
-    // Helper for setting parameters for the Convolution operator. Any unset parameters will be defaulted to the
-    // following values:
+    // ---------------------------------------------------------------------------------------------------------------
+
+    // If not specified, parameters are defaulted to the following values:
     //   Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION
     //   Direction = DML_CONVOLUTION_DIRECTION_FORWARD
     //   Strides = { 1, 1 } for 2D convolution, { 1, 1, 1 } for 3D convolution
@@ -1619,74 +1620,63 @@ namespace dml
     //   OutputPadding = { 0, 0 } for 2D convolution, { 0, 0, 0 } for 3D convolution
     //   GroupCount = 1
     //   FusedActivation = nullptr
-    // 
-    // This type is implicitly convertible to Expression, so it can be used in most contexts that require the
-    // expression type.
-    class ConvolutionExpression
+    //   OutputSizes = computed from other parameters
+    inline Expression Convolution(
+        Expression input,
+        Expression filter,
+        Optional<Expression> bias = NullOpt,
+        DML_CONVOLUTION_MODE mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION,
+        DML_CONVOLUTION_DIRECTION direction = DML_CONVOLUTION_DIRECTION_FORWARD,
+        Span<const uint32_t> strides = {},
+        Span<const uint32_t> dilations = {},
+        Span<const uint32_t> startPadding = {},
+        Span<const uint32_t> endPadding = {},
+        Span<const uint32_t> outputPadding = {},
+        uint32_t groupCount = 1,
+        FusedActivation fusedActivation = FusedActivation::None(),
+        TensorDesc::Dimensions outputSizes = {})
     {
-    public:
-        ConvolutionExpression(Expression input, Expression filter, Optional<Expression> bias)
-            : m_input(input), m_filter(filter), m_bias(bias)
-        {}
+        assert(detail::HasSameOwner({ input, filter }));
+        assert(!bias || detail::HasSameOwner({ input, *bias }));
 
-        ConvolutionExpression& Mode(DML_CONVOLUTION_MODE mode) { m_mode = mode; return *this; }
-        ConvolutionExpression& Direction(DML_CONVOLUTION_DIRECTION direction) { m_direction = direction; return *this; }
-        ConvolutionExpression& Strides(Span<const uint32_t> strides) { m_strides.assign(strides.begin(), strides.end()); return *this; }
-        ConvolutionExpression& Dilations(Span<const uint32_t> dilations) { m_dilations.assign(dilations.begin(), dilations.end()); return *this; }
-        ConvolutionExpression& StartPadding(Span<const uint32_t> startPadding) { m_startPadding.assign(startPadding.begin(), startPadding.end()); return *this; }
-        ConvolutionExpression& EndPadding(Span<const uint32_t> endPadding) { m_endPadding.assign(endPadding.begin(), endPadding.end()); return *this; }
-        ConvolutionExpression& OutputPadding(Span<const uint32_t> outputPadding) { m_outputPadding.assign(outputPadding.begin(), outputPadding.end()); return *this; }
-        ConvolutionExpression& OutputShape(Span<const uint32_t> outputShape) { m_outputShape.assign(outputShape.begin(), outputShape.end()); return *this; }
-        ConvolutionExpression& GroupCount(uint32_t groupCount) { m_groupCount = groupCount; return *this; }
-        ConvolutionExpression& FusedActivation(FusedActivation fusedActivation) { m_fusedActivation = fusedActivation; return *this; }
+        detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
-        /* implicit */ operator Expression() const
+        TensorDesc inputTensor = input.Impl()->GetOutputDesc();
+        TensorDesc filterTensor = filter.Impl()->GetOutputDesc();
+        TensorDesc biasTensor;
+        if (bias)
         {
-            assert(detail::HasSameOwner({ m_input, m_filter }));
-            assert(!m_bias || detail::HasSameOwner({ m_input, *m_bias }));
+            biasTensor = bias->Impl()->GetOutputDesc();
+        }
 
-            detail::GraphBuilder* builder = m_input.Impl()->GetGraphBuilder();
+        uint32_t dimensionCount = static_cast<uint32_t>(inputTensor.sizes.size());
 
-            TensorDesc inputTensor = m_input.Impl()->GetOutputDesc();
-            TensorDesc filterTensor = m_filter.Impl()->GetOutputDesc();
-            TensorDesc biasTensor;
-            if (m_bias)
-            {
-                biasTensor = m_bias->Impl()->GetOutputDesc();
-            }
+        assert(dimensionCount == 4 || dimensionCount == 5);
+        uint32_t spatialDimensionCount = dimensionCount - 2;
 
-            uint32_t dimensionCount = static_cast<uint32_t>(inputTensor.sizes.size());
+        // If the spatial dimension count is 2, we'll just use the first two elements by setting
+        // DimensionCount = 2 in the desc
+        const uint32_t defaultStridesAndDilations[3] = { 1, 1, 1 };
+        const uint32_t defaultPadding[3] = { 0, 0, 0 };
 
-            assert(dimensionCount == 4 || dimensionCount == 5);
-            uint32_t spatialDimensionCount = dimensionCount - 2;
+        assert(strides.empty() || strides.size() == spatialDimensionCount);
+        assert(dilations.empty() || dilations.size() == spatialDimensionCount);
+        assert(startPadding.empty() || startPadding.size() == spatialDimensionCount);
+        assert(endPadding.empty() || endPadding.size() == spatialDimensionCount);
+        assert(outputPadding.empty() || outputPadding.size() == spatialDimensionCount);
+        assert(outputSizes.empty() || outputSizes.size() == inputTensor.sizes.size());
 
-            // If the spatial dimension count is 2, we'll just use the first two elements by setting
-            // DimensionCount = 2 in the desc
-            const uint32_t defaultStridesAndDilations[3] = { 1, 1, 1 };
-            const uint32_t defaultPadding[3] = { 0, 0, 0 };
+        strides = strides.empty() ? Span<const uint32_t>{ defaultStridesAndDilations } : strides;
+        dilations = dilations.empty() ? Span<const uint32_t>{ defaultStridesAndDilations } : dilations;
+        startPadding = startPadding.empty() ? Span<const uint32_t>{ defaultPadding } : startPadding;
+        endPadding = endPadding.empty() ? Span<const uint32_t>{ defaultPadding } : endPadding;
+        outputPadding = outputPadding.empty() ? Span<const uint32_t>{ defaultPadding } : outputPadding;
 
-            assert(m_strides.empty() || m_strides.size() == spatialDimensionCount);
-            assert(m_dilations.empty() || m_dilations.size() == spatialDimensionCount);
-            assert(m_startPadding.empty() || m_startPadding.size() == spatialDimensionCount);
-            assert(m_endPadding.empty() || m_endPadding.size() == spatialDimensionCount);
-            assert(m_outputPadding.empty() || m_outputPadding.size() == spatialDimensionCount);
-            assert(m_outputShape.empty() || m_outputShape.size() == inputTensor.sizes.size());
+        // Compute the output shapes
 
-            Span<const uint32_t> strides = m_strides.empty() ? Span<const uint32_t>{ defaultStridesAndDilations } : m_strides;
-            Span<const uint32_t> dilations = m_dilations.empty() ? Span<const uint32_t>{ defaultStridesAndDilations } : m_dilations;
-            Span<const uint32_t> startPadding = m_startPadding.empty() ? Span<const uint32_t>{ defaultPadding } : m_startPadding;
-            Span<const uint32_t> endPadding = m_endPadding.empty() ? Span<const uint32_t>{ defaultPadding } : m_endPadding;
-            Span<const uint32_t> outputPadding = m_outputPadding.empty() ? Span<const uint32_t>{ defaultPadding } : m_outputPadding;
-
-            // Compute the output shapes
-
-            TensorDesc::Dimensions outputSizes;
-
-            if (!m_outputShape.empty())
-            {
-                outputSizes = m_outputShape;
-            }
-            else if (m_direction == DML_CONVOLUTION_DIRECTION_FORWARD)
+        if (outputSizes.empty())
+        {
+            if (direction == DML_CONVOLUTION_DIRECTION_FORWARD)
             {
                 outputSizes.push_back(inputTensor.sizes[0]); // output[N] = input[N]
                 outputSizes.push_back(filterTensor.sizes[0]); // output[C] = filter[N]
@@ -1705,7 +1695,7 @@ namespace dml
                     outputSizes.push_back(1 + (paddedSize - kernelSize) / strides[dim]);
                 }
             }
-            else if (m_direction == DML_CONVOLUTION_DIRECTION_BACKWARD)
+            else if (direction == DML_CONVOLUTION_DIRECTION_BACKWARD)
             {
                 // TODO: implement me
                 assert(false);
@@ -1714,36 +1704,82 @@ namespace dml
             {
                 DMLX_THROW(E_UNEXPECTED);
             }
+        }
 
-            TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
-            detail::FusedActivationStorage storage;
+        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
+        detail::FusedActivationStorage storage;
 
-            DML_CONVOLUTION_OPERATOR_DESC desc = {};
-            desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
-            desc.FilterTensor = filterTensor.AsPtr<DML_TENSOR_DESC>();
-            desc.BiasTensor = m_bias ? biasTensor.AsPtr<DML_TENSOR_DESC>() : nullptr;
-            desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-            desc.Mode = m_mode;
-            desc.Direction = m_direction;
-            desc.DimensionCount = spatialDimensionCount;
-            desc.Strides = strides.data();
-            desc.Dilations = dilations.data();
-            desc.StartPadding = startPadding.data();
-            desc.EndPadding = endPadding.data();
-            desc.OutputPadding = outputPadding.data();
-            desc.GroupCount = m_groupCount;
-            desc.FusedActivation = detail::GetFusedActivationPtr(m_fusedActivation, &storage);
+        DML_CONVOLUTION_OPERATOR_DESC desc = {};
+        desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.FilterTensor = filterTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.BiasTensor = bias ? biasTensor.AsPtr<DML_TENSOR_DESC>() : nullptr;
+        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.Mode = mode;
+        desc.Direction = direction;
+        desc.DimensionCount = spatialDimensionCount;
+        desc.Strides = strides.data();
+        desc.Dilations = dilations.data();
+        desc.StartPadding = startPadding.data();
+        desc.EndPadding = endPadding.data();
+        desc.OutputPadding = outputPadding.data();
+        desc.GroupCount = groupCount;
+        desc.FusedActivation = detail::GetFusedActivationPtr(fusedActivation, &storage);
 
-            SmallVector<detail::NodeOutput*, 3> inputs = { m_input.Impl(), m_filter.Impl() };
-            if (m_bias)
-            {
-                inputs.push_back(m_bias->Impl());
-            }
+        SmallVector<detail::NodeOutput*, 3> inputs = { input.Impl(), filter.Impl() };
+        if (bias)
+        {
+            inputs.push_back(bias->Impl());
+        }
 
-            detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_CONVOLUTION, &desc, inputs);
-            detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
+        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_CONVOLUTION, &desc, inputs);
+        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
 
-            return output;
+        return output;
+    }
+
+    // Helper for setting parameters for the Convolution operator. Sample usage:
+    // 
+    //   auto conv = dml::ConvolutionBuilder(...)
+    //        .StartPadding(...)
+    //        .EndPadding(...)
+    //        .Strides(...)
+    //        .Build();
+    // 
+    // Parameters left unspecified will be defaulted with the same values as dml::Convolution().
+    class ConvolutionBuilder
+    {
+    public:
+        ConvolutionBuilder(Expression input, Expression filter, Optional<Expression> bias = NullOpt)
+            : m_input(input), m_filter(filter), m_bias(bias)
+        {}
+
+        ConvolutionBuilder& Mode(DML_CONVOLUTION_MODE mode) { m_mode = mode; return *this; }
+        ConvolutionBuilder& Direction(DML_CONVOLUTION_DIRECTION direction) { m_direction = direction; return *this; }
+        ConvolutionBuilder& Strides(Span<const uint32_t> strides) { m_strides.assign(strides.begin(), strides.end()); return *this; }
+        ConvolutionBuilder& Dilations(Span<const uint32_t> dilations) { m_dilations.assign(dilations.begin(), dilations.end()); return *this; }
+        ConvolutionBuilder& StartPadding(Span<const uint32_t> startPadding) { m_startPadding.assign(startPadding.begin(), startPadding.end()); return *this; }
+        ConvolutionBuilder& EndPadding(Span<const uint32_t> endPadding) { m_endPadding.assign(endPadding.begin(), endPadding.end()); return *this; }
+        ConvolutionBuilder& OutputPadding(Span<const uint32_t> outputPadding) { m_outputPadding.assign(outputPadding.begin(), outputPadding.end()); return *this; }
+        ConvolutionBuilder& GroupCount(uint32_t groupCount) { m_groupCount = groupCount; return *this; }
+        ConvolutionBuilder& FusedActivation(FusedActivation fusedActivation) { m_fusedActivation = fusedActivation; return *this; }
+        ConvolutionBuilder& OutputSizes(TensorDesc::Dimensions outputSizes) { m_outputSizes = std::move(outputSizes); return *this; }
+
+        Expression Build() const
+        {
+            return Convolution(
+                m_input,
+                m_filter,
+                m_bias,
+                m_mode,
+                m_direction,
+                m_strides,
+                m_dilations,
+                m_startPadding,
+                m_endPadding,
+                m_outputPadding,
+                m_groupCount,
+                m_fusedActivation,
+                m_outputSizes);
         }
 
     private:
@@ -1757,107 +1793,86 @@ namespace dml
         SmallVector<uint32_t, 3> m_startPadding = {};
         SmallVector<uint32_t, 3> m_endPadding = {};
         SmallVector<uint32_t, 3> m_outputPadding = {};
-        TensorDesc::Dimensions m_outputShape = {};
         uint32_t m_groupCount = 1;
         dml::FusedActivation m_fusedActivation;
+        TensorDesc::Dimensions m_outputSizes = {};
     };
 
-    inline ConvolutionExpression Convolution(
-        Expression input,
-        Expression filter,
-        Optional<Expression> bias = NullOpt,
-        DML_CONVOLUTION_MODE mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION,
-        DML_CONVOLUTION_DIRECTION direction = DML_CONVOLUTION_DIRECTION_FORWARD,
-        Span<const uint32_t> strides = {},
-        Span<const uint32_t> dilations = {},
-        Span<const uint32_t> startPadding = {},
-        Span<const uint32_t> endPadding = {},
-        Span<const uint32_t> outputPadding = {},
-        Span<const uint32_t> outputShape = {},
-        uint32_t groupCount = 1,
+    // ---------------------------------------------------------------------------------------------------------------
+
+    inline Expression Gemm(
+        Expression a,
+        Expression b,
+        Optional<Expression> c = NullOpt,
+        DML_MATRIX_TRANSFORM transA = DML_MATRIX_TRANSFORM_NONE,
+        DML_MATRIX_TRANSFORM transB = DML_MATRIX_TRANSFORM_NONE,
+        float alpha = 1.0f,
+        float beta = 1.0f,
         FusedActivation fusedActivation = FusedActivation::None())
     {
-        return ConvolutionExpression(input, filter, bias)
-            .Mode(mode)
-            .Direction(direction)
-            .Strides(strides)
-            .Dilations(dilations)
-            .StartPadding(startPadding)
-            .EndPadding(endPadding)
-            .OutputPadding(outputPadding)
-            .OutputShape(outputShape)
-            .GroupCount(groupCount)
-            .FusedActivation(fusedActivation);
+        assert(detail::HasSameOwner({ a, b }));
+        assert(!c || detail::HasSameOwner({ a, *c }));
+
+        detail::GraphBuilder* builder = a.Impl()->GetGraphBuilder();
+
+        TensorDesc aTensor = a.Impl()->GetOutputDesc();
+        TensorDesc bTensor = b.Impl()->GetOutputDesc();
+        TensorDesc cTensor;
+        if (c)
+        {
+            cTensor = c->Impl()->GetOutputDesc();
+        }
+
+        TensorDesc::Dimensions outputSizes;
+        outputSizes.push_back(aTensor.sizes[0]); // output[N] = input[N]
+        outputSizes.push_back(aTensor.sizes[1]); // output[C] = input[C]
+        outputSizes.push_back(transA == DML_MATRIX_TRANSFORM_NONE ? aTensor.sizes[2] : aTensor.sizes[3]);
+        outputSizes.push_back(transB == DML_MATRIX_TRANSFORM_NONE ? bTensor.sizes[3] : bTensor.sizes[2]);
+
+        TensorDesc outputTensor(aTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
+        detail::FusedActivationStorage storage;
+
+        DML_GEMM_OPERATOR_DESC desc = {};
+        desc.ATensor = aTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.BTensor = bTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.CTensor = c ? cTensor.AsPtr<DML_TENSOR_DESC>() : nullptr;
+        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.TransA = transA;
+        desc.TransB = transB;
+        desc.Alpha = alpha;
+        desc.Beta = beta;
+        desc.FusedActivation = detail::GetFusedActivationPtr(fusedActivation, &storage);
+
+        SmallVector<detail::NodeOutput*, 3> inputs = { a.Impl(), b.Impl() };
+        if (c)
+        {
+            inputs.push_back(c->Impl());
+        }
+
+        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_GEMM, &desc, inputs);
+        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
+
+        return output;
     }
 
-    // Helper for setting parameters for the GEMM operator. Any unset parameters will be defaulted to the
-    // following values:
-    //   TransA = DML_MATRIX_TRANSFORM_NONE
-    //   TransB = DML_MATRIX_TRANSFORM_NONE
-    //   Alpha = 1.0f
-    //   Beta = 1.0f
-    //   FusedActivation = nullptr
-    // 
-    // This type is implicitly convertible to Expression, so it can be used in most contexts that require the
-    // expression type.
-    class GemmExpression
+    // Helper for setting parameters for the Gemm operator. Parameters left unspecified will be defaulted with the
+    // same values as dml::Gemm().
+    class GemmBuilder
     {
     public:
-        GemmExpression(Expression a, Expression b, Optional<Expression> c)
+        GemmBuilder(Expression a, Expression b, Optional<Expression> c = NullOpt)
             : m_a(a), m_b(b), m_c(c)
         {}
 
-        GemmExpression& TransA(DML_MATRIX_TRANSFORM transA) { m_transA = transA; return *this; }
-        GemmExpression& TransB(DML_MATRIX_TRANSFORM transB) { m_transB = transB; return *this; }
-        GemmExpression& Alpha(float alpha) { m_alpha = alpha; return *this; }
-        GemmExpression& Beta(float beta) { m_beta = beta; return *this; }
-        GemmExpression& FusedActivation(FusedActivation fusedActivation) { m_fusedActivation = fusedActivation; return *this; }
+        GemmBuilder& TransA(DML_MATRIX_TRANSFORM transA) { m_transA = transA; return *this; }
+        GemmBuilder& TransB(DML_MATRIX_TRANSFORM transB) { m_transB = transB; return *this; }
+        GemmBuilder& Alpha(float alpha) { m_alpha = alpha; return *this; }
+        GemmBuilder& Beta(float beta) { m_beta = beta; return *this; }
+        GemmBuilder& FusedActivation(FusedActivation fusedActivation) { m_fusedActivation = fusedActivation; return *this; }
 
-        /* implicit */ operator Expression() const
+        Expression Build() const
         {
-            assert(detail::HasSameOwner({ m_a, m_b }));
-            assert(!m_c || detail::HasSameOwner({ m_a, *m_c }));
-
-            detail::GraphBuilder* builder = m_a.Impl()->GetGraphBuilder();
-
-            TensorDesc aTensor = m_a.Impl()->GetOutputDesc();
-            TensorDesc bTensor = m_b.Impl()->GetOutputDesc();
-            TensorDesc cTensor;
-            if (m_c)
-            {
-                cTensor = m_c->Impl()->GetOutputDesc();
-            }
-
-            TensorDesc::Dimensions outputSizes;
-            outputSizes.push_back(aTensor.sizes[0]); // output[N] = input[N]
-            outputSizes.push_back(aTensor.sizes[1]); // output[C] = input[C]
-            outputSizes.push_back(m_transA == DML_MATRIX_TRANSFORM_NONE ? aTensor.sizes[2] : aTensor.sizes[3]);
-            outputSizes.push_back(m_transB == DML_MATRIX_TRANSFORM_NONE ? bTensor.sizes[3] : bTensor.sizes[2]);
-
-            TensorDesc outputTensor(aTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
-            detail::FusedActivationStorage storage;
-
-            DML_GEMM_OPERATOR_DESC desc = {};
-            desc.ATensor = aTensor.AsPtr<DML_TENSOR_DESC>();
-            desc.BTensor = bTensor.AsPtr<DML_TENSOR_DESC>();
-            desc.CTensor = m_c ? cTensor.AsPtr<DML_TENSOR_DESC>() : nullptr;
-            desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-            desc.TransA = m_transA;
-            desc.TransB = m_transB;
-            desc.Alpha = m_alpha;
-            desc.Beta = m_beta;
-            desc.FusedActivation = detail::GetFusedActivationPtr(m_fusedActivation, &storage);
-
-            SmallVector<detail::NodeOutput*, 3> inputs = { m_a.Impl(), m_b.Impl() };
-            if (m_c)
-            {
-                inputs.push_back(m_c->Impl());
-            }
-
-            detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_GEMM, &desc, inputs);
-            detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
-
-            return output;
+            return Gemm(m_a, m_b, m_c, m_transA, m_transB, m_alpha, m_beta, m_fusedActivation);
         }
 
     private:
@@ -1871,40 +1886,28 @@ namespace dml
         dml::FusedActivation m_fusedActivation;
     };
 
-    inline GemmExpression Gemm(
-        Expression a,
-        Expression b,
-        Optional<Expression> c = NullOpt,
-        DML_MATRIX_TRANSFORM transA = DML_MATRIX_TRANSFORM_NONE,
-        DML_MATRIX_TRANSFORM transB = DML_MATRIX_TRANSFORM_NONE,
-        float alpha = 1.0f,
-        float beta = 1.0f,
-        FusedActivation fusedActivation = FusedActivation::None())
-    {
-        return GemmExpression(a, b, c)
-            .TransA(transA)
-            .TransB(transB)
-            .Alpha(alpha)
-            .Beta(beta)
-            .FusedActivation(fusedActivation);
-    }
+    // ---------------------------------------------------------------------------------------------------------------
 
     // If `axes` is not specified, by default this reduces the entire tensor to single element.
     inline Expression Reduce(Expression input, DML_REDUCE_FUNCTION function, Span<const uint32_t> axes = {})
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
+        TensorDesc inputTensor = input.Impl()->GetOutputDesc();
+        uint32_t dimensionCount = static_cast<uint32_t>(inputTensor.sizes.size());
 
-        const uint32_t allAxes[] = { 0, 1, 2, 3 };
+        SmallVector<uint32_t, 4> defaultAxes;
         if (axes.empty())
         {
-            axes = allAxes;
+            for (uint32_t i = 0; i < dimensionCount; ++i)
+            {
+                defaultAxes.push_back(i);
+            }
+            axes = defaultAxes;
         }
-
-        TensorDesc inputTensor = input.Impl()->GetOutputDesc();
 
         // Compute the output tensor dimensions
         TensorDesc::Dimensions outputSizes;
-        for (uint32_t i = 0; i < 4; ++i)
+        for (uint32_t i = 0; i < dimensionCount; ++i)
         {
             // If the dimension is to be reduced, this dimension in the output tensor has a size of 1, otherwise
             // it matches the input tensor.
@@ -1931,7 +1934,7 @@ namespace dml
             outputDataType = inputTensor.dataType;
         }
 
-        TensorDesc outputTensor(outputDataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(outputDataType, std::move(outputSizes), builder->GetOutputLayout());
 
         DML_REDUCE_OPERATOR_DESC desc = {};
         desc.Function = function;
@@ -1997,100 +2000,21 @@ namespace dml
     // TODO: LpPooling
     // 
 
-    // Helper for setting parameters for the MaxPooling operator. Any unset parameters will be defaulted to the
-    // following values:
-    //   OutputIndices = False
+    // ---------------------------------------------------------------------------------------------------------------
+
+    struct MaxPoolingOutputs
+    {
+        Expression output;
+        Expression outputIndices; // Only valid if OutputIndices = true
+    };
+
+    // If not specified, parameters are defaulted to the following values:
     //   Strides = 1 for each spatial dimension
     //   StartPadding = 0 for each spatial dimension
     //   EndPadding = 0 for each spatial dimension
     //   Dilations = 1 for each spatial dimension
-    // 
-    // This type is implicitly convertible to Expression, so it can be used in most contexts that require the
-    // expression type.
-    class MaxPoolingExpression
-    {
-    public:
-        MaxPoolingExpression(Expression input, Span<const uint32_t> windowSize)
-            : m_input(input), m_windowSize(windowSize)
-        {}
-
-        MaxPoolingExpression& OutputIndices(bool outputIndices) { m_outputIndices = outputIndices; return *this; }
-        MaxPoolingExpression& Strides(Span<const uint32_t> strides) { m_strides.assign(strides.begin(), strides.end()); return *this; }
-        MaxPoolingExpression& StartPadding(Span<const uint32_t> startPadding) { m_startPadding.assign(startPadding.begin(), startPadding.end()); return *this; }
-        MaxPoolingExpression& EndPadding(Span<const uint32_t> endPadding) { m_endPadding.assign(endPadding.begin(), endPadding.end()); return *this; }
-        MaxPoolingExpression& Dilations(Span<const uint32_t> dilations) { m_dilations.assign(dilations.begin(), dilations.end()); return *this; }
-
-        operator std::vector<Expression>() const
-        {
-            detail::GraphBuilder* builder = m_input.Impl()->GetGraphBuilder();
-
-            TensorDesc inputTensor = m_input.Impl()->GetOutputDesc();
-
-            // If the spatial dimension count is 2, we'll just use the first two elements by setting
-            // DimensionCount = 2 in the desc
-            const uint32_t defaultStridesAndDilations[3] = { 1, 1, 1 };
-            const uint32_t defaultPadding[3] = { 0, 0, 0 };
-
-            assert(m_windowSize.size() == 2 || m_windowSize.size() == 3);
-            assert(m_strides.empty() || m_strides.size() == m_windowSize.size());
-            assert(m_dilations.empty() || m_dilations.size() == m_windowSize.size());
-            assert(m_startPadding.empty() || m_startPadding.size() == m_windowSize.size());
-            assert(m_endPadding.empty() || m_endPadding.size() == m_windowSize.size());
-
-            Span<const uint32_t> strides = m_strides.empty() ? Span<const uint32_t>{ defaultStridesAndDilations } : m_strides;
-            Span<const uint32_t> dilations = m_dilations.empty() ? Span<const uint32_t>{ defaultStridesAndDilations } : m_dilations;
-            Span<const uint32_t> startPadding = m_startPadding.empty() ? Span<const uint32_t>{ defaultPadding } : m_startPadding;
-            Span<const uint32_t> endPadding = m_endPadding.empty() ? Span<const uint32_t>{ defaultPadding } : m_endPadding;
-
-            // Calculate output size
-            TensorDesc::Dimensions outputSizes;
-            outputSizes.push_back(inputTensor.sizes[0]); // N
-            outputSizes.push_back(inputTensor.sizes[1]); // C
-            for (size_t i = 0; i < m_windowSize.size(); i++)
-            {
-                uint32_t paddedInputSize = inputTensor.sizes[2 + i] + startPadding[i] + endPadding[i];
-                uint32_t dilatedWindowSize = 1 + (m_windowSize[i] - 1) * dilations[i];
-                uint32_t outputSize = (dilatedWindowSize >= paddedInputSize) ? 1 : (paddedInputSize - dilatedWindowSize) / strides[i] + 1;
-                outputSizes.push_back(outputSize);
-            }
-
-            TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
-            TensorDesc outputIndicesTensor(DML_TENSOR_DATA_TYPE_UINT32, outputSizes, builder->GetOutputLayout());
-
-            DML_MAX_POOLING2_OPERATOR_DESC desc = {};
-            desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
-            desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-            desc.OutputIndicesTensor = m_outputIndices ? outputIndicesTensor.AsPtr<DML_TENSOR_DESC>() : nullptr;
-            desc.DimensionCount = static_cast<uint32_t>(m_windowSize.size());
-            desc.Strides = strides.data();
-            desc.WindowSize = m_windowSize.data();
-            desc.StartPadding = startPadding.data();
-            desc.EndPadding = endPadding.data();
-            desc.Dilations = dilations.data();
-
-            detail::NodeOutput* const inputs[] = { m_input.Impl() };
-            detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_MAX_POOLING2, &desc, inputs);
-
-            detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
-            if (m_outputIndices)
-            {
-                detail::NodeOutput* outputIndices = builder->CreateNodeOutput(node, 1, std::move(outputIndicesTensor));
-                return { output, outputIndices };
-            }
-            return { output };
-        }
-
-    private:
-        Expression m_input;
-        Span<const uint32_t> m_windowSize = {};
-        SmallVector<uint32_t, 3> m_strides = {};
-        SmallVector<uint32_t, 3> m_startPadding = {};
-        SmallVector<uint32_t, 3> m_endPadding = {};
-        SmallVector<uint32_t, 3> m_dilations = {};
-        bool m_outputIndices = false;
-    };
-
-    inline MaxPoolingExpression MaxPooling(
+    //   OutputIndices = false
+    inline MaxPoolingOutputs MaxPooling(
         Expression input,
         Span<const uint32_t> windowSize,
         Span<const uint32_t> strides = {},
@@ -2099,13 +2023,109 @@ namespace dml
         Span<const uint32_t> dilations = {},
         bool outputIndices = false)
     {
-        return MaxPoolingExpression(input, windowSize)
-            .Strides(strides)
-            .StartPadding(startPadding)
-            .EndPadding(endPadding)
-            .Dilations(dilations)
-            .OutputIndices(outputIndices);
+        detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
+
+        TensorDesc inputTensor = input.Impl()->GetOutputDesc();
+
+        // If the spatial dimension count is 2, we'll just use the first two elements by setting
+        // DimensionCount = 2 in the desc
+        const uint32_t defaultStridesAndDilations[3] = { 1, 1, 1 };
+        const uint32_t defaultPadding[3] = { 0, 0, 0 };
+
+        assert(windowSize.size() == 2 || windowSize.size() == 3);
+        assert(strides.empty() || strides.size() == windowSize.size());
+        assert(dilations.empty() || dilations.size() == windowSize.size());
+        assert(startPadding.empty() || startPadding.size() == windowSize.size());
+        assert(endPadding.empty() || endPadding.size() == windowSize.size());
+
+        strides = strides.empty() ? Span<const uint32_t>{ defaultStridesAndDilations } : strides;
+        dilations = dilations.empty() ? Span<const uint32_t>{ defaultStridesAndDilations } : dilations;
+        startPadding = startPadding.empty() ? Span<const uint32_t>{ defaultPadding } : startPadding;
+        endPadding = endPadding.empty() ? Span<const uint32_t>{ defaultPadding } : endPadding;
+
+        // Calculate output size
+        TensorDesc::Dimensions outputSizes;
+        outputSizes.push_back(inputTensor.sizes[0]); // N
+        outputSizes.push_back(inputTensor.sizes[1]); // C
+        for (size_t i = 0; i < windowSize.size(); i++)
+        {
+            uint32_t paddedInputSize = inputTensor.sizes[2 + i] + startPadding[i] + endPadding[i];
+            uint32_t dilatedWindowSize = 1 + (windowSize[i] - 1) * dilations[i];
+            uint32_t outputSize = (dilatedWindowSize >= paddedInputSize) ? 1 : (paddedInputSize - dilatedWindowSize) / strides[i] + 1;
+            outputSizes.push_back(outputSize);
+        }
+
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputIndicesTensor(DML_TENSOR_DATA_TYPE_UINT32, outputSizes, builder->GetOutputLayout());
+
+        DML_MAX_POOLING2_OPERATOR_DESC desc = {};
+        desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.OutputIndicesTensor = outputIndices ? outputIndicesTensor.AsPtr<DML_TENSOR_DESC>() : nullptr;
+        desc.DimensionCount = static_cast<uint32_t>(windowSize.size());
+        desc.Strides = strides.data();
+        desc.WindowSize = windowSize.data();
+        desc.StartPadding = startPadding.data();
+        desc.EndPadding = endPadding.data();
+        desc.Dilations = dilations.data();
+
+        detail::NodeOutput* const inputs[] = { input.Impl() };
+        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_MAX_POOLING2, &desc, inputs);
+
+        detail::NodeOutput* outputExpr = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
+        if (outputIndices)
+        {
+            detail::NodeOutput* outputIndicesExpr = builder->CreateNodeOutput(node, 1, std::move(outputIndicesTensor));
+            return { outputExpr, outputIndicesExpr };
+        }
+        return { outputExpr, Expression() };
     }
+
+    // Helper for setting parameters for the MaxPooling operator. Sample usage:
+    // 
+    //   auto [out, outIndices] = dml::MaxPoolingBuilder(...)
+    //        .StartPadding(...)
+    //        .EndPadding(...)
+    //        .OutputIndices(...)
+    //        .Build();
+    // 
+    // Parameters left unspecified will be defaulted with the same values as dml::MaxPooling().
+    class MaxPoolingBuilder
+    {
+    public:
+        MaxPoolingBuilder(Expression input, Span<const uint32_t> windowSize)
+            : m_input(input), m_windowSize(windowSize.begin(), windowSize.end())
+        {}
+
+        MaxPoolingBuilder& Strides(Span<const uint32_t> strides) { m_strides.assign(strides.begin(), strides.end()); return *this; }
+        MaxPoolingBuilder& StartPadding(Span<const uint32_t> startPadding) { m_startPadding.assign(startPadding.begin(), startPadding.end()); return *this; }
+        MaxPoolingBuilder& EndPadding(Span<const uint32_t> endPadding) { m_endPadding.assign(endPadding.begin(), endPadding.end()); return *this; }
+        MaxPoolingBuilder& Dilations(Span<const uint32_t> dilations) { m_dilations.assign(dilations.begin(), dilations.end()); return *this; }
+        MaxPoolingBuilder& OutputIndices(bool outputIndices) { m_outputIndices = outputIndices; return *this; }
+
+        MaxPoolingOutputs Build() const
+        {
+            return MaxPooling(
+                m_input,
+                m_windowSize,
+                m_strides,
+                m_startPadding,
+                m_endPadding,
+                m_dilations,
+                m_outputIndices);
+        }
+
+    private:
+        Expression m_input;
+        SmallVector<uint32_t, 3> m_windowSize;
+        SmallVector<uint32_t, 3> m_strides = {};
+        SmallVector<uint32_t, 3> m_startPadding = {};
+        SmallVector<uint32_t, 3> m_endPadding = {};
+        SmallVector<uint32_t, 3> m_dilations = {};
+        bool m_outputIndices = false;
+    };
+
+    // ---------------------------------------------------------------------------------------------------------------
 
     // 
     // TODO: MaxUnpooling
@@ -2367,12 +2387,18 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
+        assert(inputTensor.sizes.size() == 4 || inputTensor.sizes.size() == 5);
 
+        uint32_t i = 0;
         TensorDesc::Dimensions outputSizes;
-        outputSizes.push_back(inputTensor.sizes[0]);                    // output[N] = input[N]
-        outputSizes.push_back(inputTensor.sizes[1]);                    // output[C] = input[C]
-        outputSizes.push_back(inputTensor.sizes[2] * scaleSize.Height); // output[H] = input[H] * scaleH
-        outputSizes.push_back(inputTensor.sizes[3] * scaleSize.Width);  // output[W] = input[W] * scaleW
+        outputSizes.push_back(inputTensor.sizes[i++]);                    // output[N] = input[N]
+        outputSizes.push_back(inputTensor.sizes[i++]);                    // output[C] = input[C]
+        if (inputTensor.sizes.size() == 5)
+        {
+            outputSizes.push_back(inputTensor.sizes[i++]);                // output[D] = input[D]
+        }
+        outputSizes.push_back(inputTensor.sizes[i++] * scaleSize.Height); // output[H] = input[H] * scaleH
+        outputSizes.push_back(inputTensor.sizes[i++] * scaleSize.Width);  // output[W] = input[W] * scaleW
         TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
 
         DML_UPSAMPLE_2D_OPERATOR_DESC desc = {};
@@ -2399,23 +2425,28 @@ namespace dml
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
         TensorDesc indicesTensor = indices.Impl()->GetOutputDesc();
 
-        TensorDesc::Dimensions outputSizes = { 1, 1, 1, 1 };
+        uint32_t dimensionCount = static_cast<uint32_t>(inputTensor.sizes.size());
+        assert(indicesTensor.sizes.size() == dimensionCount);
+        assert(axis < dimensionCount);
+        assert(indexDimensions <= dimensionCount);
+
+        TensorDesc::Dimensions outputSizes(dimensionCount, 1);
 
         // All dimensions after the axis should be the same as the input
-        int outputDim = 3;
+        int outputDim = static_cast<int>(dimensionCount) - 1;
         for (; static_cast<uint32_t>(outputDim) > axis; --outputDim)
         {
             outputSizes[outputDim] = inputTensor.sizes[outputDim];
         }
 
         // All dimensions within the range [axis - indexDimensions, axis] should be the same as the indices
-        int indexDim = 3;
+        int indexDim = static_cast<int>(dimensionCount) - 1;
         for (; outputDim > static_cast<int>(axis) - static_cast<int>(indexDimensions); --outputDim, --indexDim)
         {
             outputSizes[outputDim] = indicesTensor.sizes[indexDim];
         }
 
-        // All dimensions before axis - indexDimensions should be the same as the input
+        // All dimensions before (axis - indexDimensions) should be the same as the input
         int inputDim = axis - 1;
         for (; outputDim >= 0 && inputDim >= 0; --outputDim, --inputDim)
         {
@@ -2672,47 +2703,56 @@ namespace dml
         return output;
     }
 
+    // If not specified, parameters are defaulted to the following values:
+    //   Scales = computed by dividing the output sizes by the input sizes
+    //   InputPixelOffsets = 0.5f for each dimension
+    //   OutputPixelOffsets = -0.5f for each dimension
     inline Expression Resample(
         Expression input,
-        const TensorDesc::Dimensions& outputSizes,
+        TensorDesc::Dimensions outputSizes,
         DML_INTERPOLATION_MODE mode,
         Span<const float> scales = {},
-        Span<const float> inputPixelOffsets = {0.5f, 0.5f, 0.5f, 0.5f},
-        Span<const float> outputPixelOffsets = {-0.5f, -0.5f, -0.5f, -0.5f})
+        Span<const float> inputPixelOffsets = {},
+        Span<const float> outputPixelOffsets = {})
     {
-        assert(outputSizes.size() == 4);
-        assert(inputPixelOffsets.size() == 4);
-        assert(outputPixelOffsets.size() == 4);
-
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        uint32_t dimensionCount = static_cast<uint32_t>(inputTensor.sizes.size());
+        assert(outputSizes.size() == dimensionCount);
 
-        std::array<float, 4> dml_scales;
-
+        SmallVector<float, 4> defaultScales;
         if (scales.empty())
         {
-            dml_scales[0] = static_cast<float>(outputSizes[0]) / static_cast<float>(inputTensor.sizes[0]);
-            dml_scales[1] = static_cast<float>(outputSizes[1]) / static_cast<float>(inputTensor.sizes[1]);
-            dml_scales[2] = static_cast<float>(outputSizes[2]) / static_cast<float>(inputTensor.sizes[2]);
-            dml_scales[3] = static_cast<float>(outputSizes[3]) / static_cast<float>(inputTensor.sizes[3]);
+            for (uint32_t i = 0; i < dimensionCount; ++i)
+            {
+                defaultScales.push_back(static_cast<float>(outputSizes[i]) / static_cast<float>(inputTensor.sizes[i]));
+            }
+            scales = defaultScales;
         }
-        else
+
+        SmallVector<float, 4> defaultInputPixelOffsets;
+        if (inputPixelOffsets.empty())
         {
-            assert(scales.size() == 4);
-            dml_scales[0] = scales[0];
-            dml_scales[1] = scales[1];
-            dml_scales[2] = scales[2];
-            dml_scales[3] = scales[3];
+            defaultInputPixelOffsets.assign(dimensionCount, 0.5f);
+            inputPixelOffsets = defaultInputPixelOffsets;
         }
+
+        SmallVector<float, 4> defaultOutputPixelOffsets;
+        if (outputPixelOffsets.empty())
+        {
+            defaultOutputPixelOffsets.assign(dimensionCount, -0.5f);
+            outputPixelOffsets = defaultOutputPixelOffsets;
+        }
+
+        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
 
         DML_RESAMPLE1_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
         desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
         desc.InterpolationMode = mode;
-        desc.DimensionCount = static_cast<UINT>(dml_scales.size());
-        desc.Scales = dml_scales.data();
+        desc.DimensionCount = static_cast<UINT>(scales.size());
+        desc.Scales = scales.data();
         desc.InputPixelOffsets = inputPixelOffsets.data();
         desc.OutputPixelOffsets = outputPixelOffsets.data();
 
@@ -2859,48 +2899,57 @@ namespace dml
     // 
     // TODO: NonZeroCoordinates
     // 
-    
+
+    // If not specified, parameters are defaulted to the following values:
+    //   Scales = computed by dividing the input sizes by the output sizes
+    //   InputPixelOffsets = 0.5f for each dimension
+    //   OutputPixelOffsets = -0.5f for each dimension
     inline Expression ResampleGrad(
         Expression input,
-        const TensorDesc::Dimensions& outputSizes,
+        TensorDesc::Dimensions outputSizes,
         DML_INTERPOLATION_MODE mode,
         Span<const float> scales = {},
-        Span<const float> inputPixelOffsets = {-0.5f, -0.5f, -0.5f, -0.5f},
-        Span<const float> outputPixelOffsets = {0.5f, 0.5f, 0.5f, 0.5f})
+        Span<const float> inputPixelOffsets = {},
+        Span<const float> outputPixelOffsets = {})
     {
-        assert(outputSizes.size() == 4);
-        assert(inputPixelOffsets.size() == 4);
-        assert(outputPixelOffsets.size() == 4);
-
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        uint32_t dimensionCount = static_cast<uint32_t>(inputTensor.sizes.size());
+        assert(outputSizes.size() == dimensionCount);
 
-        std::array<float, 4> dml_scales;
-
+        SmallVector<float, 4> defaultScales;
         if (scales.empty())
         {
-            dml_scales[0] = static_cast<float>(outputSizes[0]) / static_cast<float>(inputTensor.sizes[0]);
-            dml_scales[1] = static_cast<float>(outputSizes[1]) / static_cast<float>(inputTensor.sizes[1]);
-            dml_scales[2] = static_cast<float>(outputSizes[2]) / static_cast<float>(inputTensor.sizes[2]);
-            dml_scales[3] = static_cast<float>(outputSizes[3]) / static_cast<float>(inputTensor.sizes[3]);
+            for (uint32_t i = 0; i < dimensionCount; ++i)
+            {
+                defaultScales.push_back(static_cast<float>(inputTensor.sizes[i]) / static_cast<float>(outputSizes[i]));
+            }
+            scales = defaultScales;
         }
-        else
+
+        SmallVector<float, 4> defaultInputPixelOffsets;
+        if (inputPixelOffsets.empty())
         {
-            assert(scales.size() == 4);
-            dml_scales[0] = scales[0];
-            dml_scales[1] = scales[1];
-            dml_scales[2] = scales[2];
-            dml_scales[3] = scales[3];
+            defaultInputPixelOffsets.assign(dimensionCount, 0.5f);
+            inputPixelOffsets = defaultInputPixelOffsets;
         }
+
+        SmallVector<float, 4> defaultOutputPixelOffsets;
+        if (outputPixelOffsets.empty())
+        {
+            defaultOutputPixelOffsets.assign(dimensionCount, -0.5f);
+            outputPixelOffsets = defaultOutputPixelOffsets;
+        }
+
+        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
 
         DML_RESAMPLE_GRAD_OPERATOR_DESC desc = {};
         desc.InputGradientTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
         desc.OutputGradientTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
         desc.InterpolationMode = mode;
-        desc.DimensionCount = static_cast<UINT>(dml_scales.size());
-        desc.Scales = dml_scales.data();
+        desc.DimensionCount = static_cast<UINT>(scales.size());
+        desc.Scales = scales.data();
         desc.InputPixelOffsets = inputPixelOffsets.data();
         desc.OutputPixelOffsets = outputPixelOffsets.data();
 
