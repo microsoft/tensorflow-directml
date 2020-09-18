@@ -230,7 +230,14 @@ class BazelEnv:
 
     # Convert the bazel path to relative filesystem paths
     tests_info = []
-    test_data_bazel_paths = set()
+    bazel_paths = set()
+
+    for rule in xml_root.iter("rule"):
+      # Save the executable path in the set so we can quickly check if
+      # executables with the _gpu suffix have an equivalent executable without
+      # the _gpu suffix
+      bazel_path = rule.get("name")
+      bazel_paths.add(bazel_path)
 
     bin_path = self._get_bin_path(py_version)
 
@@ -242,7 +249,7 @@ class BazelEnv:
       # without "_gpu", except that they have benchmarking enabled. Since we
       # don't need these benchmarking executables for our test loop, keeping
       # them doesn't give us anything.
-      if bazel_path.endswith("_gpu"):
+      if bazel_path.endswith("_gpu") and bazel_path[:-4] in bazel_paths:
         continue
 
       if os.name == "nt":

@@ -81,12 +81,12 @@ class DmlCastKernel : public DmlKernel {
   bool zero_outputs_ = false;
 };
 
-#define DML_REGISTER_KERNEL_OUTPUT(output_type)     \
-  REGISTER_KERNEL_BUILDER(                          \
-      Name("Cast")                                  \
-          .TypeConstraint<input_type_alias>("SrcT") \
-          .TypeConstraint<output_type>("DstT")      \
-          .Device(DEVICE_DML),                      \
+#define DML_REGISTER_KERNEL_OUTPUT(output_type)              \
+  REGISTER_KERNEL_BUILDER(                                   \
+      Name("Cast")                                           \
+          .template TypeConstraint<input_type_alias>("SrcT") \
+          .template TypeConstraint<output_type>("DstT")      \
+          .Device(DEVICE_DML),                               \
       DmlKernelWrapper<DmlCastKernel, GetOutputShapeAsInputShapeHelper>)
 
 template <typename TInput>

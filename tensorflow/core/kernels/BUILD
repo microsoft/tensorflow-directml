@@ -2717,10 +2717,7 @@ tf_kernel_library(
         "//tensorflow/core:lib_internal",
         "@com_google_absl//absl/strings",
     ] + if_dml(["//tensorflow/core/common_runtime/dml:dml_runtime"]),
-    copts = tf_copts() + if_not_windows([
-        "-fms-extensions", 
-        "-Ithird_party/dml/winadapter",
-    ]) + if_windows([
+    copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
 
@@ -8120,6 +8117,7 @@ tf_kernel_library(
         "dml_extract_patches_helpers.cc",
         "dml_extract_image_patches_op.cc",
         "dml_extract_volume_patches_op.cc",
+        "dml_empty_op.cc",
     ],
     hdrs = [
         "dml_kernel_wrapper.h",
@@ -8145,10 +8143,7 @@ tf_kernel_library(
         ":rnn_ops",
         ":fused_batch_norm_op",
     ],
-    copts = tf_copts() + if_not_windows([
-        "-fms-extensions", 
-        "-Ithird_party/dml/winadapter",
-    ]) + if_windows([
+    copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
     ]),
