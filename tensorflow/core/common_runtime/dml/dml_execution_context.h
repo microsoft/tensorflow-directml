@@ -74,6 +74,8 @@ class DmlExecutionContextImpl {
   // on the GPU.
   StatusOr<DmlGpuEvent> Flush();
 
+  Status GetCommandRecorderStatus() const;
+
   // Returns an event which will become signaled when everything submitted to
   // the execution context thus far has completed execution on the GPU,
   // including work that has yet to be flushed to the queue.
@@ -154,6 +156,10 @@ class DmlExecutionContext {
   StatusOr<DmlGpuEvent> Flush() {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->Flush();
+  }
+
+  Status GetCommandRecorderStatus() const {
+    return impl_->GetCommandRecorderStatus();
   }
 
   DmlGpuEvent GetCurrentCompletionEvent() {

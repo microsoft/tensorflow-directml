@@ -72,7 +72,10 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
 
   // Note that we don't need to keep a ref on the readback_heap, because the
   // pooled allocator guarantees it'll live until we give the signal
-  auto done_callback = [dst, readback_heap, offset_in_chunk, done_event] {
+  auto done_callback = [this, dst, readback_heap, offset_in_chunk, done_event] {
+    // The device could have been removed before the callback is called
+    if (!execution_context_->GetCommandRecorderStatus().ok()) return;
+
     void* readback_heap_data = nullptr;
     DML_CHECK_SUCCEEDED(readback_heap->Map(0, nullptr, &readback_heap_data));
     readback_heap_data =
