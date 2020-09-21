@@ -109,21 +109,27 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
     return GetCurrentCompletionEvent();
   }
 
+  current_recorder_->CloseAndExecute();
   Status recorder_status = current_recorder_->GetStatus();
 
   if (!recorder_status.ok()) {
-    current_recorder_->ResetStatus();
-    current_recorder_ = nullptr;
+    // "Unknown" represents device removals, which are uncoverable failures
+    if (!errors::IsUnknown(recorder_status)) {
+      current_recorder_->ResetStatus();
+      current_recorder_ = nullptr;
+    }
     return recorder_status;
   }
-
-  current_recorder_->CloseAndExecute();
 
   // Just submitted our command list, so we have neither DML or D3D12 work
   // recorded on any of our command lists.
   current_recorder_ = nullptr;
 
-  return GetCurrentCompletionEvent();
+  return DmlExecutionContextImpl::GetCurrentCompletionEvent();
+}
+
+Status DmlExecutionContextImpl::GetCommandRecorderStatus() const {
+  return current_recorder_ ? current_recorder_->GetStatus() : Status::OK();
 }
 
 void DmlExecutionContextImpl::Close() {

@@ -159,6 +159,13 @@ DeviceProperties GetLocalDMLInfo(int device_id) {
 
 #if TENSORFLOW_USE_DIRECTML
   auto adapters = EnumerateAdapters();
+
+  // When the D3D12 or DML device is removed after initially enumerating the
+  // devices, the adapters list will be empty
+  if (adapters.empty()) {
+    return device;
+  }
+
   CHECK(device_id >= 0 && device_id < adapters.size());
 
   const auto& adapter = adapters[device_id];
