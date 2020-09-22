@@ -208,6 +208,8 @@ class TopKTest(test.TestCase):
       nn_ops.top_k(inputs, 4)
 
   @test_util.run_deprecated_v1
+  # scatter_nd is not implemented in DML.
+  @test_util.skip_dml
   def testTopKGradients(self):
     with self.session(use_gpu=True) as sess:
       inputs = array_ops.placeholder(dtypes.float32, shape=[2, 5])

@@ -35,6 +35,8 @@ class DmlTopKInitHelper : public InitializationHelper {
       }
     }
     int k_;
+    // sorted_ attr is not used because tensorflow has no specification for
+    // sorted_=False
     bool sorted_;
   };
 
@@ -59,7 +61,6 @@ class DmlTopKInitHelper : public InitializationHelper {
                     "input must have at least k columns. Had ",
                     input_in.dim_size(input_in.dims() - 1), ", needed ", k));
   }
-  bool GetSorted() const { return attr_->sorted_; }
   int GetK() const { return k; }
 
  private:
