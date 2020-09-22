@@ -155,7 +155,7 @@ dml::Expression ExtractPatches(dml::Scope& scope, dml::Expression input,
                        dml::TensorDesc::Dimensions({0, 0, 1, 0}));
 
   // Gather the elements to construct the patches
-  auto gathered = dml::GatherElements(reshaped_input, gather_indices, 2, {});
+  auto gathered = dml::GatherElements(reshaped_input, gather_indices, 2);
 
   // After gathering the elements, the patches are in the space dimensions. We
   // need to move them to the depth dimensions instead.

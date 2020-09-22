@@ -114,14 +114,15 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     constexpr uint32_t gather_axis = 3;
     constexpr uint32_t index_dimensions = 1;
 
-    uint32_t stride = is_64_bit_integer ? 8 : 4;
-
     // We need strides of 4 for int32 and strides of 8 for int64 since the
     // params are uint8
-    dml::TensorDesc::Dimensions out_strides = {0u, 0u, 0u, stride};
+    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
+    if (is_64_bit_integer) {
+      out_policy = GetEmulatedInt64TensorPolicy();
+    }
 
-    auto result = dml::Gather(params, indices, gather_axis, index_dimensions,
-                              out_strides);
+    scope.SetTensorPolicy(out_policy);
+    auto result = dml::Gather(params, indices, gather_axis, index_dimensions);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});

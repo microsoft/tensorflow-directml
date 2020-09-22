@@ -21,6 +21,8 @@
 #include <memory>
 #include <utility>
 #include <type_traits>
+#include <functional>
+#include <numeric>
 
 #if !DMLX_USE_ABSEIL
     #include <optional>
@@ -258,26 +260,54 @@ namespace dml
     };
 
     // Provides a way to customize the properties that DMLX automatically sets on tensors. Callers may provide their
-    // own TensorPolicy implementation and override the Get() method to provide custom strides, total tensor sizes,
-    // and alignment. TensorPolicy objects can be set using Scope::SetTensorPolicy().
-    struct TensorPolicy
+    // own TensorPolicy implementation to provide custom strides, total tensor sizes, and alignment. TensorPolicy
+    // objects can be set using Scope::SetTensorPolicy().
+    class TensorPolicy
     {
-        virtual TensorProperties Get(
-            DML_TENSOR_DATA_TYPE dataType,
-            DML_TENSOR_FLAGS flags,
-            const TensorDimensions& sizes) const = 0;
+    public:
+        // A function type that returns a TensorProperties object given a tensor data type, flags, and sizes.
+        using Func = std::function<
+            TensorProperties (DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, const TensorDimensions& sizes)
+            >;
 
-        virtual ~TensorPolicy() = default;
-    };
+        /*implicit*/ TensorPolicy(Func impl = &ComputeDefault)
+            : m_impl(impl)
+        {}
 
-    // The default tensor policy, which doesn't produce any changes to tensor layout, has no guaranteed alignment, and
-    // which uses DMLCalcBufferTensorSize to compute the total tensor size.
-    struct TensorPolicyDefault : TensorPolicy
-    {
         TensorProperties Get(
             DML_TENSOR_DATA_TYPE dataType,
+            DML_TENSOR_FLAGS flags,
+            const TensorDimensions& sizes) const
+        {
+            return m_impl(dataType, flags, sizes);
+        }
+
+        // Returns the default tensor policy, which doesn't produce any changes to tensor layout, has no guaranteed
+        // alignment, and which uses DMLCalcBufferTensorSize to compute the total tensor size.
+        static TensorPolicy Default()
+        {
+            return TensorPolicy(&ComputeDefault);
+        }
+
+        // A tensor policy that returns strides which produce tensors with a layout transposed to dimension order
+        // (0, 2, ..., n, 1). This is often referred to as "NHWC" or "interleaved channel" layout. This is useful,
+        // for example, when applied to 2D Convolution to produce outputs in an NHWC layout (as opposed to NCHW, which
+        // is the DirectML default for 2D Convolution).
+        // 
+        // Examples of the transposes produced by this policy:
+        //   NCW -> NWC
+        //   NCHW -> NHWC
+        //   NCDHW -> NDHWC
+        static TensorPolicy InterleavedChannel()
+        {
+            return TensorPolicy(&ComputeInterleavedChannel);
+        }
+
+    private:
+        static TensorProperties ComputeDefault(
+            DML_TENSOR_DATA_TYPE dataType,
             DML_TENSOR_FLAGS /*flags*/,
-            const TensorDimensions& sizes) const override
+            const TensorDimensions& sizes)
         {
             uint32_t dimensionCount = static_cast<uint32_t>(sizes.size());
             TensorProperties props;
@@ -286,28 +316,34 @@ namespace dml
             props.guaranteedBaseOffsetAlignment = 0;
             return props;
         }
-    };
 
-    // A tensor policy that supports 4D tensors and returns strides that produce tensors with a layout transposed to
-    // dimension order (0,2,3,1). This is useful, for example, when applied to Convolution to produce outputs in
-    // an NHWC layout (as opposed to NCHW, which is the DirectML default for Convolution).
-    struct TensorPolicyNhwc : TensorPolicy
-    {
-        TensorProperties Get(
+        static TensorProperties ComputeInterleavedChannel(
             DML_TENSOR_DATA_TYPE dataType,
             DML_TENSOR_FLAGS /*flags*/,
-            const TensorDimensions& sizes) const override
+            const TensorDimensions& sizes)
         {
-            const uint32_t dimensionCount = 4;
-
-            assert(sizes.size() == dimensionCount);
-            enum Axes { N, C, H, W };
-
+            uint32_t dimensionCount = static_cast<uint32_t>(sizes.size());
             TensorDimensions strides(dimensionCount);
-            strides[N] = sizes[H] * sizes[W] * sizes[C];
-            strides[H] = sizes[W] * sizes[C];
-            strides[W] = sizes[C];
-            strides[C] = 1;
+
+            enum Axes { N, C, /* spatial dimensions ... */ };
+
+            // N dimension strides
+            if (dimensionCount >= 1)
+            {
+                strides[N] = std::accumulate(sizes.begin() + 1, sizes.end(), 1u, std::multiplies<uint32_t>());
+            }
+
+            // C dimension strides
+            if (dimensionCount >= 2)
+            {
+                strides[C] = 1;
+            }
+
+            // Spatial dimension strides
+            for (uint32_t i = 2; i < dimensionCount; ++i)
+            {
+                strides[i] = std::accumulate(sizes.begin() + i + 1, sizes.end(), sizes[C], std::multiplies<uint32_t>());
+            }
 
             TensorProperties props;
             props.strides = strides;
@@ -315,6 +351,8 @@ namespace dml
             props.guaranteedBaseOffsetAlignment = 0;
             return props;
         }
+
+        Func m_impl;
     };
 
     struct TensorDesc
@@ -331,19 +369,13 @@ namespace dml
 
         TensorDesc() = default;
 
-        TensorDesc(DML_TENSOR_DATA_TYPE dataType, Dimensions sizes, _In_opt_ const TensorPolicy* policy = nullptr)
+        TensorDesc(DML_TENSOR_DATA_TYPE dataType, Dimensions sizes, const TensorPolicy& policy = TensorPolicy::Default())
             : TensorDesc(dataType, DML_TENSOR_FLAG_NONE, sizes, policy)
         {}
 
-        TensorDesc(DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, Dimensions sizes, _In_opt_ const TensorPolicy* policy = nullptr)
+        TensorDesc(DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, Dimensions sizes, const TensorPolicy& policy = TensorPolicy::Default())
         {
-            TensorPolicyDefault defaultPolicy;
-            if (!policy)
-            {
-                policy = &defaultPolicy;
-            }
-
-            TensorProperties props = policy->Get(dataType, flags, sizes);
+            TensorProperties props = policy.Get(dataType, flags, sizes);
             Initialize(
                 dataType,
                 flags,
@@ -524,7 +556,7 @@ namespace dml
         class GraphBuilder
         {
         public:
-            GraphBuilder(IDMLDevice* device, _In_opt_ const TensorPolicy* tensorPolicy = nullptr)
+            GraphBuilder(IDMLDevice* device, TensorPolicy tensorPolicy = TensorPolicy::Default())
                 : m_device(device)
                 , m_tensorPolicy(tensorPolicy)
             {}
@@ -534,8 +566,8 @@ namespace dml
                 return m_device.Get();
             }
 
-            void SetTensorPolicy(const TensorPolicy* policy) { m_tensorPolicy = policy; }
-            const TensorPolicy* GetTensorPolicy() const { return m_tensorPolicy; }
+            void SetTensorPolicy(TensorPolicy policy) { m_tensorPolicy = std::move(policy); }
+            const TensorPolicy& GetTensorPolicy() const { return m_tensorPolicy; }
 
             // Creates a DML operator node owned by this graph builder and returns a NodeInfo identifier. The
             // inputs to this node must be supplied in the correct order matching the DML operator.
@@ -547,7 +579,7 @@ namespace dml
 
         private:
             Microsoft::WRL::ComPtr<IDMLDevice> m_device;
-            const TensorPolicy* m_tensorPolicy;
+            TensorPolicy m_tensorPolicy;
             std::vector<InputNode> m_inputNodes;
             std::vector<OperatorNode> m_operatorNodes;
             std::vector<ReinterpretNode> m_reinterpretNodes;
@@ -559,7 +591,7 @@ namespace dml
     class Scope
     {
     public:
-        explicit Scope(IDMLDevice* device, _In_opt_ const TensorPolicy* tensorPolicy = nullptr)
+        explicit Scope(IDMLDevice* device, TensorPolicy tensorPolicy = TensorPolicy::Default())
             : m_graphBuilder(make_unique<detail::GraphBuilder>(device, tensorPolicy))
         {}
 
@@ -568,8 +600,8 @@ namespace dml
 
         // Sets/gets the tensor policy. If not set, defaults to TensorPolicyDefault. The pointer is a weak reference;
         // callers should ensure that the policy object remains alive as long as it is set on the Scope.
-        void SetTensorPolicy(const TensorPolicy* policy) { m_graphBuilder->SetTensorPolicy(policy); }
-        const TensorPolicy* GetTensorPolicy() const { return m_graphBuilder->GetTensorPolicy(); }
+        void SetTensorPolicy(TensorPolicy policy) { m_graphBuilder->SetTensorPolicy(std::move(policy)); }
+        const TensorPolicy& GetTensorPolicy() const { return m_graphBuilder->GetTensorPolicy(); }
 
         Microsoft::WRL::ComPtr<IDMLCompiledOperator> Compile(
             DML_EXECUTION_FLAGS flags,

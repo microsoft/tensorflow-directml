@@ -145,7 +145,7 @@ std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
   auto c_max_indices_flat =
       dml::Reinterpret(c_max_indices, plane_flat_size, dml::NullOpt);
   auto h_max =
-      dml::Gather(h_rgb_flat, c_max_indices_flat, channel_dim, 4, dml::NullOpt);
+      dml::Gather(h_rgb_flat, c_max_indices_flat, channel_dim, 4);
   auto h_max_resized =
       dml::Reinterpret(h_max, r.GetOutputDesc().sizes, dml::NullOpt);
 

@@ -184,7 +184,7 @@ class DmlRollKernel : public DmlKernel {
       // After reinterpreting the sizes, the gather axis is always 2
       constexpr uint32_t dml_axis = 2;
       constexpr uint32_t index_dimensions = 1;
-      result = dml::Gather(result, indices, dml_axis, index_dimensions, {});
+      result = dml::Gather(result, indices, dml_axis, index_dimensions);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
