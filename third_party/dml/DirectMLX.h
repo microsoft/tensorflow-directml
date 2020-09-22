@@ -247,79 +247,80 @@ namespace dml
     class Scope;
     class Expression;
 
-    enum class TensorLayout
+    using TensorDimensions = SmallVector<uint32_t, 4>;
+
+    // The custom properties returned by a TensorPolicy.
+    struct TensorProperties
     {
-        Default = 0,
-        Nchw = 0,
-        Nhwc = 1,
+        Optional<TensorDimensions> strides;
+        uint64_t totalTensorSizeInBytes;
+        uint32_t guaranteedBaseOffsetAlignment;
     };
 
-    // Helper for computing DML tensor strides for a given layout
-    inline void CalculateStrides(Span<const uint32_t> sizes, TensorLayout layout, _Out_ Span<uint32_t> strides)
+    // Provides a way to customize the properties that DMLX automatically sets on tensors. Callers may provide their
+    // own TensorPolicy implementation and override the Get() method to provide custom strides, total tensor sizes,
+    // and alignment. TensorPolicy objects can be set using Scope::SetTensorPolicy().
+    struct TensorPolicy
     {
-        uint32_t dimensionCount = static_cast<uint32_t>(sizes.size());
-        assert(strides.size() == dimensionCount);
+        virtual TensorProperties Get(
+            DML_TENSOR_DATA_TYPE dataType,
+            DML_TENSOR_FLAGS flags,
+            const TensorDimensions& sizes) const = 0;
 
-        if (dimensionCount == 4)
+        virtual ~TensorPolicy() = default;
+    };
+
+    // The default tensor policy, which doesn't produce any changes to tensor layout, has no guaranteed alignment, and
+    // which uses DMLCalcBufferTensorSize to compute the total tensor size.
+    struct TensorPolicyDefault : TensorPolicy
+    {
+        TensorProperties Get(
+            DML_TENSOR_DATA_TYPE dataType,
+            DML_TENSOR_FLAGS /*flags*/,
+            const TensorDimensions& sizes) const override
         {
-            enum DML_ORDER { N, C, H, W };
-
-            switch (layout)
-            {
-            case TensorLayout::Nchw:
-                strides[N] = sizes[C] * sizes[H] * sizes[W];
-                strides[C] = sizes[H] * sizes[W];
-                strides[H] = sizes[W];
-                strides[W] = 1;
-                break;
-
-            case TensorLayout::Nhwc:
-                strides[N] = sizes[H] * sizes[W] * sizes[C];
-                strides[H] = sizes[W] * sizes[C];
-                strides[W] = sizes[C];
-                strides[C] = 1;
-                break;
-
-            default:
-                assert(false); // Unrecognized tensor layout
-                DMLX_THROW(E_UNEXPECTED);
-            }
+            uint32_t dimensionCount = static_cast<uint32_t>(sizes.size());
+            TensorProperties props;
+            props.strides = NullOpt; // no strides
+            props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(dataType, dimensionCount, sizes.data(), nullptr);
+            props.guaranteedBaseOffsetAlignment = 0;
+            return props;
         }
-        else
+    };
+
+    // A tensor policy that supports 4D tensors and returns strides that produce tensors with a layout transposed to
+    // dimension order (0,2,3,1). This is useful, for example, when applied to Convolution to produce outputs in
+    // an NHWC layout (as opposed to NCHW, which is the DirectML default for Convolution).
+    struct TensorPolicyNhwc : TensorPolicy
+    {
+        TensorProperties Get(
+            DML_TENSOR_DATA_TYPE dataType,
+            DML_TENSOR_FLAGS /*flags*/,
+            const TensorDimensions& sizes) const override
         {
-            assert(dimensionCount == 5);
+            const uint32_t dimensionCount = 4;
 
-            enum DML_ORDER { N, C, D, H, W };
+            assert(sizes.size() == dimensionCount);
+            enum Axes { N, C, H, W };
 
-            switch (layout)
-            {
-            case TensorLayout::Nchw:
-                strides[N] = sizes[C] * sizes[D] * sizes[H] * sizes[W];
-                strides[C] = sizes[D] * sizes[H] * sizes[W];
-                strides[D] = sizes[H] * sizes[W];
-                strides[H] = sizes[W];
-                strides[W] = 1;
-                break;
+            TensorDimensions strides(dimensionCount);
+            strides[N] = sizes[H] * sizes[W] * sizes[C];
+            strides[H] = sizes[W] * sizes[C];
+            strides[W] = sizes[C];
+            strides[C] = 1;
 
-            case TensorLayout::Nhwc:
-                strides[N] = sizes[D] * sizes[H] * sizes[W] * sizes[C];
-                strides[D] = sizes[H] * sizes[W] * sizes[C];
-                strides[H] = sizes[W] * sizes[C];
-                strides[W] = sizes[C];
-                strides[C] = 1;
-                break;
-
-            default:
-                assert(false); // Unrecognized tensor layout
-                DMLX_THROW(E_UNEXPECTED);
-            }
+            TensorProperties props;
+            props.strides = strides;
+            props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(dataType, dimensionCount, sizes.data(), strides.data());
+            props.guaranteedBaseOffsetAlignment = 0;
+            return props;
         }
-    }
+    };
 
     struct TensorDesc
     {
     public:
-        using Dimensions = SmallVector<uint32_t, DML_TENSOR_DIMENSION_COUNT_MAX>;
+        using Dimensions = TensorDimensions;
 
         DML_TENSOR_DATA_TYPE dataType = DML_TENSOR_DATA_TYPE_UNKNOWN;
         DML_TENSOR_FLAGS flags = DML_TENSOR_FLAG_NONE;
@@ -330,26 +331,37 @@ namespace dml
 
         TensorDesc() = default;
 
-        TensorDesc(DML_TENSOR_DATA_TYPE dataType, Dimensions sizes, TensorLayout layout = TensorLayout::Default)
+        TensorDesc(DML_TENSOR_DATA_TYPE dataType, Dimensions sizes, _In_opt_ const TensorPolicy* policy = nullptr)
+            : TensorDesc(dataType, DML_TENSOR_FLAG_NONE, sizes, policy)
+        {}
+
+        TensorDesc(DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, Dimensions sizes, _In_opt_ const TensorPolicy* policy = nullptr)
         {
-            auto initialStrides = GetStrides(sizes, layout);
-            Initialize(dataType, DML_TENSOR_FLAG_NONE, std::move(sizes), std::move(initialStrides));
+            TensorPolicyDefault defaultPolicy;
+            if (!policy)
+            {
+                policy = &defaultPolicy;
+            }
+
+            TensorProperties props = policy->Get(dataType, flags, sizes);
+            Initialize(
+                dataType,
+                flags,
+                std::move(sizes),
+                std::move(props.strides),
+                props.totalTensorSizeInBytes,
+                props.guaranteedBaseOffsetAlignment);
         }
 
-        TensorDesc(DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, Dimensions sizes, TensorLayout layout = TensorLayout::Default)
+        TensorDesc(
+            DML_TENSOR_DATA_TYPE dataType,
+            DML_TENSOR_FLAGS flags,
+            Dimensions sizes,
+            Optional<Dimensions> strides,
+            uint64_t totalTensorSizeInBytes,
+            uint32_t guaranteedBaseOffsetAlignment)
         {
-            auto initialStrides = GetStrides(sizes, layout);
-            Initialize(dataType, flags, std::move(sizes), std::move(initialStrides));
-        }
-
-        TensorDesc(DML_TENSOR_DATA_TYPE dataType, Dimensions sizes, Optional<Dimensions> strides)
-        {
-            Initialize(dataType, DML_TENSOR_FLAG_NONE, std::move(sizes), std::move(strides));
-        }
-
-        TensorDesc(DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, Dimensions sizes, Optional<Dimensions> strides)
-        {
-            Initialize(dataType, flags, std::move(sizes), std::move(strides));
+            Initialize(dataType, flags, std::move(sizes), std::move(strides), totalTensorSizeInBytes, guaranteedBaseOffsetAlignment);
         }
 
         /* implicit */ TensorDesc(const DML_TENSOR_DESC& desc)
@@ -409,26 +421,13 @@ namespace dml
         DML_BUFFER_TENSOR_DESC m_bufferDesc;
         DML_TENSOR_DESC m_tensorDesc;
 
-        static Optional<Dimensions> GetStrides(const Dimensions& sizes, TensorLayout layout)
-        {
-            if (layout == TensorLayout::Nchw)
-            {
-                // NCHW is the default; no need to compute strides
-                return NullOpt;
-            }
-
-            size_t dimensionCount = sizes.size();
-            Dimensions strides(dimensionCount);
-            CalculateStrides(sizes, layout, /* out */ Span<uint32_t>(strides.data(), dimensionCount));
-
-            return strides;
-        }
-
         void Initialize(
             DML_TENSOR_DATA_TYPE tensorDataType,
             DML_TENSOR_FLAGS tensorFlags,
             Dimensions tensorSizes,
-            Optional<Dimensions> tensorStrides)
+            Optional<Dimensions> tensorStrides,
+            uint64_t totalTensorSizeInBytesVal,
+            uint32_t guaranteedBaseOffsetAlignmentVal)
         {
             const uint32_t dimensionCount = static_cast<uint32_t>(tensorSizes.size());
             assert(!tensorStrides || tensorStrides->size() == dimensionCount);
@@ -437,12 +436,8 @@ namespace dml
             this->flags = tensorFlags;
             this->sizes = std::move(tensorSizes);
             this->strides = std::move(tensorStrides);
-            this->totalTensorSizeInBytes = DMLCalcBufferTensorSize(
-                this->dataType,
-                dimensionCount,
-                this->sizes.data(),
-                this->strides ? this->strides->data() : nullptr);
-            this->guaranteedBaseOffsetAlignment = 0;
+            this->totalTensorSizeInBytes = totalTensorSizeInBytesVal;
+            this->guaranteedBaseOffsetAlignment = guaranteedBaseOffsetAlignmentVal;
         }
     };
 
@@ -529,9 +524,9 @@ namespace dml
         class GraphBuilder
         {
         public:
-            GraphBuilder(IDMLDevice* device, TensorLayout outputLayout)
+            GraphBuilder(IDMLDevice* device, _In_opt_ const TensorPolicy* tensorPolicy = nullptr)
                 : m_device(device)
-                , m_outputLayout(outputLayout)
+                , m_tensorPolicy(tensorPolicy)
             {}
 
             IDMLDevice* GetDevice() const
@@ -539,10 +534,8 @@ namespace dml
                 return m_device.Get();
             }
 
-            TensorLayout GetOutputLayout() const
-            {
-                return m_outputLayout;
-            }
+            void SetTensorPolicy(const TensorPolicy* policy) { m_tensorPolicy = policy; }
+            const TensorPolicy* GetTensorPolicy() const { return m_tensorPolicy; }
 
             // Creates a DML operator node owned by this graph builder and returns a NodeInfo identifier. The
             // inputs to this node must be supplied in the correct order matching the DML operator.
@@ -554,7 +547,7 @@ namespace dml
 
         private:
             Microsoft::WRL::ComPtr<IDMLDevice> m_device;
-            TensorLayout m_outputLayout;
+            const TensorPolicy* m_tensorPolicy;
             std::vector<InputNode> m_inputNodes;
             std::vector<OperatorNode> m_operatorNodes;
             std::vector<ReinterpretNode> m_reinterpretNodes;
@@ -566,12 +559,17 @@ namespace dml
     class Scope
     {
     public:
-        explicit Scope(IDMLDevice* device, TensorLayout outputLayout = TensorLayout::Default)
-            : m_graphBuilder(make_unique<detail::GraphBuilder>(device, outputLayout))
+        explicit Scope(IDMLDevice* device, _In_opt_ const TensorPolicy* tensorPolicy = nullptr)
+            : m_graphBuilder(make_unique<detail::GraphBuilder>(device, tensorPolicy))
         {}
 
         // For internal use only
         detail::GraphBuilder* Impl() { return m_graphBuilder.get(); }
+
+        // Sets/gets the tensor policy. If not set, defaults to TensorPolicyDefault. The pointer is a weak reference;
+        // callers should ensure that the policy object remains alive as long as it is set on the Scope.
+        void SetTensorPolicy(const TensorPolicy* policy) { m_graphBuilder->SetTensorPolicy(policy); }
+        const TensorPolicy* GetTensorPolicy() const { return m_graphBuilder->GetTensorPolicy(); }
 
         Microsoft::WRL::ComPtr<IDMLCompiledOperator> Compile(
             DML_EXECUTION_FLAGS flags,
@@ -825,7 +823,7 @@ namespace dml
             detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
             TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-            TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); // Same as input
+            TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
             TDesc desc = {};
             desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -850,7 +848,7 @@ namespace dml
             {
                 outputDataType = inputTensor.dataType;
             }
-            TensorDesc outputTensor(outputDataType, inputTensor.sizes, builder->GetOutputLayout());
+            TensorDesc outputTensor(outputDataType, inputTensor.sizes, builder->GetTensorPolicy());
 
             TDesc desc = {};
             desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -871,7 +869,7 @@ namespace dml
 
             TensorDesc aTensor = a.Impl()->GetOutputDesc();
             TensorDesc bTensor = b.Impl()->GetOutputDesc();
-            TensorDesc outputTensor(aTensor.dataType, aTensor.sizes, builder->GetOutputLayout()); // Same as input
+            TensorDesc outputTensor(aTensor.dataType, aTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
             TDesc desc = {};
             desc.ATensor = aTensor.AsPtr<DML_TENSOR_DESC>();
@@ -893,7 +891,7 @@ namespace dml
 
             TensorDesc aTensor = a.Impl()->GetOutputDesc();
             TensorDesc bTensor = b.Impl()->GetOutputDesc();
-            TensorDesc outputTensor(outputDataType, aTensor.sizes, builder->GetOutputLayout());
+            TensorDesc outputTensor(outputDataType, aTensor.sizes, builder->GetTensorPolicy());
 
             TDesc desc = {};
             desc.ATensor = aTensor.AsPtr<DML_TENSOR_DESC>();
@@ -973,7 +971,7 @@ namespace dml
 
         TensorDesc aTensor = a.Impl()->GetOutputDesc();
         TensorDesc bTensor = b.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(aTensor.dataType, aTensor.sizes, builder->GetOutputLayout()); // Same as input
+        TensorDesc outputTensor(aTensor.dataType, aTensor.sizes, builder->GetTensorPolicy()); // Same as input
         detail::FusedActivationStorage storage;
 
         DML_ELEMENT_WISE_ADD1_OPERATOR_DESC desc = {};
@@ -1009,7 +1007,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); // Same as input
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
         DML_ELEMENT_WISE_CLIP_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1100,7 +1098,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); // Same as input
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
         DML_ELEMENT_WISE_LOGICAL_NOT_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1150,7 +1148,7 @@ namespace dml
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
         TensorDesc exponentTensor = exponent.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); // Same as input
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
         DML_ELEMENT_WISE_POW_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1170,7 +1168,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); // Same as input
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
         DML_ELEMENT_WISE_CONSTANT_POW_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1215,7 +1213,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); // Same as input
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
         DML_ELEMENT_WISE_THRESHOLD_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1239,7 +1237,7 @@ namespace dml
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
         TensorDesc scaleTensor = scale.Impl()->GetOutputDesc();
         TensorDesc zeroPointTensor = zeroPoint.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_UINT8, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_UINT8, inputTensor.sizes, builder->GetTensorPolicy());
 
         DML_ELEMENT_WISE_QUANTIZE_LINEAR_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1263,7 +1261,7 @@ namespace dml
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
         TensorDesc scaleTensor = scale.Impl()->GetOutputDesc();
         TensorDesc zeroPointTensor = zeroPoint.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_FLOAT32, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_FLOAT32, inputTensor.sizes, builder->GetTensorPolicy());
 
         DML_ELEMENT_WISE_DEQUANTIZE_LINEAR_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1288,7 +1286,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_UINT8, inputTensor.sizes, builder->GetOutputLayout()); // Same as input
+        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_UINT8, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
         DML_ELEMENT_WISE_IS_NAN_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1347,7 +1345,7 @@ namespace dml
 
         TensorDesc aTensor = a.Impl()->GetOutputDesc();
         TensorDesc bTensor = b.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(aTensor.dataType, aTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(aTensor.dataType, aTensor.sizes, builder->GetTensorPolicy());
 
         DML_ELEMENT_WISE_IF_OPERATOR_DESC desc = {};
         desc.ConditionTensor = conditionTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1406,7 +1404,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_UINT8, inputTensor.sizes, builder->GetOutputLayout()); // Same as input
+        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_UINT8, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
 
         DML_ELEMENT_WISE_IS_INFINITY_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1436,7 +1434,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder(); \
         \
         TensorDesc inputTensor = input.Impl()->GetOutputDesc(); \
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); \
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); \
         \
         DML_##_name##_OPERATOR_DESC desc = {}; \
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>(); \
@@ -1454,7 +1452,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder(); \
         \
         TensorDesc inputTensor = input.Impl()->GetOutputDesc(); \
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); \
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); \
         \
         DML_##_name##_OPERATOR_DESC desc = {}; \
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>(); \
@@ -1473,7 +1471,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder(); \
         \
         TensorDesc inputTensor = input.Impl()->GetOutputDesc(); \
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout()); \
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy()); \
         \
         DML_##_name##_OPERATOR_DESC desc = {}; \
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>(); \
@@ -1532,7 +1530,7 @@ namespace dml
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
         TensorDesc slopeTensor = slope.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy());
 
         DML_ACTIVATION_PARAMETERIZED_RELU_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -1634,7 +1632,7 @@ namespace dml
         Span<const uint32_t> outputPadding = {},
         uint32_t groupCount = 1,
         FusedActivation fusedActivation = FusedActivation::None(),
-        TensorDesc::Dimensions outputSizes = {})
+        TensorDimensions outputSizes = {})
     {
         assert(detail::HasSameOwner({ input, filter }));
         assert(!bias || detail::HasSameOwner({ input, *bias }));
@@ -1706,7 +1704,7 @@ namespace dml
             }
         }
 
-        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetTensorPolicy());
         detail::FusedActivationStorage storage;
 
         DML_CONVOLUTION_OPERATOR_DESC desc = {};
@@ -1762,7 +1760,7 @@ namespace dml
         ConvolutionBuilder& OutputPadding(Span<const uint32_t> outputPadding) { m_outputPadding.assign(outputPadding.begin(), outputPadding.end()); return *this; }
         ConvolutionBuilder& GroupCount(uint32_t groupCount) { m_groupCount = groupCount; return *this; }
         ConvolutionBuilder& FusedActivation(FusedActivation fusedActivation) { m_fusedActivation = fusedActivation; return *this; }
-        ConvolutionBuilder& OutputSizes(TensorDesc::Dimensions outputSizes) { m_outputSizes = std::move(outputSizes); return *this; }
+        ConvolutionBuilder& OutputSizes(TensorDimensions outputSizes) { m_outputSizes = std::move(outputSizes); return *this; }
 
         Expression Build() const
         {
@@ -1795,7 +1793,7 @@ namespace dml
         SmallVector<uint32_t, 3> m_outputPadding = {};
         uint32_t m_groupCount = 1;
         dml::FusedActivation m_fusedActivation;
-        TensorDesc::Dimensions m_outputSizes = {};
+        TensorDimensions m_outputSizes = {};
     };
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -1823,13 +1821,13 @@ namespace dml
             cTensor = c->Impl()->GetOutputDesc();
         }
 
-        TensorDesc::Dimensions outputSizes;
+        TensorDimensions outputSizes;
         outputSizes.push_back(aTensor.sizes[0]); // output[N] = input[N]
         outputSizes.push_back(aTensor.sizes[1]); // output[C] = input[C]
         outputSizes.push_back(transA == DML_MATRIX_TRANSFORM_NONE ? aTensor.sizes[2] : aTensor.sizes[3]);
         outputSizes.push_back(transB == DML_MATRIX_TRANSFORM_NONE ? bTensor.sizes[3] : bTensor.sizes[2]);
 
-        TensorDesc outputTensor(aTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
+        TensorDesc outputTensor(aTensor.dataType, std::move(outputSizes), builder->GetTensorPolicy());
         detail::FusedActivationStorage storage;
 
         DML_GEMM_OPERATOR_DESC desc = {};
@@ -1906,7 +1904,7 @@ namespace dml
         }
 
         // Compute the output tensor dimensions
-        TensorDesc::Dimensions outputSizes;
+        TensorDimensions outputSizes;
         for (uint32_t i = 0; i < dimensionCount; ++i)
         {
             // If the dimension is to be reduced, this dimension in the output tensor has a size of 1, otherwise
@@ -1934,7 +1932,7 @@ namespace dml
             outputDataType = inputTensor.dataType;
         }
 
-        TensorDesc outputTensor(outputDataType, std::move(outputSizes), builder->GetOutputLayout());
+        TensorDesc outputTensor(outputDataType, std::move(outputSizes), builder->GetTensorPolicy());
 
         DML_REDUCE_OPERATOR_DESC desc = {};
         desc.Function = function;
@@ -1967,7 +1965,7 @@ namespace dml
         assert(strides.size() == endPadding.size());
 
         // Calculate output size
-        TensorDesc::Dimensions outputSizes;
+        TensorDimensions outputSizes;
         outputSizes.push_back(inputTensor.sizes[0]); // N
         outputSizes.push_back(inputTensor.sizes[1]); // C
         for (size_t i = 0; i < windowSizes.size(); ++i)
@@ -1977,7 +1975,7 @@ namespace dml
             outputSizes.push_back(outputSize);
         }
 
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
 
         DML_AVERAGE_POOLING_OPERATOR_DESC averagePoolDesc = {};
         averagePoolDesc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2044,7 +2042,7 @@ namespace dml
         endPadding = endPadding.empty() ? Span<const uint32_t>{ defaultPadding } : endPadding;
 
         // Calculate output size
-        TensorDesc::Dimensions outputSizes;
+        TensorDimensions outputSizes;
         outputSizes.push_back(inputTensor.sizes[0]); // N
         outputSizes.push_back(inputTensor.sizes[1]); // C
         for (size_t i = 0; i < windowSize.size(); i++)
@@ -2055,8 +2053,8 @@ namespace dml
             outputSizes.push_back(outputSize);
         }
 
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
-        TensorDesc outputIndicesTensor(DML_TENSOR_DATA_TYPE_UINT32, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
+        TensorDesc outputIndicesTensor(DML_TENSOR_DATA_TYPE_UINT32, outputSizes, builder->GetTensorPolicy());
 
         DML_MAX_POOLING2_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2146,10 +2144,10 @@ namespace dml
 
         uint32_t dims = static_cast<uint32_t>(sizes.size());
 
-        TensorDesc::Dimensions outputSizes(sizes.begin(), sizes.end());
+        TensorDimensions outputSizes(sizes.begin(), sizes.end());
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
 
         DML_SLICE_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2175,7 +2173,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc::Dimensions outputSizes(inputTensor.sizes);
+        TensorDimensions outputSizes(inputTensor.sizes);
 
         assert(inputWindowOffsets.size() == outputSizes.size());
         assert(inputWindowOffsets.size() == inputWindowStrides.size());
@@ -2187,7 +2185,7 @@ namespace dml
             outputSizes[i] = minimumInputSize;
         }
 
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
 
         DML_SLICE1_OPERATOR_DESC sliceDesc = {};
         sliceDesc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2209,7 +2207,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(targetDataType, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(targetDataType, inputTensor.sizes, builder->GetTensorPolicy());
 
         DML_CAST_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2239,10 +2237,10 @@ namespace dml
 
         for (uint32_t outputAxisSize : outputAxisSizes)
         {
-            TensorDesc::Dimensions outputSizes = inputTensor.sizes;
+            TensorDimensions outputSizes = inputTensor.sizes;
             outputSizes[axis] = outputAxisSize;
 
-            TensorDesc tensorDesc(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+            TensorDesc tensorDesc(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
             outputTensors.push_back(std::move(tensorDesc));
             outputDescs.push_back(*outputTensors.back().AsPtr<DML_TENSOR_DESC>());
 
@@ -2286,7 +2284,7 @@ namespace dml
         detail::GraphBuilder* builder = inputs[0].Impl()->GetGraphBuilder();
         DML_TENSOR_DATA_TYPE dataType = inputs[0].Impl()->GetOutputDesc().dataType;
 
-        TensorDesc::Dimensions outputSizes = inputs[0].Impl()->GetOutputDesc().sizes;
+        TensorDimensions outputSizes = inputs[0].Impl()->GetOutputDesc().sizes;
         outputSizes[axis] = 0;
 
         std::vector<TensorDesc> inputTensors;
@@ -2307,7 +2305,7 @@ namespace dml
             inputNodes.push_back(input.Impl());
         }
 
-        TensorDesc outputTensor(dataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(dataType, outputSizes, builder->GetTensorPolicy());
 
         DML_JOIN_OPERATOR_DESC desc = {};
         desc.Axis = axis;
@@ -2331,7 +2329,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc::Dimensions outputSizes = inputTensor.sizes;
+        TensorDimensions outputSizes = inputTensor.sizes;
 
         assert(outputSizes.size() == startPadding.size());
         assert(outputSizes.size() == endPadding.size());
@@ -2341,7 +2339,7 @@ namespace dml
             outputSizes[i] += startPadding[i] + endPadding[i];
         }
 
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
 
         DML_PADDING_OPERATOR_DESC paddingDesc = {};
         paddingDesc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2366,7 +2364,7 @@ namespace dml
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy());
 
         DML_VALUE_SCALE_2D_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2390,7 +2388,7 @@ namespace dml
         assert(inputTensor.sizes.size() == 4 || inputTensor.sizes.size() == 5);
 
         uint32_t i = 0;
-        TensorDesc::Dimensions outputSizes;
+        TensorDimensions outputSizes;
         outputSizes.push_back(inputTensor.sizes[i++]);                    // output[N] = input[N]
         outputSizes.push_back(inputTensor.sizes[i++]);                    // output[C] = input[C]
         if (inputTensor.sizes.size() == 5)
@@ -2399,7 +2397,7 @@ namespace dml
         }
         outputSizes.push_back(inputTensor.sizes[i++] * scaleSize.Height); // output[H] = input[H] * scaleH
         outputSizes.push_back(inputTensor.sizes[i++] * scaleSize.Width);  // output[W] = input[W] * scaleW
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
 
         DML_UPSAMPLE_2D_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2418,8 +2416,7 @@ namespace dml
         Expression input,
         Expression indices,
         uint32_t axis,
-        uint32_t indexDimensions,
-        Optional<TensorDesc::Dimensions> outputStrides)
+        uint32_t indexDimensions)
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
@@ -2430,7 +2427,7 @@ namespace dml
         assert(axis < dimensionCount);
         assert(indexDimensions <= dimensionCount);
 
-        TensorDesc::Dimensions outputSizes(dimensionCount, 1);
+        TensorDimensions outputSizes(dimensionCount, 1);
 
         // All dimensions after the axis should be the same as the input
         int outputDim = static_cast<int>(dimensionCount) - 1;
@@ -2453,7 +2450,7 @@ namespace dml
             outputSizes[outputDim] = inputTensor.sizes[inputDim];
         }
 
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, outputStrides);
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
 
         DML_GATHER_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2472,14 +2469,13 @@ namespace dml
     inline Expression GatherElements(
         Expression input,
         Expression indices,
-        uint32_t axis,
-        Optional<TensorDesc::Dimensions> outputStrides)
+        uint32_t axis)
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
         TensorDesc indicesTensor = indices.Impl()->GetOutputDesc();
 
-        TensorDesc outputTensor(inputTensor.dataType, indicesTensor.sizes, outputStrides);
+        TensorDesc outputTensor(inputTensor.dataType, indicesTensor.sizes, builder->GetTensorPolicy());
 
         DML_GATHER_ELEMENTS_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2517,7 +2513,7 @@ namespace dml
     inline Expression Tile(Expression input, Span<const uint32_t> repeats)
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
-        TensorDesc::Dimensions outputSizes = input.GetOutputDesc().sizes;
+        TensorDimensions outputSizes = input.GetOutputDesc().sizes;
 
         assert(repeats.size() == outputSizes.size());
 
@@ -2527,7 +2523,7 @@ namespace dml
         }
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, outputSizes, builder->GetTensorPolicy());
 
         DML_TILE_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2562,7 +2558,7 @@ namespace dml
         TensorDesc varianceTensor = variance.Impl()->GetOutputDesc();
         TensorDesc scaleTensor = scale.Impl()->GetOutputDesc();
         TensorDesc biasTensor = bias.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy());
 
         detail::FusedActivationStorage storage;
 
@@ -2595,7 +2591,7 @@ namespace dml
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy());
         TensorDesc scaleTensor;
         TensorDesc biasTensor;
 
@@ -2642,7 +2638,7 @@ namespace dml
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy());
 
         DML_LOCAL_RESPONSE_NORMALIZATION_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2709,7 +2705,7 @@ namespace dml
     //   OutputPixelOffsets = -0.5f for each dimension
     inline Expression Resample(
         Expression input,
-        TensorDesc::Dimensions outputSizes,
+        TensorDimensions outputSizes,
         DML_INTERPOLATION_MODE mode,
         Span<const float> scales = {},
         Span<const float> inputPixelOffsets = {},
@@ -2745,7 +2741,7 @@ namespace dml
             outputPixelOffsets = defaultOutputPixelOffsets;
         }
 
-        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetTensorPolicy());
 
         DML_RESAMPLE1_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2813,7 +2809,7 @@ namespace dml
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
         TensorDesc sequenceLengthsTensor = sequenceLengths.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy());
 
         DML_REVERSE_SUBSEQUENCES_OPERATOR_DESC reverseDesc = {};
         reverseDesc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2906,7 +2902,7 @@ namespace dml
     //   OutputPixelOffsets = -0.5f for each dimension
     inline Expression ResampleGrad(
         Expression input,
-        TensorDesc::Dimensions outputSizes,
+        TensorDimensions outputSizes,
         DML_INTERPOLATION_MODE mode,
         Span<const float> scales = {},
         Span<const float> inputPixelOffsets = {},
@@ -2942,7 +2938,7 @@ namespace dml
             outputPixelOffsets = defaultOutputPixelOffsets;
         }
 
-        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetOutputLayout());
+        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetTensorPolicy());
 
         DML_RESAMPLE_GRAD_OPERATOR_DESC desc = {};
         desc.InputGradientTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2987,14 +2983,18 @@ namespace dml
     inline Expression Reinterpret(
         Expression input,
         DML_TENSOR_DATA_TYPE newType,
-        TensorDesc::Dimensions newSizes,
-        Optional<TensorDesc::Dimensions> newStrides)
+        TensorDimensions newSizes,
+        Optional<TensorDimensions> newStrides)
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc newTensor(newType, std::move(newSizes), std::move(newStrides));
-
-        assert(inputTensor.totalTensorSizeInBytes == newTensor.totalTensorSizeInBytes);
+        TensorDesc newTensor(
+            newType,
+            inputTensor.flags,
+            std::move(newSizes),
+            std::move(newStrides),
+            inputTensor.totalTensorSizeInBytes,
+            inputTensor.guaranteedBaseOffsetAlignment);
 
         detail::NodeID node = builder->CreateReinterpretNode(input.Impl());
         detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(newTensor));
@@ -3005,8 +3005,8 @@ namespace dml
     // Same as Reinterpret above, but only adjusts tensor dimensions without affecting type.
     inline Expression Reinterpret(
         Expression input,
-        TensorDesc::Dimensions newSizes,
-        Optional<TensorDesc::Dimensions> newStrides)
+        TensorDimensions newSizes,
+        Optional<TensorDimensions> newStrides)
     {
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
 
