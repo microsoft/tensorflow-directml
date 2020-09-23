@@ -213,13 +213,14 @@ dml::TensorPolicy GetDmlXTensorPolicy(TensorFormat format) {
 }
 
 dml::TensorPolicy GetEmulatedInt64TensorPolicy() {
-  return [](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
-            const dml::TensorDimensions& sizes) {
+  return dml::TensorPolicy([](DML_TENSOR_DATA_TYPE dataType,
+                              DML_TENSOR_FLAGS flags,
+                              const dml::TensorDimensions& sizes) {
     uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
 
     // Compute strides
     dml::TensorDimensions strides(dimension_count);
-    uint32_t stride = 2; // double all strides
+    uint32_t stride = 2;  // double all strides
     for (int i = static_cast<int>(dimension_count) - 1; i >= 0; i--) {
       strides[i] = stride;
       stride *= sizes[i];
@@ -231,7 +232,7 @@ dml::TensorPolicy GetEmulatedInt64TensorPolicy() {
     props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
         dataType, dimension_count, sizes.data(), props.strides->data());
     return props;
-  };
+  });
 }
 
 namespace dml_util {
