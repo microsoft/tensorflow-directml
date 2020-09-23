@@ -270,7 +270,8 @@ namespace dml
             TensorProperties (DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, const TensorDimensions& sizes)
             >;
 
-        /*implicit*/ TensorPolicy(Func impl = &ComputeDefault)
+        TensorPolicy() = default;
+        /*implicit*/ TensorPolicy(Func impl)
             : m_impl(impl)
         {}
 
@@ -279,6 +280,12 @@ namespace dml
             DML_TENSOR_FLAGS flags,
             const TensorDimensions& sizes) const
         {
+            // Empty/uninitialized policy falls back to default.
+            if (!m_impl)
+            {
+                return ComputeDefault(dataType, flags, sizes);
+            }
+
             return m_impl(dataType, flags, sizes);
         }
 
@@ -286,7 +293,7 @@ namespace dml
         // alignment, and which uses DMLCalcBufferTensorSize to compute the total tensor size.
         static TensorPolicy Default()
         {
-            return TensorPolicy(&ComputeDefault);
+            return TensorPolicy();
         }
 
         // A tensor policy that returns strides which produce tensors with a layout transposed to dimension order
@@ -369,11 +376,11 @@ namespace dml
 
         TensorDesc() = default;
 
-        TensorDesc(DML_TENSOR_DATA_TYPE dataType, Dimensions sizes, const TensorPolicy& policy = TensorPolicy::Default())
+        TensorDesc(DML_TENSOR_DATA_TYPE dataType, Dimensions sizes, const TensorPolicy& policy = {})
             : TensorDesc(dataType, DML_TENSOR_FLAG_NONE, sizes, policy)
         {}
 
-        TensorDesc(DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, Dimensions sizes, const TensorPolicy& policy = TensorPolicy::Default())
+        TensorDesc(DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, Dimensions sizes, const TensorPolicy& policy = {})
         {
             TensorProperties props = policy.Get(dataType, flags, sizes);
             Initialize(
@@ -556,7 +563,7 @@ namespace dml
         class GraphBuilder
         {
         public:
-            GraphBuilder(IDMLDevice* device, TensorPolicy tensorPolicy = TensorPolicy::Default())
+            GraphBuilder(IDMLDevice* device, TensorPolicy tensorPolicy = {})
                 : m_device(device)
                 , m_tensorPolicy(tensorPolicy)
             {}
@@ -568,6 +575,7 @@ namespace dml
 
             void SetTensorPolicy(TensorPolicy policy) { m_tensorPolicy = std::move(policy); }
             const TensorPolicy& GetTensorPolicy() const { return m_tensorPolicy; }
+            TensorPolicy& GetTensorPolicy() { return m_tensorPolicy; }
 
             // Creates a DML operator node owned by this graph builder and returns a NodeInfo identifier. The
             // inputs to this node must be supplied in the correct order matching the DML operator.
@@ -591,17 +599,18 @@ namespace dml
     class Scope
     {
     public:
-        explicit Scope(IDMLDevice* device, TensorPolicy tensorPolicy = TensorPolicy::Default())
+        explicit Scope(IDMLDevice* device, TensorPolicy tensorPolicy = {})
             : m_graphBuilder(make_unique<detail::GraphBuilder>(device, tensorPolicy))
         {}
 
         // For internal use only
         detail::GraphBuilder* Impl() { return m_graphBuilder.get(); }
 
-        // Sets/gets the tensor policy. If not set, defaults to TensorPolicyDefault. The pointer is a weak reference;
-        // callers should ensure that the policy object remains alive as long as it is set on the Scope.
+        // Sets/gets the tensor policy. If not set, defaults to TensorPolicy::Default(). Tensor policies can be used
+        // to control properties (such as strides) on output tensors produced by this Scope.
         void SetTensorPolicy(TensorPolicy policy) { m_graphBuilder->SetTensorPolicy(std::move(policy)); }
         const TensorPolicy& GetTensorPolicy() const { return m_graphBuilder->GetTensorPolicy(); }
+        TensorPolicy& GetTensorPolicy() { return m_graphBuilder->GetTensorPolicy(); }
 
         Microsoft::WRL::ComPtr<IDMLCompiledOperator> Compile(
             DML_EXECUTION_FLAGS flags,
