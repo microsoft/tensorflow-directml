@@ -221,6 +221,7 @@ class BatchGlobalNormGradInitializationHelper : public InitializationHelper {
  private:
   const std::shared_ptr<const Attributes> attr_;
 };
+
 static dml::Expression CreateBatchNormNode(
     dml::Expression x, dml::Expression mean, dml::Expression variance,
     dml::Expression scale, dml::Expression offset, float epsilon,
@@ -229,14 +230,14 @@ static dml::Expression CreateBatchNormNode(
   DCHECK(activation_mode == functor::FusedBatchNormActivationMode::kIdentity ||
          activation_mode == functor::FusedBatchNormActivationMode::kRelu);
 
-  constexpr bool is_spatial = true;
+  auto fused_activation =
+      activation_mode == functor::FusedBatchNormActivationMode::kIdentity
+          ? dml::FusedActivation::None()
+          : dml::FusedActivation::Relu();
 
-  return activation_mode == functor::FusedBatchNormActivationMode::kIdentity
-             ? dml::BatchNormalization(x, mean, variance, scale, offset,
-                                       is_spatial, epsilon)
-             : dml::BatchNormalization(x, mean, variance, scale, offset,
-                                       is_spatial, epsilon,
-                                       DML_OPERATOR_ACTIVATION_RELU, 0.0f);
+  constexpr bool is_spatial = true;
+  return dml::BatchNormalization(x, mean, variance, scale, offset, is_spatial,
+                                 epsilon, fused_activation);
 }
 
 class DmlFusedBatchNormKernel : public DmlKernel {

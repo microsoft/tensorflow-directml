@@ -566,22 +566,22 @@ class DmlFusedConv2DKernel : public DmlKernel {
           auto conv2d = dml::Convolution(
               input, filter, bias, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
               DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations,
-              start_padding, end_padding, output_padding, {}, group_count);
+              start_padding, end_padding, output_padding, group_count);
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {conv2d});
         } break;
         case FusedComputationType::kBiasAddWithRelu: {
           auto conv2d = dml::Convolution(
               input, filter, bias, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
               DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations,
-              start_padding, end_padding, output_padding, {}, group_count,
-              DML_OPERATOR_ACTIVATION_RELU);
+              start_padding, end_padding, output_padding, group_count,
+              dml::FusedActivation::Relu());
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {conv2d});
         } break;
         case FusedComputationType::kBiasAddWithRelu6: {
           auto conv2d = dml::Convolution(
               input, filter, bias, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
               DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations,
-              start_padding, end_padding, output_padding, {}, group_count);
+              start_padding, end_padding, output_padding, group_count);
           auto relu6 = dml::ActivationRelu6(conv2d);
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {relu6});
         } break;
@@ -589,8 +589,8 @@ class DmlFusedConv2DKernel : public DmlKernel {
           auto conv2d = dml::Convolution(
               input, filter, bias, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
               DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations,
-              start_padding, end_padding, output_padding, {}, group_count,
-              DML_OPERATOR_ACTIVATION_ELU, 1.0f);
+              start_padding, end_padding, output_padding, group_count,
+              dml::FusedActivation::Elu(1.0f));
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {conv2d});
         } break;
         default:
@@ -622,7 +622,7 @@ class DmlFusedConv2DKernel : public DmlKernel {
       auto conv2d = dml::Convolution(
           input, filter, absl::nullopt, DML_CONVOLUTION_MODE_CROSS_CORRELATION,
           DML_CONVOLUTION_DIRECTION_FORWARD, strides, dilations, start_padding,
-          end_padding, output_padding, {}, group_count);
+          end_padding, output_padding, group_count);
       switch (fused_computation_type) {
         case FusedComputationType::kFusedBatchNorm: {
           auto batch_norm =
@@ -633,7 +633,7 @@ class DmlFusedConv2DKernel : public DmlKernel {
         case FusedComputationType::kFusedBatchNormWithRelu: {
           auto batch_norm = dml::BatchNormalization(
               conv2d, mean, variance, scale, offset, true,
-              fused_computation_args.epsilon, DML_OPERATOR_ACTIVATION_RELU);
+              fused_computation_args.epsilon, dml::FusedActivation::Relu());
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {batch_norm});
         } break;
         case FusedComputationType::kFusedBatchNormWithRelu6: {
@@ -644,10 +644,9 @@ class DmlFusedConv2DKernel : public DmlKernel {
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {relu6});
         } break;
         case FusedComputationType::kFusedBatchNormWithElu: {
-          auto batch_norm =
-              dml::BatchNormalization(conv2d, mean, variance, scale, offset,
-                                      true, fused_computation_args.epsilon,
-                                      DML_OPERATOR_ACTIVATION_ELU, 1.0f);
+          auto batch_norm = dml::BatchNormalization(
+              conv2d, mean, variance, scale, offset, true,
+              fused_computation_args.epsilon, dml::FusedActivation::Elu(1.0f));
           compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, {batch_norm});
         } break;
         default:
