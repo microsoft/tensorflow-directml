@@ -1366,10 +1366,10 @@ namespace dml
         std::array<float, 4> dml_scales;
 
         if (scales.empty()) {
-            dml_scales[0] = static_cast<float>(outputSizes[0]) / static_cast<float>(inputTensor.sizes[0]);
-            dml_scales[1] = static_cast<float>(outputSizes[1]) / static_cast<float>(inputTensor.sizes[1]);
-            dml_scales[2] = static_cast<float>(outputSizes[2]) / static_cast<float>(inputTensor.sizes[2]);
-            dml_scales[3] = static_cast<float>(outputSizes[3]) / static_cast<float>(inputTensor.sizes[3]);
+            dml_scales[0] = static_cast<float>(inputTensor.sizes[0]) / static_cast<float>(outputSizes[0]);
+            dml_scales[1] = static_cast<float>(inputTensor.sizes[1]) / static_cast<float>(outputSizes[1]);
+            dml_scales[2] = static_cast<float>(inputTensor.sizes[2]) / static_cast<float>(outputSizes[2]);
+            dml_scales[3] = static_cast<float>(inputTensor.sizes[3]) / static_cast<float>(outputSizes[3]);
         } else {
             assert(scales.size() == 4);
             dml_scales[0] = scales[0];
