@@ -22,7 +22,6 @@
 #include <utility>
 #include <type_traits>
 #include <functional>
-#include <numeric>
 
 #if !DMLX_USE_ABSEIL
     #include <optional>
@@ -267,7 +266,7 @@ namespace dml
     public:
         // A function type that returns a TensorProperties object given a tensor data type, flags, and sizes.
         using Func = std::function<
-            TensorProperties (DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, const TensorDimensions& sizes)
+            TensorProperties (DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags, Span<const uint32_t> sizes)
             >;
 
         TensorPolicy() = default;
@@ -278,7 +277,7 @@ namespace dml
         TensorProperties Get(
             DML_TENSOR_DATA_TYPE dataType,
             DML_TENSOR_FLAGS flags,
-            const TensorDimensions& sizes) const
+            Span<const uint32_t> sizes) const
         {
             // Empty/uninitialized policy falls back to default.
             if (!m_impl)
@@ -314,7 +313,7 @@ namespace dml
         static TensorProperties ComputeDefault(
             DML_TENSOR_DATA_TYPE dataType,
             DML_TENSOR_FLAGS /*flags*/,
-            const TensorDimensions& sizes)
+            Span<const uint32_t> sizes)
         {
             uint32_t dimensionCount = static_cast<uint32_t>(sizes.size());
             TensorProperties props;
@@ -327,7 +326,7 @@ namespace dml
         static TensorProperties ComputeInterleavedChannel(
             DML_TENSOR_DATA_TYPE dataType,
             DML_TENSOR_FLAGS /*flags*/,
-            const TensorDimensions& sizes)
+            Span<const uint32_t> sizes)
         {
             uint32_t dimensionCount = static_cast<uint32_t>(sizes.size());
             TensorDimensions strides(dimensionCount);
@@ -337,7 +336,11 @@ namespace dml
             // N dimension strides
             if (dimensionCount >= 1)
             {
-                strides[N] = std::accumulate(sizes.begin() + 1, sizes.end(), 1u, std::multiplies<uint32_t>());
+                strides[N] = 1;
+                for (uint32_t i = 1; i < dimensionCount; ++i)
+                {
+                    strides[N] *= sizes[i];
+                }
             }
 
             // C dimension strides
@@ -347,14 +350,19 @@ namespace dml
             }
 
             // Spatial dimension strides
-            for (uint32_t i = 2; i < dimensionCount; ++i)
+            if (dimensionCount >= 3)
             {
-                strides[i] = std::accumulate(sizes.begin() + i + 1, sizes.end(), sizes[C], std::multiplies<uint32_t>());
+                uint32_t stride = sizes[C];
+                for (uint32_t i = dimensionCount - 1; i >= 2; --i)
+                {
+                    strides[i] = stride;
+                    stride *= sizes[i];
+                }
             }
 
             TensorProperties props;
-            props.strides = strides;
-            props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(dataType, dimensionCount, sizes.data(), strides.data());
+            props.strides = std::move(strides);
+            props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(dataType, dimensionCount, sizes.data(), props.strides->data());
             props.guaranteedBaseOffsetAlignment = 0;
             return props;
         }
