@@ -222,11 +222,9 @@ class DmlMirrorPadGradKernel : public DmlKernel {
 
             seq_lengths_sizes[i] = 1;
 
-            dml::TensorDesc seq_lengths_desc(DML_TENSOR_DATA_TYPE_UINT32,
-                                             seq_lengths_sizes);
-
-            auto seq_lengths = dml::FillValueConstant(scope, seq_lengths_value,
-                                                      seq_lengths_desc);
+            auto seq_lengths = dml::FillValueConstant(
+                scope, seq_lengths_sizes, DML_TENSOR_DATA_TYPE_UINT32,
+                seq_lengths_value);
 
             slice = dml::ReverseSubsequences(slice, seq_lengths, i);
           }

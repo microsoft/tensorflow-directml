@@ -38,8 +38,8 @@ dml::Expression UniformFloat(dml::Scope& scope, dml::Expression input_state,
   constexpr uint32_t mantissa_mask_value = (1 << 23) - 1;
 
   auto generator_outputs =
-      dml::RandomGenerator(input_state, element_count, false);
-  auto random_bits = generator_outputs[0];
+      dml::RandomGenerator(input_state, {1, 1, 1, element_count}, false);
+  auto random_bits = generator_outputs.output;
 
   auto sign_and_exponent = dml::ScalarTensor(scope, sign_and_exponent_value,
                                              random_bits.GetOutputDesc().sizes);
@@ -59,8 +59,8 @@ dml::Expression UniformHalf(dml::Scope& scope, dml::Expression input_state,
   constexpr uint32_t mantissa_mask_value = (1 << 10) - 1;
 
   auto generator_outputs =
-      dml::RandomGenerator(input_state, element_count, false);
-  auto random_bits = generator_outputs[0];
+      dml::RandomGenerator(input_state, {1, 1, 1, element_count}, false);
+  auto random_bits = generator_outputs.output;
 
   auto sign_and_exponent = dml::ScalarTensor(scope, sign_and_exponent_value,
                                              random_bits.GetOutputDesc().sizes);

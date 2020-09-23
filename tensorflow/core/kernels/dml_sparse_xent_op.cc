@@ -131,23 +131,21 @@ class DmlSparseXentKernel : public DmlKernel {
     auto logits_size = tensors.inputs[0]->desc.GetSizes();
     dml::TensorDesc::Dimensions logits_dimensions(logits_size.begin(),
                                                   logits_size.end());
-    // DML onehot operator requires values tensor containing high and low values
-    dml::TensorDesc values_tensor_desc{TfTensorTypeTraits<T>::dml_type,
-                                       dml::TensorDesc::Dimensions{1, 1, 1, 2}};
 
+    // DML onehot operator requires values tensor containing high and low values
     auto values = dml::FillValueSequence(
-        scope, SparseXentTraits<T>::GetZeroValue(),
-        SparseXentTraits<T>::GetOneValue(), values_tensor_desc);
+        scope, dml::TensorDesc::Dimensions{1, 1, 1, 2},
+        TfTensorTypeTraits<T>::dml_type, SparseXentTraits<T>::GetZeroValue(),
+        SparseXentTraits<T>::GetOneValue());
 
     auto epsilon = dml::ScalarTensor(
         scope, SparseXentTraits<T>::GetEpsilonValue(), logits_dimensions);
 
     auto probs = dml::ActivationSoftmax(logits);
 
-    dml::TensorDesc onehot_output_desc(TfTensorTypeTraits<T>::dml_type,
-                                       logits_dimensions);
+    const uint32_t axis = 3;
     auto labels =
-        dml::OneHot(sparse_labels, values, /*Axis*/ 3, onehot_output_desc);
+        dml::OneHot(sparse_labels, values, logits_dimensions[axis], axis);
 
     dml::Expression bp;
     if (num_classes > 1) {

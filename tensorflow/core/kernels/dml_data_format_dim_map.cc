@@ -103,10 +103,8 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     DML_SCALAR_UNION bits_scalar;
     bits_scalar.UInt32 = src_dst_mapping_packed;
 
-    dml::TensorDesc params_desc{DML_TENSOR_DATA_TYPE_UINT32, {1, 1, 1, 1}};
-
-    auto params =
-        dml::FillValueConstant(scope, bits_scalar, std::move(params_desc));
+    auto params = dml::FillValueConstant(
+        scope, {1, 1, 1, 1}, DML_TENSOR_DATA_TYPE_UINT32, bits_scalar);
 
     params =
         dml::Reinterpret(params, DML_TENSOR_DATA_TYPE_UINT8, {1, 1, 1, 4}, {});
