@@ -2067,8 +2067,8 @@ namespace dml
 
     struct MaxPoolingOutputs
     {
-        Expression output;
-        Expression outputIndices; // Only valid if outputIndices = true is supplied to MaxPooling()
+        Expression values;
+        Expression indices; // Only valid if outputIndices = true is supplied to MaxPooling()
     };
 
     // If not specified, parameters are defaulted to the following values:
@@ -2738,7 +2738,7 @@ namespace dml
     inline Expression OneHot(
         Expression indices,
         Expression values,
-        uint32_t outputCount,
+        uint32_t outputLength,
         uint32_t axis)
     {
         detail::GraphBuilder* builder = indices.Impl()->GetGraphBuilder();
@@ -2747,9 +2747,9 @@ namespace dml
 
         assert(axis < static_cast<uint32_t>(indicesTensor.sizes.size()));
 
-        // The output and indices sizes must all match except for the active axis, which is supplied as outputCount.
+        // The output and indices sizes must all match except for the active axis, which is supplied as outputLength.
         TensorDimensions outputSizes = indicesTensor.sizes;
-        outputSizes[axis] = outputCount;
+        outputSizes[axis] = outputLength;
 
         TensorDesc outputTensor(valuesTensor.dataType, std::move(outputSizes), builder->GetTensorPolicy());
 
@@ -2925,8 +2925,8 @@ namespace dml
 
     struct RandomGeneratorOutputs
     {
-        Expression output;
-        Expression outputState; // Only valid if outputState = true is supplied to RandomGenerator
+        Expression values;
+        Expression state; // Only valid if outputState = true is supplied to RandomGenerator
     };
 
     inline RandomGeneratorOutputs RandomGenerator(
@@ -2954,12 +2954,12 @@ namespace dml
 
         detail::NodeOutput* const inputs[] = { inputState.Impl() };
         detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_RANDOM_GENERATOR, &desc, inputs);
-        out.output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
+        out.values = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
 
         if (outputState)
         {
             TensorDesc outputStateTensor = inputStateTensor;
-            out.outputState = builder->CreateNodeOutput(node, 1, std::move(outputStateTensor));
+            out.state = builder->CreateNodeOutput(node, 1, std::move(outputStateTensor));
         }
 
         return out;
