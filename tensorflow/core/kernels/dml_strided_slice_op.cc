@@ -61,7 +61,7 @@ static absl::optional<SimplifiedSlice> SimplifySlice(
   desc.input_strides.resize(max_output_size, 1);
   desc.output_sizes.resize(max_output_size, 1);
   desc.window_offset.resize(max_output_size, 0);
-  desc.window_sizes.resize(max_output_size, 0);
+  desc.window_sizes.resize(max_output_size, 1);
   desc.window_strides.resize(max_output_size, 1);
 
   int current_dim = max_output_size - 1;
