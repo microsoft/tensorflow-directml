@@ -230,9 +230,9 @@ class DmlLstmBlockCellOp : public DmlKernel {
         DimensionFromOffset(cell.gates_o_offsets());
     dml::TensorDesc::Dimensions cell_extent =
         DimensionFromExtent(cell.cell_extents());
-    dml::TensorDesc::Dimensions slice_stride = {1, 1, 1, 1};
+    int32_t slice_stride[] = {1, 1, 1, 1};
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto cs_prev = dml::InputTensor(scope, 1, input_descs[1]);
     auto h_prev = dml::InputTensor(scope, 2, input_descs[2]);
@@ -644,7 +644,7 @@ class DmlLstmCellBlockGradOp : public DmlKernel {
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
     auto cs_prev = dml::InputTensor(scope, 0, input_descs[0]);
 
@@ -999,9 +999,9 @@ class DmlBlockLstmOp : public DmlKernel {
         DimensionFromOffset(cell.gates_o_offsets());
     dml::TensorDesc::Dimensions cell_extent =
         DimensionFromExtent(cell.cell_extents());
-    dml::TensorDesc::Dimensions slice_stride = {1, 1, 1, 1};
+    int32_t slice_stride[] = {1, 1, 1, 1};
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
     dml::Expression wci, wcf, wco, b;
 
@@ -1498,7 +1498,7 @@ class DmlBlockLstmGradOp : public DmlKernel {
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto cs_prev = dml::InputTensor(scope, 1, input_descs[1]);
@@ -1557,7 +1557,7 @@ class DmlBlockLstmGradOp : public DmlKernel {
     dml::TensorDesc::Dimensions output_extent{1, 1, batch_size, cell_size};
     dml::TensorDesc::Dimensions xh_x_offset{0, 0, 0, 0};
     dml::TensorDesc::Dimensions xh_h_offset{0, 0, 0, input_size};
-    dml::TensorDesc::Dimensions slice_stride = {1, 1, 1, 1};
+    int32_t slice_stride[] = {1, 1, 1, 1};
 
     std::vector<dml::Expression> x_grad_tensors;
 

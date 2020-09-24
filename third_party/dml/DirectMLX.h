@@ -245,7 +245,7 @@ namespace dml
     #define DMLX_THROW(_hr) { std::abort(); } 
 #endif
 
-    class Scope;
+    class Graph;
     class Expression;
 
     using TensorDimensions = SmallVector<uint32_t, 4>;
@@ -260,7 +260,7 @@ namespace dml
 
     // Provides a way to customize the properties that DMLX automatically sets on tensors. Callers may provide their
     // own TensorPolicy implementation to provide custom strides, total tensor sizes, and alignment. TensorPolicy
-    // objects can be set using Scope::SetTensorPolicy().
+    // objects can be set using Graph::SetTensorPolicy().
     class TensorPolicy
     {
     public:
@@ -604,10 +604,10 @@ namespace dml
 
     } // namespace detail
 
-    class Scope
+    class Graph
     {
     public:
-        explicit Scope(IDMLDevice* device, TensorPolicy tensorPolicy = {})
+        explicit Graph(IDMLDevice* device, TensorPolicy tensorPolicy = {})
             : m_graphBuilder(make_unique<detail::GraphBuilder>(device, tensorPolicy))
         {}
 
@@ -615,7 +615,7 @@ namespace dml
         detail::GraphBuilder* Impl() { return m_graphBuilder.get(); }
 
         // Sets/gets the tensor policy. If not set, defaults to TensorPolicy::Default(). Tensor policies can be used
-        // to control properties (such as strides) on output tensors produced by this Scope.
+        // to control properties (such as strides) on output tensors produced by this Graph.
         void SetTensorPolicy(TensorPolicy policy) { m_graphBuilder->SetTensorPolicy(std::move(policy)); }
         const TensorPolicy& GetTensorPolicy() const { return m_graphBuilder->GetTensorPolicy(); }
         TensorPolicy& GetTensorPolicy() { return m_graphBuilder->GetTensorPolicy(); }
@@ -991,9 +991,9 @@ namespace dml
 
     } // namespace detail
 
-    inline Expression InputTensor(Scope& scope, uint32_t inputIndex, TensorDesc desc)
+    inline Expression InputTensor(Graph& graph, uint32_t inputIndex, TensorDesc desc)
     {
-        detail::GraphBuilder* builder = scope.Impl();
+        detail::GraphBuilder* builder = graph.Impl();
 
         detail::NodeID node = builder->CreateInputNode(inputIndex);
         detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(desc));
@@ -1327,22 +1327,9 @@ namespace dml
         return detail::ElementWiseUnary<DML_OPERATOR_ELEMENT_WISE_SIGN, DML_ELEMENT_WISE_SIGN_OPERATOR_DESC>(a);
     }
 
-    inline Expression IsNaN(Expression input)
+    inline Expression IsNaN(Expression input, DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
     {
-        detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
-
-        TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_UINT8, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
-
-        DML_ELEMENT_WISE_IS_NAN_OPERATOR_DESC desc = {};
-        desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-
-        detail::NodeOutput* const inputs[] = { input.Impl() };
-        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_ELEMENT_WISE_IS_NAN, &desc, inputs);
-        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
-
-        return output;
+        return detail::ElementWiseUnary<DML_OPERATOR_ELEMENT_WISE_IS_NAN, DML_ELEMENT_WISE_IS_NAN_OPERATOR_DESC>(input, outputDataType);
     }
 
     inline Expression Erf(Expression input, const Optional<DML_SCALE_BIAS>& scaleBias = NullOpt)
@@ -1461,12 +1448,15 @@ namespace dml
         return output;
     }
 
-    inline Expression IsInfinity(Expression input, DML_IS_INFINITY_MODE infinityMode = DML_IS_INFINITY_MODE_EITHER)
+    inline Expression IsInfinity(
+        Expression input,
+        DML_IS_INFINITY_MODE infinityMode = DML_IS_INFINITY_MODE_EITHER,
+        DML_TENSOR_DATA_TYPE outputDataType = DML_TENSOR_DATA_TYPE_UINT8)
     {
         detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
         TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(DML_TENSOR_DATA_TYPE_UINT8, inputTensor.sizes, builder->GetTensorPolicy()); // Same as input
+        TensorDesc outputTensor(outputDataType, inputTensor.sizes, builder->GetTensorPolicy());
 
         DML_ELEMENT_WISE_IS_INFINITY_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2197,39 +2187,8 @@ namespace dml
     // 
     // TODO: ROIPooling
     // 
-    
-    inline Expression Slice(Expression input, Span<const uint32_t> offsets, Span<const uint32_t> sizes, Span<const uint32_t> strides)
-    {
-        detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
 
-        assert(!offsets.empty());
-        assert(!sizes.empty());
-        assert(!strides.empty());
-        assert(offsets.size() == sizes.size() && sizes.size() == strides.size());
-
-        uint32_t dims = static_cast<uint32_t>(sizes.size());
-
-        TensorDimensions outputSizes(sizes.begin(), sizes.end());
-
-        TensorDesc inputTensor = input.Impl()->GetOutputDesc();
-        TensorDesc outputTensor(inputTensor.dataType, std::move(outputSizes), builder->GetTensorPolicy());
-
-        DML_SLICE_OPERATOR_DESC desc = {};
-        desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.DimensionCount = dims;
-        desc.Offsets = offsets.data();
-        desc.Sizes = sizes.data();
-        desc.Strides = strides.data();
-
-        detail::NodeOutput* const inputs[] = { input.Impl() };
-        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_SLICE, &desc, inputs);
-        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
-
-        return output;
-    }
-
-    inline Expression Slice1(
+    inline Expression Slice(
         Expression input,
         Span<const uint32_t> inputWindowOffsets,
         Span<const uint32_t> inputWindowSizes,
@@ -2643,7 +2602,7 @@ namespace dml
         Expression input,
         Optional<Expression> scale,
         Optional<Expression> bias,
-        bool crossChannel,
+        Span<const uint32_t> axes,
         bool normalizeVariance,
         float epsilon,
         FusedActivation fusedActivation = FusedActivation::None())
@@ -2665,12 +2624,13 @@ namespace dml
 
         detail::FusedActivationStorage storage;
 
-        DML_MEAN_VARIANCE_NORMALIZATION_OPERATOR_DESC desc = {};
+        DML_MEAN_VARIANCE_NORMALIZATION1_OPERATOR_DESC desc = {};
         desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
         desc.ScaleTensor = scale ? scaleTensor.AsPtr<DML_TENSOR_DESC>() : nullptr;
         desc.BiasTensor = bias ? biasTensor.AsPtr<DML_TENSOR_DESC>() : nullptr;
         desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
-        desc.CrossChannel = crossChannel;
+        desc.AxisCount = static_cast<UINT>(axes.size());
+        desc.Axes = axes.data();
         desc.NormalizeVariance = normalizeVariance;
         desc.Epsilon = epsilon;
         desc.FusedActivation = detail::GetFusedActivationPtr(fusedActivation, &storage);
@@ -2681,7 +2641,7 @@ namespace dml
             scale ? scale->Impl() : nullptr,
             bias ? bias->Impl() : nullptr
         };
-        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_MEAN_VARIANCE_NORMALIZATION, &desc, inputs);
+        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_MEAN_VARIANCE_NORMALIZATION1, &desc, inputs);
         detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
 
         return output;
@@ -2827,12 +2787,12 @@ namespace dml
     }
 
     inline Expression FillValueConstant(
-        Scope& scope,
+        Graph& graph,
         TensorDimensions outputSizes,
         DML_TENSOR_DATA_TYPE valueDataType,
         DML_SCALAR_UNION value)
     {
-        detail::GraphBuilder* builder = scope.Impl();
+        detail::GraphBuilder* builder = graph.Impl();
         TensorDesc outputTensor(valueDataType, std::move(outputSizes), builder->GetTensorPolicy());
 
         DML_FILL_VALUE_CONSTANT_OPERATOR_DESC desc = {};
@@ -2847,13 +2807,13 @@ namespace dml
     }
 
     inline Expression FillValueSequence(
-        Scope& scope,
+        Graph& graph,
         TensorDimensions outputSizes,
         DML_TENSOR_DATA_TYPE valueDataType,
         DML_SCALAR_UNION valueStart,
         DML_SCALAR_UNION valueDelta)
     {
-        detail::GraphBuilder* builder = scope.Impl();
+        detail::GraphBuilder* builder = graph.Impl();
         TensorDesc outputTensor(valueDataType, std::move(outputSizes), builder->GetTensorPolicy());
 
         DML_FILL_VALUE_SEQUENCE_OPERATOR_DESC desc = {};

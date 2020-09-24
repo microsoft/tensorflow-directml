@@ -299,7 +299,7 @@ class DmlMatrixDiagKernel : public DmlKernel {
     int64 out_width = out_shape.dim_size(out_shape.dims() - 1);
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto diag = dml::InputTensor(scope, 0, inputs[0]);
     auto result = dml::MatrixDiag(scope, diag, k_min, k_max,
                                   static_cast<float>(padding_value_),

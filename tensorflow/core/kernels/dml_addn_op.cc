@@ -66,7 +66,7 @@ class DmlAddNKernel : public DmlKernel {
                                    &identity_desc};
       Initialize(ctx, std::move(tensors), op_desc);
     } else {
-      auto scope = dml::Scope(ctx->GetDmlDevice());
+      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto result = dml::InputTensor(scope, 0, inputs[0]);
 
       for (uint32_t i = 1; i < inputs.size(); ++i) {

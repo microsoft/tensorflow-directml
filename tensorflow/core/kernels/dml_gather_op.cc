@@ -278,7 +278,7 @@ class DmlGatherKernel : public DmlKernel {
       out_policy = GetEmulatedInt64TensorPolicy();
     }
 
-    auto scope = dml::Scope(ctx->GetDmlDevice(), out_policy);
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
     auto indices_tensor = dml::InputTensor(scope, 1, inputs[1]);
 

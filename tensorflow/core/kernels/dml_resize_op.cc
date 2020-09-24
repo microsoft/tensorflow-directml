@@ -121,7 +121,7 @@ class DmlResizeKernel : public DmlKernel {
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto result = dml::InputTensor(scope, 0, inputs[0]);
 
     DataType tf_input_data_type = ctx->GetInputDataType(0);

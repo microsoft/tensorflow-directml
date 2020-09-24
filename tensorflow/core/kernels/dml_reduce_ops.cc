@@ -344,7 +344,7 @@ class DmlReduceKernel : public DmlKernel {
         dml_input_data_type != DML_TENSOR_DATA_TYPE_FLOAT16) {
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
 
-      auto scope = dml::Scope(ctx->GetDmlDevice());
+      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto result = dml::InputTensor(scope, 0, input_descs[0]);
       result = dml::Cast(result, DML_TENSOR_DATA_TYPE_FLOAT32);
       result = dml::Reduce(result, reduce_function, reduce_axes);

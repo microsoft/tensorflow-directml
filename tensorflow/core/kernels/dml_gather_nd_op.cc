@@ -213,7 +213,7 @@ class DmlGatherNdKernel : public DmlKernel {
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
 
-      auto scope = dml::Scope(ctx->GetDmlDevice());
+      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto params = dml::InputTensor(scope, 0, input_descs[0]);
       auto result = dml::Tile(
           params, {static_cast<uint32_t>(indices_leading_dims), 1, 1, 1});

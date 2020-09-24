@@ -86,7 +86,7 @@ class DmlSoftmaxXentWithLogitsKernel : public DmlKernel {
     DmlKernelTensors tensors = GetTensorInfos(ctx, params);
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
     // logits: batch_size, num_classes.
     // labels: batch_size, num_classes.

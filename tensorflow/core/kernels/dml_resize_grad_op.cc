@@ -159,7 +159,7 @@ class DmlResizeGradKernel : public DmlKernel {
     DmlKernelTensors tensors = GetTensorInfos(ctx, params);
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto result = dml::InputTensor(scope, 0, inputs[0]);
 
     if (CastInputToFloat(interpolation_mode, ctx->GetInputDataType(0))) {

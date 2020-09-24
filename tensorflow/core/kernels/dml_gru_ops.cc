@@ -181,9 +181,9 @@ class DmlGruBlockCellOp : public DmlKernel {
     dml::TensorDesc::Dimensions ru_r_offsets = {0, 0, 0, 0};
     dml::TensorDesc::Dimensions ru_u_offsets = {0, 0, 0, cell_size};
     dml::TensorDesc::Dimensions cell_extents = {1, 1, batch_size, cell_size};
-    dml::TensorDesc::Dimensions slice_strides = {1, 1, 1, 1};
+    int32_t slice_strides[] = {1, 1, 1, 1};
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto h_prev = dml::InputTensor(scope, 1, input_descs[1]);
     auto w_ru = dml::InputTensor(scope, 2, input_descs[2]);
@@ -440,7 +440,7 @@ class DmlGruCellBlockGradOp : public DmlKernel {
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto h_prev = dml::InputTensor(scope, 0, input_descs[0]);
     auto w_ru = dml::InputTensor(scope, 1, input_descs[1]);
     auto w_c = dml::InputTensor(scope, 2, input_descs[2]);
@@ -453,7 +453,7 @@ class DmlGruCellBlockGradOp : public DmlKernel {
     dml::TensorDesc::Dimensions x_extent = {1, 1, batch_size, input_size};
     dml::TensorDesc::Dimensions h_offset = {0, 0, 0, input_size};
     dml::TensorDesc::Dimensions h_extent = {1, 1, batch_size, cell_size};
-    dml::TensorDesc::Dimensions slice_stride = {1, 1, 1, 1};
+    int32_t slice_stride[] = {1, 1, 1, 1};
 
     // d_c_bar = d_h*(1-u)*(1-(c*c))
     auto d_c_bar = (d_h * (1 - u)) * (1 - dml::Pow(c, 2.0f));

@@ -31,7 +31,7 @@ namespace tensorflow {
 // lowest 23 bits from each 32-bit generator value; FP16 consumes the lowest 10
 // bits from each 32-bit generator value. FP64 (not implemented) would require
 // 2 generator values per output vaule, and it would use the lowest 52 bits.
-dml::Expression UniformFloat(dml::Scope& scope, dml::Expression input_state,
+dml::Expression UniformFloat(dml::Graph& scope, dml::Expression input_state,
                              uint32_t element_count) {
   // FP32 has 1 sign bit, 8 exponent bits, and 23 mantissa bits.
   constexpr uint32_t sign_and_exponent_value = ((1 << (8 - 1)) - 1) << 23;
@@ -52,7 +52,7 @@ dml::Expression UniformFloat(dml::Scope& scope, dml::Expression input_state,
   return dml::Reinterpret(result, DML_TENSOR_DATA_TYPE_FLOAT32) - 1.0f;
 }
 
-dml::Expression UniformHalf(dml::Scope& scope, dml::Expression input_state,
+dml::Expression UniformHalf(dml::Graph& scope, dml::Expression input_state,
                             uint32_t element_count) {
   // FP16 has 1 sign bit, 5 exponent bits, and 10 mantissa bits.
   constexpr uint32_t sign_and_exponent_value = ((1 << (5 - 1)) - 1) << 10;
@@ -159,7 +159,7 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     tensors.outputs = {output_info};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input_state = dml::InputTensor(scope, 0, inputs[0]);
 
     dml::Expression result;
@@ -305,7 +305,7 @@ class DmlRandomUniformKernel : public DmlKernel {
     tensors.outputs = {output_info};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input_state = dml::InputTensor(scope, 0, inputs[0]);
 
     dml::Expression result;

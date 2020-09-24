@@ -17,7 +17,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_common.h"
 
 namespace dml {
-dml::Expression ExtractPatches(dml::Scope& scope, dml::Expression input,
+dml::Expression ExtractPatches(dml::Graph& scope, dml::Expression input,
                                absl::Span<const uint32_t> window_sizes,
                                absl::Span<const uint32_t> window_strides,
                                absl::Span<const uint32_t> window_rates,

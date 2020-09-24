@@ -265,7 +265,7 @@ struct TfTensorTypeTraits<int32_t> {
 namespace dml {
 
 template <typename T>
-Expression ScalarTensor(Scope& scope, T value, TensorDesc::Dimensions sizes) {
+Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
   auto scalar = dml::Reinterpret(
       dml::FillValueConstant(
           scope, dml::TensorDesc::Dimensions{1, 1, 1, 1},
@@ -278,7 +278,7 @@ Expression ScalarTensor(Scope& scope, T value, TensorDesc::Dimensions sizes) {
 }
 
 template <typename T>
-Expression Sequence(Scope& scope, T start, T step,
+Expression Sequence(Graph& scope, T start, T step,
                     TensorDesc::Dimensions sizes) {
   auto seq = dml::FillValueSequence(
       scope, sizes, tensorflow::TfTensorTypeTraits<T>::dml_type,
@@ -291,7 +291,7 @@ Expression Sequence(Scope& scope, T start, T step,
 // Zero is special since the bit representation is the same regardless of type,
 // so there's no need to have a function template. The dataType is used only for
 // the tensor desc.
-inline Expression ZeroTensor(Scope& scope, DML_TENSOR_DATA_TYPE dataType,
+inline Expression ZeroTensor(Graph& scope, DML_TENSOR_DATA_TYPE dataType,
                              TensorDesc::Dimensions size) {
   DML_SCALAR_UNION scalar_value{};
   auto scalar = dml::Reinterpret(
