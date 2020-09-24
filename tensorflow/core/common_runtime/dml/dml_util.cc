@@ -215,7 +215,7 @@ dml::TensorPolicy GetDmlXTensorPolicy(TensorFormat format) {
 dml::TensorPolicy GetEmulatedInt64TensorPolicy() {
   return dml::TensorPolicy([](DML_TENSOR_DATA_TYPE dataType,
                               DML_TENSOR_FLAGS flags,
-                              const dml::TensorDimensions& sizes) {
+                              dml::Span<const uint32_t> sizes) {
     uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
 
     // Compute strides
