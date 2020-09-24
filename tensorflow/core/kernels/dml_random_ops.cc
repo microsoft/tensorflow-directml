@@ -39,7 +39,7 @@ dml::Expression UniformFloat(dml::Scope& scope, dml::Expression input_state,
 
   auto generator_outputs =
       dml::RandomGenerator(input_state, {1, 1, 1, element_count}, false);
-  auto random_bits = generator_outputs.output;
+  auto random_bits = generator_outputs.values;
 
   auto sign_and_exponent = dml::ScalarTensor(scope, sign_and_exponent_value,
                                              random_bits.GetOutputDesc().sizes);
@@ -60,7 +60,7 @@ dml::Expression UniformHalf(dml::Scope& scope, dml::Expression input_state,
 
   auto generator_outputs =
       dml::RandomGenerator(input_state, {1, 1, 1, element_count}, false);
-  auto random_bits = generator_outputs.output;
+  auto random_bits = generator_outputs.values;
 
   auto sign_and_exponent = dml::ScalarTensor(scope, sign_and_exponent_value,
                                              random_bits.GetOutputDesc().sizes);

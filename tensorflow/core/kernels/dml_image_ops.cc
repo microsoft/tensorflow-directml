@@ -117,8 +117,8 @@ std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
           .OutputIndices(true)
           .Build();
 
-  auto& c_max = max_pool_out.output;
-  auto& c_max_indices = max_pool_out.outputIndices;
+  auto& c_max = max_pool_out.values;
+  auto& c_max_indices = max_pool_out.indices;
 
   auto c_min = dml::Reduce(input, DML_REDUCE_FUNCTION_MIN, {3});
   auto delta = c_max - c_min;
