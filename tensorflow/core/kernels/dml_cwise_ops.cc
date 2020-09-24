@@ -709,6 +709,8 @@ REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(TanhGrad, y*(1 - x * x),
                                            kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(ReciprocalGrad, -y* x* x,
                                            kNchwDimensionCount)
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SoftplusGrad, x / (dml::Exp(-y) + 1),
+                                           kNchwDimensionCount)
 #undef REGISTER_DML_FLOAT_OP_KERNEL
 #undef REGISTER_OP_KERNEL
 #undef REGISTER_DML_BOOL_OP_KERNEL
