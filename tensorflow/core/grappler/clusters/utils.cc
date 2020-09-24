@@ -166,6 +166,8 @@ DeviceProperties GetLocalDMLInfo(int device_id) {
     return device;
   }
 
+  CHECK(device_id >= 0);
+
   const auto& adapter = adapters[device_id];
   device.set_model(adapter.Name());
   device.set_vendor(GetVendorName(adapter.VendorID()));
