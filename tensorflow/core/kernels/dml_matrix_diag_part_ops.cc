@@ -345,7 +345,7 @@ class DmlMatrixDiagPartKernel : public DmlKernel {
         diags_indices, {1, 1, leading_dims_size, out_rows * out_cols},
         dml::TensorDesc::Dimensions({0, 0, 0, 1}));
 
-    auto diags = dml::GatherElements(m2, diags_indices, 3, {});
+    auto diags = dml::GatherElements(m2, diags_indices, 3);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {diags});

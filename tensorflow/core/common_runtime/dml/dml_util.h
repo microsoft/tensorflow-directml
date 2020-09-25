@@ -61,7 +61,11 @@ uint32_t GetDmlDimensionIndex(DmlTensorAxis axis, uint32_t dml_dimension_count);
 DmlTensorLayout GetDmlTensorLayout(TensorFormat format, uint32_t rank);
 
 // Converts a TF-style TensorFormat into the equivalent DirectMLX enum value.
-dml::TensorLayout GetDmlXTensorLayout(TensorFormat format);
+dml::TensorPolicy GetDmlXTensorPolicy(TensorFormat format);
+
+// Retrieves a tensor policy that produces padded output striding as required
+// for int64 emulation.
+dml::TensorPolicy GetEmulatedInt64TensorPolicy();
 
 namespace dml_util {
 

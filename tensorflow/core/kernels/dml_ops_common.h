@@ -266,12 +266,11 @@ namespace dml {
 
 template <typename T>
 Expression ScalarTensor(Scope& scope, T value, TensorDesc::Dimensions sizes) {
-  dml::TensorDesc scalar_desc(tensorflow::TfTensorTypeTraits<T>::dml_type,
-                              dml::TensorDesc::Dimensions{1, 1, 1, 1});
   auto scalar = dml::Reinterpret(
       dml::FillValueConstant(
-          scope, tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(value),
-          scalar_desc),
+          scope, dml::TensorDesc::Dimensions{1, 1, 1, 1},
+          tensorflow::TfTensorTypeTraits<T>::dml_type,
+          tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(value)),
       sizes,                                  /* broadcast shape */
       dml::TensorDesc::Dimensions{0, 0, 0, 0} /* broadcast strides */
   );
@@ -281,11 +280,10 @@ Expression ScalarTensor(Scope& scope, T value, TensorDesc::Dimensions sizes) {
 template <typename T>
 Expression Sequence(Scope& scope, T start, T step,
                     TensorDesc::Dimensions sizes) {
-  dml::TensorDesc desc(tensorflow::TfTensorTypeTraits<T>::dml_type, sizes);
-
   auto seq = dml::FillValueSequence(
-      scope, tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(start),
-      tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(step), desc);
+      scope, sizes, tensorflow::TfTensorTypeTraits<T>::dml_type,
+      tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(start),
+      tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(step));
 
   return seq;
 }
@@ -295,11 +293,10 @@ Expression Sequence(Scope& scope, T start, T step,
 // the tensor desc.
 inline Expression ZeroTensor(Scope& scope, DML_TENSOR_DATA_TYPE dataType,
                              TensorDesc::Dimensions size) {
-  dml::TensorDesc scalar_desc{dataType,
-                              dml::TensorDesc::Dimensions{1, 1, 1, 1}};
   DML_SCALAR_UNION scalar_value{};
   auto scalar = dml::Reinterpret(
-      dml::FillValueConstant(scope, scalar_value, scalar_desc),
+      dml::FillValueConstant(scope, dml::TensorDesc::Dimensions{1, 1, 1, 1},
+                             dataType, scalar_value),
       size,                                   /* broadcast shape */
       dml::TensorDesc::Dimensions{0, 0, 0, 0} /* broadcast strides */
   );

@@ -321,7 +321,7 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     // the mean/variance tensors back to TF.
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorLayout(tensor_format));
+        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto scale = dml::InputTensor(scope, 1, input_descs[1]);
     auto offset = dml::InputTensor(scope, 2, input_descs[2]);
@@ -451,7 +451,7 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorLayout(tensor_format));
+        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto mean = dml::InputTensor(scope, 1, input_descs[1]);
     auto variance = dml::InputTensor(scope, 2, input_descs[2]);
@@ -684,7 +684,7 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorLayout(tensor_format));
+        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
 
     auto y_backprop =
         dml::InputTensor(scope, kYBackprop, input_descs[kYBackprop]);

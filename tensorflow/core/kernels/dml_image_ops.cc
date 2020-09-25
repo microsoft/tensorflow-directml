@@ -117,8 +117,8 @@ std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
           .OutputIndices(true)
           .Build();
 
-  auto& c_max = max_pool_out.output;
-  auto& c_max_indices = max_pool_out.outputIndices;
+  auto& c_max = max_pool_out.values;
+  auto& c_max_indices = max_pool_out.indices;
 
   auto c_min = dml::Reduce(input, DML_REDUCE_FUNCTION_MIN, {3});
   auto delta = c_max - c_min;
@@ -145,7 +145,7 @@ std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
   auto c_max_indices_flat =
       dml::Reinterpret(c_max_indices, plane_flat_size, dml::NullOpt);
   auto h_max =
-      dml::Gather(h_rgb_flat, c_max_indices_flat, channel_dim, 4, dml::NullOpt);
+      dml::Gather(h_rgb_flat, c_max_indices_flat, channel_dim, 4);
   auto h_max_resized =
       dml::Reinterpret(h_max, r.GetOutputDesc().sizes, dml::NullOpt);
 
