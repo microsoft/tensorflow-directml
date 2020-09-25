@@ -3664,15 +3664,15 @@ cc_library(
 )
 
 cc_library(
-    name = "dml_runtime",
+    name = "dml_runtime_impl",
     srcs = [
+        "common_runtime/dml/dml_device_cache.cc",
         "common_runtime/dml/dml_bfc_allocator.cc",
         "common_runtime/dml/dml_buffer.cc",
         "common_runtime/dml/dml_buffer_region.cc",
         "common_runtime/dml/dml_command_queue.cc",
         "common_runtime/dml/dml_command_recorder.cc",
         "common_runtime/dml/dml_descriptor_pool.cc",
-        "common_runtime/dml/dml_device_factory.cc",
         "common_runtime/dml/dml_device.cc",
         "common_runtime/dml/dml_device_state.cc",
         "common_runtime/dml/dml_device_context.cc",
@@ -3688,9 +3688,9 @@ cc_library(
         "common_runtime/dml/dml_tensor_desc.cc",
         "common_runtime/dml/dml_upload_heap.cc",
         "common_runtime/dml/dml_util.cc",
-        "common_runtime/dml/dml_device_cache.cc",
     ],
     hdrs = [
+        "common_runtime/dml/dml_device_cache.h",
         "common_runtime/dml/dml_bfc_allocator.h",
         "common_runtime/dml/dml_buffer.h",
         "common_runtime/dml/dml_buffer_region.h",
@@ -3715,7 +3715,6 @@ cc_library(
         "common_runtime/dml/dml_upload_heap.h",
         "common_runtime/dml/dml_util.h",
         "common_runtime/dml/dml_status.h",
-        "common_runtime/dml/dml_device_cache.h",
         "common_runtime/device.h",
         "common_runtime/local_device.h",
         "common_runtime/device_factory.h",
@@ -3724,18 +3723,43 @@ cc_library(
         "graph/types.h",
     ],
     linkstatic = 1,
+    alwayslink = 1,
+    copts = tf_copts() + if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+    ]),
     deps = [
         ":dml_core",
-        "//tensorflow/core:framework",
-        "//tensorflow/core:framework_internal",
-        "//tensorflow/core:gpu_bfc_allocator",
-        "//tensorflow/core:proto_text",
-        "//tensorflow/stream_executor",
+        ":framework",
+        ":framework_internal",
+        ":gpu_bfc_allocator",
+        ":proto_text",
+        ":stream_executor",
         "//tensorflow/stream_executor/platform:dso_loader",
     ],
+)
+
+cc_library(
+    name = "dml_device_cache",
+    linkstatic = 1,
     alwayslink = 1,
-    visibility = ["//visibility:public"],
-    
+    copts = tf_copts() + if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+    ]),
+    deps = [":dml_runtime_impl"],
+)
+
+cc_library(
+    name = "dml_runtime",
+    srcs = [
+        "common_runtime/dml/dml_device_factory.cc",
+    ],
+    deps = [
+        ":dml_runtime_impl",
+    ],
+    linkstatic = 1,
+    alwayslink = 1,
     copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
@@ -3757,15 +3781,14 @@ cc_library(
     ],
     linkstatic = 1,
     deps = [
-        "//tensorflow/core:lib",
-        "//tensorflow/core:lib_internal",
+        ":lib",
+        ":lib_internal",
         "//third_party/dml:dx_helpers",
         "@dml_redist//:headers",
         "//third_party/dml:winadapter",
     ],
     alwayslink = 1,
     visibility = ["//visibility:public"],
-    
     copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"

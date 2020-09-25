@@ -36,7 +36,7 @@ tf_cuda_library(
     ] + select({
         ":xsmm": ["@libxsmm_archive//:xsmm_avx"],
         "//conditions:default": [],
-    }) + if_dml(["//tensorflow/core:dml_runtime"]),
+    }) + if_dml(["//tensorflow/core:dml_device_cache"]),
 )
 
 tf_cc_test(
