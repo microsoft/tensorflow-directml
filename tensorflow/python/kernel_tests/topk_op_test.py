@@ -109,8 +109,9 @@ class TopKTest(test.TestCase):
     self._validateTopK(inputs, k, values, indices)
 
   # The output indices from TF are all zeros because they won't be set due to 
-  # NaN != NaN, while DML API always return valid indices that might not match TF 
-  # behavior, so this test is diabled because this issue doesn't affect the kernel.
+  # NaN != NaN, while DML API always return valid indices that might not match
+  # TF behavior, so this test is diabled because this issue doesn't affect 
+  # the kernel.
   @test_util.skip_dml
   def testTop1AllNan(self):
     inputs = [[np.NaN, np.NaN], [np.NaN, np.NaN]]
@@ -212,8 +213,6 @@ class TopKTest(test.TestCase):
       nn_ops.top_k(inputs, 4)
 
   @test_util.run_deprecated_v1
-  # scatter_nd is not implemented in DML.
-  @test_util.skip_dml
   def testTopKGradients(self):
     with self.session(use_gpu=True) as sess:
       inputs = array_ops.placeholder(dtypes.float32, shape=[2, 5])
