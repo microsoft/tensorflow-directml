@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#pragma once
+
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 
 namespace tensorflow {
