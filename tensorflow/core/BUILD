@@ -5563,7 +5563,7 @@ tf_dml_cc_test(
     name = "dml_runtime_test",
     size = "small",
     srcs = [
-        "dml_kernel_manager_test.cc",
+        "common_runtime/dml/dml_kernel_manager_test.cc",
     ],
     linkstatic = 1,
     deps = [
