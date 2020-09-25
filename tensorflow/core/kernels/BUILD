@@ -8057,6 +8057,7 @@ tf_kernel_library(
         "dml_relu_op.cc",
         "dml_random_ops.cc",
         "dml_batch_norm_ops.cc",
+        "dml_topk_op.cc",
         "dml_softmax_ops.cc",
         "dml_conv_ops.cc",
         "dml_snapshot_op.cc",
