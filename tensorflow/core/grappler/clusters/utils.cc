@@ -34,6 +34,7 @@ limitations under the License.
 #if TENSORFLOW_USE_DIRECTML
 #include "tensorflow/core/common_runtime/dml/dml_adapter.h"
 #include "tensorflow/core/common_runtime/dml/dml_adapter_heuristics.h"
+#include "tensorflow/core/common_runtime/dml/dml_device_cache.h"
 #endif
 
 #include "tensorflow/core/common_runtime/gpu/gpu_id.h"
@@ -158,17 +159,10 @@ DeviceProperties GetLocalDMLInfo(int device_id) {
   device.set_type("DML");
 
 #if TENSORFLOW_USE_DIRECTML
-  auto adapters = EnumerateAdapters();
+  const auto& device_cache = DmlDeviceCache::Instance();
+  CHECK(device_id >= 0 && device_id < device_cache.GetAdapterCount());
 
-  // After a DML device gets removed, the device IDs in subsequent runs may be
-  // out of bounds since the list is smaller by 1 element
-  if (device_id >= adapters.size()) {
-    return device;
-  }
-
-  CHECK(device_id >= 0);
-
-  const auto& adapter = adapters[device_id];
+  const auto& adapter = device_cache.GetAdapter(device_id);
   device.set_model(adapter.Name());
   device.set_vendor(GetVendorName(adapter.VendorID()));
 

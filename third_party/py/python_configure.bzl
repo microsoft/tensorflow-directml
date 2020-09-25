@@ -51,9 +51,8 @@ def _execute(
     Return:
       the result of repository_ctx.execute(cmdline)
     """
-    print(cmdline)
     result = repository_ctx.execute(cmdline)
-    if not (empty_stdout_fine or result.stdout):
+    if result.stderr or not (empty_stdout_fine or result.stdout):
         _fail("\n".join([
             error_msg.strip() if error_msg else "Repository command failed",
             result.stderr.strip(),
@@ -283,7 +282,7 @@ def _get_numpy_include(repository_ctx, python_bin):
             "import numpy;" +
             " print(numpy.get_include());",
         ],
-        error_msg = "Problem getting numpy include path. python_bin: " + python_bin,
+        error_msg = "Problem getting numpy include path.",
         error_details = "Is numpy installed?",
     ).stdout.splitlines()[0]
 
