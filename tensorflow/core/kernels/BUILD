@@ -2716,7 +2716,7 @@ tf_kernel_library(
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
         "@com_google_absl//absl/strings",
-    ] + if_dml(["//tensorflow/core/common_runtime/dml:dml_runtime"]),
+    ] + if_dml(["//tensorflow/core:dml_runtime"]),
     copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
@@ -8133,7 +8133,7 @@ tf_kernel_library(
         "dml_extract_patches_helpers.h",
     ],
     deps = NN_DEPS + [
-        "//tensorflow/core/common_runtime/dml:dml_runtime",
+        "//tensorflow/core:dml_runtime",
         ":bias_op",
         ":reduction_ops",
         ":transpose_functor",

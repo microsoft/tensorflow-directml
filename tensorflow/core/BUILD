@@ -104,6 +104,7 @@ load("//tensorflow:tensorflow.bzl", "tf_portable_proto_library")
 load("//tensorflow:tensorflow.bzl", "tf_version_info_genrule")
 
 load("//tensorflow:tensorflow.bzl", "if_cuda_or_dml")
+load("//tensorflow:tensorflow.bzl", "tf_dml_cc_test")
 
 # For platform specific build config
 load(
@@ -1523,7 +1524,7 @@ cc_library(
         ":core_cpu",
         ":gpu_runtime",
         ":sycl_runtime",
-    ] + if_dml(["//tensorflow/core/common_runtime/dml:dml_runtime"]),
+    ] + if_dml([":dml_runtime"]),
 )
 
 # This includes implementations of all kernels built into TensorFlow.
@@ -3662,6 +3663,146 @@ cc_library(
     alwayslink = 0,
 )
 
+cc_library(
+    name = "dml_runtime_impl",
+    srcs = [
+        "common_runtime/dml/dml_device_cache.cc",
+        "common_runtime/dml/dml_bfc_allocator.cc",
+        "common_runtime/dml/dml_buffer.cc",
+        "common_runtime/dml/dml_buffer_region.cc",
+        "common_runtime/dml/dml_command_queue.cc",
+        "common_runtime/dml/dml_command_recorder.cc",
+        "common_runtime/dml/dml_descriptor_pool.cc",
+        "common_runtime/dml/dml_device.cc",
+        "common_runtime/dml/dml_device_state.cc",
+        "common_runtime/dml/dml_device_context.cc",
+        "common_runtime/dml/dml_event_queue.cc",
+        "common_runtime/dml/dml_execution_context.cc",
+        "common_runtime/dml/dml_heap_allocator.cc",
+        "common_runtime/dml/dml_kernel_context.cc",
+        "common_runtime/dml/dml_kernel_key.cc",
+        "common_runtime/dml/dml_kernel_manager.cc",
+        "common_runtime/dml/dml_operator_helper.cc",
+        "common_runtime/dml/dml_pooled_heap.cc",
+        "common_runtime/dml/dml_readback_heap.cc",
+        "common_runtime/dml/dml_tensor_desc.cc",
+        "common_runtime/dml/dml_upload_heap.cc",
+        "common_runtime/dml/dml_util.cc",
+    ],
+    hdrs = [
+        "common_runtime/dml/dml_device_cache.h",
+        "common_runtime/dml/dml_bfc_allocator.h",
+        "common_runtime/dml/dml_buffer.h",
+        "common_runtime/dml/dml_buffer_region.h",
+        "common_runtime/dml/dml_command_allocator_ring.h",
+        "common_runtime/dml/dml_command_queue.h",
+        "common_runtime/dml/dml_command_recorder.h",
+        "common_runtime/dml/dml_descriptor_pool.h",
+        "common_runtime/dml/dml_device.h",
+        "common_runtime/dml/dml_device_state.h",
+        "common_runtime/dml/dml_device_context.h",
+        "common_runtime/dml/dml_event_queue.h",
+        "common_runtime/dml/dml_execution_context.h",
+        "common_runtime/dml/dml_gpu_event.h",
+        "common_runtime/dml/dml_heap_allocator.h",
+        "common_runtime/dml/dml_kernel_context.h",
+        "common_runtime/dml/dml_kernel_key.h",
+        "common_runtime/dml/dml_kernel_manager.h",
+        "common_runtime/dml/dml_operator_helper.h",
+        "common_runtime/dml/dml_pooled_heap.h",
+        "common_runtime/dml/dml_readback_heap.h",
+        "common_runtime/dml/dml_tensor_desc.h",
+        "common_runtime/dml/dml_upload_heap.h",
+        "common_runtime/dml/dml_util.h",
+        "common_runtime/dml/dml_status.h",
+        "common_runtime/device.h",
+        "common_runtime/local_device.h",
+        "common_runtime/device_factory.h",
+        "common_runtime/dma_helper.h",
+        "public/session_options.h",
+        "graph/types.h",
+    ],
+    linkstatic = 1,
+    alwayslink = 1,
+    copts = tf_copts() + if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+    ]),
+    deps = [
+        ":dml_core",
+        ":framework",
+        ":framework_internal",
+        ":gpu_bfc_allocator",
+        ":proto_text",
+        ":stream_executor",
+        "//tensorflow/stream_executor/platform:dso_loader",
+    ],
+)
+
+cc_library(
+    name = "dml_device_cache",
+    linkstatic = 1,
+    alwayslink = 1,
+    copts = tf_copts() + if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+    ]),
+    deps = [":dml_runtime_impl"],
+)
+
+cc_library(
+    name = "dml_runtime",
+    srcs = [
+        "common_runtime/dml/dml_device_factory.cc",
+    ],
+    deps = [
+        ":dml_runtime_impl",
+    ],
+    linkstatic = 1,
+    alwayslink = 1,
+    copts = tf_copts() + if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+    ]),
+)
+
+cc_library(
+    name = "dml_core",
+    srcs = [
+        "common_runtime/dml/dml_adapter.cc",
+        "common_runtime/dml/dml_adapter_impl.cc",
+    ],
+    hdrs = [
+        "common_runtime/dml/dml_common.h",
+        "common_runtime/dml/dml_error_handling.h",
+        "common_runtime/dml/dml_adapter.h",
+        "common_runtime/dml/dml_adapter_impl.h",
+        "common_runtime/dml/dml_adapter_heuristics.h",
+    ],
+    linkstatic = 1,
+    deps = [
+        ":lib",
+        ":lib_internal",
+        "//third_party/dml:dx_helpers",
+        "@dml_redist//:headers",
+        "//third_party/dml:winadapter",
+    ],
+    alwayslink = 1,
+    visibility = ["//visibility:public"],
+    copts = tf_copts() + if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+    ]),
+    linkopts = if_windows([
+        "d3d12.lib", 
+        "dxgi.lib", 
+    ]) + if_not_windows([
+        "-ld3d12",
+        "-ldxcore",
+        "-Wl,-rpath,$$ORIGIN/../_solib_directml"
+    ]),
+)
+
 # -----------------------------------------------------------------------------
 # Tests
 
@@ -5439,6 +5580,27 @@ tf_cc_tests(
         "//tensorflow/cc:function_ops",
         "//tensorflow/cc:ops",
     ],
+)
+
+tf_dml_cc_test(
+    name = "dml_runtime_test",
+    size = "small",
+    srcs = [
+        "common_runtime/dml/dml_kernel_manager_test.cc",
+    ],
+    linkstatic = 1,
+    deps = [
+        ":dml_runtime",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+        "//tensorflow/core:testlib",
+        "//tensorflow/core/kernels:dml_ops",
+        "//tensorflow/core/kernels:stateless_random_ops",
+    ],
+    extra_copts = if_windows([
+        "-DDML_BUILD_WINDOWS",
+        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
+    ]),
 )
 
 # Test data
