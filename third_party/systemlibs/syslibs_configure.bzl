@@ -16,6 +16,7 @@ VALID_LIBS = [
     "com_github_googleapis_googleapis",
     "com_github_googlecloudplatform_google_cloud_cpp",
     "com_google_protobuf",
+    "com_github_grpc_grpc",
     "com_googlesource_code_re2",
     "curl",
     "cython",
@@ -24,7 +25,6 @@ VALID_LIBS = [
     "flatbuffers",
     "gast_archive",
     "gif_archive",
-    "grpc",
     "hwloc",
     "icu",
     "jpeg",
@@ -43,7 +43,7 @@ VALID_LIBS = [
     "swig",
     "termcolor_archive",
     "wrapt",
-    "zlib_archive",
+    "zlib",
 ]
 
 def auto_configure_fail(msg):

@@ -1959,7 +1959,7 @@ cc_library(
         "@double_conversion//:double-conversion",
         "@farmhash_archive//:farmhash",
         "@nsync//:nsync_cpp",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
     alwayslink = 1,
 )
@@ -2496,7 +2496,7 @@ cc_library(
                "//tensorflow/core/platform:str_util",
                "//tensorflow/core/platform/default/build_config:platformlib",
                "@snappy",
-               "@zlib_archive//:zlib",
+               "@zlib",
                "@double_conversion//:double-conversion",
                "@com_google_protobuf//:protobuf",
            ] + tf_protos_all_impl() + tf_protos_grappler_impl() +
@@ -2585,7 +2585,7 @@ cc_library(
         "//tensorflow/core/platform/default/build_config:png",
         "@com_google_absl//absl/base",
         "@com_google_absl//absl/strings",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 
@@ -3811,7 +3811,7 @@ tf_cc_tests(
         "//third_party/eigen3",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 
