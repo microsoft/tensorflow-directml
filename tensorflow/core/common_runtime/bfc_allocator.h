@@ -53,6 +53,8 @@ class BFCAllocator : public Allocator {
                size_t max_allocation_size = -1);
   ~BFCAllocator() override;
 
+  void ReleaseMemory();
+
   string Name() override { return name_; }
 
   void* AllocateRaw(size_t alignment, size_t num_bytes) override {
@@ -79,6 +81,15 @@ class BFCAllocator : public Allocator {
   void SetTimingCounter(SharedCounter* sc) { timing_counter_ = sc; }
 
   void SetSafeFrontier(uint64 count) override;
+
+  // Deallocate free regions to give back the memory to suballocator, so that
+  // we can re-allocate a larger region.  The main use scenario of this function
+  // is when OOM happens but we have free regions and the sum of sizes of free
+  // regions and unallocated bytes is larger than the requested size, implying
+  // (external) memory fragmentation.  Returns true if any free regions are
+  // found and freed; false otherwise.  When force == true, deallocate the
+  // regions even when garbage collection is disabled.
+  bool DeallocateFreeRegions(size_t rounded_bytes, bool force = false);
 
  private:
   struct Bin;
@@ -362,14 +373,6 @@ class BFCAllocator : public Allocator {
   bool Extend(size_t alignment, size_t rounded_bytes)
       EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
-  // Deallocate free regions to give back the memory to suballocator, so that
-  // we can re-allocate a larger region.  The main use scenario of this function
-  // is when OOM happens but we have free regions and the sum of sizes of free
-  // regions and unallocated bytes is larger than the requested size, implying
-  // (external) memory fragmentation.  Returns true if any free regions are
-  // found and freed; false otherwise.
-  bool DeallocateFreeRegions(size_t rounded_bytes);
-
   // Helper function to deallocate regions.
   void DeallocateRegions(const absl::flat_hash_set<void*>& region_ptrs)
       EXCLUSIVE_LOCKS_REQUIRED(lock_);
@@ -521,7 +524,6 @@ class BFCAllocator : public Allocator {
   // Stats.
   AllocatorStats stats_ GUARDED_BY(lock_);
 
-  friend class GPUBFCAllocatorPrivateMethodsTest;
   TF_DISALLOW_COPY_AND_ASSIGN(BFCAllocator);
 };
 

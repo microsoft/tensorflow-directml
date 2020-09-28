@@ -376,6 +376,12 @@ void DmlCommandRecorder::CloseAndExecute() {
         ". This can happen when the GPU times out or when there's a problem in "
         "the driver. You won't be able to use this DML device again in the "
         "current process.");
+
+    // This device cannot be used anymore, so release the memory to allows other
+    // devices to use it
+    constexpr size_t rounded_bytes = 0;
+    constexpr bool force_deallocations = true;
+    allocator_->DeallocateFreeRegions(rounded_bytes, force_deallocations);
     return;
   }
 

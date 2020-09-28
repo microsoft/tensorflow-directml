@@ -272,10 +272,10 @@ size_t BFCAllocator::RoundedBytes(size_t bytes) {
   return rounded_bytes;
 }
 
-bool BFCAllocator::DeallocateFreeRegions(size_t rounded_bytes)
+bool BFCAllocator::DeallocateFreeRegions(size_t rounded_bytes, bool force)
     EXCLUSIVE_LOCKS_REQUIRED(lock_) {
   // Do nothing if garbage collection is off.
-  if (!garbage_collection_) {
+  if (!force && !garbage_collection_) {
     return false;
   }
 
