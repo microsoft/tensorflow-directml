@@ -200,7 +200,7 @@ cc_library(
         "@farmhash_archive//:farmhash",
         "@fft2d",
         "@highwayhash//:sip_hash",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 
@@ -230,7 +230,7 @@ cc_library(
     copts = tf_copts(),
     deps = [
         "@png_archive//:png",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
 
