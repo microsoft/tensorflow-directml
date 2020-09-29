@@ -175,6 +175,6 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@boringssl//:ssl",
-        "@zlib_archive//:zlib",
+        "@zlib",
     ],
 )
