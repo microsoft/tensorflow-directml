@@ -53,8 +53,6 @@ class BFCAllocator : public Allocator {
                size_t max_allocation_size = -1);
   ~BFCAllocator() override;
 
-  void ReleaseMemory();
-
   string Name() override { return name_; }
 
   void* AllocateRaw(size_t alignment, size_t num_bytes) override {
@@ -87,8 +85,8 @@ class BFCAllocator : public Allocator {
   // is when OOM happens but we have free regions and the sum of sizes of free
   // regions and unallocated bytes is larger than the requested size, implying
   // (external) memory fragmentation.  Returns true if any free regions are
-  // found and freed; false otherwise.  When force == true, deallocate the
-  // regions even when garbage collection is disabled.
+  // found and freed; false otherwise. When force == true, deallocate even when
+  // garbage collection is disabled.
   bool DeallocateFreeRegions(size_t rounded_bytes, bool force = false);
 
  private:

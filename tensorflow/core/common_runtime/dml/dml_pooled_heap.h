@@ -31,6 +31,11 @@ class DmlPooledHeap {
 
   uint64_t Capacity() const { return total_capacity_; }
 
+  void ReclaimAllocations();  // Frees all allocations which are no longer being
+                              // used by the GPU.
+
+  void HandleDeviceRemoved();
+
  protected:
   static constexpr uint64_t kMinChunkSize = 1024 * 1024;  // 1MB
 
@@ -83,9 +88,6 @@ class DmlPooledHeap {
                  /*out*/ DmlPooledHeap::Chunk** chunk_ptr,
                  /*out*/ uint64_t* offset_in_chunk);
 
-  void ReclaimAllocations();  // Frees all allocations which are no longer being
-                              // used by the GPU.
-
  private:
   // Attempts to find enough unused space in the supplied chunk to accommodate
   // the given allocation size. Returns the offset of that memory if successful,
@@ -104,6 +106,7 @@ class DmlPooledHeap {
   // sorted ascending by capacity (heap size)
   std::vector<Chunk> chunks_;
   uint64_t total_capacity_ = 0;  // Total size of all chunks, in bytes
+  bool device_removed_ = false;
 };
 
 }  // namespace tensorflow

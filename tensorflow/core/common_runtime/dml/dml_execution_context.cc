@@ -36,6 +36,11 @@ DmlExecutionContextImpl::DmlExecutionContextImpl(ID3D12Device* d3d12_device,
       dml_device->GetParentDevice(IID_PPV_ARGS(d3d_device_.GetAddressOf())));
 }
 
+void DmlExecutionContextImpl::RegisterDeviceRemovedCallback(
+    std::function<void()> callback) {
+  dml_recorder_.RegisterDeviceRemovedCallback(callback);
+}
+
 DmlGpuEvent DmlExecutionContextImpl::CopyBufferRegion(
     ID3D12Resource* dst_buffer, uint64_t dst_offset,
     D3D12_RESOURCE_STATES dst_state, ID3D12Resource* src_buffer,

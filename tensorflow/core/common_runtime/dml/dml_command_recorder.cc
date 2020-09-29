@@ -39,6 +39,11 @@ DmlCommandRecorder::DmlCommandRecorder(
   Open();
 }
 
+void DmlCommandRecorder::RegisterDeviceRemovedCallback(
+    std::function<void()> callback) {
+  device_removed_callbacks_.push_back(std::move(callback));
+}
+
 void DmlCommandRecorder::InitializeOperator(
     IDMLCompiledOperator* op,
     const DML_BINDING_DESC& persistent_resource_binding,
@@ -377,11 +382,12 @@ void DmlCommandRecorder::CloseAndExecute() {
         "the driver. You won't be able to use this DML device again in the "
         "current process.");
 
-    // This device cannot be used anymore, so release the memory to allows other
-    // devices to use it
-    constexpr size_t rounded_bytes = 0;
-    constexpr bool force_deallocations = true;
-    allocator_->DeallocateFreeRegions(rounded_bytes, force_deallocations);
+    // Signal to the listeners that the device has been removed, so they can
+    // handle it appropriately (e.g. release memory)
+    for (const auto& device_removed_callback : device_removed_callbacks_) {
+      device_removed_callback();
+    }
+
     return;
   }
 

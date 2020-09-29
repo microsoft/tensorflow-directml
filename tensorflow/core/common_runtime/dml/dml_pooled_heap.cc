@@ -141,6 +141,12 @@ static const char* HeapTypeString(D3D12_HEAP_TYPE type) {
 Status DmlPooledHeap::Reserve(uint64_t size_in_bytes,
                               DmlPooledHeap::Chunk** chunk_ptr,
                               /*out*/ uint64_t* offset_in_chunk) {
+  if (device_removed_) {
+    return errors::Unknown(
+        "Allocating memory is not allowed when the device has already been "
+        "removed.");
+  }
+
   assert(chunk_ptr != nullptr);
   assert(offset_in_chunk != nullptr);
 
@@ -194,6 +200,12 @@ void DmlPooledHeap::ReclaimAllocations() {
       allocs->pop_front();
     }
   }
+}
+
+void DmlPooledHeap::HandleDeviceRemoved() {
+  chunks_.clear();
+  total_capacity_ = 0;
+  device_removed_ = true;
 }
 
 void DmlPooledHeap::Trim() {

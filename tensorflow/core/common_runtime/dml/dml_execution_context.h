@@ -35,6 +35,8 @@ class DmlExecutionContextImpl {
   DmlExecutionContextImpl(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
                           ID3D12CommandQueue* queue, DmlAllocator* allocator);
 
+  void RegisterDeviceRemovedCallback(std::function<void()> callback);
+
   // Waits for flushed work, discards unflushed work, and discards associated
   // references to prevent circular references. Must be the last call on the
   // object before destruction.
@@ -103,6 +105,11 @@ class DmlExecutionContext {
  public:
   DmlExecutionContext(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
                       ID3D12CommandQueue* queue, DmlAllocator* allocator);
+
+  void RegisterDeviceRemovedCallback(std::function<void()> callback) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    impl_->RegisterDeviceRemovedCallback(std::move(callback));
+  }
 
   void Close() {
     std::unique_lock<std::mutex> lock(mutex_);

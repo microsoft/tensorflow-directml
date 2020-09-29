@@ -124,6 +124,18 @@ namespace tensorflow {
 
   auto kernel_manager = absl::make_unique<DmlKernelManager>();
 
+  execution_context->RegisterDeviceRemovedCallback(
+      [dml_allocator = dml_allocator.get(), upload_heap = upload_heap.get(),
+       readback_heap = readback_heap.get()]() {
+        // The device has been removed, so free the memory to allow other
+        // devices to use it
+        constexpr size_t rounded_bytes = 0;
+        constexpr bool force_deallocation = true;
+        dml_allocator->DeallocateFreeRegions(rounded_bytes, force_deallocation);
+        upload_heap->HandleDeviceRemoved();
+        readback_heap->HandleDeviceRemoved();
+      });
+
   // Construct the final state object
   auto state = absl::make_unique<DmlDeviceState>();
   state->adapter = absl::make_unique<DmlAdapter>(adapter);
