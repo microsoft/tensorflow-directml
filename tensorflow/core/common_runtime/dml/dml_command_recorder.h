@@ -74,8 +74,8 @@ class DmlCommandRecorder {
   Microsoft::WRL::ComPtr<IDMLCommandRecorder> recorder_;
 
   // Descriptors are allocated from a pool. The current heap pointer is only
-  // used to avoid redundantly setting the same heap; it does not have
-  // ownership of the heap object.
+  // used to avoid redundantly setting the same heap; it does not have ownership
+  // of the heap object.
   DmlDescriptorPool descriptor_pool_;
   ID3D12DescriptorHeap* current_descriptor_heap_ = nullptr;
 
@@ -92,16 +92,16 @@ class DmlCommandRecorder {
       cached_command_lists_;
 
   // Status of the first error encountered when closing the command list.
-  // Operations that flush the command list or readback from the GPU should
-  // make sure that this status doesn't contain an error before doing so.
+  // Operations that flush the command list or readback from the GPU should make
+  // sure that this status doesn't contain an error before doing so.
   Status status_ = Status::OK();
 
   void SetDescriptorHeap(ID3D12DescriptorHeap* descriptor_heap);
   void Open();
 
-  // Increments operations_recorded_in_current_command_list_. If the size of
-  // the current command list exceeds a certain value (based on heuristic),
-  // the command list is flushed.
+  // Increments operations_recorded_in_current_command_list_. If the size of the
+  // current command list exceeds a certain value (based on heuristic), the
+  // command list is flushed.
   void OnCommandRecorded();
 
   std::vector<std::function<void()>> device_removed_callbacks_;
