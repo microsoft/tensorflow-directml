@@ -31,9 +31,6 @@ class DmlPooledHeap {
 
   uint64_t Capacity() const { return total_capacity_; }
 
-  void ReclaimAllocations();  // Frees all allocations which are no longer being
-                              // used by the GPU.
-
   void HandleDeviceRemoved();
 
  protected:
@@ -87,6 +84,9 @@ class DmlPooledHeap {
   Status Reserve(uint64_t size_in_bytes,
                  /*out*/ DmlPooledHeap::Chunk** chunk_ptr,
                  /*out*/ uint64_t* offset_in_chunk);
+
+  void ReclaimAllocations();  // Frees all allocations which are no longer being
+                              // used by the GPU.
 
  private:
   // Attempts to find enough unused space in the supplied chunk to accommodate
