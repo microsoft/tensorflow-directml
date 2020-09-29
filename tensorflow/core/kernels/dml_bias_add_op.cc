@@ -146,9 +146,12 @@ class DmlBiasAddKernel : public DmlKernel {
   }
 };
 
-#define DML_REGISTER_KERNEL(type)                                   \
-  REGISTER_KERNEL_BUILDER(                                          \
-      Name("BiasAdd").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+#define DML_REGISTER_KERNEL(type)                                            \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name("BiasAdd").Device(DEVICE_DML).TypeConstraint<type>("T"),          \
+      DmlKernelWrapper<DmlBiasAddKernel, GetOutputShapeAsInputShapeHelper>); \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name("BiasAddV1").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
       DmlKernelWrapper<DmlBiasAddKernel, GetOutputShapeAsInputShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
