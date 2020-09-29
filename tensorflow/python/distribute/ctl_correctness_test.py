@@ -217,8 +217,6 @@ class TestDistributionStrategyDnnCorrectness(test.TestCase,
     np.random.seed(_RANDOM_SEED)
     random_seed.set_random_seed(_RANDOM_SEED)
 
-  # TFDML #25610789
-  @test_util.skip_dml
   @combinations.generate(
       combinations.combine(
           distribution=strategy_combinations.strategies_minus_tpu,
