@@ -89,9 +89,9 @@ class DmlPooledHeap {
   void ReclaimAllocations();  // Frees all allocations which are no longer being
                               // used by the GPU.
 
- private:
-  void OnDeviceRemoved();
+  bool DeviceRemoved() const { return device_removed_; };
 
+ private:
   // Attempts to find enough unused space in the supplied chunk to accommodate
   // the given allocation size. Returns the offset of that memory if successful,
   // null if there wasn't enough space.
@@ -110,6 +110,8 @@ class DmlPooledHeap {
   std::vector<Chunk> chunks_;
   uint64_t total_capacity_ = 0;  // Total size of all chunks, in bytes
   bool device_removed_ = false;
+
+  void OnDeviceRemoved();
 };
 
 }  // namespace tensorflow

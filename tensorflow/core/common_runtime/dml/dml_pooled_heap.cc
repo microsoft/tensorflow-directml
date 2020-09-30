@@ -146,7 +146,6 @@ Status DmlPooledHeap::Reserve(uint64_t size_in_bytes,
                               DmlPooledHeap::Chunk** chunk_ptr,
                               /*out*/ uint64_t* offset_in_chunk) {
   if (device_removed_) {
-    printf("***************Reserve After Device Removal\n");
     return errors::Unknown(
         "Allocating memory is not allowed when the device has already been "
         "removed.");

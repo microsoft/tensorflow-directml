@@ -38,6 +38,13 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
     ID3D12Resource* dst, uint64_t dst_offset, D3D12_RESOURCE_STATES dst_state,
     absl::Span<const uint8_t> src) {
   std::unique_lock<std::mutex> lock(mutex_);
+
+  if (DeviceRemoved()) {
+    return errors::Unknown(
+        "Uploading data to the GPU attempted after the device has already been "
+        "removed.");
+  }
+
   assert(!src.empty());
   assert(dst->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
 
@@ -60,7 +67,6 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
 
   if (hr == DXGI_ERROR_DEVICE_REMOVED) {
     HRESULT device_removed_reason = d3d12_device_->GetDeviceRemovedReason();
-    printf("BeginUploadToGpu failed with reason %x\n", device_removed_reason);
     device_removed_event_->NotifyListeners();
     return DeviceRemovalError(device_removed_reason);
   }

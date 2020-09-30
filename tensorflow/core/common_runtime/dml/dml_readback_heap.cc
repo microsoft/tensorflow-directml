@@ -44,6 +44,12 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
     D3D12_RESOURCE_STATES src_state) {
   std::unique_lock<std::mutex> lock(mutex_);
 
+  if (DeviceRemoved()) {
+    return errors::Unknown(
+        "Reading data from the GPU attempted after the device has already been "
+        "removed.");
+  }
+
   assert(!dst.empty());
   assert(src->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
 
@@ -76,11 +82,15 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
   // Note that we don't need to keep a ref on the readback_heap, because the
   // pooled allocator guarantees it'll live until we give the signal
   auto done_callback = [this, dst, readback_heap, offset_in_chunk, done_event] {
+    if (DeviceRemoved()) {
+      DML_CHECK_SUCCEEDED(done_event.fence->Signal(done_event.fence_value));
+      return;
+    }
+
     void* readback_heap_data = nullptr;
     HRESULT hr = readback_heap->Map(0, nullptr, &readback_heap_data);
 
     if (hr == DXGI_ERROR_DEVICE_REMOVED) {
-      printf("BeginUploadToGpu failed with reason %x\n", hr);
       device_removed_event_->NotifyListeners();
       DML_CHECK_SUCCEEDED(done_event.fence->Signal(done_event.fence_value));
       return;
