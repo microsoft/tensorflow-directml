@@ -27,7 +27,8 @@ class DmlExecutionContext;
 class DmlReadbackHeap : public DmlPooledHeap {
  public:
   DmlReadbackHeap(ID3D12Device* device, DmlExecutionContext* execution_context,
-                  DmlEventQueue* event_queue);
+                  DmlEventQueue* event_queue,
+                  DmlDeviceRemovedEvent* device_removed_event);
 
   // Copies data from the specified GPU resource into CPU memory pointed-to by
   // the span. This is non-blocking; the copy is not complete until the returned
@@ -48,6 +49,8 @@ class DmlReadbackHeap : public DmlPooledHeap {
   // copy to the readback heap has completed, whereas what the caller cares
   // about is whether the copy to the `dst` buffer is complete.
   DmlGpuEvent current_completion_event_;
+
+  DmlDeviceRemovedEvent* device_removed_event_;
 };
 
 }  // namespace tensorflow

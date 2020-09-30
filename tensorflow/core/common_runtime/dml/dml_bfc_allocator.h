@@ -23,6 +23,7 @@ limitations under the License.
 namespace tensorflow {
 
 class D3D12HeapAllocator;
+class DmlDeviceRemovedEvent;
 
 class DmlAllocator : public GPUBFCAllocator {
   // A SubAllocator that wraps a D3D12HeapAllocator
@@ -50,7 +51,7 @@ class DmlAllocator : public GPUBFCAllocator {
  public:
   DmlAllocator(D3D12HeapAllocator* heap_allocator,
                uint64_t memory_limit_in_bytes, const GPUOptions& gpu_options,
-               const string& name);
+               const string& name, DmlDeviceRemovedEvent* device_removed_event);
 
   D3D12BufferRegion CreateBufferRegion(const void* ptr, uint64_t size_in_bytes);
 

@@ -23,6 +23,7 @@ limitations under the License.
 namespace tensorflow {
 class DmlAllocator;
 class DmlCommandQueue;
+class DmlDeviceRemovedEvent;
 
 // Asynchronously performs GPU work, and automatically manages command list
 // recording and submission to queues. Work submitted to the DmlExecutionContext
@@ -33,9 +34,8 @@ class DmlExecutionContextImpl {
  public:
   // Constructs an DmlExecutionContext that executes on the supplied queue.
   DmlExecutionContextImpl(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                          ID3D12CommandQueue* queue, DmlAllocator* allocator);
-
-  void RegisterDeviceRemovedCallback(std::function<void()> callback);
+                          ID3D12CommandQueue* queue, DmlAllocator* allocator,
+                          DmlDeviceRemovedEvent* device_removed_event);
 
   // Waits for flushed work, discards unflushed work, and discards associated
   // references to prevent circular references. Must be the last call on the
@@ -76,8 +76,6 @@ class DmlExecutionContextImpl {
   // on the GPU.
   StatusOr<DmlGpuEvent> Flush();
 
-  Status GetCommandRecorderStatus() const;
-
   // Returns an event which will become signaled when everything submitted to
   // the execution context thus far has completed execution on the GPU,
   // including work that has yet to be flushed to the queue.
@@ -104,12 +102,8 @@ class DmlExecutionContextImpl {
 class DmlExecutionContext {
  public:
   DmlExecutionContext(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                      ID3D12CommandQueue* queue, DmlAllocator* allocator);
-
-  void RegisterDeviceRemovedCallback(std::function<void()> callback) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    impl_->RegisterDeviceRemovedCallback(std::move(callback));
-  }
+                      ID3D12CommandQueue* queue, DmlAllocator* allocator,
+                      DmlDeviceRemovedEvent* device_removed_event);
 
   void Close() {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -163,10 +157,6 @@ class DmlExecutionContext {
   StatusOr<DmlGpuEvent> Flush() {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->Flush();
-  }
-
-  Status GetCommandRecorderStatus() const {
-    return impl_->GetCommandRecorderStatus();
   }
 
   DmlGpuEvent GetCurrentCompletionEvent() {

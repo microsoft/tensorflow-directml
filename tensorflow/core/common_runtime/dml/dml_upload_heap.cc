@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "dml_upload_heap.h"
 
+#include "dml_util.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace tensorflow {
@@ -24,17 +25,19 @@ static D3D12_HEAP_PROPERTIES UploadHeapProps() {
 }
 
 DmlUploadHeap::DmlUploadHeap(ID3D12Device* device,
-                             DmlExecutionContext* execution_context)
+                             DmlExecutionContext* execution_context,
+                             DmlDeviceRemovedEvent* device_removed_event,
+                             ID3D12Device* d3d12_device)
     : DmlPooledHeap(device, UploadHeapProps(),
-                    D3D12_RESOURCE_STATE_GENERIC_READ),
-      execution_context_(execution_context) {}
+                    D3D12_RESOURCE_STATE_GENERIC_READ, device_removed_event),
+      execution_context_(execution_context),
+      device_removed_event_(device_removed_event),
+      d3d12_device_(d3d12_device) {}
 
 StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
     ID3D12Resource* dst, uint64_t dst_offset, D3D12_RESOURCE_STATES dst_state,
     absl::Span<const uint8_t> src) {
   std::unique_lock<std::mutex> lock(mutex_);
-  TF_RETURN_IF_ERROR(execution_context_->GetCommandRecorderStatus());
-
   assert(!src.empty());
   assert(dst->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
 
@@ -53,7 +56,17 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
   // Map the upload heap and copy the source data into it at the specified
   // offset
   void* upload_heap_data = nullptr;
-  DML_CHECK_SUCCEEDED(chunk->resource->Map(0, nullptr, &upload_heap_data));
+  HRESULT hr = chunk->resource->Map(0, nullptr, &upload_heap_data);
+
+  if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+    HRESULT device_removed_reason = d3d12_device_->GetDeviceRemovedReason();
+    printf("BeginUploadToGpu failed with reason %x\n", device_removed_reason);
+    device_removed_event_->NotifyListeners();
+    return DeviceRemovalError(device_removed_reason);
+  }
+
+  DML_CHECK_SUCCEEDED(hr);
+
   memcpy(static_cast<byte*>(upload_heap_data) + offset_in_chunk, src.data(),
          src.size());
   chunk->resource->Unmap(0, nullptr);

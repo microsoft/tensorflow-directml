@@ -23,12 +23,14 @@ namespace tensorflow {
 
 DmlCommandRecorder::DmlCommandRecorder(
     ID3D12Device* d3d_device, IDMLDevice* dml_device,
-    std::shared_ptr<DmlCommandQueue> command_queue, DmlAllocator* allocator)
+    std::shared_ptr<DmlCommandQueue> command_queue, DmlAllocator* allocator,
+    DmlDeviceRemovedEvent* device_removed_event)
     : queue_(std::move(command_queue)),
       d3d_device_(d3d_device),
       dml_device_(dml_device),
       descriptor_pool_(d3d_device, 2048),
       allocator_(allocator),
+      device_removed_event_(device_removed_event),
       command_allocator_ring_(d3d_device, queue_->GetType(),
                               queue_->GetCurrentCompletionEvent()) {
   DML_CHECK_SUCCEEDED(dml_device->CreateOperatorInitializer(
@@ -36,12 +38,10 @@ DmlCommandRecorder::DmlCommandRecorder(
   DML_CHECK_SUCCEEDED(
       dml_device->CreateCommandRecorder(IID_PPV_ARGS(&recorder_)));
 
-  Open();
-}
+  device_removed_event->AddListener(
+      std::bind(&DmlCommandRecorder::OnDeviceRemoved, this));
 
-void DmlCommandRecorder::RegisterDeviceRemovedCallback(
-    std::function<void()> callback) {
-  device_removed_callbacks_.push_back(std::move(callback));
+  Open();
 }
 
 void DmlCommandRecorder::InitializeOperator(
@@ -375,19 +375,9 @@ void DmlCommandRecorder::CloseAndExecute() {
 
   // Fail early if something horrifying happens
   if (FAILED(device_removed_reason)) {
-    status_ = errors::Unknown(
-        "Device was removed because of the following reason: ",
-        dml_util::StringifyDeviceRemovedReason(device_removed_reason),
-        ". This can happen when the GPU times out or when there's a problem in "
-        "the driver. You won't be able to use this DML device again in the "
-        "current process.");
-
     // Signal to the listeners that the device has been removed, so they can
     // handle it appropriately (e.g. release memory)
-    for (const auto& device_removed_callback : device_removed_callbacks_) {
-      device_removed_callback();
-    }
-
+    device_removed_event_->NotifyListeners();
     return;
   }
 
@@ -426,6 +416,11 @@ void DmlCommandRecorder::OnCommandRecorded() {
 
 bool DmlCommandRecorder::HasUnflushedWork() const {
   return operations_recorded_in_current_command_list_ != 0;
+}
+
+void DmlCommandRecorder::OnDeviceRemoved() {
+  HRESULT device_removed_reason = d3d_device_->GetDeviceRemovedReason();
+  status_ = DeviceRemovalError(device_removed_reason);
 }
 
 }  // namespace tensorflow

@@ -21,6 +21,8 @@ limitations under the License.
 
 namespace tensorflow {
 
+class DmlDeviceRemovedEvent;
+
 // Base class for implementing a non-blocking, ring-buffer style D3D12 heap
 // allocator where allocations are automatically freed once usage has completed
 // on the GPU.
@@ -30,8 +32,6 @@ class DmlPooledHeap {
   void Trim();
 
   uint64_t Capacity() const { return total_capacity_; }
-
-  void HandleDeviceRemoved();
 
  protected:
   static constexpr uint64_t kMinChunkSize = 1024 * 1024;  // 1MB
@@ -77,7 +77,8 @@ class DmlPooledHeap {
   };
 
   DmlPooledHeap(ID3D12Device* device, const D3D12_HEAP_PROPERTIES& heap_props,
-                D3D12_RESOURCE_STATES barrier_state);
+                D3D12_RESOURCE_STATES barrier_state,
+                DmlDeviceRemovedEvent* device_removed_event);
 
   // Finds or creates a chunk with enough space to accommodate an allocation of
   // the given size, and returns a pointer to the chunk and allocation offset.
@@ -89,6 +90,8 @@ class DmlPooledHeap {
                               // used by the GPU.
 
  private:
+  void OnDeviceRemoved();
+
   // Attempts to find enough unused space in the supplied chunk to accommodate
   // the given allocation size. Returns the offset of that memory if successful,
   // null if there wasn't enough space.

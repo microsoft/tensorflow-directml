@@ -16,29 +16,26 @@ limitations under the License.
 #include "dml_execution_context.h"
 
 #include "dml_bfc_allocator.h"
+#include "dml_util.h"
 
 namespace tensorflow {
 
-DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d12_device,
-                                         IDMLDevice* dml_device,
-                                         ID3D12CommandQueue* queue,
-                                         DmlAllocator* allocator)
-    : impl_(absl::make_unique<DmlExecutionContextImpl>(d3d12_device, dml_device,
-                                                       queue, allocator)) {}
+DmlExecutionContext::DmlExecutionContext(
+    ID3D12Device* d3d12_device, IDMLDevice* dml_device,
+    ID3D12CommandQueue* queue, DmlAllocator* allocator,
+    DmlDeviceRemovedEvent* device_removed_event)
+    : impl_(absl::make_unique<DmlExecutionContextImpl>(
+          d3d12_device, dml_device, queue, allocator, device_removed_event)) {}
 
-DmlExecutionContextImpl::DmlExecutionContextImpl(ID3D12Device* d3d12_device,
-                                                 IDMLDevice* dml_device,
-                                                 ID3D12CommandQueue* queue,
-                                                 DmlAllocator* allocator)
+DmlExecutionContextImpl::DmlExecutionContextImpl(
+    ID3D12Device* d3d12_device, IDMLDevice* dml_device,
+    ID3D12CommandQueue* queue, DmlAllocator* allocator,
+    DmlDeviceRemovedEvent* device_removed_event)
     : queue_(std::make_shared<DmlCommandQueue>(queue)),
-      dml_recorder_(d3d12_device, dml_device, queue_, allocator) {
+      dml_recorder_(d3d12_device, dml_device, queue_, allocator,
+                    device_removed_event) {
   DML_CHECK_SUCCEEDED(
       dml_device->GetParentDevice(IID_PPV_ARGS(d3d_device_.GetAddressOf())));
-}
-
-void DmlExecutionContextImpl::RegisterDeviceRemovedCallback(
-    std::function<void()> callback) {
-  dml_recorder_.RegisterDeviceRemovedCallback(callback);
 }
 
 DmlGpuEvent DmlExecutionContextImpl::CopyBufferRegion(
@@ -118,7 +115,7 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
   Status recorder_status = current_recorder_->GetStatus();
 
   if (!recorder_status.ok()) {
-    // "Unknown" represents device removals, which are uncoverable failures
+    // "Unknown" represents device removals, which are unrecoverable failures
     if (!errors::IsUnknown(recorder_status)) {
       current_recorder_->ResetStatus();
       current_recorder_ = nullptr;
@@ -131,10 +128,6 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
   current_recorder_ = nullptr;
 
   return DmlExecutionContextImpl::GetCurrentCompletionEvent();
-}
-
-Status DmlExecutionContextImpl::GetCommandRecorderStatus() const {
-  return current_recorder_ ? current_recorder_->GetStatus() : Status::OK();
 }
 
 void DmlExecutionContextImpl::Close() {

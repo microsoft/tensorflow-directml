@@ -120,4 +120,29 @@ inline absl::string_view StringifyDeviceRemovedReason(HRESULT reason) {
 
 }  // namespace dml_util
 
+inline Status DeviceRemovalError(HRESULT device_removed_reason) {
+  return errors::Unknown(
+      "Device was removed because of the following reason: ",
+      dml_util::StringifyDeviceRemovedReason(device_removed_reason),
+      ". This can happen when the GPU times out or when there's a problem in "
+      "the driver. You won't be able to use this DML device again in the "
+      "current process.");
+}
+
+class DmlDeviceRemovedEvent {
+ public:
+  void AddListener(std::function<void()>&& listener) {
+    listeners_.push_back(std::move(listener));
+  }
+
+  void NotifyListeners() const {
+    for (const auto& listener : listeners_) {
+      listener();
+    }
+  }
+
+ private:
+  std::vector<std::function<void()>> listeners_;
+};
+
 }  // namespace tensorflow

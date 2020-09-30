@@ -27,7 +27,9 @@ class DmlExecutionContext;
 // to GPU resources. This class is thread-safe.
 class DmlUploadHeap : public DmlPooledHeap {
  public:
-  DmlUploadHeap(ID3D12Device* device, DmlExecutionContext* execution_context);
+  DmlUploadHeap(ID3D12Device* device, DmlExecutionContext* execution_context,
+                DmlDeviceRemovedEvent* device_removed_event,
+                ID3D12Device* d3d12_device);
 
   // Makes a copy of the source data and begins copying it into the destination
   // resource, and returns a DmlGpuEvent which will become signaled when the
@@ -41,6 +43,8 @@ class DmlUploadHeap : public DmlPooledHeap {
  private:
   std::mutex mutex_;
   DmlExecutionContext* execution_context_;  // weak; owned by DmlDeviceState
+  DmlDeviceRemovedEvent* device_removed_event_;
+  ID3D12Device* d3d12_device_;
 };
 
 }  // namespace tensorflow

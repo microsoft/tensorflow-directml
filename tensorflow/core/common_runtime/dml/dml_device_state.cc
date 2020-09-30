@@ -101,6 +101,8 @@ namespace tensorflow {
   ComPtr<ID3D12SharingContract> sharing_contract;
   (void)command_queue->QueryInterface(IID_PPV_ARGS(&sharing_contract));
 
+  auto device_removed_event = absl::make_unique<DmlDeviceRemovedEvent>();
+
   auto heap_allocator = absl::make_unique<D3D12HeapAllocator>(
       d3d_device.Get(), CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
       D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
@@ -108,37 +110,29 @@ namespace tensorflow {
       D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
   auto dml_allocator = absl::make_unique<DmlAllocator>(
-      heap_allocator.get(), memory_limit_in_bytes, gpu_options, "DmlAllocator");
+      heap_allocator.get(), memory_limit_in_bytes, gpu_options, "DmlAllocator",
+      device_removed_event.get());
 
   auto execution_context = absl::make_unique<DmlExecutionContext>(
       d3d_device.Get(), dml_device.Get(), command_queue.Get(),
-      dml_allocator.get());
+      dml_allocator.get(), device_removed_event.get());
 
   auto event_queue = absl::make_unique<DmlEventQueue>();
 
-  auto upload_heap = absl::make_unique<DmlUploadHeap>(d3d_device.Get(),
-                                                      execution_context.get());
+  auto upload_heap = absl::make_unique<DmlUploadHeap>(
+      d3d_device.Get(), execution_context.get(), device_removed_event.get(),
+      d3d_device.Get());
 
   auto readback_heap = absl::make_unique<DmlReadbackHeap>(
-      d3d_device.Get(), execution_context.get(), event_queue.get());
+      d3d_device.Get(), execution_context.get(), event_queue.get(),
+      device_removed_event.get());
 
   auto kernel_manager = absl::make_unique<DmlKernelManager>();
-
-  execution_context->RegisterDeviceRemovedCallback(
-      [dml_allocator = dml_allocator.get(), upload_heap = upload_heap.get(),
-       readback_heap = readback_heap.get()]() {
-        // The device has been removed, so free the memory to allow other
-        // devices to use it
-        constexpr size_t rounded_bytes = 0;
-        constexpr bool force_deallocation = true;
-        dml_allocator->DeallocateFreeRegions(rounded_bytes, force_deallocation);
-        upload_heap->HandleDeviceRemoved();
-        readback_heap->HandleDeviceRemoved();
-      });
 
   // Construct the final state object
   auto state = absl::make_unique<DmlDeviceState>();
   state->adapter = absl::make_unique<DmlAdapter>(adapter);
+  state->device_removed_event = std::move(device_removed_event);
   state->d3d_device = std::move(d3d_device);
   state->command_queue = std::move(command_queue);
   state->sharing_contract = std::move(sharing_contract);

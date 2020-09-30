@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "dml_readback_heap.h"
 
+#include "dml_util.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace tensorflow {
@@ -25,11 +26,13 @@ static D3D12_HEAP_PROPERTIES ReadbackHeapProps() {
 
 DmlReadbackHeap::DmlReadbackHeap(ID3D12Device* device,
                                  DmlExecutionContext* execution_context,
-                                 DmlEventQueue* event_queue)
-    : DmlPooledHeap(device, ReadbackHeapProps(),
-                    D3D12_RESOURCE_STATE_COPY_DEST),
+                                 DmlEventQueue* event_queue,
+                                 DmlDeviceRemovedEvent* device_removed_event)
+    : DmlPooledHeap(device, ReadbackHeapProps(), D3D12_RESOURCE_STATE_COPY_DEST,
+                    device_removed_event),
       execution_context_(execution_context),
-      event_queue_(event_queue) {
+      event_queue_(event_queue),
+      device_removed_event_(device_removed_event) {
   current_completion_event_.fence_value = 0;
   DML_CHECK_SUCCEEDED(
       device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
@@ -73,11 +76,18 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
   // Note that we don't need to keep a ref on the readback_heap, because the
   // pooled allocator guarantees it'll live until we give the signal
   auto done_callback = [this, dst, readback_heap, offset_in_chunk, done_event] {
-    // The device could have been removed before the callback is called
-    if (!execution_context_->GetCommandRecorderStatus().ok()) return;
-
     void* readback_heap_data = nullptr;
-    DML_CHECK_SUCCEEDED(readback_heap->Map(0, nullptr, &readback_heap_data));
+    HRESULT hr = readback_heap->Map(0, nullptr, &readback_heap_data);
+
+    if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+      printf("BeginUploadToGpu failed with reason %x\n", hr);
+      device_removed_event_->NotifyListeners();
+      DML_CHECK_SUCCEEDED(done_event.fence->Signal(done_event.fence_value));
+      return;
+    }
+
+    DML_CHECK_SUCCEEDED(hr);
+
     readback_heap_data =
         static_cast<byte*>(readback_heap_data) + offset_in_chunk;
     memcpy(dst.data(), readback_heap_data, dst.size());

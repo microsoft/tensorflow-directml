@@ -15,13 +15,15 @@ limitations under the License.
 
 #include "dml_bfc_allocator.h"
 
+#include "dml_util.h"
 #include "tensorflow/core/util/env_var.h"
 
 namespace tensorflow {
 
 static uint64_t GetMaxAllocationSize() {
   int64 override_value = 0;
-  Status s = ReadInt64FromEnvVar("TF_DIRECTML_MAX_ALLOC_SIZE", 0, &override_value);
+  Status s =
+      ReadInt64FromEnvVar("TF_DIRECTML_MAX_ALLOC_SIZE", 0, &override_value);
 
   if (s.ok() && override_value > 0) {
     return static_cast<uint64_t>(override_value);
@@ -32,11 +34,18 @@ static uint64_t GetMaxAllocationSize() {
 
 DmlAllocator::DmlAllocator(D3D12HeapAllocator* heap_allocator,
                            uint64_t memory_limit_in_bytes,
-                           const GPUOptions& gpu_options, const string& name)
+                           const GPUOptions& gpu_options, const string& name,
+                           DmlDeviceRemovedEvent* device_removed_event)
     : GPUBFCAllocator(new SubAllocatorWrapper(heap_allocator),
                       memory_limit_in_bytes, gpu_options, name,
                       GetMaxAllocationSize()),
-      heap_allocator_(heap_allocator) {}
+      heap_allocator_(heap_allocator) {
+  constexpr size_t rounded_bytes = 0;
+  constexpr bool force_deallocation = true;
+  device_removed_event->AddListener(
+      std::bind(&DmlAllocator::DeallocateFreeRegions, this, rounded_bytes,
+                force_deallocation));
+}
 
 D3D12BufferRegion DmlAllocator::CreateBufferRegion(const void* ptr,
                                                    uint64_t size_in_bytes) {

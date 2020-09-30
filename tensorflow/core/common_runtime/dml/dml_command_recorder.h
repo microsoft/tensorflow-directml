@@ -26,15 +26,14 @@ namespace tensorflow {
 
 class DmlCommandQueue;
 class DmlAllocator;
+class DmlDeviceRemovedEvent;
 
 class DmlCommandRecorder {
  public:
   DmlCommandRecorder(ID3D12Device* d3d_device, IDMLDevice* device,
                      std::shared_ptr<DmlCommandQueue> command_queue,
-                     DmlAllocator* allocator);
-
-  void DmlCommandRecorder::RegisterDeviceRemovedCallback(
-      std::function<void()> callback);
+                     DmlAllocator* allocator,
+                     DmlDeviceRemovedEvent* device_removed_event);
 
   void InitializeOperator(IDMLCompiledOperator* op,
                           const DML_BINDING_DESC& persistent_resource_binding,
@@ -72,6 +71,7 @@ class DmlCommandRecorder {
   Microsoft::WRL::ComPtr<IDMLDevice> dml_device_;
   Microsoft::WRL::ComPtr<IDMLOperatorInitializer> initializer_;
   Microsoft::WRL::ComPtr<IDMLCommandRecorder> recorder_;
+  DmlDeviceRemovedEvent* device_removed_event_;
 
   // Descriptors are allocated from a pool. The current heap pointer is only
   // used to avoid redundantly setting the same heap; it does not have ownership
@@ -104,7 +104,7 @@ class DmlCommandRecorder {
   // command list is flushed.
   void OnCommandRecorded();
 
-  std::vector<std::function<void()>> device_removed_callbacks_;
+  void OnDeviceRemoved();
 };
 
 }  // namespace tensorflow

@@ -80,6 +80,7 @@ class BFCAllocator : public Allocator {
 
   void SetSafeFrontier(uint64 count) override;
 
+ protected:
   // Deallocate free regions to give back the memory to suballocator, so that
   // we can re-allocate a larger region.  The main use scenario of this function
   // is when OOM happens but we have free regions and the sum of sizes of free
@@ -522,6 +523,7 @@ class BFCAllocator : public Allocator {
   // Stats.
   AllocatorStats stats_ GUARDED_BY(lock_);
 
+  friend class GPUBFCAllocatorPrivateMethodsTest;
   TF_DISALLOW_COPY_AND_ASSIGN(BFCAllocator);
 };
 
