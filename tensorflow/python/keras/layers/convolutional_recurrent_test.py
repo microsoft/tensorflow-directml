@@ -31,8 +31,6 @@ from tensorflow.python.platform import test
 @keras_parameterized.run_all_keras_modes
 class ConvLSTMTest(keras_parameterized.TestCase):
 
-  # TFDML #25610831
-  @test_util.skip_dml
   @parameterized.named_parameters(
       *test_util.generate_combinations_with_testcase_name(
           data_format=['channels_first', 'channels_last'],
