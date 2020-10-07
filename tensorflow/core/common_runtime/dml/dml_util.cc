@@ -282,6 +282,34 @@ absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 8> GetBufferBindings(
   return bindings;
 }
 
+absl::string_view StringifyDeviceRemovedReason(HRESULT reason) {
+  switch (reason) {
+    case DXGI_ERROR_DEVICE_HUNG:
+      return "DXGI_ERROR_DEVICE_HUNG";
+    case DXGI_ERROR_DEVICE_REMOVED:
+      return "DXGI_ERROR_DEVICE_REMOVED";
+    case DXGI_ERROR_DEVICE_RESET:
+      return "DXGI_ERROR_DEVICE_RESET";
+    case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
+      return "DXGI_ERROR_DRIVER_INTERNAL_ERROR";
+    case DXGI_ERROR_INVALID_CALL:
+      return "DXGI_ERROR_INVALID_CALL";
+    case S_OK:
+      return "S_OK";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+Status DeviceRemovalError(HRESULT device_removed_reason) {
+  return errors::Unknown(
+      "Device was removed because of the following reason: ",
+      dml_util::StringifyDeviceRemovedReason(device_removed_reason),
+      ". This can happen when the GPU times out or when there's a problem in "
+      "the driver. You won't be able to use this DML device again in the "
+      "current process.");
+}
+
 }  // namespace dml_util
 
 }  // namespace tensorflow

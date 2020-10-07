@@ -41,6 +41,7 @@ class DmlUploadHeap : public DmlPooledHeap {
  private:
   std::mutex mutex_;
   DmlExecutionContext* execution_context_;  // weak; owned by DmlDeviceState
+  ID3D12Device* device_;
 };
 
 }  // namespace tensorflow

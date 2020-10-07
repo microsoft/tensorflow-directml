@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "dml_upload_heap.h"
 
+#include "dml_util.h"
 #include "tensorflow/core/lib/core/errors.h"
 
 namespace tensorflow {
@@ -53,7 +54,14 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
   // Map the upload heap and copy the source data into it at the specified
   // offset
   void* upload_heap_data = nullptr;
-  DML_CHECK_SUCCEEDED(chunk->resource->Map(0, nullptr, &upload_heap_data));
+  HRESULT hr = chunk->resource->Map(0, nullptr, &upload_heap_data);
+
+  if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+    return dml_util::DeviceRemovalError(device_->GetDeviceRemovedReason());
+  }
+
+  DML_CHECK_SUCCEEDED(hr);
+
   memcpy(static_cast<byte*>(upload_heap_data) + offset_in_chunk, src.data(),
          src.size());
   chunk->resource->Unmap(0, nullptr);

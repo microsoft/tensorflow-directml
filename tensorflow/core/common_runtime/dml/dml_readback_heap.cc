@@ -74,10 +74,21 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
   // pooled allocator guarantees it'll live until we give the signal
   auto done_callback = [this, dst, readback_heap, offset_in_chunk, done_event] {
     // The device could have been removed before the callback is called
-    if (!execution_context_->GetCommandRecorderStatus().ok()) return;
+    if (!execution_context_->GetCommandRecorderStatus().ok()) {
+      DML_CHECK_SUCCEEDED(done_event.fence->Signal(done_event.fence_value));
+      return;
+    }
 
     void* readback_heap_data = nullptr;
-    DML_CHECK_SUCCEEDED(readback_heap->Map(0, nullptr, &readback_heap_data));
+    HRESULT hr = readback_heap->Map(0, nullptr, &readback_heap_data);
+
+    if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+      DML_CHECK_SUCCEEDED(done_event.fence->Signal(done_event.fence_value));
+      return;
+    }
+
+    DML_CHECK_SUCCEEDED(hr);
+
     readback_heap_data =
         static_cast<byte*>(readback_heap_data) + offset_in_chunk;
     memcpy(dst.data(), readback_heap_data, dst.size());
