@@ -27,9 +27,9 @@ if ($RunOnWsl)
     $TestArtifact = Split-Path -Path $BuildArtifactsPath -Leaf
     $BuildArtifactPathWinAsWsl = wsl wslpath -a ($BuildArtifactsPath -replace '\\','/')
     $WslArtifactFolder = "/tmp/$TestArtifact"
-    # wsl rm -rf $WslArtifactFolder
-    # wsl mkdir -p /tmp
-    # wsl cp -r $BuildArtifactPathWinAsWsl $WslArtifactFolder
+    wsl rm -rf $WslArtifactFolder
+    wsl mkdir -p /tmp
+    wsl cp -r $BuildArtifactPathWinAsWsl $WslArtifactFolder
 
     $WslArtifactFolderAsWin = wsl wslpath -w $WslArtifactFolder
 }
