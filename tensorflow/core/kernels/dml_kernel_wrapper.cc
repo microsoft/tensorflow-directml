@@ -29,6 +29,17 @@ DmlKernelWrapperBase::DmlKernelWrapperBase(OpKernelConstruction* ctx,
 
 void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
   const DmlDevice* dml_device = static_cast<const DmlDevice*>(ctx->device());
+  HRESULT hr = dml_device->GetD3D12Device()->GetDeviceRemovedReason();
+
+  if (SUCCEEDED(hr)) {
+    hr = dml_device->GetDmlDevice()->GetDeviceRemovedReason();
+  }
+
+  if (FAILED(hr)) {
+    ctx->SetStatus(dml_util::DeviceRemovalError(hr));
+    return;
+  }
+
   const DmlKernelManager& kernel_manager = *dml_device->GetKernelManager();
 
   // Compute the output shapes
