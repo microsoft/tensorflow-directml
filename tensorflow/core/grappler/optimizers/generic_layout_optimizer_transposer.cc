@@ -769,10 +769,22 @@ bool FusedBatchNormGradTransposer::IsTraining(
 Status FusedBatchNormGradTransposer::TransposeNode(
     TransposeContext* context, utils::MutableNodeView* node) {
   DCHECK(IsFusedBatchNormGrad(*node->node()));
-  if (!ShouldProcess(*context, *node) || !IsFanoutPortRankN(*node, 0, 4) ||
-      !IsTraining(*node)) {
+
+  if (!ShouldProcess(*context, *node) || !IsFanoutPortRankN(*node, 0, 4)) {
     return Status::OK();
   }
+
+  if (!IsTraining(*node)) {
+    string task, device;
+    bool is_on_dml = DeviceNameUtils::SplitDeviceName(node->node()->device(),
+                                                      &task, &device) &&
+                     absl::StartsWith(device, DEVICE_DML);
+
+    if (!is_on_dml) {
+      return Status::OK();
+    }
+  }
+
   VLOG(3) << "GenericLayoutOptimizer: transforming node '" << node->GetName()
           << "' with op '" << node->GetOp() << "' from data format '"
           << context->src_format << "' to '" << context->dst_format << "'";
