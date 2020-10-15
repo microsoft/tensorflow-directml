@@ -190,7 +190,8 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
 
     // See here for documentation on filtering WARP adapter:
     // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
-    const bool is_basic_render_driver_vendor_id = desc.VendorId == 0x1414;
+    const bool is_basic_render_driver_vendor_id =
+        desc.VendorId == (UINT)VendorID::kMicrosoft;
     const bool is_basic_render_driver_device_id = desc.DeviceId == 0x8c;
 
     if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ||
@@ -302,7 +303,7 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
     // See here for documentation on filtering WARP adapter:
     // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
     const bool is_basic_render_driver_vendor_id =
-        hardware_id.vendorID == 0x1414;
+        hardware_id.vendorID == (UINT)VendorID::kMicrosoft;
     const bool is_basic_render_driver_device_id = hardware_id.deviceID == 0x8c;
 
     // Since we enumerate by performance, we can ignore everything that comes
