@@ -187,7 +187,16 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
     // is necessary for now because IDD adapters don't have the
     // DXGI_ADAPTER_FLAG_SOFTWARE flag, even though they run on software.
     // TFDML #21433167
-    if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) {
+
+    // See here for documentation on filtering WARP adapter:
+    // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
+    const bool is_basic_render_driver_vendor_id =
+        desc.VendorId == static_cast<UINT>(VendorID::kMicrosoft);
+    const bool is_basic_render_driver_device_id = desc.DeviceId == 0x8c;
+
+    if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ||
+        (is_basic_render_driver_vendor_id &&
+         is_basic_render_driver_device_id)) {
       break;
     }
 
@@ -287,12 +296,23 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
     DML_CHECK_SUCCEEDED(adapter->GetProperty(DXCoreAdapterProperty::IsHardware,
                                              &is_hardware_adapter));
 
+    DXCoreHardwareID hardware_id = {};
+    DML_CHECK_SUCCEEDED(
+        adapter->GetProperty(DXCoreAdapterProperty::HardwareID, &hardware_id));
+
+    // See here for documentation on filtering WARP adapter:
+    // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
+    const bool is_basic_render_driver_vendor_id =
+        hardware_id.vendorID == static_cast<UINT>(VendorID::kMicrosoft);
+    const bool is_basic_render_driver_device_id = hardware_id.deviceID == 0x8c;
+
     // Since we enumerate by performance, we can ignore everything that comes
     // after the first software adapter, which includes the IDD adapters. This
     // is necessary for now because IDD adapters are considered hardware
     // adapters, even though they run on software.
     // TFDML #21433167
-    if (!is_hardware_adapter) {
+    if (!is_hardware_adapter || (is_basic_render_driver_vendor_id &&
+                                 is_basic_render_driver_device_id)) {
       break;
     }
 
