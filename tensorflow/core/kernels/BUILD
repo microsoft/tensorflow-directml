@@ -8075,6 +8075,7 @@ tf_kernel_library(
         "dml_assign_ops.cc",
         "dml_gather_op.cc",
         "dml_gather_nd_op.cc",
+        "dml_scatter_nd_op.cc",
         "dml_scan_ops.cc",
         "dml_dynamic_stitch_op.cc",
         "dml_l2loss_op.cc",
