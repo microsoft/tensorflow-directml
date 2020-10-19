@@ -741,6 +741,7 @@ REGISTER_GPU_HOST_KERNEL(tstring);
 REGISTER_GPU_HOST_KERNEL(ResourceHandle);
 
 #undef REGISTER_GPU_HOST_KERNEL
+#endif
 
 #ifdef TENSORFLOW_USE_DIRECTML
 #define REGISTER_DML_KERNEL(type)                                       \
@@ -768,8 +769,6 @@ REGISTER_DML_HOST_KERNEL(tstring);
 REGISTER_DML_HOST_KERNEL(ResourceHandle);
 
 #undef REGISTER_DML_HOST_KERNEL
-
 #endif  // TENSORFLOW_USE_DIRECTML
 
-#endif
 }  // namespace tensorflow
