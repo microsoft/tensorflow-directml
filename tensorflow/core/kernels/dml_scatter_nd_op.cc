@@ -219,13 +219,13 @@ class DmlScatterNdKernel : public DmlKernel {
 
   DmlScatterNdKernel(DmlKernelConstruction* ctx,
                      const InitHelper* init_helper) {
-    const TensorShape& in_out_shape = ctx->GetOutputTensorShape(0);
     const TensorShape& indices_shape = ctx->GetInputTensorShape(0);
     const TensorShape& updates_shape = ctx->GetInputTensorShape(1);
+    const TensorShape& in_out_shape = ctx->GetOutputTensorShape(0);
 
-    DmlTensorInfo in_out_tensor;
-    in_out_tensor.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0),
-                                               in_out_shape, in_out_shape);
+    DmlTensorInfo params_tensor;
+    params_tensor.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0),
+                                               in_out_shape, TensorShape({1}));
 
     DmlTensorInfo indices_tensor;
     indices_tensor.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0),
@@ -235,9 +235,20 @@ class DmlScatterNdKernel : public DmlKernel {
     updates_tensor.desc = DmlTensorDesc::Create(ctx->GetInputDataType(1),
                                                 updates_shape, updates_shape);
 
+    DmlTensorInfo output_tensor;
+    output_tensor.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0),
+                                               in_out_shape, in_out_shape);
+
     DmlKernelTensors tensors;
-    tensors.inputs = {in_out_tensor, indices_tensor, updates_tensor};
-    tensors.outputs = {in_out_tensor};
+    tensors.inputs = {params_tensor, indices_tensor, updates_tensor};
+    tensors.outputs = {output_tensor};
+
+    auto dml_dtype = GetDmlDataTypeFromTfDataType(ctx->GetOutputDataType(0));
+    constexpr uint32_t in_dim_count = 1;
+    constexpr uint32_t in_size = 1;
+    constexpr uint32_t in_stride = 1;
+    input_buffer_size_ =
+        DMLCalcBufferTensorSize(dml_dtype, in_dim_count, &in_size, &in_stride);
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
@@ -255,6 +266,8 @@ class DmlScatterNdKernel : public DmlKernel {
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
+    DmlBuffer params_buffer = ctx->AllocateDefaultBuffer(input_buffer_size_);
+
     D3D12BufferRegion indices_buffer =
         ctx->CreateBufferForTensor(ctx->GetInputTensor(0));
 
@@ -263,9 +276,6 @@ class DmlScatterNdKernel : public DmlKernel {
 
     D3D12BufferRegion output_buffer =
         ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
-
-    DmlBuffer params_buffer =
-        ctx->AllocateDefaultBuffer(output_buffer.SizeInBytes());
 
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 3> input_bindings;
     input_bindings.push_back(params_buffer.GetBufferBinding());
@@ -281,6 +291,9 @@ class DmlScatterNdKernel : public DmlKernel {
     return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
                                 input_bindings, output_bindings);
   }
+
+ private:
+  uint64_t input_buffer_size_ = 0;
 };
 
 #define DML_REGISTER_KERNELS(type)                                    \
