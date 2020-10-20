@@ -776,6 +776,10 @@ Status FusedBatchNormGradTransposer::TransposeNode(
 
   if (!IsTraining(*node)) {
     string task, device;
+
+    // Unlike the CUDA kernel, DML's FusedBatchNormGrad should always be faster
+    // with NCHW, so we transform the layout here instead of doing it
+    // in the kernel itself.
     bool is_on_dml = DeviceNameUtils::SplitDeviceName(node->node()->device(),
                                                       &task, &device) &&
                      absl::StartsWith(device, DEVICE_DML);
