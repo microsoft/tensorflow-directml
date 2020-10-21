@@ -1868,7 +1868,7 @@ def split_training_and_validation_data(x, y, sample_weights, validation_split):
     raise ValueError('If your data is in the form of symbolic tensors, '
                      'you cannot use `validation_split`.')
   if hasattr(x[0], 'shape'):
-    split_at = int(x[0].shape[0] * (1. - validation_split))
+    split_at = int(int(x[0].shape[0]) * (1. - validation_split))
   else:
     split_at = int(len(x[0]) * (1. - validation_split))
   x, val_x = (generic_utils.slice_arrays(x, 0, split_at),
