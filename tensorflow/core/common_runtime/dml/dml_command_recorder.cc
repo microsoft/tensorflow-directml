@@ -21,6 +21,16 @@ limitations under the License.
 
 namespace tensorflow {
 
+#define DML_CHECK_DEVICE_REMOVED(hr)                                           \
+  do {                                                                         \
+    if (hr == DXGI_ERROR_DEVICE_REMOVED) {                                     \
+      status_ =                                                                \
+          dml_util::DeviceRemovalError(d3d_device_->GetDeviceRemovedReason()); \
+      return;                                                                  \
+    }                                                                          \
+    DML_CHECK_SUCCEEDED(hr);                                                   \
+  } while (0)
+
 DmlCommandRecorder::DmlCommandRecorder(
     ID3D12Device* d3d_device, IDMLDevice* dml_device,
     std::shared_ptr<DmlCommandQueue> command_queue, DmlAllocator* allocator)
@@ -31,9 +41,9 @@ DmlCommandRecorder::DmlCommandRecorder(
       allocator_(allocator),
       command_allocator_ring_(d3d_device, queue_->GetType(),
                               queue_->GetCurrentCompletionEvent()) {
-  DML_CHECK_SUCCEEDED(dml_device->CreateOperatorInitializer(
+  DML_CHECK_DEVICE_REMOVED(dml_device->CreateOperatorInitializer(
       0, nullptr, IID_PPV_ARGS(&initializer_)));
-  DML_CHECK_SUCCEEDED(
+  DML_CHECK_DEVICE_REMOVED(
       dml_device->CreateCommandRecorder(IID_PPV_ARGS(&recorder_)));
 
   Open();
@@ -47,7 +57,7 @@ void DmlCommandRecorder::InitializeOperator(
 
   // Reset the initializer to reference the input operator.
   IDMLCompiledOperator* ops[] = {op};
-  DML_CHECK_SUCCEEDED(initializer_->Reset(ABSL_ARRAYSIZE(ops), ops));
+  DML_CHECK_DEVICE_REMOVED(initializer_->Reset(ABSL_ARRAYSIZE(ops), ops));
 
   DML_BINDING_PROPERTIES init_binding_props =
       initializer_->GetBindingProperties();
@@ -65,7 +75,7 @@ void DmlCommandRecorder::InitializeOperator(
   binding_table_desc.SizeInDescriptors = num_descriptors;
 
   Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table;
-  DML_CHECK_SUCCEEDED(dml_device_->CreateBindingTable(
+  DML_CHECK_DEVICE_REMOVED(dml_device_->CreateBindingTable(
       &binding_table_desc, IID_PPV_ARGS(&binding_table)));
 
   // Create a temporary resource for initializing the op, if it's required.
@@ -143,7 +153,7 @@ void DmlCommandRecorder::ExecuteOperator(
   binding_table_desc.SizeInDescriptors = num_descriptors;
 
   Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table;
-  DML_CHECK_SUCCEEDED(dml_device_->CreateBindingTable(
+  DML_CHECK_DEVICE_REMOVED(dml_device_->CreateBindingTable(
       &binding_table_desc, IID_PPV_ARGS(&binding_table)));
 
   // Create a temporary resource for executing the op, if it's required.
@@ -318,17 +328,23 @@ void DmlCommandRecorder::Open() {
 
   assert(current_descriptor_heap_ == nullptr);
 
-  ID3D12CommandAllocator* allocator =
+  StatusOr<ID3D12CommandAllocator*> status_or_allocator =
       command_allocator_ring_.GetCurrentAllocator();
 
+  if (!status_or_allocator.status().ok()) {
+    status_ = status_or_allocator.status();
+    return;
+  }
+
   if (cached_command_lists_.empty()) {
-    DML_CHECK_SUCCEEDED(d3d_device_->CreateCommandList(
-        0, queue_->GetType(), command_allocator_ring_.GetCurrentAllocator(),
-        nullptr, IID_PPV_ARGS(&current_command_list_)));
+    DML_CHECK_DEVICE_REMOVED(d3d_device_->CreateCommandList(
+        0, queue_->GetType(), status_or_allocator.ValueOrDie(), nullptr,
+        IID_PPV_ARGS(&current_command_list_)));
   } else {
     current_command_list_ = cached_command_lists_.front();
     cached_command_lists_.pop_front();
-    DML_CHECK_SUCCEEDED(current_command_list_->Reset(allocator, nullptr));
+    DML_CHECK_DEVICE_REMOVED(current_command_list_->Reset(
+        status_or_allocator.ValueOrDie(), nullptr));
   }
 
   // The current command allocator will become eligible for reset once this
@@ -344,12 +360,21 @@ void DmlCommandRecorder::CloseAndExecute() {
   if (dml_util::HrIsOutOfMemory(hr)) {
     status_ = errors::ResourceExhausted("OOM when closing the command list");
   } else {
+    if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+      status_ =
+          dml_util::DeviceRemovalError(d3d_device_->GetDeviceRemovedReason());
+    }
+
     DML_CHECK_SUCCEEDED(hr);
 
     if (operations_recorded_in_current_command_list_ != 0) {
       // Close and execute the command list
       ID3D12CommandList* commandLists[] = {current_command_list_.Get()};
-      queue_->ExecuteCommandLists(commandLists);
+      Status execution_status = queue_->ExecuteCommandLists(commandLists);
+
+      if (!execution_status.ok()) {
+        status_ = execution_status;
+      }
     }
 
     cached_command_lists_.push_back(current_command_list_.Get());
@@ -362,20 +387,10 @@ void DmlCommandRecorder::CloseAndExecute() {
   // opened.
   current_descriptor_heap_ = nullptr;
 
-  HRESULT device_removed_reason = dml_device_->GetDeviceRemovedReason();
-
-  if (SUCCEEDED(device_removed_reason)) {
-    device_removed_reason = d3d_device_->GetDeviceRemovedReason();
+  if (status_.ok()) {
+    // Always keep the command recorder in an opened state
+    Open();
   }
-
-  // Fail early if something horrifying happens
-  if (FAILED(device_removed_reason)) {
-    status_ = dml_util::DeviceRemovalError(device_removed_reason);
-    return;
-  }
-
-  // Always keep the command recorder in an opened state
-  Open();
 }
 
 void DmlCommandRecorder::SetDescriptorHeap(

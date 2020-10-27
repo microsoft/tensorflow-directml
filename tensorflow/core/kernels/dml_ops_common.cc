@@ -172,15 +172,27 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   IDMLDevice* dml_device = ctx->GetDmlDevice();
 
   ComPtr<IDMLOperator> op;
-  DML_CHECK_SUCCEEDED(dml_device->CreateOperator(&op_desc, IID_PPV_ARGS(&op)));
+  HRESULT hr = dml_device->CreateOperator(&op_desc, IID_PPV_ARGS(&op));
+
+  if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+    return;
+  }
+
+  DML_CHECK_SUCCEEDED(hr);
 
   // For now, we don't set any flags
   DML_EXECUTION_FLAGS execution_flags = DML_EXECUTION_FLAG_NONE;
 
   // Compile the operator
   ComPtr<IDMLCompiledOperator> compiled_op;
-  DML_CHECK_SUCCEEDED(dml_device->CompileOperator(op.Get(), execution_flags,
-                                                  IID_PPV_ARGS(&compiled_op)));
+  hr = dml_device->CompileOperator(op.Get(), execution_flags,
+                                   IID_PPV_ARGS(&compiled_op));
+
+  if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+    return;
+  }
+
+  DML_CHECK_SUCCEEDED(hr);
 
   // Defer to the other overload of Initialize(), which does the actual work
   Initialize(ctx, std::move(tensor_descs), compiled_op.Get());
@@ -190,6 +202,13 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
                            DmlKernelTensors&& tensor_descs,
                            IDMLCompiledOperator* compiled_op) {
   assert(!compiled_op_);  // Initialize must only be called once
+  init_helper_ = ctx->GetInitializationHelper();
+
+  IDMLDevice* dml_device = ctx->GetDmlDevice();
+
+  if (FAILED(dml_device->GetDeviceRemovedReason())) {
+    return;
+  }
 
 #if _WIN32
   // Set the name of this compiled op, for debugging purposes. We use the name
@@ -197,14 +216,19 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   // kernel may be shared across many nodes.
   std::wstring op_type =
       Utf8ToWideChar(ctx->GetOpKernelContext()->op_kernel().type_string());
-  DML_CHECK_SUCCEEDED(compiled_op->SetName(op_type.c_str()));
+  HRESULT hr = compiled_op->SetName(op_type.c_str());
+
+  if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+    return;
+  }
+
+  DML_CHECK_SUCCEEDED(hr);
 #endif
 
   compiled_op_ = compiled_op;
   input_descs_ = std::move(tensor_descs.inputs);
   output_descs_ = std::move(tensor_descs.outputs);
   output_refs_forwarding_ = std::move(tensor_descs.output_refs_forwarding);
-  init_helper_ = ctx->GetInitializationHelper();
 
   // Create the persistent resource, if necessary
 

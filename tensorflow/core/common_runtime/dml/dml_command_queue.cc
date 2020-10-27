@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "dml_command_queue.h"
+#include "dml_util.h"
 
 namespace tensorflow {
 
@@ -26,13 +27,23 @@ DmlCommandQueue::DmlCommandQueue(ID3D12CommandQueue* existing_queue)
       device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence_)));
 }
 
-void DmlCommandQueue::ExecuteCommandLists(
+Status DmlCommandQueue::ExecuteCommandLists(
     absl::Span<ID3D12CommandList*> command_lists) {
   queue_->ExecuteCommandLists(static_cast<uint32_t>(command_lists.size()),
                               command_lists.data());
 
   ++last_fence_value_;
-  DML_CHECK_SUCCEEDED(queue_->Signal(fence_.Get(), last_fence_value_));
+  HRESULT hr = queue_->Signal(fence_.Get(), last_fence_value_);
+
+  if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+    Microsoft::WRL::ComPtr<ID3D12Device> device;
+    DML_CHECK_SUCCEEDED(queue_->GetDevice(IID_PPV_ARGS(&device)));
+    return dml_util::DeviceRemovalError(device->GetDeviceRemovedReason());
+  }
+
+  DML_CHECK_SUCCEEDED(hr);
+
+  return Status::OK();
 }
 
 DmlGpuEvent DmlCommandQueue::GetCurrentCompletionEvent() {

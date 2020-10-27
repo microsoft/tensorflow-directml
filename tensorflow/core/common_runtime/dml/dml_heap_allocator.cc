@@ -126,9 +126,15 @@ D3D12BufferRegion D3D12HeapAllocator::CreateBufferRegion(
     D3D12_RESOURCE_DESC resource_desc = CD3DX12_RESOURCE_DESC::Buffer(
         allocation->heap->GetDesc().SizeInBytes, resource_flags_);
 
-    DML_CHECK_SUCCEEDED(device_->CreatePlacedResource(
-        allocation->heap.Get(), 0, &resource_desc, initial_state_, nullptr,
-        IID_PPV_ARGS(&buffer)));
+    HRESULT hr = device_->CreatePlacedResource(allocation->heap.Get(), 0,
+                                               &resource_desc, initial_state_,
+                                               nullptr, IID_PPV_ARGS(&buffer));
+
+    if (dml_util::HrIsOutOfMemory(hr) || hr == DXGI_ERROR_DEVICE_REMOVED) {
+      return D3D12BufferRegion();
+    }
+
+    DML_CHECK_SUCCEEDED(hr);
   }
 
   return D3D12BufferRegion(this, tagged_ptr.allocation_id, std::move(buffer),

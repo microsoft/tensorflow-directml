@@ -116,6 +116,10 @@ Status DmlPooledHeap::CreateChunk(ID3D12Device* device, uint64_t size_in_bytes,
                                      size_in_bytes, " bytes");
   }
 
+  if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+    return dml_util::DeviceRemovalError(device->GetDeviceRemovedReason());
+  }
+
   DML_CHECK_SUCCEEDED(hr);
 
   *chunk = Chunk{size_in_bytes, std::move(upload_buffer)};

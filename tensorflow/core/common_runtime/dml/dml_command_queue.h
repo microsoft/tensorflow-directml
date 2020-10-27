@@ -19,6 +19,7 @@ limitations under the License.
 
 #include "dml_common.h"
 #include "dml_gpu_event.h"
+#include "tensorflow/stream_executor/lib/status.h"
 
 namespace tensorflow {
 
@@ -33,7 +34,7 @@ class DmlCommandQueue {
   Microsoft::WRL::ComPtr<ID3D12Fence> GetFence() const { return fence_; }
   uint64_t GetLastFenceValue() const { return last_fence_value_; }
 
-  void ExecuteCommandLists(absl::Span<ID3D12CommandList*> command_lists);
+  Status ExecuteCommandLists(absl::Span<ID3D12CommandList*> command_lists);
 
   // Returns an event that will become signaled when everything submitted to the
   // queue thus far has completed execution on the GPU.

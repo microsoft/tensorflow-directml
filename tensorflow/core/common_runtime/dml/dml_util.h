@@ -19,6 +19,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_common.h"
 #include "tensorflow/core/common_runtime/dml/dml_device.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "tensorflow/core/util/tensor_format.h"
 
 namespace tensorflow {
 

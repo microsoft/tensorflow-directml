@@ -17,6 +17,7 @@ limitations under the License.
 
 #include "dml_common.h"
 #include "dml_gpu_event.h"
+#include "dml_status.h"
 
 namespace tensorflow {
 
@@ -37,13 +38,19 @@ class DmlCommandAllocatorRing {
     }
   }
 
-  ID3D12CommandAllocator* GetCurrentAllocator() {
+  StatusOr<ID3D12CommandAllocator*> GetCurrentAllocator() {
     CommandAllocatorInfo& allocator_info =
         command_allocators_[current_command_allocator_];
 
     // Take the opportunity to reset the command allocator if possible.
     if (allocator_info.completion_event.IsSignaled()) {
-      DML_CHECK_SUCCEEDED(allocator_info.Get()->Reset());
+      HRESULT hr = allocator_info.Get()->Reset();
+
+      if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+        return dml_util::DeviceRemovalError(hr);
+      }
+
+      DML_CHECK_SUCCEEDED(hr);
     }
 
     return command_allocators_[current_command_allocator_].Get();
