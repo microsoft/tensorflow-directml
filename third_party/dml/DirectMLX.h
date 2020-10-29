@@ -2557,9 +2557,33 @@ namespace dml
     // TODO: ScatterElements (or should this be Scatter?)
     // 
 
-    // 
-    // TODO: ScatterND
-    // 
+    inline Expression ScatterND(
+        Expression input,
+        Expression indices,
+        Expression updates,
+        uint32_t inputDimensionCount,
+        uint32_t indicesDimensionCount)
+    {
+        detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
+        TensorDesc inputTensor = input.Impl()->GetOutputDesc();
+        TensorDesc indicesTensor = indices.Impl()->GetOutputDesc();
+        TensorDesc updatesTensor = updates.Impl()->GetOutputDesc();
+        TensorDesc outputTensor(inputTensor.dataType, inputTensor.sizes, builder->GetTensorPolicy());
+
+        DML_SCATTER_ND_OPERATOR_DESC desc = {};
+        desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.IndicesTensor = indicesTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.UpdatesTensor = updatesTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.OutputTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.InputDimensionCount = inputDimensionCount;
+        desc.IndicesDimensionCount = indicesDimensionCount;
+
+        detail::NodeOutput* const inputs[] = { input.Impl(), indices.Impl(), updates.Impl() };
+        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_SCATTER_ND, &desc, inputs);
+        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputTensor));
+
+        return output;
+    }
 
     // 
     // TODO: SpaceToDepth (DML_OPERATOR_SPACE_TO_DEPTH1)
