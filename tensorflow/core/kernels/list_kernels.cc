@@ -179,7 +179,7 @@ Status GetInputList(OpKernelContext* c, int index, const TensorList** list) {
                                    c->input(index).shape().DebugString());
   }
   const TensorList* l = c->input(index).scalar<Variant>()().get<TensorList>();
-  if (l == nullptr) { 
+  if (l == nullptr) {
     return errors::InvalidArgument(
         "Input handle is not a list. Saw: '",
         c->input(index).scalar<Variant>()().DebugString(), "'");
@@ -271,7 +271,7 @@ REGISTER_KERNEL_BUILDER(Name("EmptyTensorList")
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
-#ifdef TENSORFLOW_USE_DIRECTML
+#if TENSORFLOW_USE_DIRECTML
 REGISTER_KERNEL_BUILDER(Name("EmptyTensorList")
                             .Device(DEVICE_DML)
                             .HostMemory("element_shape")
@@ -368,7 +368,7 @@ REGISTER_KERNEL_BUILDER(
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
-#ifdef TENSORFLOW_USE_DIRECTML
+#if TENSORFLOW_USE_DIRECTML
 
 REGISTER_KERNEL_BUILDER(
     Name("TensorListLength").Device(DEVICE_DML).HostMemory("length"),
@@ -602,17 +602,17 @@ REGISTER_TENSOR_LIST_SET_ITEM_GPU(bfloat16)
 
 #if TENSORFLOW_USE_DIRECTML
 
-#define REGISTER_TENSOR_LIST_SET_ITEM_GPU(T)                      \
+#define REGISTER_TENSOR_LIST_SET_ITEM_DML(T)                      \
   REGISTER_KERNEL_BUILDER(Name("TensorListSetItem")               \
                               .TypeConstraint<T>("element_dtype") \
                               .Device(DEVICE_DML)                 \
                               .HostMemory("index"),               \
                           TensorListSetItem);
 
-TF_CALL_DML_ALL_TYPES(REGISTER_TENSOR_LIST_SET_ITEM_GPU);
-#undef REGISTER_TENSOR_LIST_SET_ITEM_GPU
+TF_CALL_DML_ALL_TYPES(REGISTER_TENSOR_LIST_SET_ITEM_DML);
+#undef REGISTER_TENSOR_LIST_SET_ITEM_DML
 
-#endif  TENSORFLOW_USE_DIRECTML
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class TensorListConcatLists : public OpKernel {
  public:
