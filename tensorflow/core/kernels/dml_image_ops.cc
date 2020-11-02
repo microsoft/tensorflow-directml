@@ -111,13 +111,14 @@ std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
                                                  img_n * img_h * img_w};
 
   const uint32_t window_size_and_strides[2] = {1, 3};
-  std::vector<dml::Expression> max_pool_out =
-      dml::MaxPoolingExpression(input, window_size_and_strides)
+  auto max_pool_out =
+      dml::MaxPoolingBuilder(input, window_size_and_strides)
           .Strides(window_size_and_strides)
-          .OutputIndices(true);
+          .OutputIndices(true)
+          .Build();
 
-  auto& c_max = max_pool_out[0];
-  auto& c_max_indices = max_pool_out[1];
+  auto& c_max = max_pool_out.values;
+  auto& c_max_indices = max_pool_out.indices;
 
   auto c_min = dml::Reduce(input, DML_REDUCE_FUNCTION_MIN, {3});
   auto delta = c_max - c_min;
@@ -144,7 +145,7 @@ std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
   auto c_max_indices_flat =
       dml::Reinterpret(c_max_indices, plane_flat_size, dml::NullOpt);
   auto h_max =
-      dml::Gather(h_rgb_flat, c_max_indices_flat, channel_dim, 4, dml::NullOpt);
+      dml::Gather(h_rgb_flat, c_max_indices_flat, channel_dim, 4);
   auto h_max_resized =
       dml::Reinterpret(h_max, r.GetOutputDesc().sizes, dml::NullOpt);
 
@@ -198,8 +199,8 @@ class DmlColorConversionKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 1);
     CHECK(ctx->GetOutputCount() == 1);
 
-    int64 num_channels = init_helper->GetNumChannels();
-    int64 num_pixels = init_helper->GetNumPixels();
+    auto num_channels = static_cast<uint32_t>(init_helper->GetNumChannels());
+    auto num_pixels = static_cast<uint32_t>(init_helper->GetNumPixels());
 
     uint32_t tensor_sizes[4] = {1, 1, num_pixels, num_channels};
     auto data_type = GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));
@@ -266,13 +267,14 @@ class DmlAdjustImageKernel : public DmlKernel {
     CHECK(ctx->GetOutputCount() == 1);
 
     const TensorShape& input_shape = ctx->GetInputTensorShape(0);
-    int64 width = init_helper->GetWidth();
-    int64 height = init_helper->GetHeight();
-    int64 channels = init_helper->GetChannels();
+    auto width = static_cast<uint32_t>(init_helper->GetWidth());
+    auto height = static_cast<uint32_t>(init_helper->GetHeight());
+    auto channels = static_cast<uint32_t>(init_helper->GetChannels());
 
     // Conversion helpers and DML require 4D input, but the leading dimensions
     // may be coalsced into N.
-    int64 num_images = input_shape.num_elements() / (width * height * channels);
+    auto num_images = static_cast<uint32_t>(input_shape.num_elements() /
+                                            (width * height * channels));
     uint32_t input_shape_dml[4] = {num_images, height, width, channels};
     uint32_t zero_strides[4] = {0, 0, 0, 0};
     auto data_type = GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));

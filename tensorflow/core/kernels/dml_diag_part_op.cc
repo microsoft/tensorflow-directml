@@ -82,12 +82,13 @@ class DmlDiagPartKernel : public DmlKernel {
     uint32_t stride_multiplier = is_64_bit_type ? 2 : 1;
 
     // Flatten the input into a vector and use strides to skip over zeros
-    uint32_t input_sizes[] = {1, 1, 1, output_shape.num_elements()};
+    auto out_num_elements = static_cast<uint32_t>(output_shape.num_elements());
+    uint32_t input_sizes[] = {1, 1, 1, out_num_elements};
     uint32_t input_strides[] = {
         0,
         0,
         0,
-        (output_shape.num_elements() + 1) * stride_multiplier,
+        (out_num_elements + 1) * stride_multiplier,
     };
 
     DmlTensorInfo input;
@@ -116,7 +117,7 @@ class DmlDiagPartKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to

@@ -185,7 +185,7 @@ class BatchMatMulV2InitHelper : public BaseBatchMatMulInitHelper {
 
 class MatMulShapeHelper : public ShapeHelper {
  public:
-  std::vector<TensorShape> MatMulShapeHelper::GetOutputShapes(
+  std::vector<TensorShape> GetOutputShapes(
       OpKernelContext* ctx,
       const InitializationHelper* initialization_helper) const override {
     const TensorShape& a_shape = ctx->input(0).shape();
@@ -336,8 +336,8 @@ class DmlBatchMatMulKernel : public DmlKernel {
     };
 
     DmlKernelTensors tensors = GetTensorInfos(ctx, params);
-    tensors.inputs[0]->desc = CreateTensorDescFromInput(ctx, 0, {}, in0_shape);
-    tensors.inputs[1]->desc = CreateTensorDescFromInput(ctx, 1, {}, in1_shape);
+    tensors.inputs[0]->desc = CreateTensorDescFromInput(ctx, 0, in0_shape);
+    tensors.inputs[1]->desc = CreateTensorDescFromInput(ctx, 1, in1_shape);
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);

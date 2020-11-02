@@ -145,7 +145,7 @@ void DmlAdapterImpl::Initialize(IDXGIAdapter* adapter) {
 
   LARGE_INTEGER driver_version;
   DML_CHECK_SUCCEEDED(
-      adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driver_version));
+      adapter->CheckInterfaceSupport(IID_IDXGIDevice, &driver_version));
 
   adapter_ = adapter;
   driver_version_ = tensorflow::DriverVersion(driver_version.QuadPart);
@@ -168,7 +168,7 @@ uint64_t DmlAdapterImpl::QueryAvailableDedicatedMemory() const {
 }
 
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
-  ComPtr<IDXGIFactory4> dxgi_factory;
+  ComPtr<IDXGIFactory6> dxgi_factory;
   DML_CHECK_SUCCEEDED(CreateDXGIFactory(IID_PPV_ARGS(&dxgi_factory)));
 
   const D3D_FEATURE_LEVEL min_feature_level = D3D_FEATURE_LEVEL_11_0;
@@ -176,17 +176,34 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
 
   uint32_t adapter_index = 0;
   ComPtr<IDXGIAdapter1> adapter;
-  while (SUCCEEDED(dxgi_factory->EnumAdapters1(adapter_index, &adapter))) {
+  while (dxgi_factory->EnumAdapterByGpuPreference(
+             adapter_index, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+             IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND) {
     DXGI_ADAPTER_DESC1 desc = {};
     DML_CHECK_SUCCEEDED(adapter->GetDesc1(&desc));
 
-    // Ignore software devices like WARP and msbda
-    if (!(desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE)) {
-      HRESULT hr = D3D12CreateDevice(adapter.Get(), min_feature_level,
-                                     __uuidof(ID3D12Device), nullptr);
-      if (SUCCEEDED(hr)) {
-        adapter_infos.emplace_back(adapter.Get());
-      }
+    // Since we enumerate by performance, we can ignore everything that comes
+    // after the first software adapter, which includes the IDD adapters. This
+    // is necessary for now because IDD adapters don't have the
+    // DXGI_ADAPTER_FLAG_SOFTWARE flag, even though they run on software.
+    // TFDML #21433167
+
+    // See here for documentation on filtering WARP adapter:
+    // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
+    const bool is_basic_render_driver_vendor_id =
+        desc.VendorId == static_cast<UINT>(VendorID::kMicrosoft);
+    const bool is_basic_render_driver_device_id = desc.DeviceId == 0x8c;
+
+    if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ||
+        (is_basic_render_driver_vendor_id &&
+         is_basic_render_driver_device_id)) {
+      break;
+    }
+
+    HRESULT hr = D3D12CreateDevice(adapter.Get(), min_feature_level,
+                                   IID_ID3D12Device, nullptr);
+    if (SUCCEEDED(hr)) {
+      adapter_infos.emplace_back(adapter.Get());
     }
 
     ++adapter_index;
@@ -260,10 +277,10 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
   DML_CHECK_SUCCEEDED(adapter_factory->CreateAdapterList(
       1, &dxcore_adapter, IID_PPV_ARGS(&adapter_list)));
 
-  // Sort the adapters so that hardware is selected first (for when driver_type
-  // == D3D_DRIVER_TYPE_UNKNOWN)
+  // Sort the adapters so that performant adapters are selected first
   DXCoreAdapterPreference sort_preferences[] = {
-      DXCoreAdapterPreference::Hardware};
+      DXCoreAdapterPreference::HighPerformance,
+  };
 
   DML_CHECK_SUCCEEDED(adapter_list->Sort(
       static_cast<uint32_t>(ABSL_ARRAYSIZE(sort_preferences)),
@@ -279,18 +296,36 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
     DML_CHECK_SUCCEEDED(adapter->GetProperty(DXCoreAdapterProperty::IsHardware,
                                              &is_hardware_adapter));
 
-    if (is_hardware_adapter) {
-      DmlAdapterImpl adapter_impl(adapter.Get());
+    DXCoreHardwareID hardware_id = {};
+    DML_CHECK_SUCCEEDED(
+        adapter->GetProperty(DXCoreAdapterProperty::HardwareID, &hardware_id));
 
-      D3D_FEATURE_LEVEL feature_level = adapter_impl.IsComputeOnly()
-                                            ? D3D_FEATURE_LEVEL_1_0_CORE
-                                            : D3D_FEATURE_LEVEL_11_0;
+    // See here for documentation on filtering WARP adapter:
+    // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
+    const bool is_basic_render_driver_vendor_id =
+        hardware_id.vendorID == static_cast<UINT>(VendorID::kMicrosoft);
+    const bool is_basic_render_driver_device_id = hardware_id.deviceID == 0x8c;
 
-      HRESULT hr = D3D12CreateDevice(adapter.Get(), feature_level,
-                                     __uuidof(ID3D12Device), nullptr);
-      if (SUCCEEDED(hr)) {
-        adapter_infos.push_back(std::move(adapter_impl));
-      }
+    // Since we enumerate by performance, we can ignore everything that comes
+    // after the first software adapter, which includes the IDD adapters. This
+    // is necessary for now because IDD adapters are considered hardware
+    // adapters, even though they run on software.
+    // TFDML #21433167
+    if (!is_hardware_adapter || (is_basic_render_driver_vendor_id &&
+                                 is_basic_render_driver_device_id)) {
+      break;
+    }
+
+    DmlAdapterImpl adapter_impl(adapter.Get());
+
+    D3D_FEATURE_LEVEL feature_level = adapter_impl.IsComputeOnly()
+                                          ? D3D_FEATURE_LEVEL_1_0_CORE
+                                          : D3D_FEATURE_LEVEL_11_0;
+
+    HRESULT hr = D3D12CreateDevice(adapter.Get(), feature_level,
+                                   IID_ID3D12Device, nullptr);
+    if (SUCCEEDED(hr)) {
+      adapter_infos.push_back(std::move(adapter_impl));
     }
   }
 

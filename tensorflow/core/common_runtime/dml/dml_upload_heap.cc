@@ -33,6 +33,7 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
     ID3D12Resource* dst, uint64_t dst_offset, D3D12_RESOURCE_STATES dst_state,
     absl::Span<const uint8_t> src) {
   std::unique_lock<std::mutex> lock(mutex_);
+  TF_RETURN_IF_ERROR(execution_context_->GetCommandRecorderStatus());
 
   assert(!src.empty());
   assert(dst->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);

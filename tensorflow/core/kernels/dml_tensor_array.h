@@ -38,7 +38,7 @@ struct DMLDeviceTag {};
 Status DmlAddToTensor(OpKernelContext* ctx, Tensor* sum, const Tensor* current,
                       const Tensor* add);
 
-Status DmlTensorSetZero(OpKernelContext* ctx, Tensor* value);
+void DmlTensorSetZero(OpKernelContext* ctx, Tensor* value);
 
 void DmlConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
                       absl::Span<PersistentTensor> values);
@@ -60,7 +60,8 @@ void DmlSplitTensor(OpKernelContext* ctx, Tensor* output_tensor,
   template <>                                                                 \
   inline Status TensorSetZero<DMLDeviceTag, T>(OpKernelContext * ctx,         \
                                                Tensor * value) {              \
-    return DmlTensorSetZero(ctx, value);                                      \
+    DmlTensorSetZero(ctx, value);                                             \
+    return Status::OK();                                                      \
   }                                                                           \
   template <>                                                                 \
   inline void ConcatTensors<DMLDeviceTag, T>(                                 \

@@ -32,7 +32,8 @@ class DmlAssignOp : public AssignOp {
     Device* device = static_cast<Device*>(context->device());
 
     device_context->CopyTensorInSameDevice(
-        &rhs, device, lhs, [](const Status& s) { TF_CHECK_OK(s); });
+        &rhs, device, lhs,
+        [context](const Status& s) { OP_REQUIRES_OK(context, s); });
   }
 };
 
@@ -51,16 +52,13 @@ class DmlAssignModifyOp : public DmlKernel {
     // to support tensors with more than 4 or 5 dimensions.
     TensorShape tensor_shape = {ctx->GetOutputTensorShape(0).num_elements()};
 
-    const auto tensor_layout =
-        GetDmlTensorLayout(FORMAT_NCHW, tensor_shape.dims());
-
     DmlKernelTensors tensors;
 
     for (uint32_t i = 0; i < ctx->GetInputCount(); ++i) {
       DmlTensorInfo input;
       input.kernel_index = i;
       input.desc = DmlTensorDesc::Create(ctx->GetInputDataType(i), tensor_shape,
-                                         tensor_shape, tensor_layout);
+                                         tensor_shape);
 
       tensors.inputs.push_back(std::move(input));
     }
@@ -68,7 +66,7 @@ class DmlAssignModifyOp : public DmlKernel {
     DmlTensorInfo output;
     output.kernel_index = 0;
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), tensor_shape,
-                                        tensor_shape, tensor_layout);
+                                        tensor_shape);
 
     tensors.outputs = {output};
 

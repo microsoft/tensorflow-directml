@@ -76,6 +76,6 @@ jobs:
         $Ado.QueuePipeline(
             $TestPipeline.id,
             $null,
-            @{'BuildId' = $env:Build_BuildId; 'EmailTo' = '$(EmailTo)'; 'TestGroups' = '$(TestGroups)'; 'Artifacts' = '$(TestArtifacts)'},
+            @{'BuildId' = $env:Build_BuildId; 'EmailTo' = '$(EmailTo)'; 'TestGroups' = '$(TestGroups)'; 'Artifacts' = '$(TestArtifacts)'; 'WslArtifacts' = '$(WslTestArtifacts)'},
             $env:Build_SourceBranch,
             $env:Build_SourceVersion)

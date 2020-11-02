@@ -43,17 +43,15 @@ class DmlCastKernel : public DmlKernel {
     // restrictions
     TensorShape tensor_shape({ctx->GetOutputTensorShape(0).num_elements()});
 
-    auto tensor_layout = GetDmlTensorLayout(FORMAT_NCHW, tensor_shape.dims());
-
     DmlTensorInfo input;
     input.kernel_index = 0;
     input.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0), tensor_shape,
-                                       tensor_shape, tensor_layout);
+                                       tensor_shape);
 
     DmlTensorInfo output;
     output.kernel_index = 0;
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), tensor_shape,
-                                        tensor_shape, tensor_layout);
+                                        tensor_shape);
 
     DmlKernelTensors tensors;
     tensors.outputs = {output};
@@ -70,7 +68,7 @@ class DmlCastKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
@@ -83,12 +81,12 @@ class DmlCastKernel : public DmlKernel {
   bool zero_outputs_ = false;
 };
 
-#define DML_REGISTER_KERNEL_OUTPUT(output_type)     \
-  REGISTER_KERNEL_BUILDER(                          \
-      Name("Cast")                                  \
-          .TypeConstraint<input_type_alias>("SrcT") \
-          .TypeConstraint<output_type>("DstT")      \
-          .Device(DEVICE_DML),                      \
+#define DML_REGISTER_KERNEL_OUTPUT(output_type)              \
+  REGISTER_KERNEL_BUILDER(                                   \
+      Name("Cast")                                           \
+          .template TypeConstraint<input_type_alias>("SrcT") \
+          .template TypeConstraint<output_type>("DstT")      \
+          .Device(DEVICE_DML),                               \
       DmlKernelWrapper<DmlCastKernel, GetOutputShapeAsInputShapeHelper>)
 
 template <typename TInput>

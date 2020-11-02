@@ -271,18 +271,14 @@ class DmlGatherKernel : public DmlKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    dml::TensorDesc::Dimensions out_strides(simple_gather.output_shape.size());
-    dml::CalculateStrides(simple_gather.output_shape,
-                          dml::TensorLayout::Default,
-                          dml::Span<uint32_t>(out_strides));
-
+    // Create a custom tensor policy to correctly pad out strides for int64
+    // emulation
+    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
     if (Is64BitIntegerType(ctx->GetInputDataType(0))) {
-      std::transform(out_strides.begin(), out_strides.end(),
-                     out_strides.begin(),
-                     [](uint32_t stride) { return stride * 2; });
+      out_policy = GetEmulatedInt64TensorPolicy();
     }
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Scope(ctx->GetDmlDevice(), out_policy);
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
     auto indices_tensor = dml::InputTensor(scope, 1, inputs[1]);
 
@@ -298,7 +294,7 @@ class DmlGatherKernel : public DmlKernel {
 
     auto result =
         dml::Gather(input_tensor, indices_tensor, simple_gather.gather_axis,
-                    simple_gather.index_dimensions, out_strides);
+                    simple_gather.index_dimensions);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
@@ -306,7 +302,7 @@ class DmlGatherKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -331,18 +327,12 @@ class DmlGatherKernel : public DmlKernel {
     auto input_bindings = dml_util::GetBufferBindings(input_buffers);
     auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
-    StatusOr<DmlGpuEvent> status_or_event =
+    DmlGpuEvent gpu_event =
         ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
                              input_bindings, output_bindings);
 
     init_helper->Unlock();
-
-    if (!status_or_event.ok()) {
-      ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-      return ctx->GetCurrentCompletionEvent();
-    }
-
-    return status_or_event.ConsumeValueOrDie();
+    return gpu_event;
   }
 };
 

@@ -41,8 +41,10 @@ def _get_tf_env(exe_path, test_framework):
   if os.name != "nt" and test_framework == "gtest":
     exe_path_head = os.path.splitext(exe_path)[0]
     tf_lib_path = f"{exe_path_head}.runfiles/org_tensorflow/tensorflow"
+    deps_lib_path = f"{exe_path_head}.runfiles/org_tensorflow/_solib_k8"
     prev_library_path = os.environ.get("LD_LIBRARY_PATH", "")
-    env_copy["LD_LIBRARY_PATH"] = f"{tf_lib_path}:{prev_library_path}"
+    ld_library_path = f"{tf_lib_path}:{deps_lib_path}:{prev_library_path}"
+    env_copy["LD_LIBRARY_PATH"] = ld_library_path
 
   return env_copy
 

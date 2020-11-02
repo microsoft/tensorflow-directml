@@ -92,7 +92,7 @@ class DmlKernel {
   // Computes this kernel. By default, this simply submits the compiled DML
   // operator for execution. A DmlGpuEvent is returned which becomes signaled
   // when the kernel completes execution on the GPU. This method is thread-safe.
-  virtual DmlGpuEvent Compute(DmlKernelContext* ctx) const;
+  virtual StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const;
 
   absl::Span<const absl::optional<uint32_t>> GetOutputRefsForwarding() const {
     return output_refs_forwarding_;
@@ -113,12 +113,20 @@ class DmlKernel {
 
   static DmlTensorDesc CreateTensorDescFromInput(
       DmlKernelConstruction* ctx, uint32_t kernel_index,
-      absl::Span<const DmlTensorAxis> tensor_layout = {},
+      absl::Span<const DmlTensorAxis> tensor_layout,
       const absl::optional<TensorShape>& tensor_shape = absl::nullopt);
 
   static DmlTensorDesc CreateTensorDescFromOutput(
       DmlKernelConstruction* ctx, uint32_t kernel_index,
-      absl::Span<const DmlTensorAxis> tensor_layout = {},
+      absl::Span<const DmlTensorAxis> tensor_layout,
+      const absl::optional<TensorShape>& tensor_shape = absl::nullopt);
+
+  static DmlTensorDesc CreateTensorDescFromInput(
+      DmlKernelConstruction* ctx, uint32_t kernel_index,
+      const absl::optional<TensorShape>& tensor_shape = absl::nullopt);
+
+  static DmlTensorDesc CreateTensorDescFromOutput(
+      DmlKernelConstruction* ctx, uint32_t kernel_index,
       const absl::optional<TensorShape>& tensor_shape = absl::nullopt);
 
   static absl::InlinedVector<DML_TENSOR_DESC, 8> GetDmlTensorDescs(
@@ -258,12 +266,11 @@ namespace dml {
 
 template <typename T>
 Expression ScalarTensor(Scope& scope, T value, TensorDesc::Dimensions sizes) {
-  dml::TensorDesc scalar_desc(tensorflow::TfTensorTypeTraits<T>::dml_type,
-                              dml::TensorDesc::Dimensions{1, 1, 1, 1});
   auto scalar = dml::Reinterpret(
       dml::FillValueConstant(
-          scope, tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(value),
-          scalar_desc),
+          scope, dml::TensorDesc::Dimensions{1, 1, 1, 1},
+          tensorflow::TfTensorTypeTraits<T>::dml_type,
+          tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(value)),
       sizes,                                  /* broadcast shape */
       dml::TensorDesc::Dimensions{0, 0, 0, 0} /* broadcast strides */
   );
@@ -273,11 +280,10 @@ Expression ScalarTensor(Scope& scope, T value, TensorDesc::Dimensions sizes) {
 template <typename T>
 Expression Sequence(Scope& scope, T start, T step,
                     TensorDesc::Dimensions sizes) {
-  dml::TensorDesc desc(tensorflow::TfTensorTypeTraits<T>::dml_type, sizes);
-
   auto seq = dml::FillValueSequence(
-      scope, tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(start),
-      tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(step), desc);
+      scope, sizes, tensorflow::TfTensorTypeTraits<T>::dml_type,
+      tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(start),
+      tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(step));
 
   return seq;
 }
@@ -287,11 +293,10 @@ Expression Sequence(Scope& scope, T start, T step,
 // the tensor desc.
 inline Expression ZeroTensor(Scope& scope, DML_TENSOR_DATA_TYPE dataType,
                              TensorDesc::Dimensions size) {
-  dml::TensorDesc scalar_desc{dataType,
-                              dml::TensorDesc::Dimensions{1, 1, 1, 1}};
   DML_SCALAR_UNION scalar_value{};
   auto scalar = dml::Reinterpret(
-      dml::FillValueConstant(scope, scalar_value, scalar_desc),
+      dml::FillValueConstant(scope, dml::TensorDesc::Dimensions{1, 1, 1, 1},
+                             dataType, scalar_value),
       size,                                   /* broadcast shape */
       dml::TensorDesc::Dimensions{0, 0, 0, 0} /* broadcast strides */
   );

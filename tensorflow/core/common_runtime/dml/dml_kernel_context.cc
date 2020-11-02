@@ -65,7 +65,7 @@ D3D12BufferRegion DmlKernelConstruction::CreateBufferForTensor(
   return dml_util::CreateBufferForTensor(device_, tensor);
 }
 
-Status DmlKernelConstruction::InitializeOperator(
+void DmlKernelConstruction::InitializeOperator(
     IDMLCompiledOperator* op,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
     absl::Span<const DML_BUFFER_BINDING> input_bindings) {
@@ -86,9 +86,8 @@ Status DmlKernelConstruction::InitializeOperator(
     input_binding_desc = {DML_BINDING_TYPE_BUFFER_ARRAY, &input_array_binding};
   }
 
-  return device_->GetExecutionContext()
-      ->InitializeOperator(op, persistent_binding_desc, input_binding_desc)
-      .status();
+  device_->GetExecutionContext()->InitializeOperator(
+      op, persistent_binding_desc, input_binding_desc);
 }
 
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {
@@ -183,7 +182,7 @@ D3D12BufferRegion DmlKernelContext::CreateBufferForTensor(
   return dml_util::CreateBufferForTensor(device_, tensor);
 }
 
-StatusOr<DmlGpuEvent> DmlKernelContext::ExecuteOperator(
+DmlGpuEvent DmlKernelContext::ExecuteOperator(
     IDMLCompiledOperator* op,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
     absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,

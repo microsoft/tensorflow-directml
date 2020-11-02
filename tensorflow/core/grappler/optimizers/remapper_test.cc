@@ -37,7 +37,118 @@ class RemapperTest : public GrapplerTest {
     // This is a requirement for fusing FusedBatchNorm + SideInput + Activation.
     setenv("TF_USE_CUDNN_BATCHNORM_SPATIAL_PERSISTENT", "1", 1 /* replace */);
   }
-};
+
+  void TestFusedPadWithConv2D(absl::string_view padding_type, bool include_bias,
+                              bool include_activation) {
+    using ::tensorflow::ops::Placeholder;
+
+    tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+
+    auto input_shape = ops::Placeholder::Shape({8, 32, 32, 3});
+    auto filter_shape = ops::Placeholder::Shape({1, 1, 3, 128});
+    auto padding_shape = ops::Placeholder::Shape({4, 2});
+
+    // The paddings have to be constant, otherwise there's no way to fetch the
+    // padding values at graph build time
+    Input::Initializer paddings_data = {{0, 0}, {10, 5}, {9, 3}, {0, 0}};
+    auto paddings = ops::Const(s.WithOpName("paddings"), paddings_data);
+
+    auto input = Placeholder(s.WithOpName("input"), DT_FLOAT, input_shape);
+    auto filter = Placeholder(s.WithOpName("filter"), DT_FLOAT, filter_shape);
+
+    auto pad = ops::Pad(s.WithOpName("pad"), input, paddings);
+
+    constexpr int explicit_paddings[] = {0, 0, 7, 10, 8, 2, 0, 0};
+    ops::Conv2D::Attrs attrs;
+
+    if (padding_type == "EXPLICIT") {
+      attrs = attrs.ExplicitPaddings(explicit_paddings);
+    }
+
+    auto input_t = GenerateRandomTensor<DT_FLOAT>({8, 32, 32, 3});
+    auto filter_t = GenerateRandomTensor<DT_FLOAT>({1, 1, 3, 128});
+
+    GrapplerItem item;
+    item.fetch = {"fetch"};
+    item.feed = {
+        {"input", input_t},
+        {"filter", filter_t},
+    };
+
+    std::vector<int> strides = {1, 1, 1, 1};
+    Output result = ops::Conv2D(s.WithOpName("conv"), pad, filter, strides,
+                                padding_type, attrs);
+
+    if (include_bias) {
+      auto bias_shape = ops::Placeholder::Shape({128});
+      auto bias = Placeholder(s.WithOpName("bias"), DT_FLOAT, bias_shape);
+      result = ops::BiasAdd(s.WithOpName("bias_add"), result, bias);
+
+      auto bias_t = GenerateRandomTensor<DT_FLOAT>({128});
+      item.feed.push_back({"bias", bias_t});
+    }
+
+    if (include_activation) {
+      result = ops::Relu(s.WithOpName("relu"), result);
+    }
+
+    result = ops::Identity(s.WithOpName("fetch"), result);
+
+    TF_ASSERT_OK(s.ToGraphDef(&item.graph));
+
+    // Place all nodes on CPU.
+    for (int i = 0; i < item.graph.node_size(); ++i) {
+      item.graph.mutable_node(i)->set_device("/device:CPU:0");
+    }
+
+    Remapper optimizer(RewriterConfig::ON);
+    GraphDef output;
+    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+    int found = 0;
+    if (include_bias) {
+      for (const NodeDef& node : output.node()) {
+        if (node.op() == "_FusedConv2D") {
+          ASSERT_GE(node.input_size(), 3);
+          EXPECT_EQ(node.input(0), "input");
+          EXPECT_EQ(node.input(1), "filter");
+          EXPECT_EQ(node.input(2), "bias");
+          EXPECT_EQ(node.attr().at("num_args").i(), 1);
+
+          const auto fused_ops = node.attr().at("fused_ops").list().s();
+
+          if (include_activation) {
+            ASSERT_EQ(fused_ops.size(), 2);
+            EXPECT_EQ(fused_ops[0], "BiasAdd");
+            EXPECT_EQ(fused_ops[1], "Relu");
+          } else {
+            ASSERT_EQ(fused_ops.size(), 1);
+            EXPECT_EQ(fused_ops[0], "BiasAdd");
+          }
+
+          found++;
+        }
+      }
+    } else {
+      for (const NodeDef& node : output.node()) {
+        if (node.op() == "Conv2D") {
+          ASSERT_GE(node.input_size(), 2);
+          EXPECT_EQ(node.input(0), "input");
+          EXPECT_EQ(node.input(1), "filter");
+          found++;
+        }
+      }
+    }
+
+    EXPECT_EQ(found, 1);
+
+    auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
+    ASSERT_EQ(tensors_expected.size(), 1);
+    auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+    ASSERT_EQ(tensors.size(), 1);
+    test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+  }
+};  // namespace grappler
 
 TEST_F(RemapperTest, FusedBatchNorm) {
   tensorflow::Scope s = tensorflow::Scope::NewRootScope();
@@ -796,9 +907,8 @@ TEST_F(RemapperTest, FuseConv2DWithSqueezeAndBias) {
   std::vector<int> strides = {1, 1, 1, 1};
   auto conv = ops::Conv2D(s.WithOpName("conv"), input, filter, strides, "SAME");
 
-  ops::Squeeze::Attrs attrs;
-  attrs = attrs.Axis({2});
-  auto squeeze = ops::Squeeze(s.WithOpName("squeeze"), conv, attrs);
+  auto squeeze = ops::Squeeze(s.WithOpName("squeeze"), conv,
+                              ops::Squeeze::Attrs().Axis({2}));
 
   auto bias_add = ops::BiasAdd(s.WithOpName("bias_add"), squeeze, bias);
   auto fetch = ops::Identity(s.WithOpName("fetch"), bias_add);
@@ -850,6 +960,60 @@ TEST_F(RemapperTest, FuseConv2DWithSqueezeAndBias) {
   auto tensors = EvaluateNodes(output, item.fetch, item.feed);
   ASSERT_EQ(tensors.size(), 1);
   test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DValidPadding) {
+  constexpr bool add_bias = false;
+  constexpr bool add_relu = false;
+  TestFusedPadWithConv2D("VALID", add_bias, add_relu);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DSamePadding) {
+  constexpr bool add_bias = false;
+  constexpr bool add_relu = false;
+  TestFusedPadWithConv2D("SAME", add_bias, add_relu);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DExplicitPadding) {
+  constexpr bool add_bias = false;
+  constexpr bool add_relu = false;
+  TestFusedPadWithConv2D("EXPLICIT", add_bias, add_relu);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DAndBiasValidPadding) {
+  constexpr bool add_bias = true;
+  constexpr bool add_relu = false;
+  TestFusedPadWithConv2D("VALID", add_bias, add_relu);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DAndBiasSamePadding) {
+  constexpr bool add_bias = true;
+  constexpr bool add_relu = false;
+  TestFusedPadWithConv2D("SAME", add_bias, add_relu);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DAndBiasExplicitPadding) {
+  constexpr bool add_bias = true;
+  constexpr bool add_relu = false;
+  TestFusedPadWithConv2D("EXPLICIT", add_bias, add_relu);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DAndBiasAndReluValidPadding) {
+  constexpr bool add_bias = true;
+  constexpr bool add_relu = true;
+  TestFusedPadWithConv2D("VALID", add_bias, add_relu);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DAndBiasAndReluSamePadding) {
+  constexpr bool add_bias = true;
+  constexpr bool add_relu = true;
+  TestFusedPadWithConv2D("SAME", add_bias, add_relu);
+}
+
+TEST_F(RemapperTest, FusePadWithConv2DAndBiasAndReluExplicitPadding) {
+  constexpr bool add_bias = true;
+  constexpr bool add_relu = true;
+  TestFusedPadWithConv2D("EXPLICIT", add_bias, add_relu);
 }
 
 }  // namespace grappler

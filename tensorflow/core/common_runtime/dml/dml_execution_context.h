@@ -55,32 +55,26 @@ class DmlExecutionContextImpl {
       absl::Span<const uint8_t>
           value /* Data type agnostic value, treated as raw bits */);
 
-  StatusOr<DmlGpuEvent> InitializeOperator(
+  DmlGpuEvent InitializeOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
       const DML_BINDING_DESC& input_array_binding);
 
-  StatusOr<DmlGpuEvent> ExecuteOperator(
+  DmlGpuEvent ExecuteOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
       absl::Span<const DML_BINDING_DESC> input_bindings,
       absl::Span<const DML_BINDING_DESC> output_bindings);
 
-  DmlGpuEvent ExecuteCommandList(ID3D12GraphicsCommandList* command_list,
-                                 _Outptr_ ID3D12Fence** fence,
-                                 _Out_ uint64_t* completion_value);
-
-  DmlGpuEvent AddUAVBarrier();
   DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
-
-  // See ID3D12CommandQueue::Wait
-  void Wait(ID3D12Fence* fence, uint64_t value);
 
   // Forces all queued work to begin executing on the GPU. This method returns
   // immediately and does not wait for the submitted work to complete execution
   // on the GPU.
-  DmlGpuEvent Flush();
+  StatusOr<DmlGpuEvent> Flush();
+
+  Status GetCommandRecorderStatus() const;
 
   // Returns an event which will become signaled when everything submitted to
   // the execution context thus far has completed execution on the GPU,
@@ -134,7 +128,7 @@ class DmlExecutionContext {
                                         value);
   }
 
-  StatusOr<DmlGpuEvent> InitializeOperator(
+  DmlGpuEvent InitializeOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
       const DML_BINDING_DESC& input_array_binding) {
@@ -143,7 +137,7 @@ class DmlExecutionContext {
                                      input_array_binding);
   }
 
-  StatusOr<DmlGpuEvent> ExecuteOperator(
+  DmlGpuEvent ExecuteOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
       absl::Span<const DML_BINDING_DESC> input_bindings,
@@ -153,32 +147,19 @@ class DmlExecutionContext {
                                   input_bindings, output_bindings);
   }
 
-  DmlGpuEvent ExecuteCommandList(ID3D12GraphicsCommandList* command_list,
-                                 _Outptr_ ID3D12Fence** fence,
-                                 _Out_ uint64_t* completion_value) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->ExecuteCommandList(command_list, fence, completion_value);
-  }
-
-  DmlGpuEvent AddUAVBarrier() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->AddUAVBarrier();
-  }
-
   DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->ResourceBarrier(barriers);
   }
 
-  void Wait(ID3D12Fence* fence, uint64_t value) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    impl_->Wait(fence, value);
-  }
-
-  DmlGpuEvent Flush() {
+  StatusOr<DmlGpuEvent> Flush() {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->Flush();
+  }
+
+  Status GetCommandRecorderStatus() const {
+    return impl_->GetCommandRecorderStatus();
   }
 
   DmlGpuEvent GetCurrentCompletionEvent() {

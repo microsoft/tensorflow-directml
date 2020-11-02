@@ -40,8 +40,9 @@ class ResizeGradInitHelper : public InitializationHelper {
   ResizeGradInitHelper(OpKernelContext* ctx,
                        std::shared_ptr<const Attributes> attr)
       : attr_(attr) {
+    const Tensor& input = ctx->input(0);
+
     if (interpolation_mode == DML_INTERPOLATION_MODE_LINEAR) {
-      const Tensor& input = ctx->input(0);
       const Tensor& original_image = ctx->input(1);
 
       ImageResizerGradientState st(attr->align_corners,
@@ -52,23 +53,19 @@ class ResizeGradInitHelper : public InitializationHelper {
         return;
       }
 
-      batch_size_ = st.batch_size;
-      channels_ = st.channels;
-      out_height_ = st.original_height;
-      out_width_ = st.original_width;
-      height_scale_ = st.height_scale;
-      width_scale_ = st.width_scale;
+      out_height_ = original_image.dim_size(1);
+      out_width_ = original_image.dim_size(2);
     } else {
       DCHECK(interpolation_mode == DML_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
 
-      // Grab and validate the input:
-      const Tensor& input = ctx->input(0);
+      const Tensor& shape_t = ctx->input(1);
+
+      // Validate the input:
       OP_REQUIRES(ctx, input.dims() == 4,
                   errors::InvalidArgument("input must be 4-dimensional",
                                           input.shape().DebugString()));
 
       // Grab and validate the output shape:
-      const Tensor& shape_t = ctx->input(1);
       OP_REQUIRES(ctx, shape_t.dims() == 1,
                   errors::InvalidArgument("shape_t must be 1-dimensional",
                                           shape_t.shape().DebugString()));
@@ -77,22 +74,24 @@ class ResizeGradInitHelper : public InitializationHelper {
                                           shape_t.shape().DebugString()));
 
       auto sizes = shape_t.vec<int32>();
+
       OP_REQUIRES(
           ctx, sizes(0) > 0 && sizes(1) > 0,
           errors::InvalidArgument("shape_t's elements must be positive"));
 
-      batch_size_ = input.dim_size(0);
-      const int64 in_height = input.dim_size(1);
-      const int64 in_width = input.dim_size(2);
-      channels_ = input.dim_size(3);
-
       out_height_ = sizes(0);
       out_width_ = sizes(1);
-      height_scale_ =
-          CalculateResizeScale(out_height_, in_height, attr->align_corners);
-      width_scale_ =
-          CalculateResizeScale(out_width_, in_width, attr->align_corners);
     }
+
+    batch_size_ = input.dim_size(0);
+    const int64 in_height = input.dim_size(1);
+    const int64 in_width = input.dim_size(2);
+    channels_ = input.dim_size(3);
+
+    height_scale_ =
+        CalculateResizeScale(in_height, out_height_, attr->align_corners);
+    width_scale_ =
+        CalculateResizeScale(in_width, out_width_, attr->align_corners);
   }
 
   bool AlignCorners() const { return attr_->align_corners; }
@@ -182,23 +181,6 @@ class DmlResizeGradKernel : public DmlKernel {
 
     float height_scale = init_helper->GetHeightScale();
     float width_scale = init_helper->GetWidthScale();
-
-    // A scale of 0 is essentially the same as a scale of 1 / input_size. It
-    // means that the input size in the forward pass was 1, and align_corners ==
-    // true. It also means that we have a single pixel that contributed to all
-    // the output pixels in the forward pass. The CPU algorithm handles this by
-    // clamping the scale, but DML's validation doesn't allow scales of 0.
-    // Therefore, if we have a scale of 0, we simply use a scale of 1 /
-    // input_size instead.
-    const TensorShape& input_shape = ctx->GetInputTensorShape(0);
-
-    if (height_scale == 0.0f) {
-      height_scale = 1.0f / input_shape.dim_size(1);
-    }
-
-    if (width_scale == 0.0f) {
-      width_scale = 1.0f / input_shape.dim_size(2);
-    }
 
     float scales[] = {1.0f, height_scale, width_scale, 1.0f};
 

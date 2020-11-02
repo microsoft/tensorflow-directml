@@ -164,12 +164,13 @@ static Status ComputeNonzeroCoordinates(OpKernelContext* ctx,
   ctx->op_device_context()->CopyDeviceTensorToCPU(
       num_nonzero_elements_tensor.tensor, "",
       static_cast<Device*>(ctx->device()), &num_nonzero_elements_tensor_cpu,
-      [&note](const Status& copy_status) {
-        CHECK(copy_status.ok());
+      [&note, ctx](const Status& copy_status) {
         note.Notify();
+        OP_REQUIRES_OK(ctx, copy_status);
       });
 
   note.WaitForNotification();
+  TF_RETURN_IF_ERROR(ctx->status());
 
   num_nonzero_elements = num_nonzero_elements_tensor_cpu.scalar<uint32_t>()();
 
@@ -247,7 +248,7 @@ class DmlWhereKernel : public OpKernel {
 
     device_context->CopyTensorInSameDevice(
         nonzero_coordinates.tensor, device, output,
-        [](const Status& s) { TF_CHECK_OK(s); });
+        [ctx](const Status& s) { OP_REQUIRES_OK(ctx, s); });
   }
 
  private:

@@ -99,20 +99,8 @@ dml::Expression MatrixDiag(dml::Scope& scope, dml::Expression diag,
     auto right_top = dml::Sequence<int32_t>(scope, rwcl_min - 1, -1,
                                             {1, 1, 1, rwcl_min - 1});
 
-    // Temporary workaround because of a bug in the graph. Currently, it's not
-    // possible to use a broadcasted scalar (i.e. [0, 0, 0, 0] strides) in the
-    // graph because the Join optimizations override the strides to [0, 0, 0,
-    // 1], which obviously makes a tensor of a different size, as if we had
-    // more elements. We should replace this logic with "auto klen_mid =
-    // dml::ScalarTensor<int32_t>(scope, rwcl_min, {1, 1, 1, rwcl_gap + 1});"
-    // once the bug has been fixed.
-    // TFDML #28238466
-    dml::TensorDesc klen_mid_desc(DML_TENSOR_DATA_TYPE_INT32,
-                                  {1, 1, 1, rwcl_gap + 1});
-
-    auto klen_mid = dml::FillValueConstant(
-        scope, tensorflow::TfTensorTypeTraits<int32_t>::ToDmlScalar(rwcl_min),
-        klen_mid_desc);
+    auto klen_mid =
+        dml::ScalarTensor<int32_t>(scope, rwcl_min, {1, 1, 1, rwcl_gap + 1});
 
     auto k_lens = dml::Join({left_btm, klen_mid, right_top}, 3);
 

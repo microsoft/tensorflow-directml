@@ -201,15 +201,38 @@ DmlTensorLayout GetDmlTensorLayout(TensorFormat format, uint32_t rank) {
   return tensor_layout;
 }
 
-dml::TensorLayout GetDmlXTensorLayout(TensorFormat format) {
+dml::TensorPolicy GetDmlXTensorPolicy(TensorFormat format) {
   switch (format) {
     case FORMAT_NHWC:
-      return dml::TensorLayout::Nhwc;
+      return dml::TensorPolicy::InterleavedChannel();
     case FORMAT_NCHW:
-      return dml::TensorLayout::Nchw;
+      return dml::TensorPolicy::Default();
     default:
       LOG(FATAL) << "Unsupported tensor layout";
   }
+}
+
+dml::TensorPolicy GetEmulatedInt64TensorPolicy() {
+  return dml::TensorPolicy([](DML_TENSOR_DATA_TYPE dataType,
+                              DML_TENSOR_FLAGS flags,
+                              dml::Span<const uint32_t> sizes) {
+    uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
+
+    // Compute strides
+    dml::TensorDimensions strides(dimension_count);
+    uint32_t stride = 2;  // double all strides
+    for (int i = static_cast<int>(dimension_count) - 1; i >= 0; i--) {
+      strides[i] = stride;
+      stride *= sizes[i];
+    }
+
+    dml::TensorProperties props = {};
+    props.guaranteedBaseOffsetAlignment = 0;
+    props.strides = std::move(strides);
+    props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+        dataType, dimension_count, sizes.data(), props.strides->data());
+    return props;
+  });
 }
 
 namespace dml_util {
@@ -218,7 +241,8 @@ void CopyTensorInSameDevice(OpKernelContext* op_ctx, Tensor* dst,
                             const Tensor& src) {
   auto* device = static_cast<Device*>(op_ctx->device());
   op_ctx->op_device_context()->CopyTensorInSameDevice(
-      &src, device, dst, [](const Status& s) { TF_CHECK_OK(s); });
+      &src, device, dst,
+      [op_ctx](const Status& s) { OP_REQUIRES_OK(op_ctx, s); });
 }
 
 D3D12BufferRegion CreateBufferForTensor(const DmlDevice* device,

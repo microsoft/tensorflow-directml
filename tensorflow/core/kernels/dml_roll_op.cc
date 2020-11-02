@@ -158,19 +158,15 @@ class DmlRollKernel : public DmlKernel {
 
       result = dml::Reinterpret(result, new_sizes, {});
 
-      auto indices_desc = dml::TensorDesc(DML_TENSOR_DATA_TYPE_UINT32,
-                                          {1, 1, 1, axis_dim_size});
-      auto indices = dml::FillValueSequence(scope, indices_start, indices_delta,
-                                            std::move(indices_desc));
+      auto indices = dml::FillValueSequence(scope, {1, 1, 1, axis_dim_size},
+                                            DML_TENSOR_DATA_TYPE_UINT32,
+                                            indices_start, indices_delta);
 
       DML_SCALAR_UNION axis_constant;
       axis_constant.UInt32 = axis_dim_size;
 
-      auto axis_desc =
-          dml::TensorDesc(DML_TENSOR_DATA_TYPE_UINT32, {1, 1, 1, 1});
-
-      auto axis_tensor =
-          dml::FillValueConstant(scope, axis_constant, std::move(axis_desc));
+      auto axis_tensor = dml::FillValueConstant(
+          scope, {1, 1, 1, 1}, DML_TENSOR_DATA_TYPE_UINT32, axis_constant);
 
       axis_tensor = dml::Reinterpret(axis_tensor, {1, 1, 1, axis_dim_size},
                                      dml::TensorDesc::Dimensions{0, 0, 0, 0});
@@ -184,7 +180,7 @@ class DmlRollKernel : public DmlKernel {
       // After reinterpreting the sizes, the gather axis is always 2
       constexpr uint32_t dml_axis = 2;
       constexpr uint32_t index_dimensions = 1;
-      result = dml::Gather(result, indices, dml_axis, index_dimensions, {});
+      result = dml::Gather(result, indices, dml_axis, index_dimensions);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =

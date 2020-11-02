@@ -36,8 +36,8 @@ class InitializationHelper {
     explicit EmptyAttributes(OpKernelConstruction* ctx) {}
   };
 
-  // By default, a kernel is considered a no-op if any of its input tensors are
-  // empty.
+  // By default, a kernel is considered a no-op if any of its input or output
+  // tensors are empty.
   virtual bool IsNoOpKernel(OpKernelContext* ctx,
                             absl::Span<const TensorShape> output_shapes) const {
     for (int i = 0; i < ctx->num_inputs(); ++i) {

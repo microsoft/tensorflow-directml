@@ -163,14 +163,17 @@ class DmlMatrixDiagPartKernel : public DmlKernel {
     const TensorShape& input_shape = ctx->GetInputTensorShape(0);
     const TensorShape& output_shape = ctx->GetOutputTensorShape(0);
 
-    int64 batch_size = 1;
+    uint32_t batch_size = 1u;
     for (int i = 0; i < input_shape.dims() - 2; ++i) {
       batch_size *= input_shape.dim_size(i);
     }
 
-    int64 elem_count_per_batch = output_shape.num_elements() / batch_size;
-    int64 input_height = input_shape.dim_size(input_shape.dims() - 2);
-    int64 input_width = input_shape.dim_size(input_shape.dims() - 1);
+    auto elem_count_per_batch =
+        static_cast<uint32_t>(output_shape.num_elements() / batch_size);
+    auto input_height =
+        static_cast<uint32_t>(input_shape.dim_size(input_shape.dims() - 2));
+    auto input_width =
+        static_cast<uint32_t>(input_shape.dim_size(input_shape.dims() - 1));
 
     // Flatten the output batches of vectors
     TensorShape flattened_output_shape(
@@ -342,7 +345,7 @@ class DmlMatrixDiagPartKernel : public DmlKernel {
         diags_indices, {1, 1, leading_dims_size, out_rows * out_cols},
         dml::TensorDesc::Dimensions({0, 0, 0, 1}));
 
-    auto diags = dml::GatherElements(m2, diags_indices, 3, {});
+    auto diags = dml::GatherElements(m2, diags_indices, 3);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {diags});

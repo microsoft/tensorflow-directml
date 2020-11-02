@@ -80,12 +80,13 @@ class DmlDiagKernel : public DmlKernel {
     uint32_t stride_multiplier = is_64_bit_type ? 2 : 1;
 
     // Flatten the output into a vector and use strides to skip over zeros
-    uint32_t output_sizes[] = {1, 1, 1, input_shape.num_elements()};
+    auto num_elements = static_cast<uint32_t>(input_shape.num_elements());
+    uint32_t output_sizes[] = {1, 1, 1, num_elements};
     uint32_t output_strides[] = {
         0,
         0,
         0,
-        (input_shape.num_elements() + 1) * stride_multiplier,
+        (num_elements + 1) * stride_multiplier,
     };
 
     DmlTensorInfo output;
@@ -109,7 +110,7 @@ class DmlDiagKernel : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Zero the buffer since we use strides to skip over elements
     Tensor* output = ctx->GetOutputTensor(0);
     ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));

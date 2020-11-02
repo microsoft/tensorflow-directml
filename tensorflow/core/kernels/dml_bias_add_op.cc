@@ -112,31 +112,25 @@ class DmlBiasAddKernel : public DmlKernel {
       }
     }
 
-    // The tensor shape has been manually broadcast and we're just performing an
-    // elementwise add, so we can pick any layout we want. Therefore we just use
-    // DML's default NCHW.
-    DmlTensorLayout layout =
-        GetDmlTensorLayout(FORMAT_NCHW, output_shape.dims());
-
     DmlKernelTensors tensors;
     tensors.inputs.resize(2);
     tensors.outputs.resize(1);
 
     tensors.inputs[0].emplace();
-    tensors.inputs[0]->desc = DmlTensorDesc::Create(
-        ctx->GetInputDataType(0), output_shape, output_shape, layout);
+    tensors.inputs[0]->desc = DmlTensorDesc::Create(ctx->GetInputDataType(0),
+                                                    output_shape, output_shape);
     tensors.inputs[0]->kernel_index = 0;
 
     // Broadcast the bias tensor over the output shape
     const TensorShape& bias_physical_shape = init_helper->GetBiasShape();
     tensors.inputs[1].emplace();
     tensors.inputs[1]->desc = DmlTensorDesc::Create(
-        ctx->GetInputDataType(1), output_shape, bias_physical_shape, layout);
+        ctx->GetInputDataType(1), output_shape, bias_physical_shape);
     tensors.inputs[1]->kernel_index = 1;
 
     tensors.outputs[0].emplace();
     tensors.outputs[0]->desc = DmlTensorDesc::Create(
-        ctx->GetOutputDataType(0), output_shape, output_shape, layout);
+        ctx->GetOutputDataType(0), output_shape, output_shape);
     tensors.outputs[0]->kernel_index = 0;
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
@@ -152,9 +146,12 @@ class DmlBiasAddKernel : public DmlKernel {
   }
 };
 
-#define DML_REGISTER_KERNEL(type)                                   \
-  REGISTER_KERNEL_BUILDER(                                          \
-      Name("BiasAdd").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+#define DML_REGISTER_KERNEL(type)                                            \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name("BiasAdd").Device(DEVICE_DML).TypeConstraint<type>("T"),          \
+      DmlKernelWrapper<DmlBiasAddKernel, GetOutputShapeAsInputShapeHelper>); \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name("BiasAddV1").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
       DmlKernelWrapper<DmlBiasAddKernel, GetOutputShapeAsInputShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
@@ -263,15 +260,14 @@ class DmlBiasAddGradKernel : public DmlKernel {
 
     DmlTensorInfo input_info = {};
     input_info.desc = DmlTensorDesc::Create(
-        ctx->GetInputDataType(0), input_shape, input_shape, input_layout, 0);
+        ctx->GetInputDataType(0), input_shape, input_shape, input_layout);
     input_info.kernel_index = 0;
 
     const TensorShape& output_shape = ctx->GetOutputTensorShape(0);
     auto output_layout = {C};
     DmlTensorInfo output_info = {};
-    output_info.desc =
-        DmlTensorDesc::Create(ctx->GetOutputDataType(0), output_shape,
-                              output_shape, output_layout, 0);
+    output_info.desc = DmlTensorDesc::Create(
+        ctx->GetOutputDataType(0), output_shape, output_shape, output_layout);
     output_info.kernel_index = 0;
 
     DmlKernelTensors tensors = {};

@@ -33,10 +33,9 @@ struct SimplifiedSlice {
 };
 
 template <typename T>
-void ShiftDim(T& vec, int shift_amount, uint32_t dim_count)
-{
-    std::rotate(vec.begin(), vec.begin() + shift_amount, vec.end());
-    vec.resize(dim_count);
+void ShiftDim(T& vec, int shift_amount, uint32_t dim_count) {
+  std::rotate(vec.begin(), vec.begin() + shift_amount, vec.end());
+  vec.resize(dim_count);
 }
 
 // This helper may simplify an N-dimensional slice to a lower rank slice by
@@ -48,8 +47,9 @@ void ShiftDim(T& vec, int shift_amount, uint32_t dim_count)
 // no offset/stride, will be
 //   merged with lower-order dimensions that are fully included in the slice.
 static absl::optional<SimplifiedSlice> SimplifySlice(
-    const TensorShape& input_shape, const gtl::InlinedVector<int64, 4>& begins,
-    const gtl::InlinedVector<int64, 4>& ends,
+    const TensorShape& input_shape,
+    const gtl::InlinedVector<int64, 4>& canonical_begins,
+    const gtl::InlinedVector<int64, 4>& canonical_ends,
     const gtl::InlinedVector<int64, 4>& strides, uint32_t min_output_size = 4,
     uint32_t max_output_size = 5) {
   assert(input_shape.dims() == begins.size());
@@ -62,7 +62,7 @@ static absl::optional<SimplifiedSlice> SimplifySlice(
   desc.input_strides.resize(max_output_size, 1);
   desc.output_sizes.resize(max_output_size, 1);
   desc.window_offset.resize(max_output_size, 0);
-  desc.window_sizes.resize(max_output_size, 0);
+  desc.window_sizes.resize(max_output_size, 1);
   desc.window_strides.resize(max_output_size, 1);
 
   int current_dim = max_output_size - 1;
@@ -89,10 +89,14 @@ static absl::optional<SimplifiedSlice> SimplifySlice(
   for (int i = input_shape.dims() - 1; i >= 0; i--) {
     const uint32_t input_size = input_shape.dim_size(i);
     const int32_t window_stride = static_cast<int32_t>(strides[i]);
-    const uint32_t begin = static_cast<uint32_t>(
-        begins[i] < 0 ? begins[i] + input_size : begins[i]);
-    const uint32_t end =
-        static_cast<uint32_t>(ends[i] < 0 ? ends[i] + input_size : ends[i]);
+
+    // Here, begin and end contain the canonical values. This means that they
+    // cannot be negative when strides are positive. When strides are negative,
+    // end can only be positive or -1. See the ValidateStridedSliceOp function
+    // in strided_slice_op.cc for reference.
+    const int64 begin = canonical_begins[i];
+    const int64 end = canonical_ends[i];
+    CHECK(end >= -1);
 
     uint32_t window_offset, window_size, output_size;
     if (window_stride > 0) {
@@ -378,7 +382,7 @@ class DmlStridedSliceKernel : public DmlKernel {
     }
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
@@ -487,7 +491,7 @@ class DmlStridedSliceGradKernel : public DmlKernel {
     }
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to

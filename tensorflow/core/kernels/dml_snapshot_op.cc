@@ -33,7 +33,8 @@ class DmlSnapshotOp : public OpKernel {
       Device* device = static_cast<Device*>(context->device());
 
       device_context->CopyTensorInSameDevice(
-          &input, device, output, [](const Status& s) { TF_CHECK_OK(s); });
+          &input, device, output,
+          [context](const Status& s) { OP_REQUIRES_OK(context, s); });
     }
   }
 };

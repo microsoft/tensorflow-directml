@@ -2716,11 +2716,8 @@ tf_kernel_library(
         "//tensorflow/core:lib",
         "//tensorflow/core:lib_internal",
         "@com_google_absl//absl/strings",
-    ] + if_dml(["//tensorflow/core/common_runtime/dml:dml_runtime"]),
-    copts = tf_copts() + if_not_windows([
-        "-fms-extensions", 
-        "-Ithird_party/dml/winadapter",
-    ]) + if_windows([
+    ] + if_dml(["//tensorflow/core:dml_runtime"]),
+    copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
 
@@ -8060,6 +8057,8 @@ tf_kernel_library(
         "dml_relu_op.cc",
         "dml_random_ops.cc",
         "dml_batch_norm_ops.cc",
+        "dml_topk_op.cc",
+        "dml_softmax_ops.cc",
         "dml_conv_ops.cc",
         "dml_snapshot_op.cc",
         "dml_fill_op.cc",
@@ -8075,6 +8074,9 @@ tf_kernel_library(
         "dml_resize_grad_op.cc",
         "dml_assign_ops.cc",
         "dml_gather_op.cc",
+        "dml_gather_nd_op.cc",
+        "dml_scatter_nd_op.cc",
+        "dml_tensor_scatter_ops.cc",
         "dml_scan_ops.cc",
         "dml_dynamic_stitch_op.cc",
         "dml_l2loss_op.cc",
@@ -8118,6 +8120,8 @@ tf_kernel_library(
         "dml_extract_patches_helpers.cc",
         "dml_extract_image_patches_op.cc",
         "dml_extract_volume_patches_op.cc",
+        "dml_empty_op.cc",
+        "dml_parallel_concat_ops.cc",
     ],
     hdrs = [
         "dml_kernel_wrapper.h",
@@ -8133,7 +8137,7 @@ tf_kernel_library(
         "dml_extract_patches_helpers.h",
     ],
     deps = NN_DEPS + [
-        "//tensorflow/core/common_runtime/dml:dml_runtime",
+        "//tensorflow/core:dml_runtime",
         ":bias_op",
         ":reduction_ops",
         ":transpose_functor",
@@ -8143,10 +8147,7 @@ tf_kernel_library(
         ":rnn_ops",
         ":fused_batch_norm_op",
     ],
-    copts = tf_copts() + if_not_windows([
-        "-fms-extensions", 
-        "-Ithird_party/dml/winadapter",
-    ]) + if_windows([
+    copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
     ]),

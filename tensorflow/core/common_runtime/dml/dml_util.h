@@ -61,7 +61,11 @@ uint32_t GetDmlDimensionIndex(DmlTensorAxis axis, uint32_t dml_dimension_count);
 DmlTensorLayout GetDmlTensorLayout(TensorFormat format, uint32_t rank);
 
 // Converts a TF-style TensorFormat into the equivalent DirectMLX enum value.
-dml::TensorLayout GetDmlXTensorLayout(TensorFormat format);
+dml::TensorPolicy GetDmlXTensorPolicy(TensorFormat format);
+
+// Retrieves a tensor policy that produces padded output striding as required
+// for int64 emulation.
+dml::TensorPolicy GetEmulatedInt64TensorPolicy();
 
 namespace dml_util {
 
@@ -94,6 +98,26 @@ inline bool HrIsOutOfMemory(HRESULT hr) {
   // when building winerror.h, so we check both potential values here
   return hr == 0x80000002 || hr == 0x8007000e;
 }
+
+inline absl::string_view StringifyDeviceRemovedReason(HRESULT reason) {
+  switch (reason) {
+    case DXGI_ERROR_DEVICE_HUNG:
+      return "DXGI_ERROR_DEVICE_HUNG";
+    case DXGI_ERROR_DEVICE_REMOVED:
+      return "DXGI_ERROR_DEVICE_REMOVED";
+    case DXGI_ERROR_DEVICE_RESET:
+      return "DXGI_ERROR_DEVICE_RESET";
+    case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
+      return "DXGI_ERROR_DRIVER_INTERNAL_ERROR";
+    case DXGI_ERROR_INVALID_CALL:
+      return "DXGI_ERROR_INVALID_CALL";
+    case S_OK:
+      return "S_OK";
+    default:
+      return "UNKNOWN";
+  }
+}
+
 }  // namespace dml_util
 
 }  // namespace tensorflow

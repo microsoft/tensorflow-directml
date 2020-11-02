@@ -23,30 +23,6 @@ limitations under the License.
 
 namespace tensorflow {
 
-static void GetVariable(OpKernelContext* op_ctx,
-                        core::RefCountPtr<Var>& variable) {
-  OP_REQUIRES_OK(op_ctx,
-                 LookupResource(op_ctx, HandleFromInput(op_ctx, 0), &variable));
-}
-
-static void PrepareVariableUpdate(OpKernelContext* op_ctx,
-                                  core::RefCountPtr<Var>& variable) {
-  Tensor* var_tensor = variable->tensor();
-  const TensorShape& var_shape = variable->tensor()->shape();
-  const TensorShape& value_shape = op_ctx->input(1).shape();
-
-  OP_REQUIRES(op_ctx, var_shape.IsSameSize(value_shape),
-              errors::InvalidArgument(
-                  "Cannot update variable with shape ", var_shape.DebugString(),
-                  " using a Tensor with shape ", value_shape.DebugString(),
-                  ", shapes must be equal."));
-
-  OP_REQUIRES_OK(op_ctx,
-                 PrepareToUpdateVariable(op_ctx, var_tensor,
-                                         variable->copy_on_read_mode.load(),
-                                         &dml_util::CopyTensorInSameDevice));
-}
-
 template <DML_OPERATOR_TYPE op_type, typename DML_OPERATOR_SPECIFIC_DESC>
 class DmlUpdateVariableOp : public DmlKernel {
  public:
@@ -54,8 +30,9 @@ class DmlUpdateVariableOp : public DmlKernel {
 
   explicit DmlUpdateVariableOp(DmlKernelConstruction* ctx,
                                const InitHelper* init_helper) {
-    uint32_t tensor_sizes[] = {1, 1, 1,
-                               ctx->GetInputTensorShape(1).num_elements()};
+    uint32_t tensor_sizes[] = {
+        1, 1, 1,
+        static_cast<uint32_t>(ctx->GetInputTensorShape(1).num_elements())};
 
     auto tensor_desc = DmlTensorDesc::Create(ctx->GetInputDataType(1),
                                              tensor_sizes, tensor_sizes);
@@ -85,24 +62,31 @@ class DmlUpdateVariableOp : public DmlKernel {
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     auto* op_ctx = ctx->GetOpKernelContext();
 
     core::RefCountPtr<Var> variable;
-    GetVariable(op_ctx, variable);
-    if (!op_ctx->status().ok()) {
-      return ctx->GetCurrentCompletionEvent();
-    }
+    TF_RETURN_IF_ERROR(
+        LookupResource(op_ctx, HandleFromInput(op_ctx, 0), &variable));
 
     mutex_lock ml(*variable->mu());
 
-    PrepareVariableUpdate(op_ctx, variable);
-    if (!op_ctx->status().ok()) {
-      return ctx->GetCurrentCompletionEvent();
+    Tensor* var_tensor = variable->tensor();
+    const TensorShape& var_shape = variable->tensor()->shape();
+    const Tensor& value = ctx->GetInputTensor(1);
+    const TensorShape& value_shape = value.shape();
+
+    if (!var_shape.IsSameSize(value_shape)) {
+      return errors::InvalidArgument(
+          "Cannot update variable with shape ", var_shape.DebugString(),
+          " using a Tensor with shape ", value_shape.DebugString(),
+          ", shapes must be equal.");
     }
 
-    const Tensor& value = ctx->GetInputTensor(1);
-    Tensor* var_tensor = variable->tensor();
+    TF_RETURN_IF_ERROR(PrepareToUpdateVariable(
+        op_ctx, var_tensor, variable->copy_on_read_mode.load(),
+        &dml_util::CopyTensorInSameDevice));
+
     D3D12BufferRegion var_resource = ctx->CreateBufferForTensor(*var_tensor);
     D3D12BufferRegion value_resource = ctx->CreateBufferForTensor(value);
 
@@ -117,16 +101,8 @@ class DmlUpdateVariableOp : public DmlKernel {
         input_bindings[0],
     };
 
-    StatusOr<DmlGpuEvent> status_or_event =
-        ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                             input_bindings, output_bindings);
-
-    if (!status_or_event.ok()) {
-      ctx->GetOpKernelContext()->SetStatus(status_or_event.status());
-      return ctx->GetCurrentCompletionEvent();
-    }
-
-    return status_or_event.ConsumeValueOrDie();
+    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
+                                input_bindings, output_bindings);
   }
 
  private:

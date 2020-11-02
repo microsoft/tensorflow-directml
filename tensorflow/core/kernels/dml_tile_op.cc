@@ -188,16 +188,15 @@ class DmlTileKernel : public DmlKernel {
     const auto& in_shape = simple_tile->input_shape;
     const auto& out_shape = simple_tile->output_shape;
     auto dtype = ctx->GetInputDataType(0);
-    auto layout = GetDmlTensorLayout(FORMAT_NCHW, kNchwDimensionCount);
 
     if (simple_tile->is_identity_op) {
       DmlTensorInfo input;
       input.kernel_index = 0;
-      input.desc = DmlTensorDesc::Create(dtype, out_shape, in_shape, layout);
+      input.desc = DmlTensorDesc::Create(dtype, out_shape, in_shape);
 
       DmlTensorInfo output;
       output.kernel_index = 0;
-      output.desc = DmlTensorDesc::Create(dtype, out_shape, out_shape, layout);
+      output.desc = DmlTensorDesc::Create(dtype, out_shape, out_shape);
 
       DmlKernelTensors tensors;
       tensors.inputs = {input};
@@ -215,11 +214,11 @@ class DmlTileKernel : public DmlKernel {
     } else {
       DmlTensorInfo input;
       input.kernel_index = 0;
-      input.desc = DmlTensorDesc::Create(dtype, in_shape, in_shape, layout);
+      input.desc = DmlTensorDesc::Create(dtype, in_shape, in_shape);
 
       DmlTensorInfo output;
       output.kernel_index = 0;
-      output.desc = DmlTensorDesc::Create(dtype, out_shape, out_shape, layout);
+      output.desc = DmlTensorDesc::Create(dtype, out_shape, out_shape);
 
       DmlKernelTensors tensors;
       tensors.inputs = {input};
@@ -239,7 +238,7 @@ class DmlTileKernel : public DmlKernel {
     }
   }
 
-  DmlGpuEvent Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to

@@ -554,8 +554,6 @@ class LinSpaceTest(test.TestCase):
         self.assertEqual([num], tf_ans.get_shape())
         return self.evaluate(tf_ans)
 
-  # TFDML #25655124
-  @test_util.skip_dml
   def testPositive(self):
     for self.force_gpu in self._gpu_modes():
       self.assertArrayNear(self._LinSpace(1., 5., 1), np.array([1.]), 1e-5)
@@ -577,8 +575,6 @@ class LinSpaceTest(test.TestCase):
           self._LinSpace(-1., -5., 4),
           np.array([-1., -7. / 3., -11. / 3., -5.]), 1e-5)
 
-  # TFDML #25655164
-  @test_util.skip_dml
   def testNegativeToPositive(self):
     for self.force_gpu in self._gpu_modes():
       self.assertArrayNear(self._LinSpace(-1., 5., 1), np.array([-1.]), 1e-5)
@@ -596,8 +592,6 @@ class LinSpaceTest(test.TestCase):
       self.assertArrayNear(self._LinSpace(5., 5., 3), np.array([5.] * 3), 1e-5)
       self.assertArrayNear(self._LinSpace(5., 5., 4), np.array([5.] * 4), 1e-5)
 
-  # TFDML #25655116/
-  @test_util.skip_dml
   def testEndpointsAreExact(self):
     for self.force_gpu in self._gpu_modes():
       # Test some cases that produce last values not equal to "stop" when
@@ -735,8 +729,6 @@ class ConvolutionDeltaOrthogonalInitializerTest(test.TestCase):
         t2 = init2(shape).eval()
       self.assertAllClose(t1, t2 / 3.14)
 
-  # TFDML #25655720
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testShapesValues(self):
     gain = 3.14
@@ -1094,8 +1086,6 @@ class ConvolutionOrthogonal3dInitializerTest(test.TestCase):
       # Compute the sum of the absolute values of 'count' determinants
       self.assertAllClose(abs_value, count, rtol=tol, atol=tol)
 
-  # TFDML #25655724
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testShapesValues(self):
     def circular_pad(input_, width, kernel_size):

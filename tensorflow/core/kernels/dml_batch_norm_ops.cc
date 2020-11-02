@@ -221,6 +221,7 @@ class BatchGlobalNormGradInitializationHelper : public InitializationHelper {
  private:
   const std::shared_ptr<const Attributes> attr_;
 };
+
 static dml::Expression CreateBatchNormNode(
     dml::Expression x, dml::Expression mean, dml::Expression variance,
     dml::Expression scale, dml::Expression offset, float epsilon,
@@ -229,14 +230,14 @@ static dml::Expression CreateBatchNormNode(
   DCHECK(activation_mode == functor::FusedBatchNormActivationMode::kIdentity ||
          activation_mode == functor::FusedBatchNormActivationMode::kRelu);
 
-  constexpr bool is_spatial = true;
+  auto fused_activation =
+      activation_mode == functor::FusedBatchNormActivationMode::kIdentity
+          ? dml::FusedActivation::None()
+          : dml::FusedActivation::Relu();
 
-  return activation_mode == functor::FusedBatchNormActivationMode::kIdentity
-             ? dml::BatchNormalization(x, mean, variance, scale, offset,
-                                       is_spatial, epsilon)
-             : dml::BatchNormalization(x, mean, variance, scale, offset,
-                                       is_spatial, epsilon,
-                                       DML_OPERATOR_ACTIVATION_RELU, 0.0f);
+  constexpr bool is_spatial = true;
+  return dml::BatchNormalization(x, mean, variance, scale, offset, is_spatial,
+                                 epsilon, fused_activation);
 }
 
 class DmlFusedBatchNormKernel : public DmlKernel {
@@ -320,7 +321,7 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     // the mean/variance tensors back to TF.
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorLayout(tensor_format));
+        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto scale = dml::InputTensor(scope, 1, input_descs[1]);
     auto offset = dml::InputTensor(scope, 2, input_descs[2]);
@@ -450,7 +451,7 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorLayout(tensor_format));
+        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto mean = dml::InputTensor(scope, 1, input_descs[1]);
     auto variance = dml::InputTensor(scope, 2, input_descs[2]);
@@ -683,7 +684,7 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorLayout(tensor_format));
+        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
 
     auto y_backprop =
         dml::InputTensor(scope, kYBackprop, input_descs[kYBackprop]);
