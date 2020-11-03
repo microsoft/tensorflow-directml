@@ -76,7 +76,7 @@ limitations under the License.
 #include "tensorflow/core/platform/types.h"
 #include "tensorflow/core/util/util.h"
 
-#if TENSORFLOW_USE_DIRECTML
+#ifdef TENSORFLOW_USE_DIRECTML
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #endif  // TENSORFLOW_USE_DIRECTML
 
@@ -301,7 +301,7 @@ REGISTER_KERNEL_BUILDER(Name("_VarHandlesOp")
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
-#if TENSORFLOW_USE_DIRECTML
+#ifdef TENSORFLOW_USE_DIRECTML
 
 REGISTER_KERNEL_BUILDER(
     Name("ReadVariableOp").Device(DEVICE_DML).HostMemory("resource"),
@@ -377,7 +377,7 @@ REGISTER_KERNEL_BUILDER(Name("VariableShape")
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
-#if TENSORFLOW_USE_DIRECTML
+#ifdef TENSORFLOW_USE_DIRECTML
 
 REGISTER_KERNEL_BUILDER(Name("VariableShape")
                             .Device(DEVICE_DML)
@@ -415,7 +415,7 @@ REGISTER_KERNEL_BUILDER(
     Name("DestroyResourceOp").Device(DEVICE_GPU).HostMemory("resource"),
     DestroyResourceOp);
 
-#if TENSORFLOW_USE_DIRECTML
+#ifdef TENSORFLOW_USE_DIRECTML
 
 REGISTER_KERNEL_BUILDER(
     Name("DestroyResourceOp").Device(DEVICE_DML).HostMemory("resource"),
@@ -600,7 +600,7 @@ TF_CALL_variant(REGISTER_GPU_KERNELS);
 #undef REGISTER_GPU_KERNELS
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
-#if TENSORFLOW_USE_DIRECTML
+#ifdef TENSORFLOW_USE_DIRECTML
 
 class DmlAssignVariableOp : public AssignVariableOpBase {
  public:
@@ -728,7 +728,7 @@ REGISTER_KERNEL_BUILDER(Name("VarIsInitializedOp")
                         IsResourceInitialized<Var>);
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
-#if TENSORFLOW_USE_DIRECTML
+#ifdef TENSORFLOW_USE_DIRECTML
 
 REGISTER_KERNEL_BUILDER(Name("VarIsInitializedOp")
                             .Device(DEVICE_DML)
@@ -899,6 +899,26 @@ REGISTER_KERNEL_BUILDER(Name("ResourceGather")
                         ResourceGatherOp<GPUDevice, Variant, int64>)
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#ifdef TENSORFLOW_USE_DIRECTML
+// Variant objects themselves sit on CPU, even if they contain data
+// pointing to a device.
+REGISTER_KERNEL_BUILDER(Name("ResourceGather")
+                            .Device(DEVICE_DML)
+                            .HostMemory("resource")
+                            .HostMemory("indices")
+                            .TypeConstraint<Variant>("dtype")
+                            .TypeConstraint<int32>("Tindices"),
+                        ResourceGatherOp<CPUDevice, Variant, int32>)
+REGISTER_KERNEL_BUILDER(Name("ResourceGather")
+                            .Device(DEVICE_DML)
+                            .HostMemory("resource")
+                            .HostMemory("indices")
+                            .TypeConstraint<Variant>("dtype")
+                            .TypeConstraint<int64>("Tindices"),
+                        ResourceGatherOp<CPUDevice, Variant, int64>)
+                        
+#endif  // TENSORFLOW_USE_DIRECTML
 
 #undef REGISTER_GATHER_CPU
 #undef REGISTER_GATHER_GPU
@@ -1107,6 +1127,26 @@ REGISTER_KERNEL_BUILDER(Name("ResourceScatterUpdate")
                                                 scatter_op::UpdateOp::ASSIGN>)
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#ifdef TENSORFLOW_USE_DIRECTML
+
+REGISTER_KERNEL_BUILDER(Name("ResourceScatterUpdate")
+                            .Device(DEVICE_DML)
+                            .HostMemory("resource")
+                            .HostMemory("indices")
+                            .TypeConstraint<Variant>("dtype")
+                            .TypeConstraint<int32>("Tindices"),
+                        ResourceScatterUpdateOp<CPUDevice, Variant, int32,
+                                                scatter_op::UpdateOp::ASSIGN>)
+REGISTER_KERNEL_BUILDER(Name("ResourceScatterUpdate")
+                            .Device(DEVICE_DML)
+                            .HostMemory("resource")
+                            .HostMemory("indices")
+                            .TypeConstraint<Variant>("dtype")
+                            .TypeConstraint<int64>("Tindices"),
+                        ResourceScatterUpdateOp<CPUDevice, Variant, int64,
+                                                scatter_op::UpdateOp::ASSIGN>)
+#endif  // TENSORFLOW_USE_DIRECTML
 
 #undef REGISTER_SCATTER_ARITHMETIC
 #undef REGISTER_SCATTER_ARITHMETIC_CPU
