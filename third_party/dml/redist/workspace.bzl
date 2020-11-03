@@ -1,6 +1,4 @@
 """Loads the DirectML redistributable library"""
-"""TODO (pavignol): Update SHA once Padding 8D is implemented"""
-"""https://microsoft.visualstudio.com/OS/_workitems/edit/27678564"""
 
 def _directml_nuget_repository_impl(repository_ctx):
   # Download NuGet CLI executable. WSL builds can use interop to invoke this executable
