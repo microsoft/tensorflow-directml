@@ -119,11 +119,6 @@ class BaseBatchToSpaceInitHelper : public InitializationHelper {
                     internal_block_dims, " but must not exceed ",
                     kMaxSpaceToBatchBlockDims));
 
-    if (internal_block_dims == 0) {
-      ctx->set_output(0, orig_input_tensor);
-      return;
-    }
-
     // For the purpose of computing the result, the input will be treated as
     // having this shape, of rank 2 + internal_block_dims.
     TensorShape internal_input_shape;
@@ -187,6 +182,13 @@ class BaseBatchToSpaceInitHelper : public InitializationHelper {
 
     internal_crops_.assign(crops.begin() + removed_prefix_block_dims * 2,
                            crops.end() - removed_suffix_block_dims * 2);
+  }
+
+  bool IsNoOpKernel(OpKernelContext* ctx,
+                    absl::Span<const TensorShape> output_shapes) const final {
+    if (ctx->input(0).NumElements() == 0) return true;
+    if (output_shapes[0].num_elements() == 0) return true;
+    return false;
   }
 
  private:

@@ -188,6 +188,13 @@ class BaseSpaceToBatchInitHelper : public InitializationHelper {
                               paddings.end() - removed_suffix_block_dims * 2);
   }
 
+  bool IsNoOpKernel(OpKernelContext* ctx,
+                    absl::Span<const TensorShape> output_shapes) const final {
+    if (ctx->input(0).NumElements() == 0) return true;
+    if (output_shapes[0].num_elements() == 0) return true;
+    return false;
+  }
+
  private:
   TensorShape internal_input_shape_;
   TensorShape internal_output_shape_;
@@ -319,12 +326,18 @@ class DmlSpaceToBatchKernel : public DmlKernel {
     absl::Span<const int64> internal_paddings =
         init_helper->GetInternalPaddings();
 
-    dml::TensorDesc::Dimensions start_paddings(internal_input_shape.dims());
-    dml::TensorDesc::Dimensions end_paddings(internal_input_shape.dims());
+    int missing_dims = internal_input_shape.dims() > kNchwDimensionCount
+                           ? 0
+                           : kNchwDimensionCount - internal_input_shape.dims();
+
+    dml::TensorDesc::Dimensions start_paddings(internal_input_shape.dims() +
+                                               missing_dims);
+    dml::TensorDesc::Dimensions end_paddings(internal_input_shape.dims() +
+                                             missing_dims);
 
     for (int i = 0; i < internal_block_dims; ++i) {
-      start_paddings[i + 1] = internal_paddings[i * 2];
-      end_paddings[i + 1] = internal_paddings[i * 2 + 1];
+      start_paddings[i + missing_dims + 1] = internal_paddings[i * 2];
+      end_paddings[i + missing_dims + 1] = internal_paddings[i * 2 + 1];
     }
 
     auto padded = dml::Padding(input, DML_PADDING_MODE_CONSTANT, 0,
@@ -338,7 +351,8 @@ class DmlSpaceToBatchKernel : public DmlKernel {
 
     for (int i = 0; i < internal_block_dims; ++i) {
       int padded_dim = internal_input_shape.dim_size(i + 1) +
-                       start_paddings[i] + end_paddings[i];
+                       start_paddings[i + missing_dims + 1] +
+                       end_paddings[i + missing_dims + 1];
 
       reshaped_padded_sizes.push_back(padded_dim / internal_block_sizes[i]);
       reshaped_padded_sizes.push_back(internal_block_sizes[i]);
@@ -377,7 +391,7 @@ class DmlSpaceToBatchKernel : public DmlKernel {
     perm_sizes.push_back(reshaped_padded_sizes.front());
 
     for (int i = 0; i < internal_block_dims; ++i) {
-      int index = i * 2 + internal_block_dims + 1;
+      int index = i * 2 + 1;
       perm_strides.push_back(reshaped_padded_strides[index]);
       perm_sizes.push_back(reshaped_padded_sizes[index]);
     }
