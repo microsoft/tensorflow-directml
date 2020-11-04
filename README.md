@@ -1,6 +1,10 @@
 # TensorFlow-DirectML <!-- omit in toc -->
 
-**:warning: NumPy 1.19.4 is broken on Windows. Please make sure that your environment has a different version of NumPy before using TensorFlow-DirectML.**
+**:warning:  :warning:**
+
+| :warning: | **NumPy 1.19.4 is broken on Windows. Please make sure that your environment has a different version of NumPy before using TensorFlow-DirectML.** |
+|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------|
+
 
 | PyPI Release                                                                                                      | Build (directml branch)                                                                                                                                                                                                                 |
 | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
