@@ -8100,6 +8100,7 @@ tf_kernel_library(
         "dml_deepcopy_op.cc",
         "dml_space_depth_ops.cc",
         "dml_batch_to_space_op.cc",
+        "dml_space_to_batch_op.cc",
         "dml_resource_variable_ops.cc",
         "dml_zeros_like_op.cc",
         "dml_tensor_array.cc",
