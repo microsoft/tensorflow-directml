@@ -10,6 +10,7 @@
         "--log_device_placement"
       ],
       "pipDeps": [
+        "numpy==1.19.3",
         "scipy",
         "portpicker"
       ],
