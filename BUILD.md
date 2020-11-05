@@ -10,7 +10,7 @@ The `directml` branch is considered the main branch for development in this repo
 
 ## Developer Mode
 
-Changes in this repository may reference in-development or preview versions of DirectML that are subject to change. This allows testing new APIs before they are committed to the DirectML API (once an API appears in DirectML.h it is immutable). A preview build of DirectML requires *developer mode* to be enabled or it will fail to load; this restriction is intended to avoid a long-term dependency on the preview library. **Packages on PyPI will only be released when the repository can depend on a stable version of DirectML.**
+This repository may periodically reference in-development versions of DirectML for testing new features. For example, experimental APIs are added to `DirectMLPreview.h`, which may have breaking changes; once an API appears in `DirectML.h` it is immutable. A preview build of DirectML requires *developer mode* to be enabled or it will fail to load. This restriction is intended to avoid a long-term dependency on the preview library. **Packages on PyPI will only be released when the repository depends on a stable version of DirectML.**
 
 You can determine if the current state of the repository references an in-development version of DirectML by inspecting `tensorflow/workspace.bzl`. If the version attribute ends with `-dev*`, then developer mode will be required. For example, the following snippet shows a dependency on DirectML 1.5.0-dev1, which requires developer mode.
 
