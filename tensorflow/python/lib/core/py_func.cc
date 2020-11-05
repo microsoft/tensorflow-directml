@@ -407,7 +407,7 @@ REGISTER_KERNEL_BUILDER(Name("EagerPyFunc")
                         PyFuncOp);
 
 DataType dml_types[] = {
-    // DML supported datatypes.
+    // DML supported datatypes and no ref types and int32s.
     DT_FLOAT,  DT_UINT8,   DT_INT16,  DT_INT8,
     DT_BOOL,   DT_UINT16,  DT_HALF,   DT_UINT32,
 };
