@@ -103,6 +103,24 @@ REGISTER_SYCL_KERNEL(bool);
 #undef REGISTER_SYCL_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                         \
+  REGISTER_KERNEL_BUILDER(Name("GetSessionHandle")        \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("handle")       \
+                              .TypeConstraint<type>("T"), \
+                          GetSessionHandleOp)             \
+  REGISTER_KERNEL_BUILDER(Name("GetSessionHandleV2")      \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("handle")       \
+                              .TypeConstraint<type>("T"), \
+                          GetSessionHandleOp)
+
+TF_CALL_NUMBER_TYPES(REGISTER_DML_KERNEL);
+REGISTER_DML_KERNEL(bool);
+#undef REGISTER_DML_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
+
 class GetSessionTensorOp : public OpKernel {
  public:
   explicit GetSessionTensorOp(OpKernelConstruction* context)
@@ -145,6 +163,19 @@ TF_CALL_NUMBER_TYPES(REGISTER_SYCL_KERNEL);
 REGISTER_SYCL_KERNEL(bool);
 #undef REGISTER_SYCL_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                             \
+  REGISTER_KERNEL_BUILDER(Name("GetSessionTensor")            \
+                              .Device(DEVICE_DML)             \
+                              .HostMemory("handle")           \
+                              .TypeConstraint<type>("dtype"), \
+                          GetSessionTensorOp)
+
+TF_CALL_NUMBER_TYPES(REGISTER_DML_KERNEL);
+REGISTER_DML_KERNEL(bool);
+#undef REGISTER_SYCL_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class DeleteSessionTensorOp : public OpKernel {
  public:
