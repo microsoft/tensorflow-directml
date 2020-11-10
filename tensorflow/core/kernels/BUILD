@@ -2727,7 +2727,11 @@ tf_kernel_library(
 tf_kernel_library(
     name = "list_kernels",
     srcs = ["list_kernels.cc"],
-    hdrs = ["list_kernels.h"],
+    hdrs = [
+        "list_kernels.h",
+        "tensor_array.h",
+        "aggregate_ops.h",
+        "split_lib.h"] + if_dml(["dml_tensor_array.h"]),
     gpu_srcs = [
         "list_kernels.cu.cc",
         "list_kernels.h",

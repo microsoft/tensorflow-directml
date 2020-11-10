@@ -20,6 +20,14 @@ limitations under the License.
 #define EIGEN_USE_GPU
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#ifdef TENSORFLOW_USE_DIRECTML
+
+#include "tensorflow/core/kernels/dml_tensor_array.h"
+using DMLDevice = tensorflow::tensor_array::DMLDeviceTag;
+
+#endif // #ifdef TENSORFLOW_USE_DIRECTML
+
+
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
@@ -36,6 +44,7 @@ limitations under the License.
 #include "tensorflow/core/platform/platform.h"
 #include "tensorflow/core/util/tensor_ops_util.h"
 #include "tensorflow/core/util/util.h"
+// #include "tensorflow/core/kernels/tensor_array.h"
 
 namespace tensorflow {
 
@@ -264,8 +273,12 @@ class TensorListStack : public OpKernel {
           }
           OP_REQUIRES_OK(
               c, c->allocate_temp(element_dtype_, element_shape, &zeros, attr));
+#ifdef TENSORFLOW_USE_DIRECTML
+          tensor_array::TensorSetZero<DMLDevice, T>(c, &zeros);
+#else
           functor::SetZeroFunctor<Device, T>()(c->eigen_device<Device>(),
                                                zeros.flat<T>());
+#endif // TENSORFLOW_USE_DIRECTML
         }
         inputs_flat.emplace_back(new typename TTypes<T, 2>::ConstMatrix(
             const_cast<const Tensor&>(zeros).shaped<T, 2>(

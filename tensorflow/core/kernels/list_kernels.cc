@@ -796,4 +796,14 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                                          DEVICE_CPU, TensorList,
                                          TensorListZerosLike<CPUDevice>);
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_TENSOR_LIST_OPS_DML(T)                                    \
+  REGISTER_KERNEL_BUILDER(Name("TensorListStack")                          \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("element_shape"),                \
+                          TensorListStack<DMLDevice, T>)
+TF_CALL_ALL_TYPES(REGISTER_TENSOR_LIST_OPS_DML);
+#endif // TENSORFLOW_USE_DIRECTML
+
 }  // namespace tensorflow
