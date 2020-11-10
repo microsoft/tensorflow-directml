@@ -273,12 +273,7 @@ class TensorListStack : public OpKernel {
           }
           OP_REQUIRES_OK(
               c, c->allocate_temp(element_dtype_, element_shape, &zeros, attr));
-#ifdef TENSORFLOW_USE_DIRECTML
-          tensor_array::TensorSetZero<DMLDevice, T>(c, &zeros);
-#else
-          functor::SetZeroFunctor<Device, T>()(c->eigen_device<Device>(),
-                                               zeros.flat<T>());
-#endif // TENSORFLOW_USE_DIRECTML
+          tensor_array::TensorSetZero<Device, T>(c, &zeros);
         }
         inputs_flat.emplace_back(new typename TTypes<T, 2>::ConstMatrix(
             const_cast<const Tensor&>(zeros).shaped<T, 2>(
