@@ -49,6 +49,6 @@ The official builds of tensorflow-directml (hosted on [PyPI](https://pypi.org/pr
 
 ## Trademarks Notice
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow Microsoft's Trademark & Brand Guidelines. Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those third-party's policies.
+This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft trademarks or logos is subject to and must follow Microsoft's Trademark & Brand Guidelines. The use of Microsoft trademarks or logos in modified versions of this project must not confuse or imply Microsoft sponsorship. Any use of third-party trademarks or logos are subject to those third-party's policies.
 
 **TensorFlow, the TensorFlow logo and any related marks are trademarks of Google Inc.**
