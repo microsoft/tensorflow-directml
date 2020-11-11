@@ -802,7 +802,7 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                               .TypeConstraint<T>("element_dtype")          \
                               .Device(DEVICE_DML)                          \
                               .HostMemory("element_shape"),                \
-                          TensorListStack<DMLDevice, T>)
+                          TensorListStack<DMLDevice, T>)                   \
 TF_CALL_ALL_TYPES(REGISTER_TENSOR_LIST_OPS_DML);
 #endif // TENSORFLOW_USE_DIRECTML
 
