@@ -25,6 +25,32 @@ using Microsoft::WRL::ComPtr;
 
 namespace tensorflow {
 
+// Constructs a physical_device_desc string from an adapter. DML's
+// physical_device_desc is JSON-encoded which allows for easier parsing.
+//
+// Example CUDA string:
+//   'device: 0, name: TITAN V, pci bus id: 0000:65:00.0, compute
+//   capability: 7.0'
+//
+// Example DML string:
+//   '{"name": "NVIDIA TITAN V", "vendor_id": 4318, "device_id": 7553,
+//   "driver_version": "27.21.14.5206"}'
+static std::string GetPhysicalDeviceDesc(const DmlAdapter& adapter) {
+  auto driver_ver = adapter.DriverVersion().parts;
+  std::string driver_ver_str = strings::StrCat(
+      driver_ver.a, ".", driver_ver.b, ".", driver_ver.c, ".", driver_ver.d);
+
+  std::stringstream ss;
+  ss << '{';
+  ss << "\"name\": \"" << adapter.Name() << "\", ";
+  ss << "\"vendor_id\": " << (uint32_t)adapter.VendorID() << ", ";
+  ss << "\"device_id\": " << adapter.DeviceID() << ", ";
+  ss << "\"driver_version\": \"" << driver_ver_str << "\"";
+  ss << '}';
+
+  return ss.str();
+}
+
 static std::unique_ptr<DmlDevice> CreateDevice(
     const SessionOptions& options, const string& name_prefix, int device_index,
     const DmlDeviceState* device_state, int64 memory_limit) {
@@ -33,7 +59,7 @@ static std::unique_ptr<DmlDevice> CreateDevice(
 
   const DeviceAttributes attributes = Device::BuildDeviceAttributes(
       name, tensorflow::DeviceType(DEVICE_DML), Bytes(memory_limit),
-      DeviceLocality(), device_state->adapter->Name());
+      DeviceLocality(), GetPhysicalDeviceDesc(*device_state->adapter));
 
   return absl::make_unique<DmlDevice>(device_state, options, attributes);
 }
