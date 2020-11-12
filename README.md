@@ -22,6 +22,30 @@ The following resources provide additional background on DirectML and TensorFlow
 - [RFC: TensorFlow on DirectML](https://github.com/tensorflow/community/pull/243)
 - [TensorFlow homepage](https://www.tensorflow.org/)
 
+## System Requirements
+
+### Windows 10
+
+* Windows 10 Version 1709, 64-bit (Build 16299 or higher)
+* Python x86-64 3.5, 3.6, or 3.7<sup>1</sup>
+* One of the following supported GPUs:
+  * AMD Radeon R5/R7/R9 2xx series or newer
+  * Intel HD Graphics 5xx or newer
+  * NVIDIA GeForce GTX 9xx series GPU or newer
+
+<sup>1</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required. NumPy 1.19.4 is [currently experiencing issues on Windows](https://github.com/numpy/numpy/wiki/FMod-Bug-on-Windows); this can be resolved by pinning the NumPy version, e.g. `pip install numpy==1.19.3`.
+
+### Windows Subsystem for Linux
+
+* Windows 10 Insider Preview, 64-bit (Build 20150 or higher)
+* Python x86-64 3.5, 3.6, or 3.7<sup>2</sup>
+* One of the following supported GPUs:
+  * AMD Radeon R5/R7/R9 2xx series or newer, and [20.20.01.05 WSL driver](https://www.amd.com/en/support/kb/release-notes/rn-rad-win-wsl-support)
+  * Intel HD Graphics 5xx or newer, and [28.20.100.8322 WSL driver](https://downloadcenter.intel.com/download/29526)
+  * NVIDIA GeForce GTX 9xx series GPU or newer, and [460.20 WSL driver](https://developer.nvidia.com/cuda/wsl/download)
+
+<sup>2</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required.
+
 ## Feedback
 
 For comments, questions, feedback, or if you're having problems, please [file an issue](https://github.com/microsoft/tensorflow-directml/issues) or contact us directly at askdirectml@microsoft.com.
