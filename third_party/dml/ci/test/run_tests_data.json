@@ -11,6 +11,7 @@
       ],
       "pipDeps": [
         "numpy==1.19.3",
+        "h5py<3.0.0",
         "scipy",
         "portpicker"
       ],
