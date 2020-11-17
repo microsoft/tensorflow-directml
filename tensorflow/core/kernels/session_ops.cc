@@ -16,6 +16,7 @@ limitations under the License.
 // See docs in ../ops/data_flow_ops.cc.
 
 #include <limits.h>
+
 #include <vector>
 
 #include "tensorflow/core/common_runtime/device.h"
@@ -42,7 +43,11 @@ class GetSessionHandleOp : public OpKernel {
 
   void Compute(OpKernelContext* ctx) override {
     const Tensor& val = ctx->input(0);
-    int64 id = ctx->session_state()->GetNewId();
+    auto session_state = ctx->session_state();
+    OP_REQUIRES(ctx, session_state != nullptr,
+                errors::FailedPrecondition(
+                    "GetSessionHandle called on null session state"));
+    int64 id = session_state->GetNewId();
     TensorStore::TensorAndKey tk{val, id, requested_device()};
     OP_REQUIRES_OK(ctx, ctx->tensor_store()->AddTensor(name(), tk));
 

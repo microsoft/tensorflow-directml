@@ -52,7 +52,7 @@ DOCLINES = __doc__.split('\n')
 # result for pip.
 # Also update tensorflow/tensorflow.bzl and
 # tensorflow/core/public/version.h
-_VERSION = '1.15.3.dev0'
+_VERSION = '1.15.4.dev0'
 
 REQUIRED_PACKAGES = [
     'absl-py >= 0.7.0',
@@ -67,7 +67,7 @@ REQUIRED_PACKAGES = [
     'keras_preprocessing >= 1.0.5',
     # mock comes with unittest.mock for python3, need to install for python2
     'mock >= 2.0.0;python_version<"3"',
-    'numpy >= 1.16.0, < 2.0',
+    'numpy >= 1.16.0, < 1.19.0',
     'opt_einsum >= 2.3.2',
     'six >= 1.10.0',
     'protobuf >= 3.6.1',
