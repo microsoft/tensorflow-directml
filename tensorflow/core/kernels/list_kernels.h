@@ -27,6 +27,7 @@ using DMLDevice = tensorflow::tensor_array::DMLDeviceTag;
 
 #endif  // #ifdef TENSORFLOW_USE_DIRECTML
 
+#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/framework/tensor.h"
@@ -42,7 +43,6 @@ using DMLDevice = tensorflow::tensor_array::DMLDeviceTag;
 #include "tensorflow/core/platform/platform.h"
 #include "tensorflow/core/util/tensor_ops_util.h"
 #include "tensorflow/core/util/util.h"
-#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
 namespace tensorflow {
 
@@ -735,8 +735,6 @@ class TensorListGather : public OpKernel {
         values.emplace_back(PersistentTensor(zeros));
       }
     }
-    // auto output_flat = output->shaped<T, 2>({1, output->NumElements()});
-
     tensor_array::ConcatTensors<Device, T>(c, output, absl::MakeSpan(values));
   }
 
@@ -766,7 +764,7 @@ class TensorListFromTensor : public OpKernel {
     TensorShape output_shape(t.shape());
     output_shape.RemoveDim(0);
     OP_REQUIRES(c, element_shape.IsCompatibleWith(output_shape),
-                errors::InvalidArgument(
+                errors::InvalidArgument(s
                     "Specified a list with shape ", element_shape.DebugString(),
                     " from a tensor with shape ", output_shape.DebugString()));
     output_list.element_shape = element_shape;
