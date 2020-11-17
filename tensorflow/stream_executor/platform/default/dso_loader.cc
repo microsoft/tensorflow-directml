@@ -16,7 +16,6 @@ limitations under the License.
 
 #include <stdlib.h>
 
-#include "DirectMLConfig.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "tensorflow/stream_executor/lib/env.h"
@@ -26,6 +25,7 @@ limitations under the License.
 #include "tensorflow/stream_executor/platform/port.h"
 #include "third_party/gpus/cuda/cuda_config.h"
 #include "third_party/tensorrt/tensorrt_config.h"
+#include "DirectMLConfig.h"
 
 namespace stream_executor {
 namespace internal {
@@ -39,6 +39,12 @@ string GetTensorRTVersion() { return TF_TENSORRT_VERSION; }
 string GetDirectMLPath() {
   const char* path = getenv("TF_DIRECTML_PATH");
   return (path != nullptr ? path : "");
+}
+
+string GetDirectMLVersion() {
+  // If TF_DIRECTML_PATH is set, use DirectML.dll / libdirectml.so.
+  // Otherwise, use DirectML<ver>.dll / libdirectml.so.<ver>.
+  return GetDirectMLPath().empty() ? DIRECTML_SOURCE_VERSION : "";
 }
 
 port::StatusOr<void*> GetDsoHandle(const string& name, const string& version,
@@ -146,32 +152,17 @@ port::StatusOr<void*> GetRocrandDsoHandle() {
 
 port::StatusOr<void*> GetHipDsoHandle() { return GetDsoHandle("hip_hcc", ""); }
 
-port::StatusOr<void*> GetDirectMLLibraryHandle(const string& basename) {
-  auto path = GetDirectMLPath();
-
-  // Bundled DirectML libraries have a mangled name to avoid collision:
-  //
-  // Original Name  | Mangled Name
-  // ---------------|-------------
-  // directml.dll   | directml.<sha>.dll
-  // libdirectml.so | libdirectml.<sha>.so
-  //
-  // We use the original name if TF_DIRECTML_PATH is set.
-  // We use the mangled name if TF_DIRECTML_PATH isn't set (most cases).
-  string name = basename;
-  if (path.empty()) {
-    name += string(".") + DIRECTML_SOURCE_VERSION;
-  }
-
-  return GetDsoHandle(name, "", path);
-}
-
 port::StatusOr<void*> GetDirectMLDsoHandle() {
-  return GetDirectMLLibraryHandle("directml");
+#ifdef _WIN32
+  return GetDsoHandle("DirectML", GetDirectMLVersion(), GetDirectMLPath());
+#else
+  return GetDsoHandle("directml", GetDirectMLVersion(), GetDirectMLPath());
+#endif
 }
 
 port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
-  return GetDirectMLLibraryHandle("directml.debug");
+  return GetDsoHandle("DirectML.Debug", GetDirectMLVersion(),
+                      GetDirectMLPath());
 }
 
 }  // namespace DsoLoader

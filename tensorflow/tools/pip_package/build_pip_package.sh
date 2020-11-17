@@ -100,13 +100,13 @@ function copy_dml_redist_files() {
   if is_windows; then
     dml_version=$(awk '/^#define DIRECTML_SOURCE_VERSION "([abcdef0-9]+)"/ { gsub("\"","",$3); print $3 }' $dml_config_path)
     echo "DML Version = '$dml_version'"
-    dml_dll=$(find "${dml_redist_root}/bin/x64-win/" -type f -name "*.dll" ! -name "DirectML.Debug.*")
-    cp "$dml_dll" "${dml_redist_dir}"/DirectML.${dml_version}.dll
+    dml_dll=$(find "${dml_redist_root}/bin/x64-win/" -type f -name "*.dll" ! -name "DirectML.Debug.*.dll")
+    cp "$dml_dll" "${dml_redist_dir}"/DirectML${dml_version}.dll
   else
     dml_version=$(awk -v RS='\r\n' '/^#define DIRECTML_SOURCE_VERSION "([abcdef0-9]+)"/ { gsub("\"","",$3); print $3 }' $dml_config_path)
     echo "DML Version = '$dml_version'"
-    dml_so=$(find "$dml_redist_root/bin/x64-linux/" -type f -name "*.so" ! -name libdirectml.debug.*)
-    cp "$dml_so" "${dml_redist_dir}"/libdirectml.${dml_version}.so
+    dml_so=$(find "$dml_redist_root/bin/x64-linux/" -type f)
+    cp "$dml_so" "${dml_redist_dir}"/libdirectml.so.${dml_version}
   fi
   cp "${dml_redist_root}/LICENSE.txt" ${dml_redist_dir}
   cp "${dml_redist_root}/ThirdPartyNotices.txt" ${dml_redist_dir}

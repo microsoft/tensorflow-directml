@@ -7,15 +7,15 @@ licenses(["notice"]) # MIT license for headers
 
 cc_library(
     name = "headers",
-    hdrs = glob(["Microsoft.AI.DirectML/include/*.h"]),
-    includes = ["Microsoft.AI.DirectML/include"],
+    hdrs = glob(["DirectML/include/*.h"]),
+    includes = ["DirectML/include"],
 )
 
 filegroup(
     name = "pip_files",
     srcs = glob([
-        "Microsoft.AI.DirectML/bin/**", 
-        "Microsoft.AI.DirectML/include/DirectMLConfig.h", 
-        "Microsoft.AI.DirectML/*.txt"]),
+        "DirectML/bin/**", 
+        "DirectML/include/DirectMLConfig.h", 
+        "DirectML/*.txt"]),
     visibility = ["//visibility:public"],
 )
