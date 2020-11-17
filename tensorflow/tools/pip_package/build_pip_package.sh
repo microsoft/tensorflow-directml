@@ -76,9 +76,7 @@ function is_windows() {
 }
 
 function copy_dml_redist_files() {
-  # Dirs under ${TMPDIR} starting with _solib_ are special: setup.py will include any files under those dirs in package_data.
-  dml_redist_dir=${TMPDIR}/_solib_directml
-  mkdir -p ${dml_redist_dir}
+  dml_redist_dir="${1%/}"
 
   if is_windows; then
     runfiles_manifest_path=bazel-bin/tensorflow/tools/pip_package/build_pip_package.exe.runfiles_manifest
@@ -108,8 +106,8 @@ function copy_dml_redist_files() {
     dml_so=$(find "$dml_redist_root/bin/x64-linux/" -type f -name "*.so" ! -name libdirectml.debug.*)
     cp "$dml_so" "${dml_redist_dir}"/libdirectml.${dml_version}.so
   fi
-  cp "${dml_redist_root}/LICENSE.txt" ${dml_redist_dir}
-  cp "${dml_redist_root}/ThirdPartyNotices.txt" ${dml_redist_dir}
+  cp "${dml_redist_root}/LICENSE.txt" "${dml_redist_dir}/DirectML_LICENSE.txt"
+  cp "${dml_redist_root}/ThirdPartyNotices.txt" "${dml_redist_dir}/DirectML_ThirdPartyNotices.txt"
 }
 
 function prepare_src() {
@@ -128,8 +126,6 @@ function prepare_src() {
     echo "Could not find bazel-bin.  Did you run from the root of the build tree?"
     exit 1
   fi
-
-  copy_dml_redist_files
 
   if is_windows; then
     rm -rf ./bazel-bin/tensorflow/tools/pip_package/simple_console_for_window_unzip
@@ -204,6 +200,8 @@ function prepare_src() {
 
   rm -f ${TMPDIR}/tensorflow/libtensorflow_framework.so
   rm -f ${TMPDIR}/tensorflow/libtensorflow_framework.so.[0-9].*
+
+  copy_dml_redist_files "${TMPDIR}/tensorflow/python"
 
   # In order to break the circular dependency between tensorflow and
   # tensorflow_estimator which forces us to do a multi-step release, we are
