@@ -41,7 +41,7 @@ The following resources provide additional background on DirectML and TensorFlow
 * Python x86-64 3.5, 3.6, or 3.7<sup>2</sup>
 * One of the following supported GPUs:
   * AMD Radeon R5/R7/R9 2xx series or newer, and [20.20.01.05 WSL driver](https://www.amd.com/en/support/kb/release-notes/rn-rad-win-wsl-support)
-  * Intel HD Graphics 5xx or newer, and [28.20.100.8322 WSL driver](https://downloadcenter.intel.com/download/29526)
+  * Intel HD Graphics 6xx or newer, and [28.20.100.8322 WSL driver](https://downloadcenter.intel.com/download/29526)
   * NVIDIA GeForce GTX 9xx series GPU or newer, and [460.20 WSL driver](https://developer.nvidia.com/cuda/wsl/download)
 
 <sup>2</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required.
