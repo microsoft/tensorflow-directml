@@ -27,6 +27,10 @@ limitations under the License.
 #include "third_party/gpus/cuda/cuda_config.h"
 #include "third_party/tensorrt/tensorrt_config.h"
 
+#if _WIN32
+#include "tensorflow/core/platform/windows/wide_char.h"
+#endif
+
 namespace stream_executor {
 namespace internal {
 
@@ -40,6 +44,38 @@ string GetDirectMLPath() {
   const char* path = getenv("TF_DIRECTML_PATH");
   return (path != nullptr ? path : "");
 }
+
+#if _WIN32
+string GetModuleDirectory() {
+  HMODULE tensorflowHmodule = nullptr;
+  BOOL getHandleResult = GetModuleHandleExW(
+      GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT |
+          GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+      reinterpret_cast<LPCWSTR>(&GetModuleDirectory), &tensorflowHmodule);
+  CHECK_EQ(getHandleResult, TRUE);
+
+  // Safe const_cast because of explicit bounds checking and contiguous memory
+  // in C++11 and later.
+  std::wstring wpath(MAX_PATH, '\0');
+  DWORD filePathSize =
+      GetModuleFileNameW(tensorflowHmodule, const_cast<wchar_t*>(wpath.data()),
+                         static_cast<DWORD>(wpath.size()));
+  if (filePathSize > wpath.size()) {
+    wpath.resize(filePathSize);
+    filePathSize = GetModuleFileNameW(tensorflowHmodule,
+                                      const_cast<wchar_t*>(wpath.data()),
+                                      static_cast<DWORD>(wpath.size()));
+  }
+  CHECK_NE(filePathSize, 0);
+
+  // Strip TF library filename from the path.
+  size_t pathDividerOffset = wpath.find_last_of('\\');
+  CHECK_NE(pathDividerOffset, std::wstring::npos);
+  wpath = wpath.substr(0, pathDividerOffset);
+
+  return tensorflow::WideCharToUtf8(wpath);
+}
+#endif
 
 port::StatusOr<void*> GetDsoHandle(const string& name, const string& version,
                                    const string& search_path = "") {
@@ -161,6 +197,7 @@ port::StatusOr<void*> GetDirectMLLibraryHandle(const string& basename) {
   string name = basename;
   if (path.empty()) {
     name += string(".") + DIRECTML_SOURCE_VERSION;
+    path = GetModuleDirectory();
   }
 
   return GetDsoHandle(name, "", path);
