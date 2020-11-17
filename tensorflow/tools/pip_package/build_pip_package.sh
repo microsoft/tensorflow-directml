@@ -210,7 +210,7 @@ function prepare_src() {
   # copied from "tensorflow" (see lines directly below).
   # - Windows : tensorflow_core/python/_pywrap_tensorflow_internal.pyd
   # - Linux   : tensorflow_core/libtensorflow_framework.so.1
-  if is_windows
+  if is_windows; then
     copy_dml_redist_files "${TMPDIR}/tensorflow/python"
   else
     copy_dml_redist_files "${TMPDIR}/tensorflow"
