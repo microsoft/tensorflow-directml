@@ -431,8 +431,9 @@ class DmlSpaceToBatchKernel : public DmlKernel {
       DmlKernelWrapper<DmlSpaceToBatchKernel<SpaceToBatchInitHelper>,   \
                        SpaceToBatchShapeHelper>);
 
-TF_CALL_float(REGISTER_DML_KERNEL);
-TF_CALL_half(REGISTER_DML_KERNEL);
+// TODO: re-register these kernels when we can depend on DML 1.15.
+// TF_CALL_float(REGISTER_DML_KERNEL);
+// TF_CALL_half(REGISTER_DML_KERNEL);
 #undef REGISTER_DML_KERNEL
 
 }  // namespace tensorflow
