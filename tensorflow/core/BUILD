@@ -3799,7 +3799,7 @@ cc_library(
     ]) + if_not_windows([
         "-ld3d12",
         "-ldxcore",
-        "-Wl,-rpath,$$ORIGIN/../_solib_directml"
+        "-Wl,-rpath,$$ORIGIN"
     ]),
 )
 
