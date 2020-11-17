@@ -2,7 +2,6 @@
 
 |           | Warnings                                                                                                                                                               |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| :warning: | **NumPy 1.19.4 is broken on Windows. Please make sure that your environment has a different version of NumPy before using TensorFlow-DirectML.**                       |
 | :warning: | **h5py 3.0.0 and 3.1.0 broke compatibility with TensorFlow. Please make sure that your environment has a different version of h5py before using TensorFlow-DirectML.** |
 
 
