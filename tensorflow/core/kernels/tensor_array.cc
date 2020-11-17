@@ -16,9 +16,9 @@ limitations under the License.
 #define EIGEN_USE_THREADS
 #include "tensorflow/core/kernels/tensor_array.h"
 
-#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/kernels/aggregate_ops_cpu.h"
+#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
 namespace tensorflow {
 
@@ -77,6 +77,33 @@ TF_CALL_complex128(TENSOR_ARRAY_SET_ZERO_GPU);
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 #undef TENSOR_ARRAY_SET_ZERO
+
+#define TENSOR_COPY_UNALIGNED(Device, T)                                     \
+  template <>                                                                \
+  Status TensorCopyUnaligned<Device, T>(OpKernelContext * ctx, Tensor * src, \
+                                        Tensor * dst) {                      \
+    TF_RETURN_IF_ERROR(ctx->allocate_temp(src->dtype(), src->shape(), dst)); \
+    dst->flat<T>().device(ctx->eigen_device<Device>()) =                     \
+        src->unaligned_flat<T>();                                            \
+    return Status::OK();                                                     \
+  }
+
+#define TENSOR_COPY_UNALIGNED_CPU(T) TENSOR_COPY_UNALIGNED(CPUDevice, T)
+TF_CALL_NUMBER_TYPES(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_bool(TENSOR_COPY_UNALIGNED_CPU);
+#undef TENSOR_COPY_UNALIGNED_CPU
+
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#define TENSOR_COPY_UNALIGNED_GPU(T) TENSOR_COPY_UNALIGNED(GPUDevice, T)
+TF_CALL_GPU_NUMBER_TYPES(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_complex64(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_complex128(TENSOR_COPY_UNALIGNED_GPU);
+#undef TENSOR_COPY_UNALIGNED_GPU
+
+#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#undef TENSOR_COPY_UNALIGNED
 
 }  // namespace tensor_array
 

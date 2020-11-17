@@ -17,6 +17,7 @@ limitations under the License.
 #define TENSORFLOW_CORE_KERNELS_TENSOR_ARRAY_H_
 
 #include <limits.h>
+
 #include <vector>
 
 #include "tensorflow/core/framework/op_kernel.h"
@@ -99,6 +100,35 @@ TF_CALL_complex128(TENSOR_ARRAY_SET_ZERO_GPU);
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 #undef TENSOR_ARRAY_SET_ZERO
+
+template <typename Device, typename T>
+Status TensorCopyUnaligned(OpKernelContext* ctx, Tensor* src, Tensor* dst) {
+  return errors::InvalidArgument(
+      "tensor_array::TensorSetZero type not supported: ",
+      DataTypeString(DataTypeToEnum<T>::value));
+};
+
+#define TENSOR_COPY_UNALIGNED(Device, T)                                     \
+  template <>                                                                \
+  Status TensorCopyUnaligned<Device, T>(OpKernelContext * ctx, Tensor * src, \
+                                        Tensor * dst);
+
+#define TENSOR_COPY_UNALIGNED_CPU(T) TENSOR_COPY_UNALIGNED(CPUDevice, T)
+TF_CALL_NUMBER_TYPES(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_bool(TENSOR_COPY_UNALIGNED_CPU);
+#undef TENSOR_COPY_UNALIGNED_CPU
+
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#define TENSOR_COPY_UNALIGNED_GPU(T) TENSOR_COPY_UNALIGNED(GPUDevice, T)
+TF_CALL_GPU_NUMBER_TYPES(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_complex64(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_complex128(TENSOR_COPY_UNALIGNED_GPU);
+#undef TENSOR_COPY_UNALIGNED_GPU
+
+#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#undef TENSOR_COPY_UNALIGNED
 
 // Concatenates the tensors in `values` and writes the result into
 // `output_tensor`. The shapes of the tensors are ignored; they are treated as

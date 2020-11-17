@@ -47,6 +47,8 @@ void DmlSplitTensor(OpKernelContext* ctx, Tensor* output_tensor,
                     const Tensor& input_tensor, int64 start_element,
                     int64 element_count);
 
+Status DmlTensorCopy(OpKernelContext* ctx, Tensor* src, Tensor* dst);
+
 // These provide template instantiations of AddToTensor, TensorSetZero,
 // ConcatTensors, and SplitTensors for DMLDeviceTag, which simply forward to the
 // non-templated version. See tensor_array.h for details.
@@ -62,6 +64,11 @@ void DmlSplitTensor(OpKernelContext* ctx, Tensor* output_tensor,
                                                Tensor * value) {              \
     DmlTensorSetZero(ctx, value);                                             \
     return Status::OK();                                                      \
+  }                                                                           \
+  template <>                                                                 \
+  inline Status TensorCopyUnaligned<DMLDeviceTag, T>(                         \
+      OpKernelContext * ctx, Tensor * src, Tensor * dst) {                    \
+    return DmlTensorCopy(ctx, src, dst);                                      \
   }                                                                           \
   template <>                                                                 \
   inline void ConcatTensors<DMLDeviceTag, T>(                                 \

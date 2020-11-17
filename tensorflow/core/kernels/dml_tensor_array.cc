@@ -127,5 +127,13 @@ void DmlSplitTensor(OpKernelContext* ctx, Tensor* output_tensor,
       src.Offset() + src_offset, barrier_state, bytes_to_copy);
 }
 
+Status DmlTensorCopy(OpKernelContext* ctx, Tensor* src, Tensor* dst) {
+  TF_RETURN_IF_ERROR(ctx->allocate_temp(src->dtype(), src->shape(), dst));
+  ctx->device()->CopyTensorInSameDevice(
+      src, dst, ctx->op_device_context(),
+      [ctx](const Status& s) { OP_REQUIRES_OK(ctx, s); });
+  return Status::OK();
+}
+
 }  // namespace tensor_array
 }  // namespace tensorflow
