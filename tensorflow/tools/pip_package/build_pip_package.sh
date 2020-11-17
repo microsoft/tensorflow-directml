@@ -63,6 +63,10 @@ function reorganize_includes() {
   move_to_root_if_exists external/com_google_protobuf/src/google
   rm -rf external/com_google_protobuf/python
 
+  # Select DML files are copied in the copy_dml_redist_files function; we should
+  # never include the entire contents of the redistributable package.
+  rm -rf external/dml_redist
+
   popd
 }
 
