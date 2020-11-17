@@ -88,9 +88,9 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
 
     dml_repository(
         name = "dml_redist",
-        package = "DirectML",
-        version = "1.5.0-dev1",
-        source = "https://pkgs.dev.azure.com/ms/DirectML/_packaging/tensorflow-directml/nuget/v3/index.json",
+        package = "Microsoft.AI.DirectML",
+        version = "1.4.0",
+        source = "https://api.nuget.org/v3/index.json",
         build_file = "//third_party/dml/redist:BUILD.bazel",
     )
 
