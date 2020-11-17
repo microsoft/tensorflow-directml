@@ -205,7 +205,15 @@ function prepare_src() {
   rm -f ${TMPDIR}/tensorflow/libtensorflow_framework.so
   rm -f ${TMPDIR}/tensorflow/libtensorflow_framework.so.[0-9].*
 
-  copy_dml_redist_files "${TMPDIR}/tensorflow/python"
+  # TFDML will attempt to load the DirectML library from the same directory as the core
+  # TF libary. This location differs based on platform. Note that tensorflow_core is
+  # copied from "tensorflow" (see lines directly below).
+  # - Windows : tensorflow_core/python/_pywrap_tensorflow_internal.pyd
+  # - Linux   : tensorflow_core/libtensorflow_framework.so.1
+  if is_windows:
+    copy_dml_redist_files "${TMPDIR}/tensorflow/python"
+  else:
+    copy_dml_redist_files "${TMPDIR}/tensorflow"
 
   # In order to break the circular dependency between tensorflow and
   # tensorflow_estimator which forces us to do a multi-step release, we are
