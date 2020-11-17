@@ -214,6 +214,7 @@ function prepare_src() {
     copy_dml_redist_files "${TMPDIR}/tensorflow/python"
   else
     copy_dml_redist_files "${TMPDIR}/tensorflow"
+  fi
 
   # In order to break the circular dependency between tensorflow and
   # tensorflow_estimator which forces us to do a multi-step release, we are
