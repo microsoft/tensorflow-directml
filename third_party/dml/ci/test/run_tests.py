@@ -81,7 +81,7 @@ def main():
 
           # Rename the DLL to DirectML.dll since TF_DIRECTML_PATH only works
           # with that name
-          lib_folder = f"{temp_dir}/_solib_directml"
+          lib_folder = f"{temp_dir}/tensorflow_core/python"
 
           old_glob = "DirectML*.dll" if os.name == "nt" else "libdirectml.so.*"
           new_name = "DirectML.dll" if os.name == "nt" else "libdirectml.so"

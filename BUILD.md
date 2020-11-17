@@ -44,7 +44,7 @@ The development headers and libraries used to build DirectX-based applications a
    -  Direct3D/DXCore Headers: `third_party/dml/winadapter`
    -  Direct3D/DXCore Libraries: `/usr/lib/wsl/lib`
 
-For both Windows and WSL, the DirectML headers and libraries are pulled from a redistributable NuGet package. This package is downloaded automatically as a part of the build (see `third_party/dml/redist`). The use of the redistributable DirectML library is governed by a separate license that is found as part of the package (found in `_solib_directml/LICENSE.txt` when extracted).
+For both Windows and WSL, the DirectML headers and libraries are pulled from a redistributable NuGet package. This package is downloaded automatically as a part of the build (see `third_party/dml/redist`). The use of the redistributable DirectML library is governed by a separate license that is found as part of the package (found in `tensorflow_core/python/DirectML_LICENSE.txt` when extracted).
 
 ## Build Environment
 

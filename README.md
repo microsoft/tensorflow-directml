@@ -38,7 +38,7 @@ If you would like to contribute to tensorflow-directml, please see our [contribu
 
 This project is licensed under [Apache License 2.0](LICENSE).
 
-The tensorflow-directml Python wheel binary package includes a redistributable version of the DirectML library, which is downloaded automatically as a part of the build. The use of the redistributable DirectML library is governed by a separate license that is found as part of the package (found in `_solib_directml/LICENSE.txt` when extracted).
+The tensorflow-directml Python wheel binary package includes a redistributable version of the DirectML library, which is downloaded automatically as a part of the build. The use of the redistributable DirectML library is governed by a separate license that is found as part of the package (found in `tensorflow_core/python/DirectML_LICENSE.txt` when extracted).
 
 ## Data Collection Notice
 
