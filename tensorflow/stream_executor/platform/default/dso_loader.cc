@@ -197,7 +197,13 @@ port::StatusOr<void*> GetDirectMLLibraryHandle(const string& basename) {
   string name = basename;
   if (path.empty()) {
     name += string(".") + DIRECTML_SOURCE_VERSION;
+
+    // Look for DML under the same directory as the core tensorflow module. This
+    // check isn't required for WSL since the RPATH of the tensorflow .so file
+    // is modified.
+#if _WIN32
     path = GetModuleDirectory();
+#endif
   }
 
   return GetDsoHandle(name, "", path);
