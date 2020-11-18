@@ -641,9 +641,8 @@ class TensorListSplit : public OpKernel {
       // TODO(apassos) maybe not always align; but weird compiler bugs seem to
       // prevent this.
       Tensor aligned;
-      OP_REQUIRES_OK(c, c->allocate_temp(tmp.dtype(), tmp.shape(), &aligned));
       tensor_array::TensorCopyUnaligned<Device, T>(c, &tmp, &aligned);
-      output_list.tensors().emplace_back(tmp);
+      output_list.tensors().emplace_back(aligned);
     }
     OP_REQUIRES(c, end == input_tensor.shape().dim_size(0),
                 errors::InvalidArgument(
@@ -764,7 +763,7 @@ class TensorListFromTensor : public OpKernel {
     TensorShape output_shape(t.shape());
     output_shape.RemoveDim(0);
     OP_REQUIRES(c, element_shape.IsCompatibleWith(output_shape),
-                errors::InvalidArgument(s
+                errors::InvalidArgument(
                     "Specified a list with shape ", element_shape.DebugString(),
                     " from a tensor with shape ", output_shape.DebugString()));
     output_list.element_shape = element_shape;
@@ -1089,8 +1088,9 @@ class TensorListPushBackBatch : public OpKernel {
       OP_REQUIRES_OK(c, c->allocate_persistent(
                             element_dtype_, input_element_shape, &tmp, &frame));
       if (input_element_shape.num_elements() > 0) {
-        auto frame_t = frame->flat<T>();
-        frame_t.device(c->eigen_device<Device>()) = input_t.template chip<0>(b);
+        int64 index = b * input_element_shape.num_elements();
+        int64 size = input_element_shape.num_elements();
+        tensor_array::SplitTensor<Device, T>(c, frame, input, index, size);
       }
       output->tensors().push_back(std::move(*frame));
     }

@@ -843,6 +843,10 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                               .HostMemory("num_elements")                  \
                               .HostMemory("indices"),                      \
                           TensorListScatter<DMLDevice, T>)                 \
+  REGISTER_KERNEL_BUILDER(Name("TensorListPushBackBatch")                  \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML),                         \
+                          TensorListPushBackBatch<DMLDevice, T>)           \
   REGISTER_KERNEL_BUILDER(Name("TensorListScatterIntoExistingList")        \
                               .TypeConstraint<T>("element_dtype")          \
                               .Device(DEVICE_DML)                          \
@@ -856,6 +860,7 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                           TensorListSplit<DMLDevice, T>)
 
 TF_CALL_ALL_TYPES(REGISTER_TENSOR_LIST_OPS_DML);
+
 #endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace tensorflow

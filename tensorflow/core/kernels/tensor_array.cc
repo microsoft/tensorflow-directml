@@ -82,7 +82,6 @@ TF_CALL_complex128(TENSOR_ARRAY_SET_ZERO_GPU);
   template <>                                                                \
   Status TensorCopyUnaligned<Device, T>(OpKernelContext * ctx, Tensor * src, \
                                         Tensor * dst) {                      \
-    TF_RETURN_IF_ERROR(ctx->allocate_temp(src->dtype(), src->shape(), dst)); \
     dst->flat<T>().device(ctx->eigen_device<Device>()) =                     \
         src->unaligned_flat<T>();                                            \
     return Status::OK();                                                     \

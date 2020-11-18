@@ -42,7 +42,11 @@ void Split<Eigen::ThreadPoolDevice, T, NDims>::operator()(
   template struct Split<Eigen::ThreadPoolDevice, T, 3>;
 
 TF_CALL_ALL_TYPES(DEFINE_CPU_KERNELS)
+DEFINE_CPU_KERNELS(qint8)
 DEFINE_CPU_KERNELS(quint8)
+DEFINE_CPU_KERNELS(qint32)
+DEFINE_CPU_KERNELS(qint16)
+DEFINE_CPU_KERNELS(quint16)
 
 #ifdef TENSORFLOW_USE_SYCL
 template <typename T, int NDims>
