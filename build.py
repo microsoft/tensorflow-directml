@@ -66,7 +66,7 @@ def configure(args):
   if sys.platform == "win32":
     os.environ["CC_OPT_FLAGS"] = "/arch:AVX"
   elif sys.platform == "linux":
-    os.environ["CC_OPT_FLAGS"] = "-march=native -Wno-sign-compare"
+    os.environ["CC_OPT_FLAGS"] = "-mavx"
     # GCC doesn't support some of the MS extensions we rely on, such as __declspec(uuid(x)).
     # Setting this var will switch over to building with Clang (still uses GNU C/C++ libs).
     os.environ["TF_DOWNLOAD_CLANG"] = "1"

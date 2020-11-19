@@ -5586,6 +5586,24 @@ tf_kernel_library(
     deps = STRING_DEPS,
 )
 
+tf_cc_test(
+    name = "as_string_op_test",
+    size = "small",
+    srcs = ["as_string_op_test.cc"],
+    deps = [
+        ":as_string_op",
+        ":ops_testutil",
+        ":ops_util",
+        "//tensorflow/core:core_cpu",
+        "//tensorflow/core:framework",
+        "//tensorflow/core:lib",
+        "//tensorflow/core:protos_all_cc",
+        "//tensorflow/core:test",
+        "//tensorflow/core:test_main",
+        "//tensorflow/core:testlib",
+    ],
+)
+
 tf_kernel_library(
     name = "unicode_ops",
     prefix = "unicode_ops",
@@ -8076,6 +8094,7 @@ tf_kernel_library(
         "dml_gather_op.cc",
         "dml_gather_nd_op.cc",
         "dml_scatter_nd_op.cc",
+        "dml_tensor_scatter_ops.cc",
         "dml_scan_ops.cc",
         "dml_dynamic_stitch_op.cc",
         "dml_l2loss_op.cc",
@@ -8099,6 +8118,7 @@ tf_kernel_library(
         "dml_deepcopy_op.cc",
         "dml_space_depth_ops.cc",
         "dml_batch_to_space_op.cc",
+        "dml_space_to_batch_op.cc",
         "dml_resource_variable_ops.cc",
         "dml_zeros_like_op.cc",
         "dml_tensor_array.cc",
@@ -8119,6 +8139,7 @@ tf_kernel_library(
         "dml_extract_image_patches_op.cc",
         "dml_extract_volume_patches_op.cc",
         "dml_empty_op.cc",
+        "dml_parallel_concat_ops.cc",
     ],
     hdrs = [
         "dml_kernel_wrapper.h",

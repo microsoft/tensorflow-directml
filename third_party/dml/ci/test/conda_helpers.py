@@ -55,9 +55,9 @@ class CondaEnv:
 
   def install_package(self, package_name):
     subprocess.run(
-        f"{self.hook_command}"
-        f" && conda activate {self.env_name}"
-        f" && pip install {package_name}",
+        f'{self.hook_command}'
+        f' && conda activate {self.env_name}'
+        f' && pip install "{package_name}"',
         shell=True,
         check=True)
 

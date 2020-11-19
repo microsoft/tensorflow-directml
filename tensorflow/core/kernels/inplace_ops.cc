@@ -250,6 +250,29 @@ REGISTER_KERNEL_BUILDER(Name("_ParallelConcatUpdate")
                         ParallelConcatUpdate<CPUDevice>);
 #endif
 
+#ifdef TENSORFLOW_USE_DIRECTML
+
+#define REGISTER_PARALLEL_CONCAT(type)                                     \
+  REGISTER_KERNEL_BUILDER(                                                 \
+      Name("ParallelConcat").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      FailureKernel);
+REGISTER_PARALLEL_CONCAT(float);
+REGISTER_PARALLEL_CONCAT(Eigen::half);
+#undef REGISTER_PARALLEL_CONCAT
+
+// Register versions that operate on int32 data on the CPU even though the op
+// has been placed on the GPU
+
+REGISTER_KERNEL_BUILDER(Name("_ParallelConcatUpdate")
+                            .Device(DEVICE_DML)
+                            .HostMemory("value")
+                            .HostMemory("update")
+                            .HostMemory("output")
+                            .TypeConstraint<int32>("T"),
+                        ParallelConcatUpdate<CPUDevice>);
+
+#endif
+
 class InplaceOpBase : public OpKernel {
  public:
   explicit InplaceOpBase(OpKernelConstruction* ctx) : OpKernel(ctx) {}

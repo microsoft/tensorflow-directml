@@ -298,20 +298,22 @@ class SpaceToBatchNDTest(test.TestCase):
         block_shape=[3, 4, 2],
         paddings=[[1, 2], [0, 0], [3, 0]])
 
-    self._testDirect(
-        input_shape=[3, 3, 4, 5, 2],
-        block_shape=[3, 4, 2, 2],
-        paddings=[[1, 2], [0, 0], [3, 0], [0, 0]])
+    # DML doesn't support more than 3 non-combined block dimensions
+    if test_util.gpu_device_type() != "DML":
+      self._testDirect(
+          input_shape=[3, 3, 4, 5, 2],
+          block_shape=[3, 4, 2, 2],
+          paddings=[[1, 2], [0, 0], [3, 0], [0, 0]])
 
-    self._testDirect(
-        input_shape=[3, 2, 2, 3, 4, 5, 2, 5],
-        block_shape=[1, 1, 3, 4, 2, 2],
-        paddings=[[0, 0], [0, 0], [1, 2], [0, 0], [3, 0], [0, 0]])
+      self._testDirect(
+          input_shape=[3, 2, 2, 3, 4, 5, 2, 5],
+          block_shape=[1, 1, 3, 4, 2, 2],
+          paddings=[[0, 0], [0, 0], [1, 2], [0, 0], [3, 0], [0, 0]])
 
-    self._testDirect(
-        input_shape=[3, 2, 2, 3, 4, 5, 2, 5],
-        block_shape=[1, 1, 3, 4, 2, 2, 1],
-        paddings=[[0, 0], [0, 0], [1, 2], [0, 0], [3, 0], [0, 0], [0, 0]])
+      self._testDirect(
+          input_shape=[3, 2, 2, 3, 4, 5, 2, 5],
+          block_shape=[1, 1, 3, 4, 2, 2, 1],
+          paddings=[[0, 0], [0, 0], [1, 2], [0, 0], [3, 0], [0, 0], [0, 0]])
 
 
 class SpaceToBatchSpaceToDepth(test.TestCase, PythonOpImpl):

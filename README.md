@@ -1,5 +1,10 @@
 # TensorFlow-DirectML <!-- omit in toc -->
 
+|           | Warnings                                                                                                                                                               |
+|-----------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| :warning: | **h5py 3.0.0 and 3.1.0 broke compatibility with TensorFlow. Please make sure that your environment has a different version of h5py before using TensorFlow-DirectML.** |
+
+
 | PyPI Release                                                                                                      | Build (directml branch)                                                                                                                                                                                                                 |
 | ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [![PyPI version](https://badge.fury.io/py/tensorflow-directml.svg)](https://badge.fury.io/py/tensorflow-directml) | [![Build Status](https://dev.azure.com/microsoft/WindowsAI/_apis/build/status/TensorFlow/TF%20-%20Nightly%20Build?branchName=directml)](https://dev.azure.com/microsoft/WindowsAI/_build/latest?definitionId=56563&branchName=directml) |

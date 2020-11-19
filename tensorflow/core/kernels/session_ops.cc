@@ -16,6 +16,7 @@ limitations under the License.
 // See docs in ../ops/data_flow_ops.cc.
 
 #include <limits.h>
+
 #include <vector>
 
 #include "tensorflow/core/common_runtime/device.h"
@@ -42,7 +43,11 @@ class GetSessionHandleOp : public OpKernel {
 
   void Compute(OpKernelContext* ctx) override {
     const Tensor& val = ctx->input(0);
-    int64 id = ctx->session_state()->GetNewId();
+    auto session_state = ctx->session_state();
+    OP_REQUIRES(ctx, session_state != nullptr,
+                errors::FailedPrecondition(
+                    "GetSessionHandle called on null session state"));
+    int64 id = session_state->GetNewId();
     TensorStore::TensorAndKey tk{val, id, requested_device()};
     OP_REQUIRES_OK(ctx, ctx->tensor_store()->AddTensor(name(), tk));
 
@@ -103,6 +108,24 @@ REGISTER_SYCL_KERNEL(bool);
 #undef REGISTER_SYCL_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
 
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                         \
+  REGISTER_KERNEL_BUILDER(Name("GetSessionHandle")        \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("handle")       \
+                              .TypeConstraint<type>("T"), \
+                          GetSessionHandleOp)             \
+  REGISTER_KERNEL_BUILDER(Name("GetSessionHandleV2")      \
+                              .Device(DEVICE_DML)         \
+                              .HostMemory("handle")       \
+                              .TypeConstraint<type>("T"), \
+                          GetSessionHandleOp)
+
+TF_CALL_NUMBER_TYPES(REGISTER_DML_KERNEL);
+REGISTER_DML_KERNEL(bool);
+#undef REGISTER_DML_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
+
 class GetSessionTensorOp : public OpKernel {
  public:
   explicit GetSessionTensorOp(OpKernelConstruction* context)
@@ -145,6 +168,19 @@ TF_CALL_NUMBER_TYPES(REGISTER_SYCL_KERNEL);
 REGISTER_SYCL_KERNEL(bool);
 #undef REGISTER_SYCL_KERNEL
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL(type)                             \
+  REGISTER_KERNEL_BUILDER(Name("GetSessionTensor")            \
+                              .Device(DEVICE_DML)             \
+                              .HostMemory("handle")           \
+                              .TypeConstraint<type>("dtype"), \
+                          GetSessionTensorOp)
+
+TF_CALL_NUMBER_TYPES(REGISTER_DML_KERNEL);
+REGISTER_DML_KERNEL(bool);
+#undef REGISTER_SYCL_KERNEL
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class DeleteSessionTensorOp : public OpKernel {
  public:

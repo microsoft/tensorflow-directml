@@ -312,7 +312,7 @@ class DmlScatterNdKernel : public DmlKernel {
           .TypeConstraint<int64>("Tindices")                          \
           .HostMemory("shape"),                                       \
       DmlKernelWrapper<DmlScatterNdKernel<int64>,                     \
-                       GetOutputShapeFromDimsTensorHelper<int32, 2>>)
+                       GetOutputShapeFromDimsTensorHelper<int64, 2>>)
 
 TF_CALL_int32(DML_REGISTER_KERNELS);
 TF_CALL_half(DML_REGISTER_KERNELS);

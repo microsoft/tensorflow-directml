@@ -311,4 +311,39 @@ REGISTER_KERNEL_BUILDER(Name("Unique")
                             .HostMemory("idx"),
                         UniqueOp<int64, int64>);
 #endif  // TENSORFLOW_USE_SYCL
+
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("Unique")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int32>("out_idx")
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .HostMemory("idx"),
+                        UniqueOp<int32, int32>);
+REGISTER_KERNEL_BUILDER(Name("Unique")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int64>("T")
+                            .TypeConstraint<int32>("out_idx")
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .HostMemory("idx"),
+                        UniqueOp<int64, int32>);
+REGISTER_KERNEL_BUILDER(Name("Unique")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int32>("T")
+                            .TypeConstraint<int64>("out_idx")
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .HostMemory("idx"),
+                        UniqueOp<int32, int64>);
+REGISTER_KERNEL_BUILDER(Name("Unique")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<int64>("T")
+                            .TypeConstraint<int64>("out_idx")
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .HostMemory("idx"),
+                        UniqueOp<int64, int64>);
+#endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow
