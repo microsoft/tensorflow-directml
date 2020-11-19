@@ -24,6 +24,7 @@ limitations under the License.
 #include "dml_upload_heap.h"
 #include "dml_util.h"
 #include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/util/env_var.h"
 #include "tensorflow/stream_executor/platform/default/dso_loader.h"
 
 using Microsoft::WRL::ComPtr;
@@ -72,18 +73,15 @@ namespace tensorflow {
 
   // Default to using compute queues for AMD since it seems to mitigate TDRs and
   // improve performance
-  D3D12_COMMAND_LIST_TYPE queue_type = adapter.VendorID() == VendorID::kAmd
+  const bool use_compute_queue_default = adapter.VendorID() == VendorID::kAmd;
+
+  bool use_compute_queue;
+  Status s = ReadBoolFromEnvVar("TF_DIRECTML_USE_COMPUTE_QUEUE",
+                                use_compute_queue_default, &use_compute_queue);
+
+  D3D12_COMMAND_LIST_TYPE queue_type = use_compute_queue
                                            ? D3D12_COMMAND_LIST_TYPE_COMPUTE
                                            : D3D12_COMMAND_LIST_TYPE_DIRECT;
-
-  const char* use_compute_queue = std::getenv("TF_DIRECTML_USE_COMPUTE_QUEUE");
-  if (use_compute_queue) {
-    if (strcmp(use_compute_queue, "1") == 0) {
-      queue_type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-    } else if (strcmp(use_compute_queue, "0") == 0) {
-      queue_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    }
-  }
 
   D3D12_COMMAND_QUEUE_DESC command_queue_desc = {};
   command_queue_desc.Type = queue_type;
