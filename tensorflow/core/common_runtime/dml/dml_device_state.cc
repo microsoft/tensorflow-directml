@@ -70,10 +70,19 @@ namespace tensorflow {
   ComPtr<IDMLDevice> dml_device;
   dml_device = CreateDmlDevice(d3d_device.Get(), dml_flags);
 
-  D3D12_COMMAND_LIST_TYPE queue_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  // Default to using compute queues for AMD since it seems to mitigate TDRs and
+  // improve performance
+  D3D12_COMMAND_LIST_TYPE queue_type = adapter.VendorID() == VendorID::kAmd
+                                           ? D3D12_COMMAND_LIST_TYPE_COMPUTE
+                                           : D3D12_COMMAND_LIST_TYPE_DIRECT;
 
-  if (adapter.VendorID() == VendorID::kAmd) {
-    queue_type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+  const char* use_compute_queue = std::getenv("TF_DIRECTML_USE_COMPUTE_QUEUE");
+  if (use_compute_queue) {
+    if (strcmp(use_compute_queue, "1") == 0) {
+      queue_type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+    } else if (strcmp(use_compute_queue, "0") == 0) {
+      queue_type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+    }
   }
 
   D3D12_COMMAND_QUEUE_DESC command_queue_desc = {};
