@@ -73,10 +73,13 @@ string GetModuleDirectory() {
   }
   CHECK_NE(filePathSize, 0);
 
-  // Strip TF library filename from the path.
+  // Strip TF library filename from the path and truncate the buffer.
+  // PathCchRemoveFileSpec may return S_FALSE if nothing was removed, but
+  // this indicates an error (module path should be a filename, not a dir).
   CHECK_EQ(
       PathCchRemoveFileSpec(const_cast<wchar_t*>(wpath.data()), wpath.size()),
       S_OK);
+  wpath.resize(wcslen(wpath.c_str()));
 
   return tensorflow::WideCharToUtf8(wpath);
 }
