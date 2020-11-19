@@ -373,8 +373,8 @@ REGISTER_KERNEL_BUILDER(
 REGISTER_KERNEL_BUILDER(
     Name("TensorListLength").Device(DEVICE_DML).HostMemory("length"),
     TensorListLength);
-    
-#endif // TENSORFLOW_USE_DIRECTML
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 class TensorListElementShape : public OpKernel {
  public:
@@ -795,5 +795,72 @@ REGISTER_UNARY_VARIANT_BINARY_OP_FUNCTION(ADD_VARIANT_BINARY_OP, DEVICE_CPU,
 REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                                          DEVICE_CPU, TensorList,
                                          TensorListZerosLike<CPUDevice>);
+
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_TENSOR_LIST_OPS_DML(T)                                    \
+  REGISTER_KERNEL_BUILDER(Name("TensorListStack")                          \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("element_shape"),                \
+                          TensorListStack<DMLDevice, T>)                   \
+  REGISTER_KERNEL_BUILDER(Name("TensorListGather")                         \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("indices")                       \
+                              .HostMemory("element_shape"),                \
+                          TensorListGather<DMLDevice, T>)                  \
+  REGISTER_KERNEL_BUILDER(Name("TensorListGetItem")                        \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("index")                         \
+                              .HostMemory("element_shape"),                \
+                          TensorListGetItem<DMLDevice, T>)                 \
+  REGISTER_KERNEL_BUILDER(Name("TensorListPopBack")                        \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("element_shape"),                \
+                          TensorListPopBack<DMLDevice, T>)                 \
+  REGISTER_KERNEL_BUILDER(Name("TensorListConcat")                         \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("lengths"),                      \
+                          TensorListConcat<DMLDevice, T>)                  \
+  REGISTER_KERNEL_BUILDER(Name("TensorListFromTensor")                     \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("element_shape"),                \
+                          TensorListFromTensor<DMLDevice, T>)              \
+  REGISTER_KERNEL_BUILDER(Name("TensorListScatter")                        \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("element_shape")                 \
+                              .HostMemory("indices"),                      \
+                          TensorListScatter<DMLDevice, T>)                 \
+  REGISTER_KERNEL_BUILDER(Name("TensorListScatterV2")                      \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("element_shape")                 \
+                              .HostMemory("num_elements")                  \
+                              .HostMemory("indices"),                      \
+                          TensorListScatter<DMLDevice, T>)                 \
+  REGISTER_KERNEL_BUILDER(Name("TensorListPushBackBatch")                  \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML),                         \
+                          TensorListPushBackBatch<DMLDevice, T>)           \
+  REGISTER_KERNEL_BUILDER(Name("TensorListScatterIntoExistingList")        \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("indices"),                      \
+                          TensorListScatterIntoExistingList<DMLDevice, T>) \
+  REGISTER_KERNEL_BUILDER(Name("TensorListSplit")                          \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("element_shape")                 \
+                              .HostMemory("lengths"),                      \
+                          TensorListSplit<DMLDevice, T>)
+
+TF_CALL_ALL_TYPES(REGISTER_TENSOR_LIST_OPS_DML);
+
+#endif  // TENSORFLOW_USE_DIRECTML
 
 }  // namespace tensorflow
