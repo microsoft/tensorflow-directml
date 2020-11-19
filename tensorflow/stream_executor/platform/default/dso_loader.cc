@@ -28,6 +28,7 @@ limitations under the License.
 #include "third_party/tensorrt/tensorrt_config.h"
 
 #if _WIN32
+#include <pathcch.h>
 #include "tensorflow/core/platform/windows/wide_char.h"
 #endif
 
@@ -60,8 +61,12 @@ string GetModuleDirectory() {
   DWORD filePathSize =
       GetModuleFileNameW(tensorflowHmodule, const_cast<wchar_t*>(wpath.data()),
                          static_cast<DWORD>(wpath.size()));
-  if (filePathSize > wpath.size()) {
-    wpath.resize(filePathSize);
+
+  // Stop searching if the path is 2^16 characters long to avoid allocating an
+  // absurd amount of memory. Where DID you install python?
+  while ((GetLastError() == ERROR_INSUFFICIENT_BUFFER) &&
+         (wpath.size() < 65536)) {
+    wpath.resize(wpath.size() * 2);
     filePathSize = GetModuleFileNameW(tensorflowHmodule,
                                       const_cast<wchar_t*>(wpath.data()),
                                       static_cast<DWORD>(wpath.size()));
@@ -69,9 +74,9 @@ string GetModuleDirectory() {
   CHECK_NE(filePathSize, 0);
 
   // Strip TF library filename from the path.
-  size_t pathDividerOffset = wpath.find_last_of('\\');
-  CHECK_NE(pathDividerOffset, std::wstring::npos);
-  wpath = wpath.substr(0, pathDividerOffset);
+  CHECK_EQ(
+      PathCchRemoveFileSpec(const_cast<wchar_t*>(wpath.data()), wpath.size()),
+      S_OK);
 
   return tensorflow::WideCharToUtf8(wpath);
 }

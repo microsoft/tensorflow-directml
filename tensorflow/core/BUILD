@@ -3796,6 +3796,7 @@ cc_library(
     linkopts = if_windows([
         "d3d12.lib", 
         "dxgi.lib", 
+        "pathcch.lib",
     ]) + if_not_windows([
         "-ld3d12",
         "-ldxcore",
