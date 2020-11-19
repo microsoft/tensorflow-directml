@@ -33,7 +33,7 @@ The following resources provide additional background on DirectML and TensorFlow
   * Intel HD Graphics 5xx or newer
   * NVIDIA GeForce GTX 9xx series GPU or newer
 
-<sup>1</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required. NumPy 1.19.4 is [currently experiencing issues on Windows](https://github.com/numpy/numpy/wiki/FMod-Bug-on-Windows); this can be resolved by pinning the NumPy version, e.g. `pip install numpy==1.19.3`.
+<sup>1</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required. NumPy 1.19.4 is [currently experiencing issues on Windows](https://github.com/numpy/numpy/wiki/FMod-Bug-on-Windows); this can be resolved by pinning the NumPy version, e.g. `pip install numpy==1.18.5`.
 
 ### Windows Subsystem for Linux
 
