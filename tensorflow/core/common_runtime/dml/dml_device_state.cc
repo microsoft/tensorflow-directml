@@ -24,6 +24,7 @@ limitations under the License.
 #include "dml_upload_heap.h"
 #include "dml_util.h"
 #include "tensorflow/core/platform/env.h"
+#include "tensorflow/core/util/env_var.h"
 #include "tensorflow/stream_executor/platform/default/dso_loader.h"
 
 using Microsoft::WRL::ComPtr;
@@ -70,8 +71,20 @@ namespace tensorflow {
   ComPtr<IDMLDevice> dml_device;
   dml_device = CreateDmlDevice(d3d_device.Get(), dml_flags);
 
+  // Default to using compute queues for AMD since it seems to mitigate TDRs and
+  // improve performance
+  const bool use_compute_queue_default = adapter.VendorID() == VendorID::kAmd;
+
+  bool use_compute_queue;
+  Status s = ReadBoolFromEnvVar("TF_DIRECTML_USE_COMPUTE_QUEUE",
+                                use_compute_queue_default, &use_compute_queue);
+
+  D3D12_COMMAND_LIST_TYPE queue_type = use_compute_queue
+                                           ? D3D12_COMMAND_LIST_TYPE_COMPUTE
+                                           : D3D12_COMMAND_LIST_TYPE_DIRECT;
+
   D3D12_COMMAND_QUEUE_DESC command_queue_desc = {};
-  command_queue_desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+  command_queue_desc.Type = queue_type;
   command_queue_desc.Priority = D3D12_COMMAND_QUEUE_PRIORITY_NORMAL;
   command_queue_desc.Flags = D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT;
   command_queue_desc.NodeMask = 0;
