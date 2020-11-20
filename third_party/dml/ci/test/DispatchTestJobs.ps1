@@ -108,6 +108,7 @@ foreach ($AgentInfo in $AgentsInfo)
         'AgentStatus' = $AgentInfo.Status; 
         'AgentEnabled' = $AgentInfo.Enabled; 
         'IsSlowRing' = $false;
+        'Artifacts' = @($AgentInfo.Artifacts -split ',');
     }
 
     if (!$AgentInfo.Enabled)
