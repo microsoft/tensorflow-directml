@@ -24,14 +24,6 @@ import importlib as _importlib
 import types as _types
 import os as _os
 
-_extra_dll_dir = _os.path.join(_os.path.dirname(__file__), '..', '_solib_directml')
-if _sys.platform == 'win32' and _os.path.isdir(_extra_dll_dir):
-    if _sys.version_info >= (3, 8):
-        _os.add_dll_directory(_extra_dll_dir)
-    else:
-        _os.environ.setdefault('PATH', '')
-        _os.environ['PATH'] += _os.pathsep + _extra_dll_dir
-
 # Since TensorFlow Python code now resides in tensorflow_core but TensorFlow
 # ecosystem code (e.g. estimator, but also even tensorflow) imports tensorflow
 # we need to do forwarding between the two. To do so, we use a lazy loader to

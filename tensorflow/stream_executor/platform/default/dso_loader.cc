@@ -16,6 +16,7 @@ limitations under the License.
 
 #include <stdlib.h>
 
+#include "DirectMLConfig.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "tensorflow/stream_executor/lib/env.h"
@@ -25,7 +26,11 @@ limitations under the License.
 #include "tensorflow/stream_executor/platform/port.h"
 #include "third_party/gpus/cuda/cuda_config.h"
 #include "third_party/tensorrt/tensorrt_config.h"
-#include "DirectMLConfig.h"
+
+#if _WIN32
+#include <pathcch.h>
+#include "tensorflow/core/platform/windows/wide_char.h"
+#endif
 
 namespace stream_executor {
 namespace internal {
@@ -41,11 +46,44 @@ string GetDirectMLPath() {
   return (path != nullptr ? path : "");
 }
 
-string GetDirectMLVersion() {
-  // If TF_DIRECTML_PATH is set, use DirectML.dll / libdirectml.so.
-  // Otherwise, use DirectML<ver>.dll / libdirectml.so.<ver>.
-  return GetDirectMLPath().empty() ? DIRECTML_SOURCE_VERSION : "";
+#if _WIN32
+string GetModuleDirectory() {
+  HMODULE tensorflowHmodule = nullptr;
+  BOOL getHandleResult = GetModuleHandleExW(
+      GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT |
+          GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+      reinterpret_cast<LPCWSTR>(&GetModuleDirectory), &tensorflowHmodule);
+  CHECK_EQ(getHandleResult, TRUE);
+
+  // Safe const_cast because of explicit bounds checking and contiguous memory
+  // in C++11 and later.
+  std::wstring wpath(MAX_PATH, '\0');
+  DWORD filePathSize =
+      GetModuleFileNameW(tensorflowHmodule, const_cast<wchar_t*>(wpath.data()),
+                         static_cast<DWORD>(wpath.size()));
+
+  // Stop searching if the path is 2^16 characters long to avoid allocating an
+  // absurd amount of memory. Where DID you install python?
+  while ((GetLastError() == ERROR_INSUFFICIENT_BUFFER) &&
+         (wpath.size() < 65536)) {
+    wpath.resize(wpath.size() * 2);
+    filePathSize = GetModuleFileNameW(tensorflowHmodule,
+                                      const_cast<wchar_t*>(wpath.data()),
+                                      static_cast<DWORD>(wpath.size()));
+  }
+  CHECK_NE(filePathSize, 0);
+
+  // Strip TF library filename from the path and truncate the buffer.
+  // PathCchRemoveFileSpec may return S_FALSE if nothing was removed, but
+  // this indicates an error (module path should be a filename, not a dir).
+  CHECK_EQ(
+      PathCchRemoveFileSpec(const_cast<wchar_t*>(wpath.data()), wpath.size()),
+      S_OK);
+  wpath.resize(wcslen(wpath.c_str()));
+
+  return tensorflow::WideCharToUtf8(wpath);
 }
+#endif
 
 port::StatusOr<void*> GetDsoHandle(const string& name, const string& version,
                                    const string& search_path = "") {
@@ -152,17 +190,39 @@ port::StatusOr<void*> GetRocrandDsoHandle() {
 
 port::StatusOr<void*> GetHipDsoHandle() { return GetDsoHandle("hip_hcc", ""); }
 
-port::StatusOr<void*> GetDirectMLDsoHandle() {
-#ifdef _WIN32
-  return GetDsoHandle("DirectML", GetDirectMLVersion(), GetDirectMLPath());
-#else
-  return GetDsoHandle("directml", GetDirectMLVersion(), GetDirectMLPath());
+port::StatusOr<void*> GetDirectMLLibraryHandle(const string& basename) {
+  auto path = GetDirectMLPath();
+
+  // Bundled DirectML libraries have a mangled name to avoid collision:
+  //
+  // Original Name  | Mangled Name
+  // ---------------|-------------
+  // directml.dll   | directml.<sha>.dll
+  // libdirectml.so | libdirectml.<sha>.so
+  //
+  // We use the original name if TF_DIRECTML_PATH is set.
+  // We use the mangled name if TF_DIRECTML_PATH isn't set (most cases).
+  string name = basename;
+  if (path.empty()) {
+    name += string(".") + DIRECTML_SOURCE_VERSION;
+
+    // Look for DML under the same directory as the core tensorflow module. This
+    // check isn't required for WSL since the RPATH of the tensorflow .so file
+    // is modified.
+#if _WIN32
+    path = GetModuleDirectory();
 #endif
+  }
+
+  return GetDsoHandle(name, "", path);
+}
+
+port::StatusOr<void*> GetDirectMLDsoHandle() {
+  return GetDirectMLLibraryHandle("directml");
 }
 
 port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
-  return GetDsoHandle("DirectML.Debug", GetDirectMLVersion(),
-                      GetDirectMLPath());
+  return GetDirectMLLibraryHandle("directml.debug");
 }
 
 }  // namespace DsoLoader
