@@ -184,7 +184,7 @@ class DmlCompositeBinaryKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, inputs[0]);
     auto y = dml::InputTensor(scope, 1, inputs[1]);
 
@@ -319,7 +319,7 @@ class DmlCompositeUnaryKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, inputs[0]);
 
     ExpressionFunctor expression;
@@ -803,7 +803,7 @@ class DmlBinaryWithZeroKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, inputs[0]);
     auto y = dml::InputTensor(scope, 1, inputs[1]);
     auto zero = dml::ZeroTensor(scope, x.GetOutputDesc().dataType,
@@ -914,7 +914,7 @@ class DmlSquaredDifferenceKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, inputs[0]);
     auto y = dml::InputTensor(scope, 1, inputs[1]);
     auto diff = x - y;
@@ -1043,7 +1043,7 @@ class DmlApproximateEqualKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, inputs[0]);
     auto y = dml::InputTensor(scope, 1, inputs[1]);
 
@@ -1196,7 +1196,7 @@ class DmlBitCountKernel : public DmlKernel {
       // 2D so that we can reduce each adjacent pair of counts.
       dml::TensorDesc::Dimensions double_sizes = {1, 1, num_elements, 2};
 
-      auto scope = dml::Scope(ctx->GetDmlDevice());
+      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto in_64_bit = dml::InputTensor(scope, 0, in_desc);
       auto in_32_bit = dml::Reinterpret(in_64_bit, DML_TENSOR_DATA_TYPE_UINT32,
                                         double_sizes, dml::NullOpt);

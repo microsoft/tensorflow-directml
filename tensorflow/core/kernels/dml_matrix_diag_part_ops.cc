@@ -258,7 +258,7 @@ class DmlMatrixDiagPartKernel : public DmlKernel {
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto m = dml::InputTensor(scope, 0, inputs[0]);
 
     float padding_value = static_cast<float>(init_helper->GetPaddingValue());

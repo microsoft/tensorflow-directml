@@ -82,7 +82,7 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
       }
     }
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
     DmlKernelTensors tensors = GetTensorInfos(ctx, {});
     auto inputs = GetDmlTensorDescs(tensors.inputs);

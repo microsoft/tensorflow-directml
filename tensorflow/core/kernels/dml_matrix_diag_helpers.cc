@@ -24,7 +24,7 @@ limitations under the License.
 
 namespace dml {
 
-dml::Expression MatrixDiag(dml::Scope& scope, dml::Expression diag,
+dml::Expression MatrixDiag(dml::Graph& scope, dml::Expression diag,
                            int32_t k_min, int32_t k_max, float padding_value,
                            int64_t out_height, int64_t out_width) {
   assert(k_min <= k_max);

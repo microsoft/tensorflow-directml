@@ -321,7 +321,7 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     // the mean/variance tensors back to TF.
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
+        dml::Graph(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto scale = dml::InputTensor(scope, 1, input_descs[1]);
     auto offset = dml::InputTensor(scope, 2, input_descs[2]);
@@ -451,7 +451,7 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
+        dml::Graph(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
     auto mean = dml::InputTensor(scope, 1, input_descs[1]);
     auto variance = dml::InputTensor(scope, 2, input_descs[2]);
@@ -574,7 +574,7 @@ class DmlBatchNormWithGlobalNormalizationKernel : public DmlKernel {
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
     const uint32_t beta_index = scale_after_normalization ? 4 : 3;
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto t = dml::InputTensor(scope, 0, input_descs[0]);
     auto m = dml::InputTensor(scope, 1, input_descs[1]);
     auto v = dml::InputTensor(scope, 2, input_descs[2]);
@@ -684,7 +684,7 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
     auto scope =
-        dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
+        dml::Graph(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
 
     auto y_backprop =
         dml::InputTensor(scope, kYBackprop, input_descs[kYBackprop]);
@@ -885,7 +885,7 @@ class DmlBatchGlobalNormGradKernel : public DmlKernel {
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
     const uint32_t back_prop_index =
         scale_after_normalization ? kBackProp : kBackProp - 1;
