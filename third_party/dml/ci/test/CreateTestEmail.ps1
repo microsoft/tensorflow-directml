@@ -136,6 +136,8 @@ $HeaderTags = $Headers | ForEach-Object { "<th style=`"$HeadersStyle`">$_</th>" 
 $Html += "<table style=`"border-collapse:collapse; text-align:center; width:100%`">"
 $Html += "<tr>$HeaderTags</tr>"
 
+$DispatchedArtifacts = ($DispatchInfo | % { $_.Artifacts.Count } | Measure-Object -Sum).Sum
+
 foreach ($TestGroup in $TestGroups)
 {
     $FirstGroupRow = $True
@@ -173,7 +175,7 @@ foreach ($TestGroup in $TestGroups)
         elseif ($AgentResults.Counts.Pass -gt 0)    { $AgentColor = $Green }
         else                                        { $AgentColor = $Gray }
 
-        foreach ($BuildArtifact in $BuildArtifacts)
+        foreach ($BuildArtifact in $AgentJob.Artifacts)
         {
             $AgentResult = $AgentResults | Where-Object Build -eq $BuildArtifact
 
@@ -222,7 +224,7 @@ foreach ($TestGroup in $TestGroups)
             {
                 $FirstGroupRow = $False
                 $CellStyle = "border:1px solid gray; background-color: $GroupColor"
-                $Html += "<td rowspan=`"$($AgentNames.Count * $BuildArtifacts.Count)`" colspan=`"1`" style=`"$CellStyle`">$TestGroup</td>"
+                $Html += "<td rowspan=`"$DispatchedArtifacts`" colspan=`"1`" style=`"$CellStyle`">$TestGroup</td>"
             }
 
             $CellStyle = "border:1px solid gray; background-color: $AgentColor"
@@ -232,14 +234,13 @@ foreach ($TestGroup in $TestGroups)
 
                 if ($AgentJobUrl)
                 {
-                    $Html += "<td rowspan=`"$($BuildArtifacts.Count)`" style=`"$CellStyle`"><a href=`"$AgentJobUrl`">$($AgentName)</a></td>"
+                    $Html += "<td rowspan=`"$($AgentJob.Artifacts.Count)`" style=`"$CellStyle`"><a href=`"$AgentJobUrl`">$($AgentName)</a></td>"
                 }
                 else
                 {
-                    $Html += "<td rowspan=`"$($BuildArtifacts.Count)`" style=`"$CellStyle`">$($AgentName)</td>"
+                    $Html += "<td rowspan=`"$($AgentJob.Artifacts.Count)`" style=`"$CellStyle`">$($AgentName)</td>"
                 }
 
-                $SystemHref = "$RunPath\agent\$($AgentName)\dxdiag.xml"
                 if ($AgentInfo)
                 {
                     $SystemInfo = "$($AgentInfo.SystemDescription)<br>$($AgentInfo.DisplayAdapter) ($($AgentInfo.DisplayDriver))"
@@ -263,11 +264,11 @@ foreach ($TestGroup in $TestGroups)
                     }
                 }
 
-                $Html += "<td rowspan=`"$($BuildArtifacts.Count)`" style=`"$CellStyle; text-align: left; font-size:12px`">$SystemInfo</td>"
+                $Html += "<td rowspan=`"$($AgentJob.Artifacts.Count)`" style=`"$CellStyle; text-align: left; font-size:12px`">$SystemInfo</td>"
             }
 
             $CellStyle = "border:1px solid gray; background-color: $ResultColor"
-    
+
             if ($TaefLogURL)
             {
                 $Html += "<td style=`"$CellStyle`"><a href=`"$TaefLogURL`">$($BuildArtifact)</a></td>"
