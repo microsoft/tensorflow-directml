@@ -314,8 +314,8 @@ class DmlSpaceToBatchKernel : public DmlKernel {
       return;
     }
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
-    auto input = dml::InputTensor(scope, 0, inputs[0]);
+    auto graph = dml::Graph(ctx->GetDmlDevice());
+    auto input = dml::InputTensor(graph, 0, inputs[0]);
 
     absl::Span<const int64> internal_block_sizes =
         init_helper->GetInternalBlockSizes();
@@ -408,7 +408,7 @@ class DmlSpaceToBatchKernel : public DmlKernel {
     permuted_reshaped_padded = dml::Identity(permuted_reshaped_padded);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
-        scope.Compile(DML_EXECUTION_FLAG_NONE, {permuted_reshaped_padded});
+        graph.Compile(DML_EXECUTION_FLAG_NONE, {permuted_reshaped_padded});
 
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }

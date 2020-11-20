@@ -155,7 +155,7 @@ class DmlMirrorPadGradKernel : public DmlKernel {
       return;
     }
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto result = dml::InputTensor(scope, 0, inputs[0]);
 
     const Tensor& paddings_tensor = ctx->GetConstantInputTensor(1);
@@ -193,7 +193,7 @@ class DmlMirrorPadGradKernel : public DmlKernel {
           dml::TensorDesc::Dimensions slice_sizes = sizes;
           slice_sizes[i] = padding;
 
-          auto slice = dml::Slice1(result, offsets, slice_sizes, slice_strides);
+          auto slice = dml::Slice(result, offsets, slice_sizes, slice_strides);
 
           uint32_t needed_padding = sizes[i] - padding * 2;
 
@@ -237,8 +237,8 @@ class DmlMirrorPadGradKernel : public DmlKernel {
           sliced_result_sizes[i] -= padding;
 
           // Extract the non-padded part of the input
-          result = dml::Slice1(result, sliced_result_offsets,
-                               sliced_result_sizes, slice_strides);
+          result = dml::Slice(result, sliced_result_offsets,
+                              sliced_result_sizes, slice_strides);
 
           // Finally, add the slice to the result
           result += slice;
