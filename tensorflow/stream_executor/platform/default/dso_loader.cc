@@ -27,6 +27,11 @@ limitations under the License.
 #include "third_party/gpus/cuda/cuda_config.h"
 #include "third_party/tensorrt/tensorrt_config.h"
 
+#if _WIN32
+#include <pathcch.h>
+#include "tensorflow/core/platform/windows/wide_char.h"
+#endif
+
 namespace stream_executor {
 namespace internal {
 
@@ -40,6 +45,45 @@ string GetDirectMLPath() {
   const char* path = getenv("TF_DIRECTML_PATH");
   return (path != nullptr ? path : "");
 }
+
+#if _WIN32
+string GetModuleDirectory() {
+  HMODULE tensorflowHmodule = nullptr;
+  BOOL getHandleResult = GetModuleHandleExW(
+      GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT |
+          GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+      reinterpret_cast<LPCWSTR>(&GetModuleDirectory), &tensorflowHmodule);
+  CHECK_EQ(getHandleResult, TRUE);
+
+  // Safe const_cast because of explicit bounds checking and contiguous memory
+  // in C++11 and later.
+  std::wstring wpath(MAX_PATH, '\0');
+  DWORD filePathSize =
+      GetModuleFileNameW(tensorflowHmodule, const_cast<wchar_t*>(wpath.data()),
+                         static_cast<DWORD>(wpath.size()));
+
+  // Stop searching if the path is 2^16 characters long to avoid allocating an
+  // absurd amount of memory. Where DID you install python?
+  while ((GetLastError() == ERROR_INSUFFICIENT_BUFFER) &&
+         (wpath.size() < 65536)) {
+    wpath.resize(wpath.size() * 2);
+    filePathSize = GetModuleFileNameW(tensorflowHmodule,
+                                      const_cast<wchar_t*>(wpath.data()),
+                                      static_cast<DWORD>(wpath.size()));
+  }
+  CHECK_NE(filePathSize, 0);
+
+  // Strip TF library filename from the path and truncate the buffer.
+  // PathCchRemoveFileSpec may return S_FALSE if nothing was removed, but
+  // this indicates an error (module path should be a filename, not a dir).
+  CHECK_EQ(
+      PathCchRemoveFileSpec(const_cast<wchar_t*>(wpath.data()), wpath.size()),
+      S_OK);
+  wpath.resize(wcslen(wpath.c_str()));
+
+  return tensorflow::WideCharToUtf8(wpath);
+}
+#endif
 
 port::StatusOr<void*> GetDsoHandle(const string& name, const string& version,
                                    const string& search_path = "") {
@@ -161,6 +205,13 @@ port::StatusOr<void*> GetDirectMLLibraryHandle(const string& basename) {
   string name = basename;
   if (path.empty()) {
     name += string(".") + DIRECTML_SOURCE_VERSION;
+
+    // Look for DML under the same directory as the core tensorflow module. This
+    // check isn't required for WSL since the RPATH of the tensorflow .so file
+    // is modified.
+#if _WIN32
+    path = GetModuleDirectory();
+#endif
   }
 
   return GetDsoHandle(name, "", path);
