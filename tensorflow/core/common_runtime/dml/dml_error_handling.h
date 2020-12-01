@@ -15,9 +15,23 @@ limitations under the License.
 
 #pragma once
 
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include "winadapter.h"
+#endif
+
 #include "tensorflow/core/platform/default/logging.h"
 
-#define DML_CHECK_SUCCEEDED(hr)      \
-  do {                               \
-    CHECK_EQ(SUCCEEDED((hr)), true); \
+namespace tensorflow {
+[[noreturn]] void DmlHandleFailedHr(HRESULT hr, const char* expression,
+                                    const char* file, int line);
+}  // namespace tensorflow
+
+#define DML_CHECK_SUCCEEDED(x)                                    \
+  do {                                                            \
+    HRESULT _hr = (x);                                            \
+    if (TF_PREDICT_FALSE(FAILED(_hr))) {                          \
+      tensorflow::DmlHandleFailedHr(_hr, #x, __FILE__, __LINE__); \
+    }                                                             \
   } while (0)
