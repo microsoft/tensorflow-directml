@@ -18,6 +18,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_error_handling.h"
 
 #include "absl/strings/str_cat.h"
+#include "tensorflow/core/common_runtime/dml/dml_util.h"
 
 namespace tensorflow {
 [[noreturn]] void DmlHandleFailedHr(HRESULT hr, const char* expression,
@@ -31,9 +32,10 @@ namespace tensorflow {
     case DXGI_ERROR_DEVICE_RESET:
     case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
       tensorflow::internal::LogMessage(file, line, tensorflow::ERROR)
-          << "The DirectML device has encountered an unrecoverable error. This "
-             "is most often caused by a timeout occurring on the GPU. Please "
-             "visit https://aka.ms/??? for more information and "
+          << "The DirectML device has encountered an unrecoverable error ("
+          << dml_util::StringifyDeviceRemovedReason(hr)
+          << "). This is most often caused by a timeout occurring on the GPU. "
+             "Please visit https://aka.ms/tastycheese for more information and "
              "troubleshooting steps.";
       break;
   }
