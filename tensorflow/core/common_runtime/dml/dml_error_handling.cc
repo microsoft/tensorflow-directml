@@ -18,11 +18,12 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_error_handling.h"
 
 #include "absl/strings/str_cat.h"
-#include "tensorflow/core/common_runtime/dml/dml_util.h"
 
 namespace tensorflow {
-[[noreturn]] void DmlHandleFailedHr(HRESULT hr, const char* expression,
-                                    const char* file, int line) {
+namespace dml_util {
+
+[[noreturn]] void HandleFailedHr(HRESULT hr, const char* expression,
+                                 const char* file, int line) {
   DCHECK(FAILED(hr));
 
   // Detect device removal and print a diagnostic
@@ -33,7 +34,7 @@ namespace tensorflow {
     case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
       tensorflow::internal::LogMessage(file, line, tensorflow::ERROR)
           << "The DirectML device has encountered an unrecoverable error ("
-          << dml_util::StringifyDeviceRemovedReason(hr)
+          << StringifyDeviceRemovedReason(hr)
           << "). This is most often caused by a timeout occurring on the GPU. "
              "Please visit https://aka.ms/tastycheese for more information and "
              "troubleshooting steps.";
@@ -48,4 +49,31 @@ namespace tensorflow {
   // Should never get here
   DCHECK(false);
 }
+
+bool HrIsOutOfMemory(HRESULT hr) {
+  // E_OUTOFMEMORY has a different value depending on whether _WIN32 is defined
+  // when building winerror.h, so we check both potential values here
+  return hr == 0x80000002 || hr == 0x8007000e;
+}
+
+absl::string_view StringifyDeviceRemovedReason(HRESULT reason) {
+  switch (reason) {
+    case DXGI_ERROR_DEVICE_HUNG:
+      return "DXGI_ERROR_DEVICE_HUNG";
+    case DXGI_ERROR_DEVICE_REMOVED:
+      return "DXGI_ERROR_DEVICE_REMOVED";
+    case DXGI_ERROR_DEVICE_RESET:
+      return "DXGI_ERROR_DEVICE_RESET";
+    case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
+      return "DXGI_ERROR_DRIVER_INTERNAL_ERROR";
+    case DXGI_ERROR_INVALID_CALL:
+      return "DXGI_ERROR_INVALID_CALL";
+    case S_OK:
+      return "S_OK";
+    default:
+      return "UNKNOWN";
+  }
+}
+
+}  // namespace dml_util
 }  // namespace tensorflow
