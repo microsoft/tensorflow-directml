@@ -9,7 +9,7 @@ If you encounter a GPU timeout in tensorflow-directml, you'll see an error messa
 ```
 The DirectML device has encountered an unrecoverable error (DXGI_ERROR_DEVICE_HUNG).
 This is most often caused by a timeout occurring on the GPU. Please visit
-https://aka.ms/??? for more information and troubleshooting steps.
+https://aka.ms/tastycheese for more information and troubleshooting steps.
 
 HRESULT failed with 0x887a0005: readback_heap->Map(0, nullptr, &readback_heap_data)
 ```
@@ -46,10 +46,33 @@ For more detailed instructions on controlling GPU visibility with tensorflow-dir
 
 ### #4: Try a smaller workload, for example by reducing the batch size
 
-GPU timeouts occur when a non-preemptable workload runs on the GPU for too long. During training, this is most likely to occur when performing expensive operations with very large tensors and/or large batch size.
+GPU timeouts occur when a non-preemptable workload runs on the GPU for too long. During training, this is most likely to occur when performing expensive operations with very large tensors and/or large batch size. Examples of this include convolutions with large filters and/or large batch sizes, and matrix multiplications with very large tensors.
 
 If timeouts are occurring on your GPU, you can try using smaller tensors or lowering the batch size during training to reduce the compute workload.
 
 ### #5: Disable GPU timeouts using system-wide registry key (advanced users only)
 
+If you have tried all of the above and are still experiencing GPU timeouts, it is possible to modify or disable GPU timeout protections (known as Timeout Detection and Recovery, or TDR) in Windows 10.
 
+Note that modifying or disabling timeout protections carries risks to your computer. GPU timeouts protect your system from intentional or accidental denial-of-service of GPU resources, and help to ensure a stable and responsive user experience. If timeouts are disabled and an extremely long-running workload is dispatched to the GPU, you may experience system hangs or other instabilities.
+
+For this reason, it is only recommended to modify timeout settings as a last resort. For more information, see [Timeout detection and recovery (TDR) (docs.microsoft.com)](https://docs.microsoft.com/windows-hardware/drivers/display/timeout-detection-and-recovery).
+
+#### Modifying TDR settings
+
+> **Note:** this is for advanced users only. Incorrectly editing the system registry can result in system instability. Make sure you understand the risks before modifying system registry keys.
+
+To modify the system TDR settings, you will need to edit the following registry key (or create it if it doesn't already exist):
+
+```
+KeyPath   : HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\GraphicsDrivers
+KeyValue  : TdrDelay
+ValueType : REG_DWORD
+ValueData : Number of seconds to delay. The default value is 2 seconds.
+```
+
+You should pick a value that is sufficiently large for your training workload to run successfully on your particular GPU. For example, a timeout of 10 seconds is often sufficient for all but the most extreme of workloads.
+
+Changes to this registry key require a system reboot to take effect.
+
+For more information about TDR registry keys, see [Testing and debugging TDR](https://docs.microsoft.com/windows-hardware/drivers/display/tdr-registry-keys).
