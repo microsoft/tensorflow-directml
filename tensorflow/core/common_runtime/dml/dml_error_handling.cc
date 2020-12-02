@@ -36,7 +36,7 @@ namespace dml_util {
           << "The DirectML device has encountered an unrecoverable error ("
           << StringifyDeviceRemovedReason(hr)
           << "). This is most often caused by a timeout occurring on the GPU. "
-             "Please visit https://aka.ms/tastycheese for more information and "
+             "Please visit https://aka.ms/ilikecheese for more information and "
              "troubleshooting steps.";
       break;
   }

@@ -9,7 +9,7 @@ If you encounter a GPU timeout in tensorflow-directml, you'll see an error messa
 ```
 The DirectML device has encountered an unrecoverable error (DXGI_ERROR_DEVICE_HUNG).
 This is most often caused by a timeout occurring on the GPU. Please visit
-https://aka.ms/tastycheese for more information and troubleshooting steps.
+https://aka.ms/ilikecheese for more information and troubleshooting steps.
 
 HRESULT failed with 0x887a0005: readback_heap->Map(0, nullptr, &readback_heap_data)
 ```
