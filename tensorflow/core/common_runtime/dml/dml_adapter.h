@@ -89,7 +89,8 @@ class DmlAdapter {
   const std::string& Name() const;
   bool IsComputeOnly() const;
   uint64_t GetTotalDedicatedMemory() const;
-  uint64_t QueryAvailableDedicatedMemory() const;
+  uint64_t GetTotalSharedMemory() const;
+  uint64_t QueryAvailableLocalMemory() const;
 
  private:
   // This object is immutable, so this is shared to allow copies.
