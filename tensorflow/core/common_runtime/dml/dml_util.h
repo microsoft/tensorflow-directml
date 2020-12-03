@@ -93,31 +93,6 @@ Microsoft::WRL::ComPtr<T> MakeOrAbort(TArgs&&... args) {
   return obj;
 }
 
-inline bool HrIsOutOfMemory(HRESULT hr) {
-  // E_OUTOFMEMORY has a different value depending on whether _WIN32 is defined
-  // when building winerror.h, so we check both potential values here
-  return hr == 0x80000002 || hr == 0x8007000e;
-}
-
-inline absl::string_view StringifyDeviceRemovedReason(HRESULT reason) {
-  switch (reason) {
-    case DXGI_ERROR_DEVICE_HUNG:
-      return "DXGI_ERROR_DEVICE_HUNG";
-    case DXGI_ERROR_DEVICE_REMOVED:
-      return "DXGI_ERROR_DEVICE_REMOVED";
-    case DXGI_ERROR_DEVICE_RESET:
-      return "DXGI_ERROR_DEVICE_RESET";
-    case DXGI_ERROR_DRIVER_INTERNAL_ERROR:
-      return "DXGI_ERROR_DRIVER_INTERNAL_ERROR";
-    case DXGI_ERROR_INVALID_CALL:
-      return "DXGI_ERROR_INVALID_CALL";
-    case S_OK:
-      return "S_OK";
-    default:
-      return "UNKNOWN";
-  }
-}
-
 }  // namespace dml_util
 
 }  // namespace tensorflow

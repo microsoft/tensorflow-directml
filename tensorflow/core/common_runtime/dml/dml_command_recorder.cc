@@ -362,22 +362,9 @@ void DmlCommandRecorder::CloseAndExecute() {
   // opened.
   current_descriptor_heap_ = nullptr;
 
-  HRESULT device_removed_reason = dml_device_->GetDeviceRemovedReason();
-
-  if (SUCCEEDED(device_removed_reason)) {
-    device_removed_reason = d3d_device_->GetDeviceRemovedReason();
-  }
-
   // Fail early if something horrifying happens
-  if (FAILED(device_removed_reason)) {
-    status_ = errors::Unknown(
-        "Device was removed because of the following reason: ",
-        dml_util::StringifyDeviceRemovedReason(device_removed_reason),
-        ". This can happen when the GPU times out or when there's a problem in "
-        "the driver. You won't be able to use this DML device again in the "
-        "current process.");
-    return;
-  }
+  DML_CHECK_SUCCEEDED(dml_device_->GetDeviceRemovedReason());
+  DML_CHECK_SUCCEEDED(d3d_device_->GetDeviceRemovedReason());
 
   // Always keep the command recorder in an opened state
   Open();
