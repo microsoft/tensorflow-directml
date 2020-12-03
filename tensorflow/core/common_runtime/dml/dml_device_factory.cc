@@ -169,7 +169,8 @@ class DmlDeviceFactory : public DeviceFactory {
         } else {
           // No per_process_gpu_memory_fraction was specified: use a memory
           // limit equal to the AVAILALBLE GPU memory
-          uint64_t available_gpu_memory = adapter.QueryAvailableLocalMemory();
+          uint64_t available_gpu_memory =
+              adapter.QueryAvailableLocalMemory();
 
           memory_limit = available_gpu_memory;
         }
