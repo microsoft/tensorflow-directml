@@ -3771,6 +3771,7 @@ cc_library(
     srcs = [
         "common_runtime/dml/dml_adapter.cc",
         "common_runtime/dml/dml_adapter_impl.cc",
+        "common_runtime/dml/dml_error_handling.cc",
     ],
     hdrs = [
         "common_runtime/dml/dml_common.h",
