@@ -64,6 +64,22 @@ static std::unique_ptr<DmlDevice> CreateDevice(
   return absl::make_unique<DmlDevice>(device_state, options, attributes);
 }
 
+static bool IsUmaAdapter(const DmlAdapter& adapter) {
+  D3D_FEATURE_LEVEL feature_level = adapter.IsComputeOnly()
+                                        ? D3D_FEATURE_LEVEL_1_0_CORE
+                                        : D3D_FEATURE_LEVEL_11_0;
+
+  ComPtr<ID3D12Device> d3d12_device;
+  DML_CHECK_SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
+                                        IID_PPV_ARGS(&d3d12_device)));
+
+  D3D12_FEATURE_DATA_ARCHITECTURE1 feature_data = {};
+  DML_CHECK_SUCCEEDED(d3d12_device->CheckFeatureSupport(
+      D3D12_FEATURE_ARCHITECTURE1, &feature_data, sizeof(feature_data)));
+
+  return feature_data.CacheCoherentUMA;
+}
+
 class DmlDeviceFactory : public DeviceFactory {
  public:
   Status ListPhysicalDevices(std::vector<string>* devices) override {
@@ -149,6 +165,18 @@ class DmlDeviceFactory : public DeviceFactory {
           // limit equal to the AVAILALBLE GPU memory
           uint64_t available_gpu_memory =
               adapter.QueryAvailableDedicatedMemory();
+
+          if (IsUmaAdapter(adapter)) {
+            // For adapters with unified memory architecture (UMA), add shared
+            // memory to the total available memory
+            available_gpu_memory += adapter.QueryAvailableSharedMemory();
+          }
+
+          LOG(INFO) << "!!! ADAPTER INFO:\n"
+                    << "Dedicated: " << adapter.QueryAvailableDedicatedMemory()
+                    << "\n"
+                    << "Shared: " << adapter.QueryAvailableSharedMemory()
+                    << "\n";
 
           memory_limit = available_gpu_memory;
         }

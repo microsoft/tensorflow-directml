@@ -167,6 +167,17 @@ uint64_t DmlAdapterImpl::QueryAvailableDedicatedMemory() const {
   return info.Budget;
 }
 
+uint64_t DmlAdapterImpl::QueryAvailableSharedMemory() const {
+  ComPtr<IDXGIAdapter3> adapter3;
+  DML_CHECK_SUCCEEDED(adapter_.As(&adapter3));
+
+  DXGI_QUERY_VIDEO_MEMORY_INFO info = {};
+  DML_CHECK_SUCCEEDED(adapter3->QueryVideoMemoryInfo(
+      0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &info));
+
+  return info.Budget;
+}
+
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
   ComPtr<IDXGIFactory6> dxgi_factory;
   DML_CHECK_SUCCEEDED(CreateDXGIFactory(IID_PPV_ARGS(&dxgi_factory)));
@@ -258,6 +269,21 @@ uint64_t DmlAdapterImpl::QueryAvailableDedicatedMemory() const {
   DXCoreAdapterMemoryBudgetNodeSegmentGroup query = {};
   query.nodeIndex = 0;
   query.segmentGroup = DXCoreSegmentGroup::Local;
+
+  DXCoreAdapterMemoryBudget info = {};
+  DML_CHECK_SUCCEEDED(dxcore_adapter->QueryState(
+      DXCoreAdapterState::AdapterMemoryBudget, &query, &info));
+
+  return info.budget;
+}
+
+uint64_t DmlAdapterImpl::QueryAvailableSharedMemory() const {
+  ComPtr<IDXCoreAdapter> dxcore_adapter;
+  DML_CHECK_SUCCEEDED(adapter_.As(&dxcore_adapter));
+
+  DXCoreAdapterMemoryBudgetNodeSegmentGroup query = {};
+  query.nodeIndex = 0;
+  query.segmentGroup = DXCoreSegmentGroup::NonLocal;
 
   DXCoreAdapterMemoryBudget info = {};
   DML_CHECK_SUCCEEDED(dxcore_adapter->QueryState(

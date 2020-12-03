@@ -41,6 +41,10 @@ uint64_t DmlAdapter::QueryAvailableDedicatedMemory() const {
   return impl_->QueryAvailableDedicatedMemory();
 }
 
+uint64_t DmlAdapter::QueryAvailableSharedMemory() const {
+  return impl_->QueryAvailableSharedMemory();
+}
+
 const char* GetVendorName(VendorID id) {
   switch (id) {
     case VendorID::kAmd:

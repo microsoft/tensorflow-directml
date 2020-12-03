@@ -45,6 +45,7 @@ class DmlAdapterImpl {
   }
 
   uint64_t QueryAvailableDedicatedMemory() const;
+  uint64_t QueryAvailableSharedMemory() const;
 
  private:
 #if _WIN32
