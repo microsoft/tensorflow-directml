@@ -2,14 +2,14 @@
 
 Because tensorflow-directml supports such a wide range of hardware (including consumer gaming and integrated GPUs), it is occasionally possible to encounter a training workload that causes a *GPU timeout* on some hardware/drivers.
 
-GPU timeouts are caused by long-running workloads that exceed the system-defined GPU preemption timeout, which is 2 seconds by default. The exact circumstances that cause a GPU timeout depend on a wide variety of factors, including the specific hardware and driver configuration used.
+GPU timeouts are caused by long-running workloads that exceed the system-defined GPU preemption timeout, which is 2 seconds by default. At the lowest level, the exact circumstance that causes a GPU timeout is when a non-preemptable dispatch runs on the GPU for a time that exceeds the defined limit. A "dispatch" often corresponds to the evaluation of a single TensorFlow operator (like conv2d, or matmul) on the GPU. Because of this, the prevalence of timeouts depends on a wide variety of factors, including the specific hardware and driver configuration used.
 
 If you encounter a GPU timeout in tensorflow-directml, you'll see an error message similar to the following:
 
 ```
 The DirectML device has encountered an unrecoverable error (DXGI_ERROR_DEVICE_HUNG).
 This is most often caused by a timeout occurring on the GPU. Please visit
-https://aka.ms/ilikecheese for more information and troubleshooting steps.
+https://aka.ms/tfdmltimeout for more information and troubleshooting steps.
 
 HRESULT failed with 0x887a0005: readback_heap->Map(0, nullptr, &readback_heap_data)
 ```
