@@ -44,8 +44,11 @@ class DmlAdapterImpl {
     return dedicated_memory_in_bytes_;
   }
 
-  uint64_t QueryAvailableDedicatedMemory() const;
-  uint64_t QueryAvailableSharedMemory() const;
+  uint64_t GetTotalSharedMemory() const {
+    return shared_memory_in_bytes_;
+  }
+
+  uint64_t QueryAvailableLocalMemory() const;
 
  private:
 #if _WIN32
@@ -62,6 +65,7 @@ class DmlAdapterImpl {
   std::string description_;
   bool is_compute_only_;
   uint64_t dedicated_memory_in_bytes_;
+  uint64_t shared_memory_in_bytes_;
 };
 
 // Retrieves a list of DML-compatible hardware adapters on the system.

@@ -153,27 +153,17 @@ void DmlAdapterImpl::Initialize(IDXGIAdapter* adapter) {
   device_id_ = desc.DeviceId;
   description_ = WideCharToUtf8(desc.Description);
   dedicated_memory_in_bytes_ = desc.DedicatedVideoMemory;
+  shared_memory_in_bytes_ = desc.SharedSystemMemory;
   is_compute_only_ = false;
 }
 
-uint64_t DmlAdapterImpl::QueryAvailableDedicatedMemory() const {
+uint64_t DmlAdapterImpl::QueryAvailableLocalMemory() const {
   ComPtr<IDXGIAdapter3> adapter3;
   DML_CHECK_SUCCEEDED(adapter_.As(&adapter3));
 
   DXGI_QUERY_VIDEO_MEMORY_INFO info = {};
   DML_CHECK_SUCCEEDED(adapter3->QueryVideoMemoryInfo(
       0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &info));
-
-  return info.Budget;
-}
-
-uint64_t DmlAdapterImpl::QueryAvailableSharedMemory() const {
-  ComPtr<IDXGIAdapter3> adapter3;
-  DML_CHECK_SUCCEEDED(adapter_.As(&adapter3));
-
-  DXGI_QUERY_VIDEO_MEMORY_INFO info = {};
-  DML_CHECK_SUCCEEDED(adapter3->QueryVideoMemoryInfo(
-      0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &info));
 
   return info.Budget;
 }
@@ -251,6 +241,10 @@ void DmlAdapterImpl::Initialize(IDXCoreAdapter* adapter) {
       DXCoreAdapterProperty::DedicatedAdapterMemory,
       sizeof(dedicated_memory_in_bytes_), &dedicated_memory_in_bytes_));
 
+  DML_CHECK_SUCCEEDED(adapter->GetProperty(
+      DXCoreAdapterProperty::SharedSystemMemory,
+      sizeof(shared_memory_in_bytes_), &shared_memory_in_bytes_));
+
   const bool is_graphics_supported =
       adapter->IsAttributeSupported(DXCORE_ADAPTER_ATTRIBUTE_D3D12_GRAPHICS);
 
@@ -262,28 +256,13 @@ void DmlAdapterImpl::Initialize(IDXCoreAdapter* adapter) {
   is_compute_only_ = !is_graphics_supported;
 }
 
-uint64_t DmlAdapterImpl::QueryAvailableDedicatedMemory() const {
+uint64_t DmlAdapterImpl::QueryAvailableLocalMemory() const {
   ComPtr<IDXCoreAdapter> dxcore_adapter;
   DML_CHECK_SUCCEEDED(adapter_.As(&dxcore_adapter));
 
   DXCoreAdapterMemoryBudgetNodeSegmentGroup query = {};
   query.nodeIndex = 0;
   query.segmentGroup = DXCoreSegmentGroup::Local;
-
-  DXCoreAdapterMemoryBudget info = {};
-  DML_CHECK_SUCCEEDED(dxcore_adapter->QueryState(
-      DXCoreAdapterState::AdapterMemoryBudget, &query, &info));
-
-  return info.budget;
-}
-
-uint64_t DmlAdapterImpl::QueryAvailableSharedMemory() const {
-  ComPtr<IDXCoreAdapter> dxcore_adapter;
-  DML_CHECK_SUCCEEDED(adapter_.As(&dxcore_adapter));
-
-  DXCoreAdapterMemoryBudgetNodeSegmentGroup query = {};
-  query.nodeIndex = 0;
-  query.segmentGroup = DXCoreSegmentGroup::NonLocal;
 
   DXCoreAdapterMemoryBudget info = {};
   DML_CHECK_SUCCEEDED(dxcore_adapter->QueryState(

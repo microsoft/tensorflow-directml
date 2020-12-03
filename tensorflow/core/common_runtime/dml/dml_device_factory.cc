@@ -159,24 +159,17 @@ class DmlDeviceFactory : public DeviceFactory {
           // limit as a fraction of TOTAL GPU memory
           uint64_t total_gpu_memory = adapter.GetTotalDedicatedMemory();
 
+          if (IsUmaAdapter(adapter)) {
+            // For adapters with unified memory architecture (UMA), add shared
+            // memory to the total GPU memory
+            total_gpu_memory += adapter.GetTotalSharedMemory();
+          }
+
           memory_limit = total_gpu_memory * memory_fraction;
         } else {
           // No per_process_gpu_memory_fraction was specified: use a memory
           // limit equal to the AVAILALBLE GPU memory
-          uint64_t available_gpu_memory =
-              adapter.QueryAvailableDedicatedMemory();
-
-          if (IsUmaAdapter(adapter)) {
-            // For adapters with unified memory architecture (UMA), add shared
-            // memory to the total available memory
-            available_gpu_memory += adapter.QueryAvailableSharedMemory();
-          }
-
-          LOG(INFO) << "!!! ADAPTER INFO:\n"
-                    << "Dedicated: " << adapter.QueryAvailableDedicatedMemory()
-                    << "\n"
-                    << "Shared: " << adapter.QueryAvailableSharedMemory()
-                    << "\n";
+          uint64_t available_gpu_memory = adapter.QueryAvailableLocalMemory();
 
           memory_limit = available_gpu_memory;
         }
