@@ -15,13 +15,13 @@ limitations under the License.
 
 #pragma once
 
+#include "tensorflow/core/platform/default/logging.h"
+
 #ifdef _WIN32
 #include <Windows.h>
 #else
 #include "winadapter.h"
 #endif
-
-#include "tensorflow/core/platform/default/logging.h"
 
 namespace tensorflow {
 namespace dml_util {
