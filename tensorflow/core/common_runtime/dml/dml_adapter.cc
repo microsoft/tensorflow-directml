@@ -37,8 +37,12 @@ uint64_t DmlAdapter::GetTotalDedicatedMemory() const {
   return impl_->GetTotalDedicatedMemory();
 }
 
-uint64_t DmlAdapter::QueryAvailableDedicatedMemory() const {
-  return impl_->QueryAvailableDedicatedMemory();
+uint64_t DmlAdapter::GetTotalSharedMemory() const {
+  return impl_->GetTotalSharedMemory();
+}
+
+uint64_t DmlAdapter::QueryAvailableLocalMemory() const {
+  return impl_->QueryAvailableLocalMemory();
 }
 
 const char* GetVendorName(VendorID id) {
