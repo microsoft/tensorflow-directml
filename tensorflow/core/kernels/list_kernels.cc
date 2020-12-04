@@ -264,7 +264,7 @@ REGISTER_KERNEL_BUILDER(Name("EmptyTensorList").Device(DEVICE_CPU),
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 REGISTER_KERNEL_BUILDER(Name("EmptyTensorList")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DML)
                             .HostMemory("element_shape")
                             .HostMemory("max_num_elements"),
                         EmptyTensorList);
@@ -331,7 +331,7 @@ REGISTER_KERNEL_BUILDER(Name("TensorListPushBack").Device(DEVICE_CPU),
 
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
-REGISTER_KERNEL_BUILDER(Name("TensorListPushBack").Device(DEVICE_GPU),
+REGISTER_KERNEL_BUILDER(Name("TensorListPushBack").Device(DEVICE_DML),
                         TensorListPushBack);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
@@ -363,7 +363,7 @@ REGISTER_KERNEL_BUILDER(Name("TensorListLength").Device(DEVICE_CPU),
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 REGISTER_KERNEL_BUILDER(
-    Name("TensorListLength").Device(DEVICE_GPU).HostMemory("length"),
+    Name("TensorListLength").Device(DEVICE_DML).HostMemory("length"),
     TensorListLength);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
@@ -411,7 +411,7 @@ REGISTER_KERNEL_BUILDER(Name("TensorListElementShape").Device(DEVICE_CPU),
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 REGISTER_KERNEL_BUILDER(Name("TensorListElementShape")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DML)
                             .HostMemory("element_shape"),
                         TensorListElementShape);
 
@@ -457,7 +457,7 @@ REGISTER_KERNEL_BUILDER(Name("TensorListReserve").Device(DEVICE_CPU),
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 REGISTER_KERNEL_BUILDER(Name("TensorListReserve")
-                            .Device(DEVICE_GPU)
+                            .Device(DEVICE_DML)
                             .HostMemory("element_shape")
                             .HostMemory("num_elements"),
                         TensorListReserve);
@@ -530,7 +530,7 @@ REGISTER_KERNEL_BUILDER(Name("TensorListResize").Device(DEVICE_CPU),
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 REGISTER_KERNEL_BUILDER(
-    Name("TensorListResize").Device(DEVICE_GPU).HostMemory("size"),
+    Name("TensorListResize").Device(DEVICE_DML).HostMemory("size"),
     TensorListResize);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
@@ -586,7 +586,7 @@ REGISTER_KERNEL_BUILDER(Name("TensorListSetItem").Device(DEVICE_CPU),
 #define REGISTER_TENSOR_LIST_SET_ITEM_GPU(T)                      \
   REGISTER_KERNEL_BUILDER(Name("TensorListSetItem")               \
                               .TypeConstraint<T>("element_dtype") \
-                              .Device(DEVICE_GPU)                 \
+                              .Device(DEVICE_DML)                 \
                               .HostMemory("index"),               \
                           TensorListSetItem);
 
@@ -714,7 +714,7 @@ REGISTER_KERNEL_BUILDER(Name("TensorListConcatLists").Device(DEVICE_CPU),
 
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
-REGISTER_KERNEL_BUILDER(Name("TensorListConcatLists").Device(DEVICE_GPU),
+REGISTER_KERNEL_BUILDER(Name("TensorListConcatLists").Device(DEVICE_DML),
                         TensorListConcatLists);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
@@ -825,6 +825,17 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                               .Device(DEVICE_DML)                          \
                               .HostMemory("lengths"),                      \
                           TensorListConcat<DMLDevice, T>)                  \
+  REGISTER_KERNEL_BUILDER(Name("TensorListConcatV2")                       \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("leading_dims")                  \
+                              .HostMemory("element_shape")                 \
+                              .HostMemory("lengths"),                      \
+                          TensorListConcat<DMLDevice, T>)                  \
+  REGISTER_KERNEL_BUILDER(Name("TensorListPushBackBatch")                  \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML),                         \
+                          TensorListPushBackBatch<DMLDevice, T>)           \
   REGISTER_KERNEL_BUILDER(Name("TensorListFromTensor")                     \
                               .TypeConstraint<T>("element_dtype")          \
                               .Device(DEVICE_DML)                          \
@@ -843,10 +854,6 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                               .HostMemory("num_elements")                  \
                               .HostMemory("indices"),                      \
                           TensorListScatter<DMLDevice, T>)                 \
-  REGISTER_KERNEL_BUILDER(Name("TensorListPushBackBatch")                  \
-                              .TypeConstraint<T>("element_dtype")          \
-                              .Device(DEVICE_DML),                         \
-                          TensorListPushBackBatch<DMLDevice, T>)           \
   REGISTER_KERNEL_BUILDER(Name("TensorListScatterIntoExistingList")        \
                               .TypeConstraint<T>("element_dtype")          \
                               .Device(DEVICE_DML)                          \
@@ -859,7 +866,15 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                               .HostMemory("lengths"),                      \
                           TensorListSplit<DMLDevice, T>)
 
-TF_CALL_ALL_TYPES(REGISTER_TENSOR_LIST_OPS_DML);
+TF_CALL_GPU_NUMBER_TYPES(REGISTER_TENSOR_LIST_OPS_DML);
+REGISTER_TENSOR_LIST_OPS_DML(bfloat16);
+TF_CALL_complex64(REGISTER_TENSOR_LIST_OPS_DML);
+TF_CALL_complex128(REGISTER_TENSOR_LIST_OPS_DML);
+TF_CALL_int32(REGISTER_TENSOR_LIST_OPS_DML);
+TF_CALL_int64(REGISTER_TENSOR_LIST_OPS_DML);
+REGISTER_TENSOR_LIST_OPS_DML(bool);
+
+#undef REGISTER_TENSOR_LIST_OPS_DML
 
 #endif  // TENSORFLOW_USE_DIRECTML
 

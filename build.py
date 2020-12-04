@@ -200,7 +200,7 @@ def build(args):
   if args.subcommands:
     cl.append("--subcommands")
   cl.append("--config=opt")
-  cl.append("--config=dml")
+  cl.append("--config=cuda")
   if args.telemetry:
     cl.append("--config=dml_telemetry")
   if args.config == "debug":

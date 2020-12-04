@@ -2,7 +2,7 @@ licenses(["notice"])  # Apache 2.0
 
 package(default_visibility = ["//tensorflow/stream_executor:__subpackages__"])
 
-load("//tensorflow:tensorflow.bzl", "tf_copts")
+load("//tensorflow:tensorflow.bzl", "tf_copts", "if_windows")
 
 cc_library(
     name = "platform",
@@ -30,4 +30,5 @@ cc_library(
         "@local_config_tensorrt//:tensorrt_headers",
         "@dml_redist//:headers",
     ],
+    linkopts = if_windows(["-DEFAULTLIB:pathcch.lib"]) 
 )
