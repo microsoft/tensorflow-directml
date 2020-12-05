@@ -1,3 +1,6 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
 name: $(Date:yyMMdd-HHmm)$(Rev:.r).$(SourceBranchName)
 
 # No CI trigger; run on a schedule only.
