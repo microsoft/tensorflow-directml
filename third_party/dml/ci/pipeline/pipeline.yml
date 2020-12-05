@@ -50,7 +50,7 @@ parameters:
   default: $(emailTo) # the default is stored in the pipeline as a variable
 
 variables:
-  isMasterBranch: ${{eq(variables['Build.SourceBranch'], 'refs/heads/master')}}
+  isMasterBranch: ${{eq(variables['Build.SourceBranch'], 'refs/heads/directml')}}
   isReleaseBranch: ${{startsWith(variables['Build.SourceBranch'], 'refs/heads/release/')}}
   isMasterOrReleaseBranch: ${{or(eq(variables.isMasterBranch, 'True'), eq(variables.isReleaseBranch, 'True'))}}
 
