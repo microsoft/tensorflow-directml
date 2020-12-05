@@ -460,5 +460,5 @@ if ($EmailTo)
     Send-MailMessage @MailArgs
 }
 
-$Html | Out-File "Summary.md"
+$Html | Out-File "Summary.md" -Encoding utf8
 Write-Host "##vso[task.uploadsummary]$(Resolve-Path Summary.md)"
