@@ -15,7 +15,8 @@ schedules:
   displayName: Nightly Run
   branches:
     include:
-    - master
+    - directml
+    - release/*
   always: false
 
 parameters:
