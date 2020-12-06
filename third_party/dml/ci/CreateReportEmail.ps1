@@ -169,7 +169,7 @@ if ($Commits.Count -gt 0)
 
     foreach ($Commit in $Commits)
     {
-        $Url = "https://dev.azure.com/$Instance/_git/$Project/commit/$($Commit.id)"
+        $Url = "https://github.com/microsoft/tensorflow-directml/commit/$($Commit.id)"
         $Timestamp = ([datetime]$Commit.timestamp).ToString("yyyy-MM-dd HH:mm:ss")
 
         $Style = "padding:1px 3px; border-bottom:1px solid gray; border-left:1px solid gray"
@@ -340,10 +340,6 @@ if ($TestsArtifactsExist)
                     $StartTime = [datetime]$AgentResult.Start
                     $EndTime = [datetime]$AgentResult.End
                     $Time = New-TimeSpan $StartTime $EndTime
-
-                    # URL to download TAEF console log.
-                    $TaefLogURL = "https://dev.azure.com/${Instance}/_apis/resources/Containers/${TestResultsContainerID}?itemPath=test%2F${AgentName}%2F${BuildArtifact}%2Ftest_${TestGroup}_log.txt"
-                    $TaefErrorsURL = "https://dev.azure.com/${Instance}/_apis/resources/Containers/${TestResultsContainerID}?itemPath=test%2F${AgentName}%2F${BuildArtifact}%2Ftest_${TestGroup}_errors.txt"
                 }
                 else
                 {
@@ -407,18 +403,11 @@ if ($TestsArtifactsExist)
 
                 $CellStyle = "border:1px solid gray; background-color: $ResultColor"
         
-                if ($TaefLogURL)
-                {
-                    $Html += "<td style=`"$CellStyle`"><a href=`"$TaefLogURL`">$($BuildArtifact)</a></td>"
-                }
-                else
-                {
-                    $Html += "<td style=`"$CellStyle`">$($BuildArtifact)</td>"
-                }
+                $Html += "<td style=`"$CellStyle`">$($BuildArtifact)</td>"
 
                 if ($AgentResults.Counts.Errors -gt 0)
                 {
-                    $Html += "<td style=`"$CellStyle`"><a href=`"$TaefErrorsURL`">Yes</a></td>"
+                    $Html += "<td style=`"$CellStyle`">Yes</a></td>"
                 }
                 else
                 {
