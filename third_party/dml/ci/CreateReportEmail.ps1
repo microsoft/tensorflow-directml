@@ -176,7 +176,7 @@ if ($Commits.Count -gt 0)
         $Html += "<tr style=`"text-align:left;`">"
         $Html += "<td style=`"$Style; font-family:monospace;`"><a target=`"_blank`" href=`"$($Url)`">$($Commit.id.substring(0,8))</a></td>"
         $Html += "<td style=`"$Style;`">$Timestamp</td>"
-        $Html += "<td style=`"$Style; border-right:1px solid gray;`"><b>$($Commit.author.uniqueName)</b> : $($Commit.message)</td>"
+        $Html += "<td style=`"$Style; border-right:1px solid gray;`"><b>$($Commit.author.displayName)</b> : $($Commit.message)</td>"
         $Html += "</tr>"
     }
 
