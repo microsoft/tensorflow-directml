@@ -215,7 +215,12 @@ class DmlTernaryKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Graph(ctx->GetDmlDevice());
+    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
+    if (Is64BitIntegerType(ctx->GetOutputDataType(0))) {
+      out_policy = GetEmulatedInt64TensorPolicy();
+    }
+
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
     auto cond_tensor = dml::InputTensor(scope, 0, inputs[0]);
     auto then_tensor = dml::InputTensor(scope, 1, inputs[1]);
     auto else_tensor = dml::InputTensor(scope, 2, inputs[2]);
