@@ -2735,6 +2735,9 @@ tf_kernel_library(
     gpu_srcs = [
         "list_kernels.cu.cc",
         "list_kernels.h",
+        "tensor_array.h",
+        "aggregate_ops.h",
+        "split_lib.h",
     ],
     deps = [
         ":concat_lib",
