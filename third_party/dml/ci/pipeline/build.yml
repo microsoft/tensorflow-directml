@@ -1,0 +1,240 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
+parameters:
+- name: artifacts
+  type: object
+  default: []
+- name: enableTests
+  type: boolean
+  default: true
+- name: buildCApi
+  type: boolean
+  default: false
+- name: archiveSharePath
+  type: string
+  default: ''
+
+jobs:
+- ${{each artifact in parameters.artifacts}}:
+  - job: build_${{replace(artifact, '-','_')}}
+    displayName: Build ${{artifact}}
+    timeoutInMinutes: 120
+    workspace:
+      clean: all
+    steps:
+    - task: PowerShell@2
+      name: vars
+      displayName: Initialize Variables
+      inputs:
+        targetType: inline
+        script: |
+          if ('${{artifact}}' -match '(x64-win|x64-linux)-(release|debug)-(cp\d\d)')
+          {
+            $Architecture, $Configuration, $PyVersion = $Matches[1..3]
+            Write-Host "Architecture = '$Architecture'"
+            Write-Host "##vso[task.setVariable variable=architecture;isOutput=true]$Architecture"
+            Write-Host "Configuration = '$Configuration'"
+            Write-Host "##vso[task.setVariable variable=configuration;isOutput=true]$Configuration"
+            Write-Host "PyVersion = '$PyVersion'"
+            Write-Host "##vso[task.setVariable variable=pyVersion;isOutput=true]$PyVersion"
+            $StartTicks = (Get-Date).Ticks
+            Write-Host "Start Time = '$StartTicks' $([datetime]$StartTicks)"
+            Write-Host "##vso[task.setVariable variable=startTicks;isOutput=true]$StartTicks"
+          }
+          else
+          {
+            throw "Could not parse build artifact: '${{artifact}}'"
+          }
+
+    # The built-in checkout task doesn't allow for additional git command-line args such as
+    # "--config core.autocrlf", so we have a custom clone step in PS. The most important part here
+    # is to ensure we clone with auto-converted line endings on Windows, but retain the original 
+    # Linux line endings when building in WSL. This extra configuration is required since the ADO
+    # agents are running on Windows and will, by default, always convert line endings to CRLF.
+    - checkout: none
+    - powershell: |
+        # Append ".dev<DATE>" to the _VERSION variable in setup.py. For example, if the pipeline version
+        # is 200610-2233.1.master, and _VERSION is currently 1.15.2, then the updated version will be
+        # 1.15.2.dev200610.
+        function UpdatePkgVersion()
+        {
+          # DevVersion is the first 6 digits of the pipeline version (e.g. 200610-2233.1.master -> 200610)
+          $DevVersion = "$(Build.BuildNumber)" -replace '(\d{6}).*','$1'
+          $SetupPyPath = "$SourcePathWin/tensorflow/tools/pip_package/setup.py"
+          $SetupPy = (Get-Content $SetupPyPath -Raw) -replace "_VERSION = '(\d+\.\d+\.\d+).*'", "_VERSION = '`$1.dev$DevVersion'"
+          Set-Content $SetupPyPath $SetupPy -Encoding ascii
+        }
+
+        $Url = "https://github.com/microsoft/tensorflow-directml"
+        $Branch = "$(Build.SourceBranch)" -replace "^refs/heads/"
+
+        if (Test-Path "$env:SYSTEMDRIVE\ap_build") { cmd /c rd /s /q "$env:SYSTEMDRIVE\ap_build" }
+
+        $SourcePathWin = "$env:SYSTEMDRIVE\ap_build\s" # e.g. C:\ap_build\s
+        $SourcePathWinAsWsl = (wsl wslpath ("$SourcePathWin" -replace '\\','/')) # e.g. /mnt/c/ap_build/s
+        $SourcePathWsl = "~/ap_build/s" # e.g. /home/apilot/ap_build/s
+
+        $ArtifactsPathWin = "$env:SYSTEMDRIVE\ap_build\a" # e.g. C:\Users\apilot\ap_build\a
+        $ArtifactsPathWinAsWsl = (wsl wslpath ("$ArtifactsPathWin" -replace '\\','/')) # e.g. /mnt/c/apilot/agent/_work/8/a
+        $ArtifactsPathWsl = "~/ap_build/a" # e.g. /home/apilot/ap_build/a
+
+        New-Item -Path $ArtifactsPathWin -ItemType Directory -Force
+
+        if ("$(vars.Architecture)" -eq "x64-linux")
+        {
+          # Can't clone source directly to the WSL filesystem, so clone to Windows and copy to WSL
+          wsl rm -rf ~/ap_build
+          wsl mkdir -p $ArtifactsPathWsl
+          Invoke-Expression "git clone $Url --recursive --depth 1 --branch $Branch --config core.autocrlf=input $SourcePathWin"
+          UpdatePkgVersion
+          Write-Host "Copy $SourcePathWinAsWsl to $SourcePathWsl"
+          wsl cp -rT $SourcePathWinAsWsl $SourcePathWsl
+        }
+        else
+        {
+          Invoke-Expression "git clone $Url --recursive --depth 1 --branch $Branch $SourcePathWin"
+          UpdatePkgVersion
+        }
+
+        Set-Location $SourcePathWin
+        $TfSourceVersion = git rev-parse HEAD
+
+        # Save paths as variables so future steps can use them
+        Write-Host "##vso[task.setvariable variable=TfSourcePathWin]$SourcePathWin"
+        Write-Host "##vso[task.setvariable variable=TfSourcePathWinAsWsl]$SourcePathWinAsWsl"
+        Write-Host "##vso[task.setvariable variable=TfSourcePathWsl]$SourcePathWsl"
+        Write-Host "##vso[task.setvariable variable=TfArtifactsPathWin]$ArtifactsPathWin"
+        Write-Host "##vso[task.setvariable variable=TfArtifactsPathWinAsWsl]$ArtifactsPathWinAsWsl"
+        Write-Host "##vso[task.setvariable variable=TfArtifactsPathWsl]$ArtifactsPathWsl"
+        Write-Host "##vso[task.setvariable variable=TfSourceVersion]$TfSourceVersion"
+        Write-Host "TfSourcePathWin         = $SourcePathWin"
+        Write-Host "TfSourcePathWinAsWsl    = $SourcePathWinAsWsl"
+        Write-Host "TfSourcePathWsl         = $SourcePathWsl"
+        Write-Host "TfArtifactsPathWin      = $ArtifactsPathWin"
+        Write-Host "TfArtifactsPathWinAsWsl = $ArtifactsPathWinAsWsl"
+        Write-Host "TfArtifactsPathWsl      = $ArtifactsPathWsl"
+        Write-Host "TfSourceVersion         = $TfSourceVersion"
+      env:
+        SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+      displayName: Clone TensorFlow
+
+    - task: ms.vss-governance-buildtask.governance-build-task-component-detection.ComponentGovernanceComponentDetection@0
+      displayName: 'Component Detection'
+      continueOnError: true
+
+    - powershell: |
+        $CondaEnv = "build_tensorflow_dml_1.15_$(vars.PyVersion)"
+        if ("$(vars.Architecture)" -eq "x64-linux")
+        {
+          cmd /c "wsl cd $(TfSourcePathWsl); third_party/dml/ci/wsl_build.sh $CondaEnv $(vars.Configuration) $(TfArtifactsPathWsl) ${{parameters.enableTests}} ${{parameters.buildCApi}}"
+        }
+        else
+        {
+          cd "$(TfSourcePathWin)"
+          & "$env:SYSTEMDRIVE/apilot/miniconda3/shell/condabin/conda-hook.ps1"
+          conda activate $CondaEnv
+          if ("${{parameters.enableTests}}" -eq "True")
+          {
+            python build.py --clean --package --tests --config $(vars.Configuration) --build_output $(TfArtifactsPathWin) --telemetry
+          }
+          else
+          {
+            python build.py --clean --package --config $(vars.Configuration) --build_output $(TfArtifactsPathWin) --telemetry
+          }
+
+          if ("${{parameters.buildCApi}}" -eq "True")
+          {
+            python build.py --config $(vars.Configuration) --build_output $(TfArtifactsPathWin) --target //tensorflow/tools/lib_package:libtensorflow --telemetry
+          }
+        }
+      name: build_step
+      displayName: Build.py
+
+    - ${{if parameters.enableTests}}:
+      - powershell: |
+          $CondaEnv = "build_tensorflow_dml_1.15_$(vars.PyVersion)"
+          if ("$(vars.Architecture)" -eq "x64-linux")
+          {
+            cmd /c "wsl cd $(TfSourcePathWsl); third_party/dml/ci/wsl_gather_test_binaries.sh $CondaEnv $(TfArtifactsPathWsl) $(TfArtifactsPathWinAsWsl)/artifacts/tests/test_binaries"
+          }
+          else
+          {
+            & "$env:SYSTEMDRIVE/apilot/miniconda3/shell/condabin/conda-hook.ps1"
+            conda activate $CondaEnv
+            python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(TfArtifactsPathWin) --destination $(TfArtifactsPathWin)\artifacts\tests\test_binaries
+          }
+        name: gather_step
+        displayName: gather_test_binaries.py
+        workingDirectory: $(TfSourcePathWin)
+
+    - powershell: |
+        New-Item -Force -ItemType Directory -Path "$(TfArtifactsPathWin)\artifacts"
+
+        if ("$(vars.Architecture)" -eq "x64-linux")
+        {
+          Write-Host "Copy $(TfArtifactsPathWsl)/python_package/* -> $(TfArtifactsPathWinAsWsl)/artifacts"
+          wsl cp -rT $(TfArtifactsPathWsl)/python_package $(TfArtifactsPathWinAsWsl)/artifacts
+
+          if ("${{parameters.enableTests}}" -eq "True")
+          {
+            Write-Host "Copy third_party/dml/ci/* -> $(TfArtifactsPathWinAsWsl)/artifacts"
+            wsl cp -rT $(TfSourcePathWsl)/third_party/dml/ci $(TfArtifactsPathWinAsWsl)/artifacts
+          }
+
+          if ("${{parameters.buildCApi}}" -eq "True")
+          {
+            Write-Host "Copy $(TfSourcePathWsl)/bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz -> $(TfArtifactsPathWinAsWsl)/artifacts"
+            wsl cp "$(TfSourcePathWsl)/bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz" $(TfArtifactsPathWinAsWsl)/artifacts
+          }
+        }
+        else
+        {
+          # Robocopy returns non-zero exit codes for successful copies, so zero it to prevent ADO task from failing.
+          robocopy /e "$(TfArtifactsPathWin)\python_package" "$(TfArtifactsPathWin)\artifacts"
+          if ($LASTEXITCODE -ge 8) { throw "Robocopy failed with code $LASTEXITCODE" } else { $LASTEXITCODE = 0 }
+          
+          if ("${{parameters.enableTests}}" -eq "True")
+          {
+            robocopy /e "$(TfSourcePathWin)/third_party/dml/ci" "$(TfArtifactsPathWin)\artifacts"
+            if ($LASTEXITCODE -ge 8) { throw "Robocopy failed with code $LASTEXITCODE" } else { $LASTEXITCODE = 0 }
+          }
+
+          if ("${{parameters.buildCApi}}" -eq "True")
+          {
+            Copy-Item "$(TfSourcePathWin)\bazel-bin\tensorflow\tools\lib_package\libtensorflow.tar.gz" "$(TfArtifactsPathWin)\artifacts" -Verbose
+          }
+        }
+      name: stage_artifacts
+      displayName: Stage Artifacts
+
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Build Artifacts
+      inputs:
+        PathtoPublish: '$(TfArtifactsPathWin)\artifacts'
+        ArtifactName: ${{artifact}}
+
+    - ${{if gt(length(parameters.archiveSharePath), 0)}}:
+      - powershell: |
+          $ZipPath = "$(System.ArtifactsDirectory)\${{artifact}}.zip"
+          Compress-Archive -Path '$(TfArtifactsPathWin)\artifacts' -DestinationPath $ZipPath -Verbose
+          New-Item -ItemType Directory -Path '${{parameters.archiveSharePath}}' -Force
+          Copy-Item -Path $ZipPath -Destination '${{parameters.archiveSharePath}}' -Verbose
+        displayName: Copy to Network Share
+        continueOnError: true
+
+    - powershell: |
+        $Duration = ((Get-Date) - [datetime]$(vars.startTicks)).ToString("c")
+        [ordered]@{agentName = $env:AGENT_NAME; status = $env:AGENT_JOBSTATUS; duration = $Duration} | 
+          ConvertTo-Json | 
+          Out-File $(System.ArtifactsDirectory)\${{artifact}}.json
+      name: info_step
+      displayName: Gather Agent Info
+      condition: always()
+
+    - task: PublishBuildArtifacts@1
+      displayName: Publish Agent Info
+      condition: always()
+      inputs:
+        PathtoPublish: $(System.ArtifactsDirectory)\${{artifact}}.json
+        ArtifactName: build

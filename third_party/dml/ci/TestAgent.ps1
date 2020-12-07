@@ -78,6 +78,12 @@ foreach ($TestGroup in $TestGroups)
 
         Write-Host "Copying $TestGroup artifacts..."
         robocopy $BuildArtifactsPath $TestArtifactsPath "test_${TestGroup}_*" /R:3 /W:10
+
+        # Robocopy returns non-zero exit codes for successful copies, so zero it to prevent ADO task from failing.
+        if ($LASTEXITCODE -ge 8) 
+        { 
+            Write-Host "##[error]Robocopy failed with code $LASTEXITCODE"
+        } else { $LASTEXITCODE = 0 }
     }
     else
     {

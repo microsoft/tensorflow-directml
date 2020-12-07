@@ -1,0 +1,95 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
+name: $(Date:yyMMdd-HHmm)$(Rev:.r).$(SourceBranchName)
+
+# No CI trigger; run on a schedule only.
+trigger: none
+
+# Do not trigger on PRs.
+pr: none
+
+# Build nightly at 8 AM UTC (1 AM PDT)
+schedules:
+- cron: "0 8 * * *"
+  displayName: Nightly Run
+  branches:
+    include:
+    - directml
+    - release/*
+  always: false
+
+parameters:
+- name: buildArtifacts
+  displayName: Build Artifacts
+  type: object
+  default: [x64-win-release-cp36, x64-win-debug-cp36, x64-linux-release-cp36]
+
+- name: buildCApi
+  displayName: Build C API
+  type: boolean
+  default: false
+
+- name: testArtifacts
+  displayName: Test Artifacts
+  type: object
+  default: [x64-win-release-cp36, x64-linux-release-cp36]
+
+- name: testGroups
+  displayName: Test Groups
+  type: object
+  default: [python, core]
+
+- name: enableTests
+  displayName: Enable Tests
+  type: boolean
+  default: true
+
+- name: emailTo
+  displayName: Email Results To
+  type: string
+  default: $(emailTo) # the default is stored in the pipeline as a variable
+
+variables:
+  isMasterBranch: ${{eq(variables['Build.SourceBranch'], 'refs/heads/directml')}}
+  isReleaseBranch: ${{startsWith(variables['Build.SourceBranch'], 'refs/heads/release/')}}
+  isMasterOrReleaseBranch: ${{or(eq(variables.isMasterBranch, 'True'), eq(variables.isReleaseBranch, 'True'))}}
+
+stages:
+- stage: buildStage
+  displayName: Build
+  pool: DirectML-Build
+  jobs:
+  - template: build.yml
+    parameters:
+      enableTests: ${{parameters.enableTests}}
+      buildCApi: ${{parameters.buildCApi}}
+      artifacts: ${{parameters.buildArtifacts}}
+      # Archive builds of main branches to a network share (if the variable is set)
+      ${{if eq(variables.isMasterOrReleaseBranch, 'True')}}:
+        archiveSharePath: $(archiveSharePath)
+
+- ${{if parameters.enableTests}}:
+  - stage: testStage
+    displayName: Test
+    dependsOn: buildStage
+    jobs:
+    - template: test.yml
+      parameters:
+        agentPools: ["DirectML", "DirectML-WSL"]
+        testGroups: ${{parameters.testGroups}}
+        artifacts: ${{parameters.testArtifacts}}
+
+- stage: reportStage
+  displayName: Report Results
+  ${{if parameters.enableTests}}:
+    dependsOn: [buildStage, testStage]
+  ${{if not(parameters.enableTests)}}:
+    dependsOn: [buildStage]
+  condition: succeededOrFailed()
+  pool: DirectML-Build
+  jobs:
+  - template: report.yml
+    parameters:
+      emailTo: ${{parameters.emailTo}}
+      enableTests: ${{parameters.enableTests}}
