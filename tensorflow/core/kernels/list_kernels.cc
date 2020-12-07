@@ -825,6 +825,17 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                               .Device(DEVICE_DML)                          \
                               .HostMemory("lengths"),                      \
                           TensorListConcat<DMLDevice, T>)                  \
+  REGISTER_KERNEL_BUILDER(Name("TensorListConcatV2")                       \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML)                          \
+                              .HostMemory("leading_dims")                  \
+                              .HostMemory("element_shape")                 \
+                              .HostMemory("lengths"),                      \
+                          TensorListConcat<DMLDevice, T>)                  \
+  REGISTER_KERNEL_BUILDER(Name("TensorListPushBackBatch")                  \
+                              .TypeConstraint<T>("element_dtype")          \
+                              .Device(DEVICE_DML),                         \
+                          TensorListPushBackBatch<DMLDevice, T>)           \
   REGISTER_KERNEL_BUILDER(Name("TensorListFromTensor")                     \
                               .TypeConstraint<T>("element_dtype")          \
                               .Device(DEVICE_DML)                          \
@@ -843,10 +854,6 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                               .HostMemory("num_elements")                  \
                               .HostMemory("indices"),                      \
                           TensorListScatter<DMLDevice, T>)                 \
-  REGISTER_KERNEL_BUILDER(Name("TensorListPushBackBatch")                  \
-                              .TypeConstraint<T>("element_dtype")          \
-                              .Device(DEVICE_DML),                         \
-                          TensorListPushBackBatch<DMLDevice, T>)           \
   REGISTER_KERNEL_BUILDER(Name("TensorListScatterIntoExistingList")        \
                               .TypeConstraint<T>("element_dtype")          \
                               .Device(DEVICE_DML)                          \
@@ -859,7 +866,15 @@ REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP,
                               .HostMemory("lengths"),                      \
                           TensorListSplit<DMLDevice, T>)
 
-TF_CALL_ALL_TYPES(REGISTER_TENSOR_LIST_OPS_DML);
+TF_CALL_GPU_NUMBER_TYPES(REGISTER_TENSOR_LIST_OPS_DML);
+REGISTER_TENSOR_LIST_OPS_DML(bfloat16);
+TF_CALL_complex64(REGISTER_TENSOR_LIST_OPS_DML);
+TF_CALL_complex128(REGISTER_TENSOR_LIST_OPS_DML);
+TF_CALL_int32(REGISTER_TENSOR_LIST_OPS_DML);
+TF_CALL_int64(REGISTER_TENSOR_LIST_OPS_DML);
+REGISTER_TENSOR_LIST_OPS_DML(bool);
+
+#undef REGISTER_TENSOR_LIST_OPS_DML
 
 #endif  // TENSORFLOW_USE_DIRECTML
 
