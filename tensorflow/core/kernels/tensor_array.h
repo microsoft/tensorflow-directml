@@ -46,7 +46,7 @@ namespace tensor_array {
 // Full implementations are in tensor_array.cc
 template <typename Device, typename T>
 Status AddToTensor(OpKernelContext* ctx, Tensor* sum, const Tensor* current,
-                   const Tensor* add);
+                   const Tensor* add) = delete;
 
 #define TENSOR_ARRAY_WRITE_OR_ADD(Device, T)                         \
   template <>                                                        \
@@ -75,7 +75,7 @@ TF_CALL_bfloat16(TENSOR_ARRAY_WRITE_OR_ADD_GPU);
 #undef TENSOR_ARRAY_WRITE_OR_ADD
 
 template <typename Device, typename T>
-Status TensorSetZero(OpKernelContext* ctx, Tensor* value);
+Status TensorSetZero(OpKernelContext* ctx, Tensor* value) = delete;
 
 #define TENSOR_ARRAY_SET_ZERO(Device, T) \
   template <>                            \
@@ -111,7 +111,8 @@ TF_CALL_bool(TENSOR_ARRAY_SET_ZERO_GPU);
 #undef TENSOR_ARRAY_SET_ZERO
 
 template <typename Device, typename T>
-Status TensorCopyUnaligned(OpKernelContext* ctx, Tensor* src, Tensor* dst);
+Status TensorCopyUnaligned(OpKernelContext* ctx, Tensor* src,
+                           Tensor* dst) = delete;
 
 #define TENSOR_COPY_UNALIGNED(Device, T)                                     \
   template <>                                                                \
