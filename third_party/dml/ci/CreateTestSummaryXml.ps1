@@ -6,14 +6,12 @@
 Converts an aggregate of all JSON test summaries into the xUnit format for VSTS.
 
 .DESCRIPTION
-Autopilot runs TAEF tests using the WTT logging option. Each test agent converts the WTT log into
-a more useful JSON format and uploads it to the data share. This script then reads all the JSON
-results, builds an aggregate summary, and outputs an xUnit-formatted file that VSTS can use to
-display test results in the browser.
+This script then reads all the JSON results, builds an aggregate summary, and outputs an 
+xUnit-formatted file that VSTS can use to display test results in the browser.
 
 This script uses the following rules to aggregate the results:
-- Test groups (DML, WinML_Models, etc.) are reported as test assemblies.
-- Test modules (dmlblackbox.dll, winmlruntimetests.dll, etc.) are reported as test collections.
+- Test groups are reported as test assemblies.
+- Test modules are reported as test collections.
 - A test result is 'pass' if it passes on at least one agent, and has not failed on any agents.
 - A test result is 'fail' if at least one agent fails the test.
 - A test result is 'skipped' if all agents report either 'skipped' or 'blocked' in TAEF.
@@ -26,7 +24,8 @@ xUnit schema: https://xunit.github.io/docs/format-xml-v2.html
 #>
 param
 (
-    [string]$TestArtifactsPath
+    [string]$TestArtifactsPath,
+    [string]$OutputPath = "$TestArtifactsPath\test_summary.xml"
 )
 
 class Test
@@ -320,4 +319,5 @@ $XmlWriter.Flush()
 $XmlWriter.Close()
 
 Write-Host 'Saving XML file...'
-[System.Text.Encoding]::UTF8.GetString($XmlMemoryStream.ToArray()) | Out-File -Encoding utf8 "$TestArtifactsPath\test_summary.xml"
+New-Item -ItemType File -Path $OutputPath -Force
+[System.Text.Encoding]::UTF8.GetString($XmlMemoryStream.ToArray()) | Out-File $OutputPath -Encoding utf8

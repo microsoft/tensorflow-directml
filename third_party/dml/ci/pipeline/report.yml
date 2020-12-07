@@ -1,0 +1,63 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT License.
+
+parameters:
+- name: emailTo
+  type: string
+  default: ''
+- name: buildMetadataArtifactName
+  type: string
+  default: build
+- name: testResultsArtifactName
+  type: string
+  default: test
+- name: enableTests
+  type: boolean
+  default: true
+
+jobs:
+- job: report
+  timeoutInMinutes: 30
+  displayName: Report Results
+  condition: succeededOrFailed()
+  workspace:
+    clean: all
+  steps:
+  - checkout: self
+    fetchDepth: 1
+
+  - task: DownloadBuildArtifacts@0
+    displayName: Download Build Metadata
+    inputs:
+      buildType: current
+      downloadType: single
+      artifactName: ${{parameters.buildMetadataArtifactName}}
+
+  - ${{if parameters.enableTests}}:
+    - task: DownloadBuildArtifacts@0
+      displayName: Download Test Summaries
+      continueOnError: true
+      inputs:
+        buildType: current
+        downloadType: single
+        artifactName: ${{parameters.testResultsArtifactName}}
+        itemPattern: |
+          ${{parameters.testResultsArtifactName}}/matrix.json
+          ${{parameters.testResultsArtifactName}}/test_summary.json
+          ${{parameters.testResultsArtifactName}}/test_summary.xml
+          ${{parameters.testResultsArtifactName}}/agent_summary.json
+
+  - task: PowerShell@2
+    displayName: Create Report Email
+    condition: succeededOrFailed()
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    inputs:
+      targetType: filePath
+      filePath: third_party/dml/ci/CreateReportEmail.ps1
+      arguments: >
+        -TestArtifactsPath $(System.ArtifactsDirectory)/${{parameters.testResultsArtifactName}}
+        -BuildArtifactsPath $(System.ArtifactsDirectory)/${{parameters.buildMetadataArtifactName}}
+        -PipelineRunID $(Build.BuildID)
+        -AccessToken $(System.AccessToken)
+        -EmailTo ${{parameters.emailTo}}

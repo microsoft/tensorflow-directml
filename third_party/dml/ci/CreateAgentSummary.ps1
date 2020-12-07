@@ -7,7 +7,8 @@ Collates agent info into a master summary.
 #>
 param
 (
-    [string]$TestArtifactsPath
+    [string]$TestArtifactsPath,
+    [string]$OutputPath = "$TestArtifactsPath\agent_summary.json"
 )
 
 $AllResults = @{}
@@ -41,14 +42,11 @@ foreach ($AgentPath in $AgentPaths.FullName)
     if (Test-Path $EnvironmentVarsPath)
     {
         $AgentVars = Get-Content $EnvironmentVarsPath | ConvertFrom-Json
-        if ($AgentVars.AutopilotSystemDescription)
-        {
-            $Result.SystemDescription = $AgentVars.AutopilotSystemDescription
-        }
     }
 
     $AgentName = $AgentPath | Split-Path -Leaf
     $AllResults.$AgentName = $Result
 }
 
-ConvertTo-Json $AllResults -Depth 8 | Out-File "$TestArtifactsPath\agent_summary.json" -Encoding utf8
+New-Item -ItemType File -Path $OutputPath -Force
+ConvertTo-Json $AllResults -Depth 8 | Out-File $OutputPath -Encoding utf8
