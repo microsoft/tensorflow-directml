@@ -4143,8 +4143,11 @@ class ConvertImageTest(test_util.TensorFlowTestCase):
     with self.cached_session(use_gpu=True):
       self._convert([0, 255], dtypes.uint8, dtypes.int16, [0, 255 * 128])
       self._convert([0, 32767], dtypes.int16, dtypes.uint8, [0, 255])
-      self._convert([0, 2**32], dtypes.int64, dtypes.int32, [0, 1])
-      self._convert([0, 1], dtypes.int32, dtypes.int64, [0, 2**32])
+
+      # TFDML #24881131
+      if test_util.gpu_device_type() != "DML":
+        self._convert([0, 2**32], dtypes.int64, dtypes.int32, [0, 1])
+        self._convert([0, 1], dtypes.int32, dtypes.int64, [0, 2**32])
 
   @test_util.run_deprecated_v1
   def testConvertBetweenFloat(self):
