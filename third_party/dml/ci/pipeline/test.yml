@@ -57,6 +57,7 @@ jobs:
     - agent.name -equals $(agentName)
   timeoutInMinutes: 60
   cancelTimeoutInMinutes: 1
+  continueOnError: true
   workspace:
     clean: all
   steps:
@@ -141,6 +142,7 @@ jobs:
   pool: ${{parameters.agentPools[0]}}
   timeoutInMinutes: 30
   condition: succeededOrFailed()
+  continueOnError: true
   variables:
     testArtifactsPath: $(System.ArtifactsDirectory)/${{parameters.resultsArtifactName}}
     testSummariesPath: $(System.ArtifactsDirectory)/summaries
