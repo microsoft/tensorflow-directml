@@ -57,6 +57,7 @@ jobs:
     - agent.name -equals $(agentName)
   timeoutInMinutes: 60
   cancelTimeoutInMinutes: 1
+  continueOnError: true
   workspace:
     clean: all
   steps:
