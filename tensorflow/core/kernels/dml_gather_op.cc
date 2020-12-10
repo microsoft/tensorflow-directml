@@ -43,7 +43,7 @@ class GatherInitializationHelper : public InitializationHelper {
     if (ctx->input(0).dtype() == DT_RESOURCE) {
       OP_REQUIRES_OK(
           ctx, LookupResource(ctx, HandleFromInput(ctx, 0), &params_resource_));
-      params_resource_lock_.emplace(*params_resource_->mu());
+      params_resource_->mu()->lock_shared();
     }
 
     const Tensor& params = GetParamsTensor(ctx);
@@ -120,15 +120,11 @@ class GatherInitializationHelper : public InitializationHelper {
                                                 : ctx->input(0);
   }
 
-  void Unlock() const { params_resource_lock_.reset(); }
+  void Unlock() const { params_resource_->mu()->unlock_shared(); }
 
  private:
   int64 axis_;
   int32 positive_batch_dims_;
-
-  // Since the initialization helper and the kernel share the same lifetime,
-  // the mutex should be unlocked before Compute finishes
-  mutable absl::optional<mutex_lock> params_resource_lock_;
   core::RefCountPtr<Var> params_resource_;
 };
 

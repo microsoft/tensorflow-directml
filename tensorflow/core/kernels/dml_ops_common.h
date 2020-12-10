@@ -266,13 +266,15 @@ namespace dml {
 
 template <typename T>
 Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
+  dml::TensorDesc::Dimensions scalar_dims(sizes.size(), 1);
+  dml::TensorDesc::Dimensions scalar_strides(sizes.size(), 0);
+
   auto scalar = dml::Reinterpret(
       dml::FillValueConstant(
-          scope, dml::TensorDesc::Dimensions{1, 1, 1, 1},
-          tensorflow::TfTensorTypeTraits<T>::dml_type,
+          scope, scalar_dims, tensorflow::TfTensorTypeTraits<T>::dml_type,
           tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(value)),
-      sizes,                                  /* broadcast shape */
-      dml::TensorDesc::Dimensions{0, 0, 0, 0} /* broadcast strides */
+      sizes,         /* broadcast shape */
+      scalar_strides /* broadcast strides */
   );
   return scalar;
 }
