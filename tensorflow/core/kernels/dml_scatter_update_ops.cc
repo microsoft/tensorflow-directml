@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <numeric>
+
 #include "tensorflow/core/common_runtime/dml/dml_operator_helper.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/framework/register_types.h"
@@ -116,42 +118,21 @@ struct ScatterUpdateOperation {
 
   dml::Expression operator()(dml::Graph& scope, dml::Expression params,
                              dml::Expression indices, dml::Expression updates,
-                             uint32_t scatter_axis) {
+                             uint32_t scatter_axis, bool int64_indices,
+                             bool scalar_updates) {
     return dml::ScatterElements(params, indices, updates, scatter_axis);
   }
 };
 
-template <typename TParams>
-struct ScatterMinOperation {
-  static constexpr bool inplace_allowed = false;
-
-  dml::Expression operator()(dml::Graph& scope, dml::Expression params,
-                             dml::Expression indices, dml::Expression updates,
-                             uint32_t scatter_axis) {
-    TParams identity_value = std::numeric_limits<TParams>::max();
-    auto identity = dml::ScalarTensor<TParams>(scope, identity_value,
-                                               params.GetOutputDesc().sizes);
-    auto sparse_updates =
-        dml::ScatterElements(identity, indices, updates, scatter_axis);
-
-    return dml::Min(params, sparse_updates);
+struct BinaryMinOperation {
+  dml::Expression operator()(dml::Expression a, dml::Expression b) {
+    return dml::Min(a, b);
   }
 };
 
-template <typename TParams>
-struct ScatterMaxOperation {
-  static constexpr bool inplace_allowed = false;
-
-  dml::Expression operator()(dml::Graph& scope, dml::Expression params,
-                             dml::Expression indices, dml::Expression updates,
-                             uint32_t scatter_axis) {
-    constexpr TParams identity_value = std::numeric_limits<TParams>::min();
-    auto identity = dml::ScalarTensor<TParams>(scope, identity_value,
-                                               params.GetOutputDesc().sizes);
-    auto sparse_updates =
-        dml::ScatterElements(identity, indices, updates, scatter_axis);
-
-    return dml::Max(params, sparse_updates);
+struct BinaryMaxOperation {
+  dml::Expression operator()(dml::Expression a, dml::Expression b) {
+    return dml::Max(a, b);
   }
 };
 
@@ -172,24 +153,78 @@ static constexpr TParams BinaryOperationIdentityValue() {
   if (std::is_same<BinaryOperation, std::minus<dml::Expression>>::value) {
     return static_cast<TParams>(0);
   }
+
+  if (std::is_same<BinaryOperation, BinaryMinOperation>::value) {
+    return std::numeric_limits<TParams>::max();
+  }
+
+  if (std::is_same<BinaryOperation, BinaryMaxOperation>::value) {
+    return std::numeric_limits<TParams>::lowest();
+  }
 }
 
-template <typename BinaryOperation, typename TParams>
+// For arithmetic Scatter operations, TensorFlow supports duplicate indices so
+// we can't use DirectML's Scatter. For now, we can use the graph as a
+// workaround but we should revisit it in the future and add a DirectML API if
+// we get signals that this implementation is a bottleneck.
+template <typename BinaryOperation, DML_REDUCE_FUNCTION reduce_function,
+          typename TParams>
 struct ScatterBinaryOperation {
   static constexpr bool inplace_allowed = false;
 
   dml::Expression operator()(dml::Graph& scope, dml::Expression params,
                              dml::Expression indices, dml::Expression updates,
-                             uint32_t scatter_axis) {
+                             uint32_t scatter_axis, bool int64_indices,
+                             bool scalar_updates) {
+    auto params_sizes = params.GetOutputDesc().sizes;
+    uint32_t row_count = params_sizes[scatter_axis];
+
+    dml::TensorDesc::Dimensions row_indices_sizes({1, 1, row_count, 1});
+
+    auto row_indices = dml::FillValueSequence(
+        scope, row_indices_sizes, indices.GetOutputDesc().dataType,
+        dml::ScalarTensor(0, indices.GetOutputDesc().dataType),
+        dml::ScalarTensor(1, indices.GetOutputDesc().dataType));
+
+    auto indices_sizes = indices.GetOutputDesc().sizes;
+    dml::TensorDesc::Dimensions broadcasted_sizes({
+        1,
+        indices_sizes[2],
+        row_count,
+        params_sizes[3],
+    });
+
+    auto broadcasted_row_indices =
+        dml::Reinterpret(row_indices, broadcasted_sizes,
+                         dml::TensorDesc::Dimensions({0, 0, 1, 0}));
+
+    uint32_t indices_stride_multiplier = int64_indices ? 2 : 1;
+    auto broadcasted_indices = dml::Reinterpret(
+        indices, broadcasted_sizes,
+        dml::TensorDesc::Dimensions({0, indices_stride_multiplier, 0, 0}));
+
+    dml::Expression broadcasted_updates =
+        scalar_updates
+            ? dml::Reinterpret(updates, broadcasted_sizes,
+                               dml::TensorDesc::Dimensions({0, 0, 0, 0}))
+            : dml::Reinterpret(
+                  updates, broadcasted_sizes,
+                  dml::TensorDesc::Dimensions({0, indices_sizes[3], 0, 1}));
+
     constexpr TParams identity_value =
         BinaryOperationIdentityValue<BinaryOperation, TParams>();
-    auto identity = dml::ScalarTensor<TParams>(scope, identity_value,
-                                               params.GetOutputDesc().sizes);
+
+    auto identity =
+        dml::ScalarTensor<TParams>(scope, identity_value, broadcasted_sizes);
 
     auto sparse_updates =
-        dml::ScatterElements(identity, indices, updates, scatter_axis);
+        dml::If(broadcasted_indices == broadcasted_row_indices,
+                broadcasted_updates, identity);
 
-    return BinaryOperation()(params, sparse_updates);
+    auto reduced_updates = dml::Reduce(sparse_updates, reduce_function, {1});
+    auto result = BinaryOperation()(params, reduced_updates);
+
+    return result;
   }
 };
 
@@ -206,60 +241,61 @@ class DmlScatterUpdateKernel : public DmlKernel {
     const TensorShape& params_shape = params_tensor.shape();
     const TensorShape& indices_shape = ctx->GetInputTensorShape(1);
     const TensorShape& updates_shape = ctx->GetInputTensorShape(2);
+    bool scalar_updates = TensorShapeUtils::IsScalar(updates_shape);
 
     const TensorShape flat_params_shape({
-          params_shape.dim_size(0),
-          params_shape.num_elements() / params_shape.dim_size(0),
-      });
+        params_shape.dim_size(0),
+        params_shape.num_elements() / params_shape.dim_size(0),
+    });
+
+    const TensorShape flat_indices_shape({
+        indices_shape.num_elements(),
+        params_shape.num_elements() / params_shape.dim_size(0),
+    });
+
+    const TensorShape non_broadcast_flat_indices_shape({
+        indices_shape.num_elements(),
+        1,
+    });
+
+    const TensorShape flat_updates_shape({
+        indices_shape.num_elements(),
+        params_shape.num_elements() / params_shape.dim_size(0),
+    });
+
+    const TensorShape& non_broadcast_flat_updates_shape =
+        scalar_updates ? updates_shape : flat_updates_shape;
+
+    DmlTensorInfo input_tensor_info;
+    input_tensor_info.kernel_index = 0;
+    input_tensor_info.desc = DmlTensorDesc::Create(
+        params_tensor.dtype(), flat_params_shape, flat_params_shape);
+
+    DmlTensorInfo indices_tensor_info;
+    indices_tensor_info.kernel_index = 1;
+    indices_tensor_info.desc =
+        DmlTensorDesc::Create(ctx->GetInputDataType(1), flat_indices_shape,
+                              non_broadcast_flat_indices_shape);
+
+    DmlTensorInfo updates_tensor_info;
+    updates_tensor_info.kernel_index = 2;
+    updates_tensor_info.desc =
+        DmlTensorDesc::Create(ctx->GetInputDataType(2), flat_updates_shape,
+                              non_broadcast_flat_updates_shape);
+
+    DmlTensorInfo output_tensor_info;
+    output_tensor_info.kernel_index = 0;
+    output_tensor_info.desc = DmlTensorDesc::Create(params_tensor.dtype(),
+                                                    params_shape, params_shape);
 
     DmlKernelTensors tensors;
-    {
-      DmlTensorInfo input_tensor_info;
-      input_tensor_info.kernel_index = 0;
-      input_tensor_info.desc = DmlTensorDesc::Create(
-          params_tensor.dtype(), flat_params_shape, flat_params_shape);
-      tensors.inputs.push_back(std::move(input_tensor_info));
-    }
+    tensors.inputs = {
+        input_tensor_info,
+        indices_tensor_info,
+        updates_tensor_info,
+    };
 
-    {
-      const TensorShape non_broadcastflat_indices_shape({
-          indices_shape.num_elements(),
-          1,
-      });
-
-      const TensorShape flat_indices_shape({
-          indices_shape.num_elements(),
-          updates_shape.num_elements() / indices_shape.num_elements(),
-      });
-
-      DmlTensorInfo indices_tensor_info;
-      indices_tensor_info.kernel_index = 1;
-      indices_tensor_info.desc =
-          DmlTensorDesc::Create(ctx->GetInputDataType(1), flat_indices_shape,
-                                non_broadcastflat_indices_shape);
-      tensors.inputs.push_back(std::move(indices_tensor_info));
-    }
-
-    {
-      const TensorShape flat_updates_shape({
-          indices_shape.num_elements(),
-          updates_shape.num_elements() / indices_shape.num_elements(),
-      });
-
-      DmlTensorInfo updates_tensor_info;
-      updates_tensor_info.kernel_index = 2;
-      updates_tensor_info.desc = DmlTensorDesc::Create(
-          ctx->GetInputDataType(2), flat_updates_shape, flat_updates_shape);
-      tensors.inputs.push_back(std::move(updates_tensor_info));
-    }
-
-    {
-      DmlTensorInfo output_tensor_info;
-      output_tensor_info.kernel_index = 0;
-      output_tensor_info.desc = DmlTensorDesc::Create(
-          params_tensor.dtype(), params_shape, params_shape);
-      tensors.outputs.push_back(std::move(output_tensor_info));
-    }
+    tensors.outputs = {output_tensor_info};
 
     if (params_tensor.dtype() != DT_RESOURCE) {
       // The input ref and the output ref must refer to the same memory
@@ -274,7 +310,9 @@ class DmlScatterUpdateKernel : public DmlKernel {
 
     const uint32_t scatter_axis =
         params.GetOutputDesc().sizes.size() - flat_params_shape.dims();
-    auto result = ScatterOp()(scope, params, indices, updates, scatter_axis);
+    auto result = ScatterOp()(scope, params, indices, updates, scatter_axis,
+                              Is64BitIntegerType(ctx->GetInputDataType(1)),
+                              scalar_updates);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
@@ -364,19 +402,28 @@ class DmlScatterUpdateKernel : public DmlKernel {
   REGISTER_RESOURCE_SCATTER_KERNEL_INDEX(type, name, op, int64);
 
 template <typename type>
-using ScatterPlusOp = ScatterBinaryOperation<std::plus<dml::Expression>, type>;
+using ScatterPlusOp = ScatterBinaryOperation<std::plus<dml::Expression>,
+                                             DML_REDUCE_FUNCTION_SUM, type>;
 
 template <typename type>
-using ScatterMinusOp =
-    ScatterBinaryOperation<std::minus<dml::Expression>, type>;
+using ScatterMinusOp = ScatterBinaryOperation<std::minus<dml::Expression>,
+                                              DML_REDUCE_FUNCTION_SUM, type>;
 
 template <typename type>
-using ScatterMulOp =
-    ScatterBinaryOperation<std::multiplies<dml::Expression>, type>;
+using ScatterMulOp = ScatterBinaryOperation<std::multiplies<dml::Expression>,
+                                            DML_REDUCE_FUNCTION_MULTIPLY, type>;
 
 template <typename type>
-using ScatterDivOp =
-    ScatterBinaryOperation<std::divides<dml::Expression>, type>;
+using ScatterDivOp = ScatterBinaryOperation<std::divides<dml::Expression>,
+                                            DML_REDUCE_FUNCTION_MULTIPLY, type>;
+
+template <typename type>
+using ScatterMinOp =
+    ScatterBinaryOperation<BinaryMinOperation, DML_REDUCE_FUNCTION_MIN, type>;
+
+template <typename type>
+using ScatterMaxOp =
+    ScatterBinaryOperation<BinaryMaxOperation, DML_REDUCE_FUNCTION_MAX, type>;
 
 #define REGISTER_DML_KERNEL(type)                                         \
   REGISTER_SCATTER_KERNEL(type, "ScatterUpdate", ScatterUpdateOperation); \
@@ -384,8 +431,8 @@ using ScatterDivOp =
   REGISTER_SCATTER_KERNEL(type, "ScatterSub", ScatterMinusOp<type>);      \
   REGISTER_SCATTER_KERNEL(type, "ScatterMul", ScatterMulOp<type>);        \
   REGISTER_SCATTER_KERNEL(type, "ScatterDiv", ScatterDivOp<type>);        \
-  REGISTER_SCATTER_KERNEL(type, "ScatterMin", ScatterMinOperation<type>); \
-  REGISTER_SCATTER_KERNEL(type, "ScatterMax", ScatterMaxOperation<type>); \
+  REGISTER_SCATTER_KERNEL(type, "ScatterMin", ScatterMinOp<type>);        \
+  REGISTER_SCATTER_KERNEL(type, "ScatterMax", ScatterMaxOp<type>);        \
   REGISTER_RESOURCE_SCATTER_KERNEL(type, "ResourceScatterUpdate",         \
                                    ScatterUpdateOperation);               \
   REGISTER_RESOURCE_SCATTER_KERNEL(type, "ResourceScatterAdd",            \
@@ -397,9 +444,9 @@ using ScatterDivOp =
   REGISTER_RESOURCE_SCATTER_KERNEL(type, "ResourceScatterDiv",            \
                                    ScatterDivOp<type>);                   \
   REGISTER_RESOURCE_SCATTER_KERNEL(type, "ResourceScatterMin",            \
-                                   ScatterMinOperation<type>);            \
+                                   ScatterMinOp<type>);                   \
   REGISTER_RESOURCE_SCATTER_KERNEL(type, "ResourceScatterMax",            \
-                                   ScatterMaxOperation<type>);
+                                   ScatterMaxOp<type>);
 
 // We register the subset of types that the GPU device registers for these
 // operators, which is why half is not included
