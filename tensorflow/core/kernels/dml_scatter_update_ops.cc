@@ -74,7 +74,9 @@ class ScatterUpdateInitializationHelper : public InitializationHelper {
 
   ScatterUpdateInitializationHelper(OpKernelContext* ctx,
                                     std::shared_ptr<const Attributes> attr) {
-    if (ctx->input(0).dtype() == DT_RESOURCE) {
+    DCHECK(ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE);
+
+    if (!ctx->input_is_ref(0)) {
       OP_REQUIRES_OK(
           ctx, LookupResource(ctx, HandleFromInput(ctx, 0), &params_resource_));
       params_resource_->mu()->lock_shared();
@@ -103,8 +105,10 @@ class ScatterUpdateInitializationHelper : public InitializationHelper {
   }
 
   const Tensor& GetParamsTensor(OpKernelContext* ctx) const {
-    return ctx->input(0).dtype() == DT_RESOURCE ? *params_resource_->tensor()
-                                                : ctx->input(0);
+    DCHECK(ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE);
+
+    return params_resource_ ? *params_resource_->tensor()
+                            : ctx->mutable_input(0, false);
   }
 
   void Unlock() const {
