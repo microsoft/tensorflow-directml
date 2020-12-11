@@ -120,7 +120,11 @@ class GatherInitializationHelper : public InitializationHelper {
                                                 : ctx->input(0);
   }
 
-  void Unlock() const { params_resource_->mu()->unlock_shared(); }
+  void Unlock() const {
+    if (params_resource_) {
+      params_resource_->mu()->unlock_shared();
+    }
+  }
 
  private:
   int64 axis_;
