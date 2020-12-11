@@ -351,7 +351,7 @@ DML_SCALAR_UNION ScalarTensor(double value, DML_TENSOR_DATA_TYPE data_type) {
       break;
 
     default:
-      DML_CHECK_SUCCEEDED(E_NOTIMPL);
+      DML_CHECK_SUCCEEDED(E_INVALIDARG);
       break;
   }
 
