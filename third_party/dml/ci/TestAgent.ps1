@@ -66,15 +66,17 @@ foreach ($TestGroup in $TestGroups)
         # We convert the AbslTest log to the same JSON format as the TAEF tests to avoid duplicating postprocessing steps.
         # After this step, there should be no differences between the 2 pipelines.
         Write-Host "Parsing $TestGroup results..."
-        $TestResults = & "$PSScriptRoot\ParseAbslTestLogs.ps1" $TestResultFragments
-        $TestResultFragments | Remove-Item
+        py "$PSScriptRoot\generate_absl_test_summary.py" `
+            --log_path test_${TestGroup}_log.txt `
+            --out_summary_path "$BuildArtifactsPath/test_${TestGroup}_summary.json" `
+            --out_error_log_path "$BuildArtifactsPath/test_${TestGroup}_errors.txt" --xml_paths ($TestResultFragments | Join-String -Separator " ")
 
-        $Results.Summary = $TestResults
-        $Results | ConvertTo-Json -Depth 8 -Compress | Out-File "$BuildArtifactsPath/test_${TestGroup}_summary.json" -Encoding utf8
-        if ($TestResults.Errors)
+        if ($LASTEXITCODE -ne 0)
         {
-            $TestResults.Errors | Out-File "$BuildArtifactsPath/test_${TestGroup}_errors.txt"
+            throw "generate_absl_test_summary.py failed"
         }
+
+        $TestResultFragments | Remove-Item
 
         Write-Host "Copying $TestGroup artifacts..."
         robocopy $BuildArtifactsPath $TestArtifactsPath "test_${TestGroup}_*" /R:3 /W:10
