@@ -27,8 +27,8 @@ limitations under the License.
 namespace tensorflow {
 
 // Check whether updates.shape = indices.shape + params.shape[1:]
-static bool ValidShapes(const Tensor& params, const Tensor& updates,
-                        const Tensor& indices) {
+static bool ValidRefShapes(const Tensor& params, const Tensor& updates,
+                           const Tensor& indices) {
   if (updates.dims() == 0) return true;
   if (updates.dims() != indices.dims() + params.dims() - 1) return false;
   for (int d = 0; d < indices.dims(); d++) {
@@ -44,9 +44,9 @@ static bool ValidShapes(const Tensor& params, const Tensor& updates,
   return true;
 }
 
-static Status DoValidationChecking(const Tensor& params, const Tensor& indices,
-                                   const Tensor& updates) {
-  if (params.dtype() != DT_RESOURCE && !params.IsInitialized()) {
+static Status ValidateRefScatter(const Tensor& params, const Tensor& indices,
+                                 const Tensor& updates) {
+  if (!params.IsInitialized()) {
     return errors::FailedPrecondition("Null ref for params");
   }
 
@@ -55,13 +55,53 @@ static Status DoValidationChecking(const Tensor& params, const Tensor& indices,
                                    params.shape().DebugString());
   }
 
-  if (!ValidShapes(params, updates, indices)) {
+  if (!ValidRefShapes(params, updates, indices)) {
     return errors::InvalidArgument(
         "Must have updates.shape = indices.shape + "
         "params.shape[1:] or updates.shape = [], got ",
         "updates.shape ", updates.shape().DebugString(), ", indices.shape ",
         indices.shape().DebugString(), ", params.shape ",
         params.shape().DebugString());
+  }
+
+  return Status::OK();
+}
+
+static Status ValidateResourceScatter(const Tensor& indices,
+                                      const Tensor& updates) {
+  int64 num_updates = updates.NumElements();
+  int64 num_indices = indices.NumElements();
+  if (num_indices > 0 && !TensorShapeUtils::IsScalar(updates.shape()) &&
+      num_updates % num_indices != 0) {
+    return errors::InvalidArgument(
+        "shape of indices (", indices.shape().DebugString(),
+        ") is not compatible with the shape of updates (",
+        updates.shape().DebugString(), ")");
+  }
+
+  return Status::OK();
+}
+
+template <typename Index>
+static Status ValidateCommonScatter(const Tensor& params,
+                                    const Tensor& indices) {
+  // Check that we have enough index space
+  const int64 N_big = indices.NumElements();
+
+  if (N_big > std::numeric_limits<Index>::max()) {
+    return errors::InvalidArgument("indices has too many elements for ",
+                                   DataTypeString(DataTypeToEnum<Index>::v()),
+                                   " indexing: ", N_big, " > ",
+                                   std::numeric_limits<Index>::max());
+  }
+
+  const Index N = static_cast<Index>(indices.NumElements());
+
+  if (params.dim_size(0) > std::numeric_limits<Index>::max()) {
+    return errors::InvalidArgument("params.shape[0] too large for ",
+                                   DataTypeString(DataTypeToEnum<Index>::v()),
+                                   " indexing: ", params.dim_size(0), " > ",
+                                   std::numeric_limits<Index>::max());
   }
 
   return Status::OK();
@@ -82,29 +122,22 @@ class ScatterUpdateInitializationHelper : public InitializationHelper {
       params_resource_->mu()->lock_shared();
     }
 
-    const Tensor& params = GetParamsTensor(ctx);
+    const Tensor params = GetParamsTensor(ctx);
     const Tensor& indices = ctx->input(1);
     const Tensor& updates = ctx->input(2);
-    OP_REQUIRES_OK(ctx, DoValidationChecking(params, indices, updates));
 
-    // Check that we have enough index space
-    const int64 N_big = indices.NumElements();
-    OP_REQUIRES(
-        ctx, N_big <= std::numeric_limits<Index>::max(),
-        errors::InvalidArgument("indices has too many elements for ",
-                                DataTypeString(DataTypeToEnum<Index>::v()),
-                                " indexing: ", N_big, " > ",
-                                std::numeric_limits<Index>::max()));
-    const Index N = static_cast<Index>(indices.NumElements());
-    OP_REQUIRES(
-        ctx, params.dim_size(0) <= std::numeric_limits<Index>::max(),
-        errors::InvalidArgument("params.shape[0] too large for ",
-                                DataTypeString(DataTypeToEnum<Index>::v()),
-                                " indexing: ", params.dim_size(0), " > ",
-                                std::numeric_limits<Index>::max()));
+    if (ctx->input_is_ref(0)) {
+      OP_REQUIRES_OK(ctx, ValidateRefScatter(params, indices, updates));
+    }
+
+    OP_REQUIRES_OK(ctx, ValidateCommonScatter<Index>(params, indices));
+
+    if (!ctx->input_is_ref(0)) {
+      OP_REQUIRES_OK(ctx, ValidateResourceScatter(indices, updates));
+    }
   }
 
-  const Tensor& GetParamsTensor(OpKernelContext* ctx) const {
+  Tensor GetParamsTensor(OpKernelContext* ctx) const {
     DCHECK(ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE);
 
     return params_resource_ ? *params_resource_->tensor()
@@ -243,7 +276,7 @@ class DmlScatterUpdateKernel : public DmlKernel {
 
   explicit DmlScatterUpdateKernel(DmlKernelConstruction* ctx,
                                   const InitHelper* init_helper) {
-    const Tensor& params_tensor =
+    const Tensor params_tensor =
         init_helper->GetParamsTensor(ctx->GetOpKernelContext());
 
     const TensorShape& params_shape = params_tensor.shape();
@@ -331,7 +364,7 @@ class DmlScatterUpdateKernel : public DmlKernel {
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     auto init_helper = ctx->GetInitializationHelper<InitHelper>();
 
-    const Tensor& params_tensor =
+    const Tensor params_tensor =
         init_helper->GetParamsTensor(ctx->GetOpKernelContext());
 
     // Create input buffers
