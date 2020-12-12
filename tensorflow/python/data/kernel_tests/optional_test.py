@@ -91,8 +91,6 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
     with self.assertRaises(errors.InvalidArgumentError):
       self.evaluate(opt.get_value())
 
-  # TFDML #25510189
-  @test_util.skip_dml
   def testAddN(self):
     devices = ["/cpu:0"]
     if test_util.is_gpu_available():
@@ -119,8 +117,6 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
                                              opt_none1.value_structure)
         self.assertFalse(self.evaluate(add_opt.has_value()))
 
-  # TFDML #25510189
-  @test_util.skip_dml
   def testNestedAddN(self):
     devices = ["/cpu:0"]
     if test_util.is_gpu_available():
@@ -141,8 +137,6 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
                                                    opt1.value_structure)
         self.assertAllEqual(inner_add_opt.get_value(), [4, 6.0])
 
-  # TFDML #25510189
-  @test_util.skip_dml
   def testZerosLike(self):
     devices = ["/cpu:0"]
     if test_util.is_gpu_available():
@@ -165,8 +159,6 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
                                                opt_none.value_structure)
         self.assertFalse(self.evaluate(zeros_opt.has_value()))
 
-  # TFDML #25510189
-  @test_util.skip_dml
   def testNestedZerosLike(self):
     devices = ["/cpu:0"]
     if test_util.is_gpu_available():

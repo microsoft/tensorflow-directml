@@ -125,8 +125,6 @@ class KerasMultiWorkerOptimizerTest(test_base.IndependentWorkerTestBase,
       threads_to_join = [threads['worker'][0]]
     self.join_independent_workers(threads_to_join)
 
-  # TFDML #25564181
-  @tf_test_util.skip_dml
   @combinations.generate(
       combinations.combine(
           mode=['graph'],

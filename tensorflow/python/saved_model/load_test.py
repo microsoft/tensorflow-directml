@@ -162,8 +162,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
     self.evaluate(imported.weights.assign(4.0))
     self.assertEqual(8., self.evaluate(imported.f(constant_op.constant(2.))))
 
-  # TFDML #25563352
-  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_capture_constant(self, cycles):
     root = tracking.AutoTrackable()
@@ -629,8 +627,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
     cycle(m, cycles)
     self.assertEqual(4.0, m.f(constant_op.constant(2.0)).numpy())
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_basic_backprop(self, cycles):
     weight = variables.Variable(1., trainable=True)
     bias = variables.Variable(0., trainable=True)
@@ -649,8 +645,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
       grad = t.gradient(loss, [imported.weight, imported.bias])
       self.assertAllClose(grad, [3.5, 1.0])
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_nested_backprop(self, cycles):
     weight = variables.Variable(1., trainable=True)
     bias = variables.Variable(0., trainable=True)
@@ -1072,8 +1066,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
     imported.variables[1].assign(4.)
     self.assertAllClose([9., 16.], [loss() for loss in imported.losses])
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_captured_constant(self, cycles):
     const = array_ops.zeros([100])
     root = tracking.AutoTrackable()
@@ -1204,8 +1196,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
     root.lookup2 = _make_lookup_function(table2)
     return root
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_table(self, cycles):
     root = self._make_model_with_tables()
     imported = cycle(root, cycles, signatures={})
@@ -1213,8 +1203,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual([0, -1, -1, 2], imported.lookup1(keys).numpy())
     self.assertAllEqual([2, 0, 1, -1], imported.lookup2(keys).numpy())
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_table_collections_untouched_eager(self, cycles):
 
     def _gather_nonempty_collections():
@@ -1234,8 +1222,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
     cycle(root, cycles)
     self.assertEqual(original_collections, _gather_nonempty_collections())
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_table_in_graph(self, cycles):
     root = self._make_model_with_tables()
 
@@ -1314,8 +1300,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
     self.assertAllEqual(3, root.f(constant_op.constant(2)).numpy())
     self.assertAllEqual(4, root.f(constant_op.constant(3)).numpy())
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_partial(self, cycles):
     def f(x, y):
       return x + y
@@ -1613,8 +1597,6 @@ class LoadTest(test.TestCase, parameterized.TestCase):
     self.assertEqual(({"output_0": 1., "output_1": 0.}),
                      self.evaluate(root.signatures["serving_default"]()))
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_model_with_custom_function_attached(self, cycles):
     root = util.Checkpoint(model=sequential.Sequential([core.Dense(2)]))
 
@@ -1799,8 +1781,6 @@ class KerasLoadTest(test.TestCase, parameterized.TestCase):
         dict(out=2., out_1=3.),
         loaded.signatures["serving_default"](constant_op.constant(1.)))
 
-  # TFDML #25563352
-  @test_util.skip_dml
   def test_functional_model_with_conv(self, cycles):
     x = input_layer.Input(name="x", shape=(None, None, 3), dtype=dtypes.float32)
     conved = convolutional.Conv2D(filters=3, kernel_size=3, dilation_rate=2)(x)

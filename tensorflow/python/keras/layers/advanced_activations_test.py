@@ -37,14 +37,10 @@ class AdvancedActivationsTest(keras_parameterized.TestCase):
                                kwargs={'alpha': alpha},
                                input_shape=(2, 3, 4))
 
-  # TFDML #25557482
-  @test_util.skip_dml
   def test_prelu(self):
     testing_utils.layer_test(keras.layers.PReLU, kwargs={},
                              input_shape=(2, 3, 4))
 
-  # TFDML #25557482
-  @test_util.skip_dml
   def test_prelu_share(self):
     testing_utils.layer_test(keras.layers.PReLU,
                              kwargs={'shared_axes': 1},
@@ -95,8 +91,6 @@ class AdvancedActivationsTest(keras_parameterized.TestCase):
             kwargs={'negative_slope': -2},
             input_shape=(2, 3, 4))
 
-  # TFDML #25557482
-  @test_util.skip_dml
   @keras_parameterized.run_with_all_model_types
   def test_layer_as_activation(self):
     layer = keras.layers.Dense(1, activation=keras.layers.ReLU())

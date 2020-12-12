@@ -72,8 +72,6 @@ class StackOpTest(test.TestCase):
         c = array_ops.parallel_stack(xs)
         self.assertAllEqual(c.eval(), data)
 
-  # TFDML #25510624
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSimpleParallelGPU(self):
     np.random.seed(7)
@@ -124,8 +122,6 @@ class StackOpTest(test.TestCase):
         c = array_ops.parallel_stack(data)
         self.assertAllEqual(c.eval(), data)
 
-  # TFDML #25510624
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testConstParallelGPU(self):
     np.random.seed(7)
@@ -204,8 +200,6 @@ class StackOpTest(test.TestCase):
     self.assertAllEqual(stacked, expected)
     self.assertAllEqual(parallel_stacked, expected)
 
-  # TFDML #25510624
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testAxis0DefaultGPU(self):
     with self.session(use_gpu=True):

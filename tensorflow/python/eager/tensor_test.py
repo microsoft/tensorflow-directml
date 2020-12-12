@@ -272,8 +272,6 @@ class TFETensorTest(test_util.TensorFlowTestCase):
     for list_element, tensor_element in zip(l, t):
       self.assertAllEqual(list_element, tensor_element.numpy())
 
-  # TFDML #25564709
-  @test_util.skip_dml
   @test_util.run_gpu_only
   def testStringTensorOnGPU(self):
     with ops.device(test_util.gpu_device_name()):
@@ -405,8 +403,6 @@ class TFETensorTest(test_util.TensorFlowTestCase):
     t = constant_op.constant([], dtype=np.float32)
     self.assertAllEqual(np.array(memoryview(t)), np.array([]))
 
-  # TFDML #25510688
-  @test_util.skip_dml
   @test_util.run_gpu_only
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testMemoryviewCopyToCPU(self):

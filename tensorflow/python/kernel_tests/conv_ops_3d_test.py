@@ -204,7 +204,7 @@ class Conv3DTest(test.TestCase):
             self.assertAllClose(
                 e_value.flatten(), c_value.flatten(), atol=tolerance, rtol=1e-6)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testConv3D1x1x1Filter(self):
     expected_output = [
@@ -233,7 +233,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         expected=expected_output)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testConv3D1x1x1Filter2x1x1Dilation(self):
     if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
@@ -245,7 +245,7 @@ class Conv3DTest(test.TestCase):
           dilations=[2, 1, 1])
 
   # Expected values computed using scipy's correlate function.
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testConv3D2x2x2Filter(self):
     expected_output = [
@@ -262,7 +262,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         expected=expected_output)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testConv3D2x2x2Filter1x2x1Dilation(self):
     if test.is_gpu_available(skip_devices=["SYCL"]) or test_util.IsMklEnabled():
@@ -273,7 +273,7 @@ class Conv3DTest(test.TestCase):
           padding="VALID",
           dilations=[1, 2, 1])
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testConv3DStrides(self):
     expected_output = [
@@ -296,7 +296,7 @@ class Conv3DTest(test.TestCase):
         padding="SAME",
         expected=expected_output)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testConv3D2x2x2FilterStride2(self):
     expected_output = [
@@ -309,7 +309,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         expected=expected_output)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testConv3DStride3(self):
     expected_output = [
@@ -327,7 +327,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         expected=expected_output)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testConv3D2x2x2FilterStride2Same(self):
     expected_output = [
@@ -368,7 +368,7 @@ class Conv3DTest(test.TestCase):
       values = self.evaluate(conv)
       self.assertEqual(values.shape, tensor_shape.TensorShape(output_shape))
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testKernelSmallerThanStride(self):
     expected_output = [
@@ -413,7 +413,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         expected=expected_output)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   def testKernelSizeMatchesInputSize(self):
     self._VerifyValues(
@@ -521,7 +521,7 @@ class Conv3DTest(test.TestCase):
       self._ConstructAndTestGradientForConfig(data_format=data_format,
                                               use_gpu=use_gpu, **kwargs)
 
-  # TFDML #25512586
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientValidPaddingStrideOne(self):
@@ -535,7 +535,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         test_input=True)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testFilterGradientValidPaddingStrideOne(self):
@@ -549,7 +549,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         test_input=False)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientValidPaddingStrideTwo(self):
@@ -563,7 +563,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         test_input=True)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testFilterGradientValidPaddingStrideTwo(self):
@@ -577,7 +577,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         test_input=False)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientValidPaddingStrideThree(self):
@@ -591,7 +591,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         test_input=True)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testFilterGradientValidPaddingStrideThree(self):
@@ -605,7 +605,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         test_input=False)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientSamePaddingStrideOne(self):
@@ -619,7 +619,7 @@ class Conv3DTest(test.TestCase):
         padding="SAME",
         test_input=True)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testFilterGradientSamePaddingStrideOne(self):
@@ -633,7 +633,7 @@ class Conv3DTest(test.TestCase):
         padding="SAME",
         test_input=False)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientSamePaddingStrideTwo(self):
@@ -647,7 +647,7 @@ class Conv3DTest(test.TestCase):
         padding="SAME",
         test_input=True)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testFilterGradientSamePaddingStrideTwo(self):
@@ -661,7 +661,7 @@ class Conv3DTest(test.TestCase):
         padding="SAME",
         test_input=False)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientSamePaddingStrideThree(self):
@@ -675,7 +675,7 @@ class Conv3DTest(test.TestCase):
         padding="SAME",
         test_input=True)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testFilterGradientSamePaddingStrideThree(self):
@@ -689,7 +689,7 @@ class Conv3DTest(test.TestCase):
         padding="SAME",
         test_input=False)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientSamePaddingDifferentStrides(self):
@@ -703,7 +703,7 @@ class Conv3DTest(test.TestCase):
         padding="SAME",
         test_input=True)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testFilterGradientKernelSizeMatchesInputSize(self):
@@ -717,7 +717,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         test_input=False)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientKernelSizeMatchesInputSize(self):
@@ -744,7 +744,7 @@ class Conv3DTest(test.TestCase):
 
   # Test the fast path in gemm_pack_rhs/gemm_pack_colmajor_block, when channel
   # dimension is a multiple of packet size.
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testInputGradientValidPaddingStrideOneFastPath(self):
@@ -758,7 +758,7 @@ class Conv3DTest(test.TestCase):
         padding="VALID",
         test_input=True)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testFilterGradientValidPaddingStrideOneFastPath(self):
@@ -834,7 +834,7 @@ class Conv3DTest(test.TestCase):
       self.assertArrayNear(expected_value.flatten(), actual_value.flatten(),
                            err)
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testConv3D2x2Depth3ValidBackpropFilterStride1x1Dilation2x1(self):
@@ -852,7 +852,7 @@ class Conv3DTest(test.TestCase):
             err=1e-5,
             mode="filter")
 
-  # TFDML #25509207
+  # TFDML #31059117
   @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testConv3D2x2Depth3ValidBackpropInputStride1x1Dilation2x1(self):

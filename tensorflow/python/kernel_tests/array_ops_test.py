@@ -592,16 +592,14 @@ class StridedSliceTest(test_util.TensorFlowTestCase):
         _ = checker[::1, ::1, ::1]
         # Not zero slice
         _ = checker[::1, ::5, ::2]
-        # TFDML #25681907
-        if test_util.gpu_device_type() != "DML":
-          # Reverse in each dimension independently
-          _ = checker[::-1, :, :]
-          _ = checker[:, ::-1, :]
-          _ = checker[:, :, ::-1]
-          ## negative index tests i.e. n-2 in first component
-          _ = checker[-2::-1, :, ::1]
-          # negative index tests i.e. n-2 in first component, non-unit stride
-          _ = checker[-2::-1, :, ::2]
+        # Reverse in each dimension independently
+        _ = checker[::-1, :, :]
+        _ = checker[:, ::-1, :]
+        _ = checker[:, :, ::-1]
+        ## negative index tests i.e. n-2 in first component
+        _ = checker[-2::-1, :, ::1]
+        # negative index tests i.e. n-2 in first component, non-unit stride
+        _ = checker[-2::-1, :, ::2]
 
         # Check rank-0 examples
         checker2 = StridedSliceChecker(self, 5, tensor_type=tensor_type)
@@ -735,10 +733,8 @@ class StridedSliceTest(test_util.TensorFlowTestCase):
       # newaxis in between ellipsis and explicit range
       _ = checker[..., np.newaxis, :]
       _ = checker[:, ..., np.newaxis, :, :]
-      # TFDML #25681907
-      if test_util.gpu_device_type() != "DML":
-        # Reverse final dimension with new axis
-        _ = checker[:, :, np.newaxis, :, 2::-1]
+      # Reverse final dimension with new axis
+      _ = checker[:, :, np.newaxis, :, 2::-1]
       # Ellipsis in middle of two newaxis
       _ = checker[np.newaxis, ..., np.newaxis]
 

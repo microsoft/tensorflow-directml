@@ -324,8 +324,6 @@ class SaverUtilsTest(test.TestCase):
 
 class CheckpointManagerTest(test.TestCase):
 
-  # TFDML #25576387
-  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testDeletion(self):
     checkpoint = util.Checkpoint()
@@ -383,8 +381,6 @@ class CheckpointManagerTest(test.TestCase):
     self.assertFalse(checkpoint_management.checkpoint_exists(second_path))
     self.assertFalse(checkpoint_management.checkpoint_exists(first_path))
 
-  # TFDML #25562242
-  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   @test.mock.patch.object(checkpoint_management, "time")
   def testSaveRestoreState(self, mock_time):

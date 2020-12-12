@@ -981,9 +981,6 @@ cuda_py_test(
         "//tensorflow/python/eager:test",
         "//tensorflow/python/keras",
     ],
-    tags = [
-        "no_dml", # TFDML #25579048
-    ],
 )
 
 py_library(

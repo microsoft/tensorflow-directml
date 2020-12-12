@@ -155,8 +155,6 @@ class AdamOptimizerTest(test.TestCase):
           self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
           self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
 
-  # TFDML #25571890
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSparseDevicePlacement(self):
     for index_dtype in [dtypes.int32, dtypes.int64]:

@@ -149,8 +149,6 @@ class RaggedMapOpTest(test_util.TensorFlowTestCase,
       ),
   ])
 
-  # TFDML #25576420
-  @test_util.skip_dml
   def testRaggedMap(
       self,
       fn,

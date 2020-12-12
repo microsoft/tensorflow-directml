@@ -56,8 +56,6 @@ class WideDeepModelTest(keras_parameterized.TestCase):
     wide_deep_model.fit(inputs, output, epochs=5)
     self.assertTrue(wide_deep_model.built)
 
-  # TFDML #25564982
-  @tf_test_util.skip_dml
   def test_wide_deep_model_backprop(self):
     with self.cached_session():
       linear_model = linear.LinearModel(units=1, kernel_initializer='zeros')
@@ -116,8 +114,6 @@ class WideDeepModelTest(keras_parameterized.TestCase):
     wide_deep_model.fit(inputs, output, epochs=5)
     self.assertTrue(wide_deep_model.built)
 
-  # TFDML #25565138
-  @tf_test_util.skip_dml
   def test_wide_deep_model_as_layer(self):
     linear_model = linear.LinearModel(units=1)
     dnn_model = sequential.Sequential([core.Dense(units=1)])
@@ -207,8 +203,6 @@ class WideDeepModelTest(keras_parameterized.TestCase):
   # same raw input but different transformed inputs, i.e,. the raw input is
   # categorical, and linear model accepts one hot encoding, while dnn model
   # accepts embedding encoding.
-  # TFDML #25564985
-  @tf_test_util.skip_dml
   def test_wide_deep_model_with_two_feature_columns(self):
     vocab_list = ['alpha', 'beta', 'gamma']
     vocab_val = [0.4, 0.6, 0.9]
