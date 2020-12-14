@@ -224,8 +224,8 @@ struct ScatterBinaryOperation {
 
     auto row_indices = dml::FillValueSequence(
         scope, row_indices_sizes, indices.GetOutputDesc().dataType,
-        dml::ScalarTensor(0, indices.GetOutputDesc().dataType),
-        dml::ScalarTensor(1, indices.GetOutputDesc().dataType));
+        dml::ScalarUnion(0, indices.GetOutputDesc().dataType),
+        dml::ScalarUnion(1, indices.GetOutputDesc().dataType));
 
     auto indices_sizes = indices.GetOutputDesc().sizes;
     dml::TensorDesc::Dimensions broadcasted_sizes({

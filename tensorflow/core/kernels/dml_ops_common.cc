@@ -306,8 +306,8 @@ const DML_BUFFER_BINDING* DmlKernel::GetPersistentResourceBinding() const {
 }  // namespace tensorflow
 
 namespace dml {
-DML_SCALAR_UNION ScalarTensor(double value, DML_TENSOR_DATA_TYPE data_type) {
-  DML_SCALAR_UNION scalar;
+DML_SCALAR_UNION ScalarUnion(double value, DML_TENSOR_DATA_TYPE data_type) {
+  DML_SCALAR_UNION scalar{};
 
   switch (data_type) {
     case DML_TENSOR_DATA_TYPE_INT8:
@@ -349,6 +349,13 @@ DML_SCALAR_UNION ScalarTensor(double value, DML_TENSOR_DATA_TYPE data_type) {
     case DML_TENSOR_DATA_TYPE_FLOAT64:
       scalar.Float64 = static_cast<double>(value);
       break;
+
+    case DML_TENSOR_DATA_TYPE_FLOAT16: {
+      Eigen::half float16_value = static_cast<Eigen::half>(value);
+      const BYTE* float16_bytes = reinterpret_cast<const BYTE*>(&float16_value);
+      std::copy(float16_bytes, float16_bytes + sizeof(float16_value),
+                scalar.Bytes);
+    } break;
 
     default:
       DML_CHECK_SUCCEEDED(E_INVALIDARG);

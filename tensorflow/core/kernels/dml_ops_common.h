@@ -264,7 +264,7 @@ struct TfTensorTypeTraits<int32_t> {
 // Extends DirectMLX with tensorflow helpers
 namespace dml {
 
-DML_SCALAR_UNION ScalarTensor(double value, DML_TENSOR_DATA_TYPE data_type);
+DML_SCALAR_UNION ScalarUnion(double value, DML_TENSOR_DATA_TYPE data_type);
 
 template <typename T>
 Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
