@@ -43,10 +43,10 @@ class GatherInitializationHelper : public InitializationHelper {
     if (ctx->input(0).dtype() == DT_RESOURCE) {
       OP_REQUIRES_OK(
           ctx, LookupResource(ctx, HandleFromInput(ctx, 0), &params_resource_));
-      params_resource_lock_.emplace(*params_resource_->mu());
+      params_resource_->mu()->lock_shared();
     }
 
-    const Tensor& params = GetParamsTensor(ctx);
+    const Tensor params = GetParamsTensor(ctx);
     const Tensor& indices = ctx->input(1);
 
     OP_REQUIRES(
@@ -115,20 +115,20 @@ class GatherInitializationHelper : public InitializationHelper {
   int32 GetBatchDims() const { return positive_batch_dims_; }
   int64 GetAxis() const { return axis_; }
 
-  const Tensor& GetParamsTensor(OpKernelContext* ctx) const {
+  const Tensor GetParamsTensor(OpKernelContext* ctx) const {
     return ctx->input(0).dtype() == DT_RESOURCE ? *params_resource_->tensor()
                                                 : ctx->input(0);
   }
 
-  void Unlock() const { params_resource_lock_.reset(); }
+  void Unlock() const {
+    if (params_resource_) {
+      params_resource_->mu()->unlock_shared();
+    }
+  }
 
  private:
   int64 axis_;
   int32 positive_batch_dims_;
-
-  // Since the initialization helper and the kernel share the same lifetime,
-  // the mutex should be unlocked before Compute finishes
-  mutable absl::optional<mutex_lock> params_resource_lock_;
   core::RefCountPtr<Var> params_resource_;
 };
 
@@ -141,7 +141,7 @@ class GatherShapeHelper : public ShapeHelper {
     auto init_helper = static_cast<const GatherInitializationHelper<TIndex>*>(
         initialization_helper);
 
-    const Tensor& params = init_helper->GetParamsTensor(ctx);
+    const Tensor params = init_helper->GetParamsTensor(ctx);
     const Tensor& indices = ctx->input(1);
 
     // The result shape is params.shape[:axis] + indices.shape[batch_dims:] +
@@ -237,7 +237,7 @@ class DmlGatherKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 2 || ctx->GetInputCount() == 3);
     CHECK(ctx->GetOutputCount() == 1);
 
-    const Tensor& params_tensor =
+    const Tensor params_tensor =
         init_helper->GetParamsTensor(ctx->GetOpKernelContext());
 
     const TensorShape& indices_shape = ctx->GetInputTensorShape(1);
