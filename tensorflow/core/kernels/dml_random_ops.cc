@@ -19,10 +19,12 @@ limitations under the License.
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
+#include "tensorflow/core/kernels/random_op.h"
 #include "tensorflow/core/kernels/stateless_random_ops.h"
 #include "tensorflow/core/util/guarded_philox_random.h"
 
 namespace tensorflow {
+using CPUDevice = Eigen::ThreadPoolDevice;
 
 // Helpers to convert random uniform bits to a real uniform distribution. This
 // approach outputs a floating-point value with sign=0 (positive), exponent=2^0,
@@ -31,7 +33,7 @@ namespace tensorflow {
 // lowest 23 bits from each 32-bit generator value; FP16 consumes the lowest 10
 // bits from each 32-bit generator value. FP64 (not implemented) would require
 // 2 generator values per output vaule, and it would use the lowest 52 bits.
-dml::Expression UniformFloat(dml::Scope& scope, dml::Expression input_state,
+dml::Expression UniformFloat(dml::Graph& scope, dml::Expression input_state,
                              uint32_t element_count) {
   // FP32 has 1 sign bit, 8 exponent bits, and 23 mantissa bits.
   constexpr uint32_t sign_and_exponent_value = ((1 << (8 - 1)) - 1) << 23;
@@ -52,7 +54,7 @@ dml::Expression UniformFloat(dml::Scope& scope, dml::Expression input_state,
   return dml::Reinterpret(result, DML_TENSOR_DATA_TYPE_FLOAT32) - 1.0f;
 }
 
-dml::Expression UniformHalf(dml::Scope& scope, dml::Expression input_state,
+dml::Expression UniformHalf(dml::Graph& scope, dml::Expression input_state,
                             uint32_t element_count) {
   // FP16 has 1 sign bit, 5 exponent bits, and 10 mantissa bits.
   constexpr uint32_t sign_and_exponent_value = ((1 << (5 - 1)) - 1) << 10;
@@ -159,7 +161,7 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     tensors.outputs = {output_info};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input_state = dml::InputTensor(scope, 0, inputs[0]);
 
     dml::Expression result;
@@ -305,7 +307,7 @@ class DmlRandomUniformKernel : public DmlKernel {
     tensors.outputs = {output_info};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input_state = dml::InputTensor(scope, 0, inputs[0]);
 
     dml::Expression result;
@@ -365,6 +367,72 @@ class DmlRandomUniformKernel : public DmlKernel {
           .HostMemory("shape")            \
           .TypeConstraint<type>("dtype"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
+TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+// ----------------------------------------------------------------------------
+
+// Emulates a DML philox PRNG+distribution by executing it on the CPU and
+// copying the results to the GPU.
+template <class Distribution>
+class DmlEmulatedPhiloxRandomKernel : public OpKernel {
+ public:
+  typedef typename Distribution::ResultElementType T;
+  explicit DmlEmulatedPhiloxRandomKernel(OpKernelConstruction* ctx)
+      : OpKernel(ctx) {
+    OP_REQUIRES_OK(ctx, generator_.Init(ctx));
+  }
+
+  void Compute(OpKernelContext* ctx) override {
+    const Tensor& shape = ctx->input(0);
+
+    TensorShape output_shape;
+    OP_REQUIRES_OK(ctx, MakeShape(shape, &output_shape));
+
+    AllocatorAttributes host_attrs;
+    host_attrs.set_on_host(true);
+
+    Tensor host_output;
+    OP_REQUIRES_OK(
+        ctx, ctx->allocate_temp(ctx->expected_output_dtype(0), output_shape,
+                                &host_output, host_attrs));
+
+    auto output_flat = host_output.flat<T>();
+    functor::FillPhiloxRandom<CPUDevice, Distribution>()(
+        ctx, ctx->eigen_device<CPUDevice>(),
+        // Multiplier 256 is the same as in FillPhiloxRandomTask; do not change
+        // it just here.
+        generator_.ReserveRandomOutputs(output_flat.size(), 256),
+        output_flat.data(), output_flat.size(), Distribution());
+
+    Tensor* output;
+    OP_REQUIRES_OK(ctx, ctx->allocate_output(0, output_shape, &output));
+
+    Device* device = static_cast<Device*>(ctx->device());
+    ctx->op_device_context()->CopyCPUTensorToDevice(
+        &host_output, device, output, [](const Status& s) { TF_CHECK_OK(s); });
+  }
+
+ private:
+  GuardedPhiloxRandom generator_;
+};
+
+#define DML_REGISTER_KERNEL(type)                                        \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("RandomStandardNormal")                                       \
+          .Device(DEVICE_DML)                                            \
+          .HostMemory("shape")                                           \
+          .TypeConstraint<type>("dtype"),                                \
+      DmlEmulatedPhiloxRandomKernel<                                     \
+          random::NormalDistribution<random::PhiloxRandom, type>>);      \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("TruncatedNormal")                                            \
+          .Device(DEVICE_DML)                                            \
+          .HostMemory("shape")                                           \
+          .TypeConstraint<type>("dtype"),                                \
+      DmlEmulatedPhiloxRandomKernel<random::TruncatedNormalDistribution< \
+          random::SingleSampleAdapter<random::PhiloxRandom>, type>>);
+
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 

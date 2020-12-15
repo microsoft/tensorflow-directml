@@ -304,3 +304,64 @@ const DML_BUFFER_BINDING* DmlKernel::GetPersistentResourceBinding() const {
 }
 
 }  // namespace tensorflow
+
+namespace dml {
+DML_SCALAR_UNION ScalarUnion(double value, DML_TENSOR_DATA_TYPE data_type) {
+  DML_SCALAR_UNION scalar{};
+
+  switch (data_type) {
+    case DML_TENSOR_DATA_TYPE_INT8:
+      scalar.Int8 = static_cast<int8_t>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_UINT8:
+      scalar.UInt8 = static_cast<uint8_t>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_INT16:
+      scalar.Int16 = static_cast<int16_t>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_UINT16:
+      scalar.UInt16 = static_cast<uint16_t>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_INT32:
+      scalar.Int32 = static_cast<int32_t>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_UINT32:
+      scalar.UInt32 = static_cast<uint32_t>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_INT64:
+      scalar.Int64 = static_cast<int64_t>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_UINT64:
+      scalar.UInt64 = static_cast<uint64_t>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_FLOAT32:
+      scalar.Float32 = static_cast<float>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_FLOAT64:
+      scalar.Float64 = static_cast<double>(value);
+      break;
+
+    case DML_TENSOR_DATA_TYPE_FLOAT16: {
+      Eigen::half float16_value = static_cast<Eigen::half>(value);
+      const BYTE* float16_bytes = reinterpret_cast<const BYTE*>(&float16_value);
+      std::copy(float16_bytes, float16_bytes + sizeof(float16_value),
+                scalar.Bytes);
+    } break;
+
+    default:
+      DML_CHECK_SUCCEEDED(E_INVALIDARG);
+      break;
+  }
+
+  return scalar;
+}
+}  // namespace dml

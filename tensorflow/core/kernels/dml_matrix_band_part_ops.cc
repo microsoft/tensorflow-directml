@@ -120,7 +120,7 @@ class DmlMatrixBandPartKernel : public DmlKernel {
       return;
     }
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input = dml::InputTensor(scope, 0, inputs[0]);
 
     // Indices of each column broadcasted to the rows

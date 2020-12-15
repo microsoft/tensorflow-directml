@@ -636,7 +636,7 @@ class DmlApplyAdamWithAmsgradKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto m = dml::InputTensor(scope, 1, inputs[1]);
     auto v = dml::InputTensor(scope, 2, inputs[2]);
@@ -755,7 +755,7 @@ class DmlApplyAdaMaxKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto m = dml::InputTensor(scope, 1, inputs[1]);
     auto v = dml::InputTensor(scope, 2, inputs[2]);
@@ -833,7 +833,7 @@ class DmlApplyGradientDescentKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto alpha = dml::InputTensor(scope, 1, inputs[1]);
     auto delta = dml::InputTensor(scope, 2, inputs[2]);
@@ -922,7 +922,7 @@ class DmlApplyAdadeltaKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto accum = dml::InputTensor(scope, 1, inputs[1]);
     auto accum_update = dml::InputTensor(scope, 2, inputs[2]);
@@ -1031,7 +1031,7 @@ class DmlApplyAdagradKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto accum = dml::InputTensor(scope, 1, inputs[1]);
     auto lr = dml::InputTensor(scope, 2, inputs[2]);
@@ -1137,7 +1137,7 @@ class DmlApplyMomentumKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto accum = dml::InputTensor(scope, 1, inputs[1]);
     auto lr = dml::InputTensor(scope, 2, inputs[2]);
@@ -1228,7 +1228,7 @@ class DmlApplyKerasMomentumKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto accum = dml::InputTensor(scope, 1, inputs[1]);
     auto lr = dml::InputTensor(scope, 2, inputs[2]);
@@ -1332,7 +1332,7 @@ class DmlApplyRMSPropKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto ms = dml::InputTensor(scope, 1, inputs[1]);
     auto mom = dml::InputTensor(scope, 2, inputs[2]);
@@ -1443,7 +1443,7 @@ class DmlApplyCenteredRMSPropKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto mg = dml::InputTensor(scope, 1, inputs[1]);
     auto ms = dml::InputTensor(scope, 2, inputs[2]);
@@ -1543,7 +1543,7 @@ class DmlApplyAddSignKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto m = dml::InputTensor(scope, 1, inputs[1]);
     auto lr = dml::InputTensor(scope, 2, inputs[2]);
@@ -1637,7 +1637,7 @@ class DmlApplyPowerSignKernel : public DmlTrainingKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto var = dml::InputTensor(scope, 0, inputs[0]);
     auto m = dml::InputTensor(scope, 1, inputs[1]);
     auto lr = dml::InputTensor(scope, 2, inputs[2]);

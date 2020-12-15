@@ -123,7 +123,7 @@ static absl::optional<SimplifiedSlice> SimplifySlice(
         // skipped by padding the input strides to account for the extra
         // physical elements.
         InsertDim(
-            /*inputSize    */ coalesced * output_size,
+            /*inputSize    */ coalesced * input_size,
             /*inputStride  */ total_stride,
             /*outputSize   */ coalesced * output_size,
             /*windowOffset */ 0,

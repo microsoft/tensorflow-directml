@@ -2727,10 +2727,17 @@ tf_kernel_library(
 tf_kernel_library(
     name = "list_kernels",
     srcs = ["list_kernels.cc"],
-    hdrs = ["list_kernels.h"],
+    hdrs = [
+        "list_kernels.h",
+        "tensor_array.h",
+        "aggregate_ops.h",
+        "split_lib.h"] + if_dml(["dml_tensor_array.h"]),
     gpu_srcs = [
         "list_kernels.cu.cc",
         "list_kernels.h",
+        "tensor_array.h",
+        "aggregate_ops.h",
+        "split_lib.h",
     ],
     deps = [
         ":concat_lib",
@@ -8094,6 +8101,7 @@ tf_kernel_library(
         "dml_gather_op.cc",
         "dml_gather_nd_op.cc",
         "dml_scatter_nd_op.cc",
+        "dml_scatter_update_ops.cc",
         "dml_tensor_scatter_ops.cc",
         "dml_scan_ops.cc",
         "dml_dynamic_stitch_op.cc",
@@ -8145,6 +8153,7 @@ tf_kernel_library(
         "dml_kernel_wrapper.h",
         "dml_ops_common.h",
         "assign_op.h",
+        "random_op.h",
         "stateless_random_ops.h",
         "tensor_array.h",
         "concat_lib.h",
