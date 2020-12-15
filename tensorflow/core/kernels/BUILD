@@ -8153,6 +8153,7 @@ tf_kernel_library(
         "dml_kernel_wrapper.h",
         "dml_ops_common.h",
         "assign_op.h",
+        "random_op.h",
         "stateless_random_ops.h",
         "tensor_array.h",
         "concat_lib.h",
