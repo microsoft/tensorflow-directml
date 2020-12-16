@@ -19,6 +19,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_buffer.h"
 #include "tensorflow/core/common_runtime/dml/dml_buffer_region.h"
 #include "tensorflow/core/common_runtime/dml/dml_common.h"
+#include "tensorflow/core/common_runtime/dml/dml_descriptor_bfc_allocator.h"
 #include "tensorflow/core/common_runtime/dml/dml_gpu_event.h"
 #include "tensorflow/core/framework/op_kernel.h"
 
@@ -49,6 +50,11 @@ class DmlKernelConstruction {
 
   // Retrives the D3D12 default heap buffer backing the specified tensor.
   D3D12BufferRegion CreateBufferForTensor(const Tensor& tensor) const;
+
+  // Allocates a range of D3D12 descriptors at least size_in_descriptors large.
+  // When the returned object is destructed, the descriptors are freed back to
+  // the pool.
+  DescriptorAllocation AllocateDescriptors(size_t size_in_descriptors) const;
 
   // Initializes a given DML operator on the GPU. Note that this merely queues
   // the initialization; the returned event will enter the signaled state when
@@ -135,6 +141,11 @@ class DmlKernelContext {
 
   // Retrives the D3D12 default heap buffer backing the specified tensor.
   D3D12BufferRegion CreateBufferForTensor(const Tensor& tensor) const;
+
+  // Allocates a range of D3D12 descriptors at least size_in_descriptors large.
+  // When the returned object is destructed, the descriptors are freed back to
+  // the pool.
+  DescriptorAllocation AllocateDescriptors(size_t size_in_descriptors) const;
 
   // Executes a DML operator. Note that this merely queues the execution; the
   // returned event will enter the signaled state when it completes.

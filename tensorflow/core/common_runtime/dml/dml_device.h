@@ -34,6 +34,10 @@ class DmlDevice : public LocalDevice {
 
   DmlAllocator* GetAllocator() const { return state_->dml_allocator.get(); }
 
+  DmlDescriptorAllocator* GetDescriptorAllocator() const {
+    return state_->descriptor_allocator.get();
+  }
+
   DmlKernelManager* GetKernelManager() const {
     return state_->kernel_manager.get();
   }

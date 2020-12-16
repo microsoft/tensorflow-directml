@@ -65,6 +65,11 @@ D3D12BufferRegion DmlKernelConstruction::CreateBufferForTensor(
   return dml_util::CreateBufferForTensor(device_, tensor);
 }
 
+DescriptorAllocation DmlKernelConstruction::AllocateDescriptors(
+    size_t size_in_descriptors) const {
+  return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
+}
+
 void DmlKernelConstruction::InitializeOperator(
     IDMLCompiledOperator* op,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
@@ -180,6 +185,11 @@ DmlBuffer DmlKernelContext::AllocateDefaultBuffer(uint64_t num_bytes) const {
 D3D12BufferRegion DmlKernelContext::CreateBufferForTensor(
     const Tensor& tensor) const {
   return dml_util::CreateBufferForTensor(device_, tensor);
+}
+
+DescriptorAllocation DmlKernelContext::AllocateDescriptors(
+    size_t size_in_descriptors) const {
+  return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
 }
 
 DmlGpuEvent DmlKernelContext::ExecuteOperator(

@@ -173,6 +173,12 @@ class DmlKernel {
 
  private:
   Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op_;
+
+  // An owning range of descriptors allocated to this kernel for execution, and
+  // the DML binding table associated with that descriptor range.
+  DescriptorAllocation execution_descriptors_;
+  Microsoft::WRL::ComPtr<IDMLBindingTable> execution_binding_table_;
+
   DmlBuffer persistent_resource_;
   absl::optional<DML_BUFFER_BINDING> persistent_resource_binding_;
   std::shared_ptr<const InitializationHelper> init_helper_;

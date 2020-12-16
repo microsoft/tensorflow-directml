@@ -24,9 +24,45 @@ DmlDescriptorAllocator::DmlDescriptorAllocator(
                    kEnableGarbageCollection, kMaxAllocationSizeInDescriptors),
       heap_allocator_(heap_allocator) {}
 
+DescriptorAllocation DmlDescriptorAllocator::Alloc(size_t size_in_descriptors) {
+  void* p = this->AllocateRaw(0, size_in_descriptors);
+  return DescriptorAllocation(this, p, size_in_descriptors);
+}
+
 D3D12DescriptorHandles DmlDescriptorAllocator::GetDescriptorHandles(
     const void* ptr) const {
   return heap_allocator_->GetDescriptorHandles(ptr);
+}
+
+DescriptorAllocation::DescriptorAllocation(DmlDescriptorAllocator* allocator,
+                                           void* p, size_t size_in_descriptors)
+    : allocator_(allocator), p_(p), size_in_descriptors_(size_in_descriptors) {}
+
+DescriptorAllocation ::~DescriptorAllocation() {
+  if (allocator_ && p_) {
+    allocator_->DeallocateRaw(p_);
+  }
+}
+
+DescriptorAllocation::DescriptorAllocation(DescriptorAllocation&& x) {
+  *this = std::move(x);
+}
+
+DescriptorAllocation& DescriptorAllocation::operator=(
+    DescriptorAllocation&& x) {
+  if (this != &x) {
+    allocator_ = x.allocator_;
+    p_ = x.p_;
+    size_in_descriptors_ = x.size_in_descriptors_;
+
+    x.allocator_ = nullptr;
+    x.p_ = nullptr;
+    x.size_in_descriptors_ = 0;
+  }
+}
+
+D3D12DescriptorHandles DescriptorAllocation::GetDescriptorHandles() const {
+  return allocator_->GetDescriptorHandles(p_);
 }
 
 }  // namespace tensorflow

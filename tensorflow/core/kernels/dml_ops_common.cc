@@ -201,6 +201,25 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
 #endif
 
   compiled_op_ = compiled_op;
+
+  // Set up binding table for execution
+
+  DML_BINDING_PROPERTIES binding_props = compiled_op_->GetBindingProperties();
+  execution_descriptors_ =
+      ctx->AllocateDescriptors(binding_props.RequiredDescriptorCount);
+  assert(execution_descriptors_.SizeInDescriptors() ==
+         binding_props.RequiredDescriptorCount);
+
+  auto descriptor_handles = execution_descriptors_.GetDescriptorHandles();
+
+  DML_BINDING_TABLE_DESC binding_table_desc = {};
+  binding_table_desc.Dispatchable = compiled_op_.Get();
+  binding_table_desc.CPUDescriptorHandle = descriptor_handles.cpu;
+  binding_table_desc.GPUDescriptorHandle = descriptor_handles.gpu;
+  binding_table_desc.SizeInDescriptors = binding_props.RequiredDescriptorCount;
+  DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateBindingTable(
+      &binding_table_desc, IID_PPV_ARGS(&execution_binding_table_)));
+
   input_descs_ = std::move(tensor_descs.inputs);
   output_descs_ = std::move(tensor_descs.outputs);
   output_refs_forwarding_ = std::move(tensor_descs.output_refs_forwarding);

@@ -31,11 +31,16 @@ class DmlCommandRecorder {
  public:
   DmlCommandRecorder(ID3D12Device* d3d_device, IDMLDevice* device,
                      std::shared_ptr<DmlCommandQueue> command_queue,
-                     DmlAllocator* allocator);
+                     DmlAllocator* allocator,
+                     DmlDescriptorAllocator* descriptor_allocator);
 
+  // Unlike ExecuteOperator(), this will set up the descriptors and binding
+  // table for you, and automatically release them (using the given event queue)
+  // whenever the initialization completes on the GPU.
   void InitializeOperator(IDMLCompiledOperator* op,
-                            const DML_BINDING_DESC& persistent_resource_binding,
-                            const DML_BINDING_DESC& input_array_binding);
+                          const DML_BINDING_DESC& persistent_resource_binding,
+                          const DML_BINDING_DESC& input_array_binding,
+                          DmlEventQueue* event_queue);
 
   void ExecuteOperator(IDMLCompiledOperator* op,
                        const DML_BINDING_DESC& persistent_resource_binding,
@@ -67,7 +72,6 @@ class DmlCommandRecorder {
   std::shared_ptr<DmlCommandQueue> queue_;
   Microsoft::WRL::ComPtr<ID3D12Device> d3d_device_;
   Microsoft::WRL::ComPtr<IDMLDevice> dml_device_;
-  Microsoft::WRL::ComPtr<IDMLOperatorInitializer> initializer_;
   Microsoft::WRL::ComPtr<IDMLCommandRecorder> recorder_;
 
   // Descriptors are allocated from a pool. The current heap pointer is only
@@ -77,6 +81,7 @@ class DmlCommandRecorder {
   ID3D12DescriptorHeap* current_descriptor_heap_ = nullptr;
 
   DmlAllocator* allocator_;
+  DmlDescriptorAllocator* descriptor_allocator_;
   DmlCommandAllocatorRing<2> command_allocator_ring_;
 
   // The command list currently being recorded into, and whether any command

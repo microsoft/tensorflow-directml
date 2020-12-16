@@ -17,51 +17,67 @@ limitations under the License.
 
 #include "dml_bfc_allocator.h"
 #include "dml_buffer.h"
+#include "dml_descriptor_bfc_allocator.h"
 #include "dml_util.h"
 
 namespace tensorflow {
 
 DmlCommandRecorder::DmlCommandRecorder(
     ID3D12Device* d3d_device, IDMLDevice* dml_device,
-    std::shared_ptr<DmlCommandQueue> command_queue, DmlAllocator* allocator)
+    std::shared_ptr<DmlCommandQueue> command_queue, DmlAllocator* allocator,
+    DmlDescriptorAllocator* descriptor_allocator)
     : queue_(std::move(command_queue)),
       d3d_device_(d3d_device),
       dml_device_(dml_device),
       descriptor_pool_(d3d_device, 2048),
       allocator_(allocator),
+      descriptor_allocator_(descriptor_allocator),
       command_allocator_ring_(d3d_device, queue_->GetType(),
                               queue_->GetCurrentCompletionEvent()) {
-  DML_CHECK_SUCCEEDED(dml_device->CreateOperatorInitializer(
-      0, nullptr, IID_PPV_ARGS(&initializer_)));
   DML_CHECK_SUCCEEDED(
       dml_device->CreateCommandRecorder(IID_PPV_ARGS(&recorder_)));
 
   Open();
 }
 
+// The state needed to initialize a DML operator, that has to be kept alive
+// until the initialization completes on the GPU. Recall that the lifetime
+// semantics of a DML binding table are tied to that of the underlying
+// descriptor heap, not the IDMLBindingTable object itself. This is why the
+// descriptor allocation is in this struct, but the binding table itself is not.
+struct DmlInitializationState {
+  Microsoft::WRL::ComPtr<IDMLOperatorInitializer> initializer;
+  DescriptorAllocation descriptor_range;
+};
+
 void DmlCommandRecorder::InitializeOperator(
     IDMLCompiledOperator* op,
     const DML_BINDING_DESC& persistent_resource_binding,
-    const DML_BINDING_DESC& input_array_binding) {
+    const DML_BINDING_DESC& input_array_binding, DmlEventQueue* event_queue) {
   if (!status_.ok()) return;
+
+  // The only reason this is a shared_ptr instead of a unique_ptr is because
+  // C++11 doesn't support move-capture in lambdas.
+  auto init_state = std::make_shared<DmlInitializationState>();
 
   // Reset the initializer to reference the input operator.
   IDMLCompiledOperator* ops[] = {op};
-  DML_CHECK_SUCCEEDED(initializer_->Reset(ABSL_ARRAYSIZE(ops), ops));
+  DML_CHECK_SUCCEEDED(dml_device_->CreateOperatorInitializer(
+      ABSL_ARRAYSIZE(ops), ops, IID_PPV_ARGS(&init_state->initializer)));
 
   DML_BINDING_PROPERTIES init_binding_props =
-      initializer_->GetBindingProperties();
-  DML_BINDING_PROPERTIES exec_binding_props = op->GetBindingProperties();
+      init_state->initializer->GetBindingProperties();
 
   const uint32_t num_descriptors = init_binding_props.RequiredDescriptorCount;
-  DmlDescriptorRange descriptor_range = descriptor_pool_.AllocDescriptors(
-      num_descriptors, queue_->GetNextCompletionEvent());
+  init_state->descriptor_range = descriptor_allocator_->Alloc(num_descriptors);
+
+  auto descriptor_handles = init_state->descriptor_range.GetDescriptorHandles();
 
   // Create a binding table for initialization.
   DML_BINDING_TABLE_DESC binding_table_desc = {};
-  binding_table_desc.Dispatchable = initializer_.Get();
-  binding_table_desc.CPUDescriptorHandle = descriptor_range.cpu_handle;
-  binding_table_desc.GPUDescriptorHandle = descriptor_range.gpu_handle;
+  binding_table_desc.Dispatchable = init_state->initializer.Get();
+  binding_table_desc.CPUDescriptorHandle = descriptor_handles.cpu;
+  binding_table_desc.GPUDescriptorHandle = descriptor_handles.gpu;
   binding_table_desc.SizeInDescriptors = num_descriptors;
 
   Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table;
@@ -105,9 +121,9 @@ void DmlCommandRecorder::InitializeOperator(
   }
 
   // Record the initialization work.
-  SetDescriptorHeap(descriptor_range.heap);
-  recorder_->RecordDispatch(current_command_list_.Get(), initializer_.Get(),
-                            binding_table.Get());
+  SetDescriptorHeap(descriptor_handles.heap);
+  recorder_->RecordDispatch(current_command_list_.Get(),
+                            init_state->initializer.Get(), binding_table.Get());
 
   // Barrier if there's an output (i.e. persistent resource), or if any temps
   // are used.
@@ -118,6 +134,15 @@ void DmlCommandRecorder::InitializeOperator(
         CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
     current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
   }
+
+  // Enqueue an event to ensure that the relevant initialization state lives at
+  // least until the operation completes execution on the GPU.
+  auto on_initialize_completed = [init_state]() mutable {
+    // Free the initialization state
+    init_state.reset();
+  };
+  event_queue->Enqueue(queue_->GetNextCompletionEvent(),
+                       std::move(on_initialize_completed));
 
   OnCommandRecorded();
 }

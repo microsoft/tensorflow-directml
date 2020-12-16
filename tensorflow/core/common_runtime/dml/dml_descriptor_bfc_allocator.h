@@ -21,6 +21,34 @@ limitations under the License.
 
 namespace tensorflow {
 
+class DmlDescriptorAllocator;
+
+// RAII class that wraps the allocations returned by DmlDescriptorAllocator, and
+// automatically frees the allocation on destruction.
+class DescriptorAllocation {
+ public:
+  DescriptorAllocation() = default;
+  DescriptorAllocation(DmlDescriptorAllocator* allocator, void* p,
+                       size_t size_in_descriptors);
+  ~DescriptorAllocation();
+
+  // Move-only
+  DescriptorAllocation(const DescriptorAllocation&) = delete;
+  DescriptorAllocation& operator=(const DescriptorAllocation&) = delete;
+  DescriptorAllocation(DescriptorAllocation&&);
+  DescriptorAllocation& operator=(DescriptorAllocation&&);
+
+  D3D12DescriptorHandles GetDescriptorHandles() const;
+  size_t SizeInDescriptors() const { return size_in_descriptors_; }
+
+  explicit operator bool() const { return (allocator_ && p_); }
+
+ private:
+  DmlDescriptorAllocator* allocator_ = nullptr;
+  void* p_ = nullptr;
+  size_t size_in_descriptors_ = 0;
+};
+
 class DmlDescriptorAllocator : public BFCAllocator {
   // We allocate our descriptor heaps in fixed-sized blocks of 64k descriptors.
   // This is more than sufficient to accommodate even the largest of DML
@@ -61,6 +89,9 @@ class DmlDescriptorAllocator : public BFCAllocator {
  public:
   DmlDescriptorAllocator(D3D12DescriptorHeapAllocator* heap_allocator,
                          const string& name);
+
+  // Same as AllocateRaw(), except that it wraps the result in an RAII object.
+  DescriptorAllocation Alloc(size_t size_in_descriptors);
 
   D3D12DescriptorHandles GetDescriptorHandles(const void* ptr) const;
 
