@@ -32,6 +32,8 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import variables
 from tensorflow.python.platform import test
 
+import os
+input(os.getpid())
 
 class SegmentReductionHelper(test.TestCase):
 

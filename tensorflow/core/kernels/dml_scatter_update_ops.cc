@@ -152,7 +152,7 @@ class ScatterUpdateInitializationHelper : public InitializationHelper {
 
  private:
   core::RefCountPtr<Var> params_resource_;
-};  // namespace tensorflow
+};
 
 struct ScatterUpdateOperation {
   static constexpr bool inplace_allowed = true;
