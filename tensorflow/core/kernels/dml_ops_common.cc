@@ -263,6 +263,14 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(DmlKernelContext* ctx) const {
   auto input_bindings = dml_util::GetBufferBindings(input_buffers);
   auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
+  return Compute(ctx, input_bindings, output_bindings);
+}
+
+StatusOr<DmlGpuEvent> DmlKernel::Compute(
+    DmlKernelContext* ctx,
+    absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
+    absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings)
+    const {
   DML_BINDING_PROPERTIES exec_binding_props =
       compiled_op_->GetBindingProperties();
 

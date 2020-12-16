@@ -62,6 +62,9 @@ DescriptorAllocation& DescriptorAllocation::operator=(
 }
 
 D3D12DescriptorHandles DescriptorAllocation::GetDescriptorHandles() const {
+  if (!allocator_ || !p_) {
+    return D3D12DescriptorHandles{nullptr, UINT64(-1), SIZE_T(-1)};
+  }
   return allocator_->GetDescriptorHandles(p_);
 }
 

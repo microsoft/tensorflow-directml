@@ -101,8 +101,7 @@ class DmlUpdateVariableOp : public DmlKernel {
         input_bindings[0],
     };
 
-    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                                input_bindings, output_bindings);
+    return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 
  private:

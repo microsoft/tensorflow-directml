@@ -167,6 +167,13 @@ class DmlKernel {
   absl::InlinedVector<D3D12BufferRegion, 4> CreateOutputBuffers(
       DmlKernelContext* ctx) const;
 
+  // Same as Compute(), except that it allows for custom input/output bindings.
+  StatusOr<DmlGpuEvent> Compute(
+      DmlKernelContext* ctx,
+      absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
+      absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings)
+      const;
+
   const DML_BUFFER_BINDING* GetPersistentResourceBinding() const;
 
   IDMLCompiledOperator* GetCompiledOp() const { return compiled_op_.Get(); }

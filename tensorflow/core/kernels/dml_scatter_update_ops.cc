@@ -388,9 +388,13 @@ class DmlScatterUpdateKernel : public DmlKernel {
           input_bindings[0],
       };
 
-      gpu_event =
-          ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                               input_bindings, output_bindings);
+      auto status_or_event =
+          DmlKernel::Compute(ctx, input_bindings, output_bindings);
+      if (!status_or_event.ok()) {
+        return status_or_event;
+      }
+
+      gpu_event = status_or_event.ValueOrDie();
     } else {
       DmlBuffer output_buffer =
           ctx->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
@@ -399,8 +403,11 @@ class DmlScatterUpdateKernel : public DmlKernel {
           output_buffer.GetBufferBinding(),
       };
 
-      ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                           input_bindings, output_bindings);
+      auto status_or_event =
+          DmlKernel::Compute(ctx, input_bindings, output_bindings);
+      if (!status_or_event.ok()) {
+        return status_or_event;
+      }
 
       ctx->CopyBufferToBuffer(input_buffers[0].Resource(),
                               input_buffers[0].Offset(),
