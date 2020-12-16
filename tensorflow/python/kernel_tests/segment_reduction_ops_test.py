@@ -32,6 +32,7 @@ from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import variables
 from tensorflow.python.platform import test
 
+
 class SegmentReductionHelper(test.TestCase):
 
   def _input(self, input_shape, dtype=dtypes_lib.int32):
