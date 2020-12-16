@@ -539,7 +539,7 @@ class DmlFusedConv2DKernel : public DmlKernel {
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice(), GetDmlXTensorPolicy(conv_params.data_format));
+    auto scope = dml::Graph(ctx->GetDmlDevice(), GetDmlXTensorPolicy(conv_params.data_format));
     auto input = dml::InputTensor(scope, 0, input_descs[0]);
     auto filter = dml::InputTensor(scope, 1, input_descs[1]);
 

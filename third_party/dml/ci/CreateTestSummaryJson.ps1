@@ -19,7 +19,8 @@ This script will summarize test results across all environments so that each tes
 #>
 param
 (
-    [string]$TestArtifactsPath
+    [string]$TestArtifactsPath,
+    [string]$OutputPath = "$TestArtifactsPath\test_summary.json"
 )
 
 # Sort test results.
@@ -104,4 +105,5 @@ foreach ($TestSummary in $Summary.Tests.Values)
     }
 }
 
-$Summary | ConvertTo-Json -Depth 8 -Compress | Out-File "$TestArtifactsPath\test_summary.json" -Encoding utf8
+New-Item -ItemType File -Path $OutputPath -Force
+$Summary | ConvertTo-Json -Depth 8 -Compress | Out-File $OutputPath -Encoding utf8

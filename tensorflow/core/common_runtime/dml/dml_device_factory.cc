@@ -25,6 +25,32 @@ using Microsoft::WRL::ComPtr;
 
 namespace tensorflow {
 
+// Constructs a physical_device_desc string from an adapter. DML's
+// physical_device_desc is JSON-encoded which allows for easier parsing.
+//
+// Example CUDA string:
+//   'device: 0, name: TITAN V, pci bus id: 0000:65:00.0, compute
+//   capability: 7.0'
+//
+// Example DML string:
+//   '{"name": "NVIDIA TITAN V", "vendor_id": 4318, "device_id": 7553,
+//   "driver_version": "27.21.14.5206"}'
+static std::string GetPhysicalDeviceDesc(const DmlAdapter& adapter) {
+  auto driver_ver = adapter.DriverVersion().parts;
+  std::string driver_ver_str = strings::StrCat(
+      driver_ver.a, ".", driver_ver.b, ".", driver_ver.c, ".", driver_ver.d);
+
+  std::stringstream ss;
+  ss << '{';
+  ss << "\"name\": \"" << adapter.Name() << "\", ";
+  ss << "\"vendor_id\": " << (uint32_t)adapter.VendorID() << ", ";
+  ss << "\"device_id\": " << adapter.DeviceID() << ", ";
+  ss << "\"driver_version\": \"" << driver_ver_str << "\"";
+  ss << '}';
+
+  return ss.str();
+}
+
 static std::unique_ptr<DmlDevice> CreateDevice(
     const SessionOptions& options, const string& name_prefix, int device_index,
     const DmlDeviceState* device_state, int64 memory_limit) {
@@ -33,9 +59,25 @@ static std::unique_ptr<DmlDevice> CreateDevice(
 
   const DeviceAttributes attributes = Device::BuildDeviceAttributes(
       name, tensorflow::DeviceType(DEVICE_DML), Bytes(memory_limit),
-      DeviceLocality(), device_state->adapter->Name());
+      DeviceLocality(), GetPhysicalDeviceDesc(*device_state->adapter));
 
   return absl::make_unique<DmlDevice>(device_state, options, attributes);
+}
+
+static bool IsUmaAdapter(const DmlAdapter& adapter) {
+  D3D_FEATURE_LEVEL feature_level = adapter.IsComputeOnly()
+                                        ? D3D_FEATURE_LEVEL_1_0_CORE
+                                        : D3D_FEATURE_LEVEL_11_0;
+
+  ComPtr<ID3D12Device> d3d12_device;
+  DML_CHECK_SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
+                                        IID_PPV_ARGS(&d3d12_device)));
+
+  D3D12_FEATURE_DATA_ARCHITECTURE1 feature_data = {};
+  DML_CHECK_SUCCEEDED(d3d12_device->CheckFeatureSupport(
+      D3D12_FEATURE_ARCHITECTURE1, &feature_data, sizeof(feature_data)));
+
+  return feature_data.CacheCoherentUMA;
 }
 
 class DmlDeviceFactory : public DeviceFactory {
@@ -117,12 +159,18 @@ class DmlDeviceFactory : public DeviceFactory {
           // limit as a fraction of TOTAL GPU memory
           uint64_t total_gpu_memory = adapter.GetTotalDedicatedMemory();
 
+          if (IsUmaAdapter(adapter)) {
+            // For adapters with unified memory architecture (UMA), add shared
+            // memory to the total GPU memory
+            total_gpu_memory += adapter.GetTotalSharedMemory();
+          }
+
           memory_limit = total_gpu_memory * memory_fraction;
         } else {
           // No per_process_gpu_memory_fraction was specified: use a memory
           // limit equal to the AVAILALBLE GPU memory
           uint64_t available_gpu_memory =
-              adapter.QueryAvailableDedicatedMemory();
+              adapter.QueryAvailableLocalMemory();
 
           memory_limit = available_gpu_memory;
         }

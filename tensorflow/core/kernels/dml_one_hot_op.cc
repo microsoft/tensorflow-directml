@@ -171,7 +171,7 @@ class DmlOneHotKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto indices = dml::InputTensor(scope, 0, inputs[0]);
     auto on_value = dml::InputTensor(scope, 1, inputs[1]);
     auto off_value = dml::InputTensor(scope, 2, inputs[2]);

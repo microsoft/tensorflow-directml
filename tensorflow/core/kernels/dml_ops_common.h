@@ -264,21 +264,25 @@ struct TfTensorTypeTraits<int32_t> {
 // Extends DirectMLX with tensorflow helpers
 namespace dml {
 
+DML_SCALAR_UNION ScalarUnion(double value, DML_TENSOR_DATA_TYPE data_type);
+
 template <typename T>
-Expression ScalarTensor(Scope& scope, T value, TensorDesc::Dimensions sizes) {
+Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
+  dml::TensorDesc::Dimensions scalar_dims(sizes.size(), 1);
+  dml::TensorDesc::Dimensions scalar_strides(sizes.size(), 0);
+
   auto scalar = dml::Reinterpret(
       dml::FillValueConstant(
-          scope, dml::TensorDesc::Dimensions{1, 1, 1, 1},
-          tensorflow::TfTensorTypeTraits<T>::dml_type,
+          scope, scalar_dims, tensorflow::TfTensorTypeTraits<T>::dml_type,
           tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(value)),
-      sizes,                                  /* broadcast shape */
-      dml::TensorDesc::Dimensions{0, 0, 0, 0} /* broadcast strides */
+      sizes,         /* broadcast shape */
+      scalar_strides /* broadcast strides */
   );
   return scalar;
 }
 
 template <typename T>
-Expression Sequence(Scope& scope, T start, T step,
+Expression Sequence(Graph& scope, T start, T step,
                     TensorDesc::Dimensions sizes) {
   auto seq = dml::FillValueSequence(
       scope, sizes, tensorflow::TfTensorTypeTraits<T>::dml_type,
@@ -291,7 +295,7 @@ Expression Sequence(Scope& scope, T start, T step,
 // Zero is special since the bit representation is the same regardless of type,
 // so there's no need to have a function template. The dataType is used only for
 // the tensor desc.
-inline Expression ZeroTensor(Scope& scope, DML_TENSOR_DATA_TYPE dataType,
+inline Expression ZeroTensor(Graph& scope, DML_TENSOR_DATA_TYPE dataType,
                              TensorDesc::Dimensions size) {
   DML_SCALAR_UNION scalar_value{};
   auto scalar = dml::Reinterpret(

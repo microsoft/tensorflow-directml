@@ -17,6 +17,7 @@ limitations under the License.
 #define TENSORFLOW_CORE_KERNELS_TENSOR_ARRAY_H_
 
 #include <limits.h>
+
 #include <vector>
 
 #include "tensorflow/core/framework/op_kernel.h"
@@ -45,11 +46,7 @@ namespace tensor_array {
 // Full implementations are in tensor_array.cc
 template <typename Device, typename T>
 Status AddToTensor(OpKernelContext* ctx, Tensor* sum, const Tensor* current,
-                   const Tensor* add) {
-  return errors::InvalidArgument(
-      "tensor_array::AddToTensor type not supported: ",
-      DataTypeString(DataTypeToEnum<T>::value));
-};
+                   const Tensor* add) = delete;
 
 #define TENSOR_ARRAY_WRITE_OR_ADD(Device, T)                         \
   template <>                                                        \
@@ -57,7 +54,11 @@ Status AddToTensor(OpKernelContext* ctx, Tensor* sum, const Tensor* current,
                                 const Tensor* current, const Tensor* add);
 
 #define TENSOR_ARRAY_WRITE_OR_ADD_CPU(T) TENSOR_ARRAY_WRITE_OR_ADD(CPUDevice, T)
-TF_CALL_NUMBER_TYPES(TENSOR_ARRAY_WRITE_OR_ADD_CPU)
+TF_CALL_NUMBER_TYPES(TENSOR_ARRAY_WRITE_OR_ADD_CPU);
+TF_CALL_string(TENSOR_ARRAY_WRITE_OR_ADD_CPU);
+TF_CALL_bool(TENSOR_ARRAY_WRITE_OR_ADD_CPU);
+TF_CALL_variant(TENSOR_ARRAY_WRITE_OR_ADD_CPU);
+TF_CALL_resource(TENSOR_ARRAY_WRITE_OR_ADD_CPU);
 #undef TENSOR_ARRAY_WRITE_OR_ADD_CPU
 
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
@@ -66,6 +67,7 @@ TF_CALL_NUMBER_TYPES(TENSOR_ARRAY_WRITE_OR_ADD_CPU)
 TF_CALL_GPU_NUMBER_TYPES(TENSOR_ARRAY_WRITE_OR_ADD_GPU);
 TF_CALL_complex64(TENSOR_ARRAY_WRITE_OR_ADD_GPU);
 TF_CALL_complex128(TENSOR_ARRAY_WRITE_OR_ADD_GPU);
+TF_CALL_bfloat16(TENSOR_ARRAY_WRITE_OR_ADD_GPU);
 #undef TENSOR_ARRAY_WRITE_OR_ADD_GPU
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
@@ -73,11 +75,7 @@ TF_CALL_complex128(TENSOR_ARRAY_WRITE_OR_ADD_GPU);
 #undef TENSOR_ARRAY_WRITE_OR_ADD
 
 template <typename Device, typename T>
-Status TensorSetZero(OpKernelContext* ctx, Tensor* value) {
-  return errors::InvalidArgument(
-      "tensor_array::TensorSetZero type not supported: ",
-      DataTypeString(DataTypeToEnum<T>::value));
-};
+Status TensorSetZero(OpKernelContext* ctx, Tensor* value) = delete;
 
 #define TENSOR_ARRAY_SET_ZERO(Device, T) \
   template <>                            \
@@ -86,6 +84,14 @@ Status TensorSetZero(OpKernelContext* ctx, Tensor* value) {
 #define TENSOR_ARRAY_SET_ZERO_CPU(T) TENSOR_ARRAY_SET_ZERO(CPUDevice, T)
 TF_CALL_NUMBER_TYPES(TENSOR_ARRAY_SET_ZERO_CPU);
 TF_CALL_bool(TENSOR_ARRAY_SET_ZERO_CPU);
+TF_CALL_qint8(TENSOR_ARRAY_SET_ZERO_CPU);
+TF_CALL_qint16(TENSOR_ARRAY_SET_ZERO_CPU);
+TF_CALL_qint32(TENSOR_ARRAY_SET_ZERO_CPU);
+TF_CALL_quint8(TENSOR_ARRAY_SET_ZERO_CPU);
+TF_CALL_quint16(TENSOR_ARRAY_SET_ZERO_CPU);
+TF_CALL_string(TENSOR_ARRAY_SET_ZERO_CPU);
+TF_CALL_variant(TENSOR_ARRAY_SET_ZERO_CPU);
+TF_CALL_resource(TENSOR_ARRAY_SET_ZERO_CPU);
 #undef TENSOR_ARRAY_SET_ZERO_CPU
 
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
@@ -94,11 +100,52 @@ TF_CALL_bool(TENSOR_ARRAY_SET_ZERO_CPU);
 TF_CALL_GPU_NUMBER_TYPES(TENSOR_ARRAY_SET_ZERO_GPU);
 TF_CALL_complex64(TENSOR_ARRAY_SET_ZERO_GPU);
 TF_CALL_complex128(TENSOR_ARRAY_SET_ZERO_GPU);
+TF_CALL_int32(TENSOR_ARRAY_SET_ZERO_GPU);
+TF_CALL_int64(TENSOR_ARRAY_SET_ZERO_GPU);
+TF_CALL_bfloat16(TENSOR_ARRAY_SET_ZERO_GPU);
+TF_CALL_bool(TENSOR_ARRAY_SET_ZERO_GPU);
 #undef TENSOR_ARRAY_SET_ZERO_GPU
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
 #undef TENSOR_ARRAY_SET_ZERO
+
+template <typename Device, typename T>
+Status TensorCopyUnaligned(OpKernelContext* ctx, Tensor* src,
+                           Tensor* dst) = delete;
+
+#define TENSOR_COPY_UNALIGNED(Device, T)                                     \
+  template <>                                                                \
+  Status TensorCopyUnaligned<Device, T>(OpKernelContext * ctx, Tensor * src, \
+                                        Tensor * dst);
+
+#define TENSOR_COPY_UNALIGNED_CPU(T) TENSOR_COPY_UNALIGNED(CPUDevice, T)
+TF_CALL_NUMBER_TYPES(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_bool(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_qint8(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_qint16(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_qint32(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_quint8(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_quint16(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_string(TENSOR_COPY_UNALIGNED_CPU);
+TF_CALL_variant(TENSOR_COPY_UNALIGNED_CPU);
+#undef TENSOR_COPY_UNALIGNED_CPU
+
+#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#define TENSOR_COPY_UNALIGNED_GPU(T) TENSOR_COPY_UNALIGNED(GPUDevice, T)
+TF_CALL_GPU_NUMBER_TYPES(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_complex64(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_complex128(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_int32(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_int64(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_bfloat16(TENSOR_COPY_UNALIGNED_GPU);
+TF_CALL_bool(TENSOR_COPY_UNALIGNED_GPU);
+#undef TENSOR_COPY_UNALIGNED_GPU
+
+#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
+
+#undef TENSOR_COPY_UNALIGNED
 
 // Concatenates the tensors in `values` and writes the result into
 // `output_tensor`. The shapes of the tensors are ignored; they are treated as

@@ -151,7 +151,7 @@ class DmlExtractImagePatchesKernel : public DmlKernel {
 
     DmlKernelTensors tensors = GetTensorInfos(ctx, DmlKernelParams{});
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input = dml::InputTensor(scope, 0, inputs[0]);
     auto result = dml::ExtractPatches(scope, input, window_sizes,
                                       window_strides, window_rates,

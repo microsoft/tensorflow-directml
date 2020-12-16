@@ -17,7 +17,27 @@ limitations under the License.
 
 #include "tensorflow/core/platform/default/logging.h"
 
-#define DML_CHECK_SUCCEEDED(hr)      \
-  do {                               \
-    CHECK_EQ(SUCCEEDED((hr)), true); \
+#ifdef _WIN32
+#include <Windows.h>
+#else
+#include "winadapter.h"
+#endif
+
+namespace tensorflow {
+namespace dml_util {
+[[noreturn]] void HandleFailedHr(HRESULT hr, const char* expression,
+                                 const char* file, int line);
+
+bool HrIsOutOfMemory(HRESULT hr);
+absl::string_view StringifyDeviceRemovedReason(HRESULT reason);
+
+}  // namespace dml_util
+}  // namespace tensorflow
+
+#define DML_CHECK_SUCCEEDED(x)                                           \
+  do {                                                                   \
+    HRESULT _hr = (x);                                                   \
+    if (TF_PREDICT_FALSE(FAILED(_hr))) {                                 \
+      tensorflow::dml_util::HandleFailedHr(_hr, #x, __FILE__, __LINE__); \
+    }                                                                    \
   } while (0)

@@ -124,7 +124,7 @@ class DmlSparseXentKernel : public DmlKernel {
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto logits = dml::InputTensor(scope, 0, input_descs[0]);
     auto sparse_labels = dml::InputTensor(scope, 1, input_descs[1]);
 

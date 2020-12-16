@@ -274,11 +274,11 @@ class DmlTensorScatterBinaryKernel : public DmlKernel {
         DMLCalcBufferTensorSize(dml_dtype, in_dim_count, &in_size, &in_stride);
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
-    auto input = dml::InputTensor(scope, 0, inputs[0]);
-    auto indices = dml::InputTensor(scope, 1, inputs[1]);
-    auto updates = dml::InputTensor(scope, 2, inputs[2]);
-    auto empty_input = dml::InputTensor(scope, 3, inputs[3]);
+    auto graph = dml::Graph(ctx->GetDmlDevice());
+    auto input = dml::InputTensor(graph, 0, inputs[0]);
+    auto indices = dml::InputTensor(graph, 1, inputs[1]);
+    auto updates = dml::InputTensor(graph, 2, inputs[2]);
+    auto empty_input = dml::InputTensor(graph, 3, inputs[3]);
 
     // First, perform the scatter on an empty tensor
     auto result = dml::ScatterND(empty_input, indices, updates,
@@ -289,7 +289,7 @@ class DmlTensorScatterBinaryKernel : public DmlKernel {
     result = BinaryOp()(input, result);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
-        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+        graph.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }

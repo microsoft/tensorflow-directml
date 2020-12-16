@@ -20,6 +20,13 @@ limitations under the License.
 #define EIGEN_USE_GPU
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#ifdef TENSORFLOW_USE_DIRECTML
+
+#include "tensorflow/core/kernels/dml_tensor_array.h"
+using DMLDevice = tensorflow::tensor_array::DMLDeviceTag;
+
+#endif  // #ifdef TENSORFLOW_USE_DIRECTML
+
 #include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
@@ -29,6 +36,7 @@ limitations under the License.
 #include "tensorflow/core/framework/variant_op_registry.h"
 #include "tensorflow/core/kernels/concat_lib.h"
 #include "tensorflow/core/kernels/fill_functor.h"
+#include "tensorflow/core/kernels/tensor_array.h"
 #include "tensorflow/core/lib/core/coding.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/core/refcount.h"
@@ -249,13 +257,11 @@ class TensorListStack : public OpKernel {
       return;
     }
 
-    ConstMatrixVector inputs_flat;
-    inputs_flat.reserve(tensor_list->tensors().size());
+    std::vector<PersistentTensor> values;
     Tensor zeros;
     for (const auto& t : tensor_list->tensors()) {
       if (t.dtype() != DT_INVALID) {
-        inputs_flat.emplace_back(new typename TTypes<T, 2>::ConstMatrix(
-            t.shaped<T, 2>({1, t.NumElements()})));
+        values.emplace_back(PersistentTensor(t));
       } else {
         if (!zeros.NumElements()) {
           AllocatorAttributes attr;
@@ -264,23 +270,12 @@ class TensorListStack : public OpKernel {
           }
           OP_REQUIRES_OK(
               c, c->allocate_temp(element_dtype_, element_shape, &zeros, attr));
-          functor::SetZeroFunctor<Device, T>()(c->eigen_device<Device>(),
-                                               zeros.flat<T>());
+          tensor_array::TensorSetZero<Device, T>(c, &zeros);
         }
-        inputs_flat.emplace_back(new typename TTypes<T, 2>::ConstMatrix(
-            const_cast<const Tensor&>(zeros).shaped<T, 2>(
-                {1, zeros.NumElements()})));
+        values.emplace_back(PersistentTensor(zeros));
       }
     }
-    auto output_flat = output->shaped<T, 2>({1, output->NumElements()});
-
-#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-    if (std::is_same<Device, Eigen::GpuDevice>::value) {
-      ConcatGPU<T>(c, inputs_flat, output, &output_flat);
-      return;
-    }
-#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-    ConcatCPU<T>(c->device(), inputs_flat, &output_flat);
+    tensor_array::ConcatTensors<Device, T>(c, output, absl::MakeSpan(values));
   }
 
  private:
@@ -344,8 +339,7 @@ class TensorListGetItem : public OpKernel {
         attr.set_on_host(true);
       }
       OP_REQUIRES_OK(c, c->allocate_output(0, element_shape, &result, attr));
-      functor::SetZeroFunctor<Device, T>()(c->eigen_device<Device>(),
-                                           result->flat<T>());
+      tensor_array::TensorSetZero<Device, T>(c, result);
     }
   }
 
@@ -391,8 +385,7 @@ class TensorListPopBack : public OpKernel {
         attr.set_on_host(true);
       }
       OP_REQUIRES_OK(c, c->allocate_output(1, element_shape, &result, attr));
-      functor::SetZeroFunctor<Device, T>()(c->eigen_device<Device>(),
-                                           result->flat<T>());
+      tensor_array::TensorSetZero<Device, T>(c, result);
     }
 
     TensorList* output_list = nullptr;
@@ -556,17 +549,14 @@ class TensorListConcat : public OpKernel {
     if (output->NumElements() == 0) {
       return;
     }
-
-    ConstMatrixVector inputs_flat;
-    inputs_flat.reserve(tensor_list->tensors().size());
+    std::vector<PersistentTensor> values;
     // Store the zeros tensors in a vector to prevent them from being GC'ed till
     // concat is complete.
     std::vector<Tensor> zeros_vec;
     for (int i = 0; i < tensor_list->tensors().size(); i++) {
       const Tensor& element_tensor = tensor_list->tensors()[i];
       if (element_tensor.dtype() != DT_INVALID) {
-        inputs_flat.emplace_back(new typename TTypes<T, 2>::ConstMatrix(
-            element_tensor.shaped<T, 2>({1, element_tensor.NumElements()})));
+        values.emplace_back(PersistentTensor(element_tensor));
       } else {
         AllocatorAttributes attr;
         if (element_dtype_ == DT_VARIANT) {
@@ -578,22 +568,11 @@ class TensorListConcat : public OpKernel {
         Tensor& zeros = zeros_vec.back();
         OP_REQUIRES_OK(
             c, c->allocate_temp(element_dtype_, element_shape, &zeros, attr));
-        functor::SetZeroFunctor<Device, T>()(c->eigen_device<Device>(),
-                                             zeros.flat<T>());
-        inputs_flat.emplace_back(new typename TTypes<T, 2>::ConstMatrix(
-            const_cast<const Tensor&>(zeros).shaped<T, 2>(
-                {1, zeros.NumElements()})));
+        tensor_array::TensorSetZero<Device, T>(c, &zeros);
+        values.emplace_back(PersistentTensor(zeros));
       }
     }
-    auto output_flat = output->shaped<T, 2>({1, output->NumElements()});
-
-#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-    if (std::is_same<Device, Eigen::GpuDevice>::value) {
-      ConcatGPU<T>(c, inputs_flat, output, &output_flat);
-      return;
-    }
-#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-    ConcatCPU<T>(c->device(), inputs_flat, &output_flat);
+    tensor_array::ConcatTensors<Device, T>(c, output, absl::MakeSpan(values));
   }
 
  private:
@@ -663,9 +642,7 @@ class TensorListSplit : public OpKernel {
       // TODO(apassos) maybe not always align; but weird compiler bugs seem to
       // prevent this.
       Tensor aligned;
-      OP_REQUIRES_OK(c, c->allocate_temp(tmp.dtype(), tmp.shape(), &aligned));
-      aligned.flat<T>().device(c->eigen_device<Device>()) =
-          tmp.unaligned_flat<T>();
+      tensor_array::TensorCopyUnaligned<Device, T>(c, &tmp, &aligned);
       output_list.tensors().emplace_back(aligned);
     }
     OP_REQUIRES(c, end == input_tensor.shape().dim_size(0),
@@ -732,8 +709,9 @@ class TensorListGather : public OpKernel {
       return;
     }
 
-    ConstMatrixVector inputs_flat;
-    inputs_flat.reserve(indices.NumElements());
+    // ConstMatrixVector inputs_flat;
+    std::vector<PersistentTensor> values;
+    // inputs_flat.reserve(indices.NumElements());
     Tensor zeros;
     for (int index = 0; index < indices.NumElements(); ++index) {
       const int i = indices.flat<int32>()(index);
@@ -743,8 +721,7 @@ class TensorListGather : public OpKernel {
                                   tensor_list->tensors().size(), " elements."));
       const Tensor& t = tensor_list->tensors()[i];
       if (t.dtype() != DT_INVALID) {
-        inputs_flat.emplace_back(new typename TTypes<T, 2>::ConstMatrix(
-            t.shaped<T, 2>({1, t.NumElements()})));
+        values.emplace_back(PersistentTensor(t));
       } else {
         if (!zeros.NumElements()) {
           AllocatorAttributes attr;
@@ -753,23 +730,12 @@ class TensorListGather : public OpKernel {
           }
           OP_REQUIRES_OK(
               c, c->allocate_temp(element_dtype_, element_shape, &zeros, attr));
-          functor::SetZeroFunctor<Device, T>()(c->eigen_device<Device>(),
-                                               zeros.flat<T>());
+          tensor_array::TensorSetZero<Device, T>(c, &zeros);
         }
-        inputs_flat.emplace_back(new typename TTypes<T, 2>::ConstMatrix(
-            const_cast<const Tensor&>(zeros).shaped<T, 2>(
-                {1, zeros.NumElements()})));
+        values.emplace_back(PersistentTensor(zeros));
       }
     }
-    auto output_flat = output->shaped<T, 2>({1, output->NumElements()});
-
-#if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-    if (std::is_same<Device, Eigen::GpuDevice>::value) {
-      ConcatGPU<T>(c, inputs_flat, output, &output_flat);
-      return;
-    }
-#endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
-    ConcatCPU<T>(c->device(), inputs_flat, &output_flat);
+    tensor_array::ConcatTensors<Device, T>(c, output, absl::MakeSpan(values));
   }
 
  private:
@@ -812,9 +778,7 @@ class TensorListFromTensor : public OpKernel {
       // TODO(apassos) maybe not always align; but weird compiler bugs seem to
       // prevent this.
       Tensor aligned;
-      OP_REQUIRES_OK(c, c->allocate_temp(tmp.dtype(), tmp.shape(), &aligned));
-      aligned.flat<T>().device(c->eigen_device<Device>()) =
-          tmp.unaligned_flat<T>();
+      tensor_array::TensorCopyUnaligned<Device, T>(c, &tmp, &aligned);
       output_list.tensors().push_back(aligned);
     }
     output_tensor->scalar<Variant>()() = std::move(output_list);
@@ -836,11 +800,7 @@ Status Scatter(OpKernelContext* c, const Tensor& value, const Tensor& indices,
     // TODO(apassos) maybe not always align; but weird compiler bugs seem to
     // prevent this.
     Tensor aligned;
-    TF_RETURN_IF_ERROR(c->allocate_temp(tmp.dtype(), tmp.shape(), &aligned));
-    // TODO(apassos) do all slices in a single kernel invocation instead of
-    // many small ones.
-    aligned.flat<T>().device(c->eigen_device<Device>()) =
-        tmp.unaligned_flat<T>();
+    tensor_array::TensorCopyUnaligned<Device, T>(c, &tmp, &aligned);
     std::swap(list->tensors()[i], aligned);
   }
   return Status::OK();
@@ -1129,8 +1089,9 @@ class TensorListPushBackBatch : public OpKernel {
       OP_REQUIRES_OK(c, c->allocate_persistent(
                             element_dtype_, input_element_shape, &tmp, &frame));
       if (input_element_shape.num_elements() > 0) {
-        auto frame_t = frame->flat<T>();
-        frame_t.device(c->eigen_device<Device>()) = input_t.template chip<0>(b);
+        int64 index = b * input_element_shape.num_elements();
+        int64 size = input_element_shape.num_elements();
+        tensor_array::SplitTensor<Device, T>(c, frame, input, index, size);
       }
       output->tensors().push_back(std::move(*frame));
     }

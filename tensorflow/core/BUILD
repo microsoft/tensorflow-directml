@@ -3771,6 +3771,7 @@ cc_library(
     srcs = [
         "common_runtime/dml/dml_adapter.cc",
         "common_runtime/dml/dml_adapter_impl.cc",
+        "common_runtime/dml/dml_error_handling.cc",
     ],
     hdrs = [
         "common_runtime/dml/dml_common.h",
@@ -3796,10 +3797,11 @@ cc_library(
     linkopts = if_windows([
         "d3d12.lib", 
         "dxgi.lib", 
+        "pathcch.lib",
     ]) + if_not_windows([
         "-ld3d12",
         "-ldxcore",
-        "-Wl,-rpath,$$ORIGIN/../_solib_directml"
+        "-Wl,-rpath,$$ORIGIN"
     ]),
 )
 

@@ -188,7 +188,9 @@ class ScatterTest(test.TestCase):
                          tf_scatter,
                          repeat_indices=False,
                          updates_are_scalar=False):
-    vtypes = [np.float32, np.float64]
+    vtypes = ([np.float32]
+        if test_util.gpu_device_type() == 'DML' else [np.float32, np.float64])
+
     if tf_scatter != state_ops.scatter_div:
       vtypes.append(np.int32)
 

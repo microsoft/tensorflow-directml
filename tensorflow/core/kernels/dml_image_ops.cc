@@ -93,7 +93,7 @@ class AdjustImageInitHelper : public InitializationHelper {
 };
 
 template <typename T>
-std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
+std::vector<dml::Expression> RGBToHSVPlanes(dml::Graph& scope,
                                             dml::Expression input) {
   // This helper can only be called with an NHWC tensor as input.
   auto& inputSizes = input.GetOutputDesc().sizes;
@@ -156,7 +156,7 @@ std::vector<dml::Expression> RGBToHSVPlanes(dml::Scope& scope,
   return {h, s, c_max};
 }
 
-static dml::Expression HSVPlanesToRGB(dml::Scope& scope, dml::Expression h,
+static dml::Expression HSVPlanesToRGB(dml::Graph& scope, dml::Expression h,
                                       dml::Expression s, dml::Expression v) {
   // This helper can only be called with {N,H,W,1}-shaped tensors with equal
   // sizes.
@@ -213,7 +213,7 @@ class DmlColorConversionKernel : public DmlKernel {
     tensors.outputs = {tensor_info};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input = dml::InputTensor(scope, 0, inputs[0]);
 
     ConversionFunctor f;
@@ -228,7 +228,7 @@ class DmlColorConversionKernel : public DmlKernel {
 
 template <typename T>
 struct DmlRGBToHSVFunctor {
-  dml::Expression operator()(dml::Scope& scope, dml::Expression input) {
+  dml::Expression operator()(dml::Graph& scope, dml::Expression input) {
     return dml::Join(RGBToHSVPlanes<T>(scope, input), 3);
   }
 };
@@ -242,7 +242,7 @@ TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL)
 #undef DML_REGISTER_KERNEL
 
 struct DmlHSVToRGBFunctor {
-  dml::Expression operator()(dml::Scope& scope, dml::Expression input) {
+  dml::Expression operator()(dml::Graph& scope, dml::Expression input) {
     auto hsv_planes = dml::Split(input, 3, {1, 1, 1});
     return HSVPlanesToRGB(scope, hsv_planes[0], hsv_planes[1], hsv_planes[2]);
   }
@@ -293,7 +293,7 @@ class DmlAdjustImageKernel : public DmlKernel {
     tensors.outputs = {input_tensor_info};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input = dml::InputTensor(scope, 0, inputs[0]);
     auto adjustment = dml::InputTensor(scope, 1, inputs[1]);
 
@@ -309,7 +309,7 @@ class DmlAdjustImageKernel : public DmlKernel {
 
 template <typename T>
 struct DmlAdjustSaturationFunctor {
-  dml::Expression operator()(dml::Scope& scope, dml::Expression input,
+  dml::Expression operator()(dml::Graph& scope, dml::Expression input,
                              dml::Expression scale) {
     auto hsv_planes = RGBToHSVPlanes<T>(scope, input);
     auto scale_bcast =
@@ -330,7 +330,7 @@ TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL)
 
 template <typename T>
 struct DmlAdjustHueFunctor {
-  dml::Expression operator()(dml::Scope& scope, dml::Expression input,
+  dml::Expression operator()(dml::Graph& scope, dml::Expression input,
                              dml::Expression delta) {
     auto hsv_planes = RGBToHSVPlanes<T>(scope, input);
 
@@ -357,7 +357,7 @@ TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL)
 #undef DML_REGISTER_KERNEL
 
 struct DmlAdjustContrastFunctor {
-  dml::Expression operator()(dml::Scope& scope, dml::Expression input,
+  dml::Expression operator()(dml::Graph& scope, dml::Expression input,
                              dml::Expression contrast_factor) {
     contrast_factor =
         dml::Reinterpret(contrast_factor, input.GetOutputDesc().sizes,

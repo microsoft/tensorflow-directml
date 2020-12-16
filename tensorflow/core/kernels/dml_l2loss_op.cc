@@ -53,7 +53,7 @@ class DmlL2LossKernel : public DmlKernel {
     tensors.outputs = {output_info};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input = dml::InputTensor(scope, 0, inputs[0]);
 
     auto loss = dml::Reduce(input, DML_REDUCE_FUNCTION_SUM_SQUARE) * 0.5f;

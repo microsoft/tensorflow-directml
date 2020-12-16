@@ -119,7 +119,7 @@ class DmlRollKernel : public DmlKernel {
       return;
     }
 
-    auto scope = dml::Scope(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto result = dml::InputTensor(scope, 0, inputs[0]);
 
     DML_SCALAR_UNION indices_start;
