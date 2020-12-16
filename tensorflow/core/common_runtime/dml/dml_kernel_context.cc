@@ -201,22 +201,20 @@ DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
     absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
     absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings) {
   // Bind the temporary resource
+  DML_BINDING_DESC temporary_binding_desc = {DML_BINDING_TYPE_NONE, nullptr};
   if (temporary_resource_binding) {
-    DML_BINDING_DESC binding_desc = {};
-    binding_desc = {DML_BINDING_TYPE_BUFFER, temporary_resource_binding};
-    binding_table->BindTemporaryResource(&binding_desc);
-  } else {
-    binding_table->BindTemporaryResource(nullptr);
+    temporary_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                              temporary_resource_binding};
   }
+  binding_table->BindTemporaryResource(&temporary_binding_desc);
 
   // Bind the persistent resource
+  DML_BINDING_DESC persistent_binding_desc = {DML_BINDING_TYPE_NONE, nullptr};
   if (persistent_resource_binding) {
-    DML_BINDING_DESC binding_desc = {};
-    binding_desc = {DML_BINDING_TYPE_BUFFER, persistent_resource_binding};
-    binding_table->BindPersistentResource(&binding_desc);
-  } else {
-    binding_table->BindPersistentResource(nullptr);
+    persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                               persistent_resource_binding};
   }
+  binding_table->BindPersistentResource(&persistent_binding_desc);
 
   // Set up the input bindings
   absl::InlinedVector<DML_BINDING_DESC, 8> input_binding_descs;
