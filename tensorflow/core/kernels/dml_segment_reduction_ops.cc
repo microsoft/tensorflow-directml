@@ -98,8 +98,8 @@ constexpr TData GetIdentityValue() {
 template <DML_REDUCE_FUNCTION reduce_function, typename TData>
 struct SegmentReductionFunctor {
   dml::Expression operator()(dml::Graph& scope, dml::Expression data,
-                             dml::Expression segment_ids,
-                             uint32_t num_segments) {
+                             dml::Expression segment_ids, uint32_t num_segments,
+                             bool int64_indices) {
     dml::TensorDesc::Dimensions row_indices_sizes({1, num_segments, 1, 1});
 
     auto row_indices = dml::FillValueSequence(
@@ -124,9 +124,11 @@ struct SegmentReductionFunctor {
         data, broadcasted_sizes,
         dml::TensorDesc::Dimensions({0, 0, broadcasted_sizes[3], 1}));
 
-    auto broadcasted_segment_ids =
-        dml::Reinterpret(segment_ids, broadcasted_sizes,
-                         dml::TensorDesc::Dimensions({0, 0, 1, 0}));
+    uint32_t indices_stride_multiplier = int64_indices ? 2 : 1;
+
+    auto broadcasted_segment_ids = dml::Reinterpret(
+        segment_ids, broadcasted_sizes,
+        dml::TensorDesc::Dimensions({0, 0, indices_stride_multiplier, 0}));
 
     TData identity_value = GetIdentityValue<reduce_function, TData>();
 
@@ -192,8 +194,9 @@ class DmlSegmentReductionKernel : public DmlKernel {
     auto scope = dml::Graph(ctx->GetDmlDevice());
     auto data = dml::InputTensor(scope, 0, inputs[0]);
     auto segment_ids = dml::InputTensor(scope, 1, inputs[1]);
-    auto result = SegmentReductionOp()(scope, data, segment_ids,
-                                       output_shape.dim_size(0));
+    auto result =
+        SegmentReductionOp()(scope, data, segment_ids, output_shape.dim_size(0),
+                             Is64BitIntegerType(ctx->GetInputDataType(1)));
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
