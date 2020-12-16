@@ -495,8 +495,8 @@ Status TensorHandle::CopyToDevice(EagerContext* ctx, tensorflow::Device* dstd,
     *output = *src;
     return Status::OK();
   }
-  if (!dst_device_context && (src->dtype() != tensorflow::DT_VARIANT &&
-                   !tensorflow::DataTypeCanUseMemcpy(src->dtype()))) {
+  if (dst_device_context && (src->dtype() != tensorflow::DT_VARIANT &&
+                             !tensorflow::DataTypeCanUseMemcpy(src->dtype()))) {
     return tensorflow::errors::InvalidArgument(
         "Can't copy Tensor with type ",
         tensorflow::DataTypeString(src->dtype()), " to device ", dstd->name(),
