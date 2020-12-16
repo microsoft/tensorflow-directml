@@ -202,24 +202,11 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
 
   compiled_op_ = compiled_op;
 
-  // Set up binding table for execution
-
-  DML_BINDING_PROPERTIES binding_props = compiled_op_->GetBindingProperties();
-  descriptors_for_binding_table_ =
-      ctx->AllocateDescriptors(binding_props.RequiredDescriptorCount);
-  assert(descriptors_for_binding_table_.SizeInDescriptors() ==
-         binding_props.RequiredDescriptorCount);
-
-  auto descriptor_handles =
-      descriptors_for_binding_table_.GetDescriptorHandles();
-
-  DML_BINDING_TABLE_DESC binding_table_desc = {};
-  binding_table_desc.Dispatchable = compiled_op_.Get();
-  binding_table_desc.CPUDescriptorHandle = descriptor_handles.cpu;
-  binding_table_desc.GPUDescriptorHandle = descriptor_handles.gpu;
-  binding_table_desc.SizeInDescriptors = binding_props.RequiredDescriptorCount;
+  // Create a binding table for execution, but not actually attached to a
+  // descriptor range (yet). The binding table will be set to a descriptor range
+  // in Compute().
   DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateBindingTable(
-      &binding_table_desc, IID_PPV_ARGS(&binding_table_)));
+      nullptr, IID_PPV_ARGS(&binding_table_)));
 
   input_descs_ = std::move(tensor_descs.inputs);
   output_descs_ = std::move(tensor_descs.outputs);
@@ -227,6 +214,8 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   init_helper_ = ctx->GetInitializationHelper();
 
   // Create the persistent resource, if necessary
+
+  DML_BINDING_PROPERTIES binding_props = compiled_op_->GetBindingProperties();
 
   if (binding_props.PersistentResourceSize != 0) {
     VLOG(2) << "Allocating"
