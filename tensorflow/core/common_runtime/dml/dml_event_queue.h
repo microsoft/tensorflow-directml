@@ -15,10 +15,10 @@ limitations under the License.
 
 #pragma once
 
-#include <queue>
-#include <thread>
 #include <condition_variable>
 #include <functional>
+#include <queue>
+#include <thread>
 
 #include "dml_common.h"
 #include "dml_gpu_event.h"
@@ -41,9 +41,10 @@ class DmlEventQueue {
     DmlGpuEvent gpu_event;
     std::function<void()> done_callback;
 
-    // Orders Events by ascending fence value.
+    // Orders Events by descending fence value, so that priority_queue::top
+    // returns the smallest value.
     bool operator<(const Event& other) const {
-      return (this->gpu_event.fence_value < other.gpu_event.fence_value);
+      return (this->gpu_event.fence_value > other.gpu_event.fence_value);
     }
   };
 
