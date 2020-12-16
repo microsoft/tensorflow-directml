@@ -19,19 +19,20 @@ limitations under the License.
 
 namespace tensorflow {
 
-DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d12_device,
-                                         IDMLDevice* dml_device,
-                                         ID3D12CommandQueue* queue,
-                                         DmlAllocator* allocator)
-    : impl_(absl::make_unique<DmlExecutionContextImpl>(d3d12_device, dml_device,
-                                                       queue, allocator)) {}
+DmlExecutionContext::DmlExecutionContext(
+    ID3D12Device* d3d12_device, IDMLDevice* dml_device,
+    ID3D12CommandQueue* queue, DmlAllocator* allocator,
+    DmlDescriptorAllocator* descriptor_allocator)
+    : impl_(absl::make_unique<DmlExecutionContextImpl>(
+          d3d12_device, dml_device, queue, allocator, descriptor_allocator)) {}
 
-DmlExecutionContextImpl::DmlExecutionContextImpl(ID3D12Device* d3d12_device,
-                                                 IDMLDevice* dml_device,
-                                                 ID3D12CommandQueue* queue,
-                                                 DmlAllocator* allocator)
+DmlExecutionContextImpl::DmlExecutionContextImpl(
+    ID3D12Device* d3d12_device, IDMLDevice* dml_device,
+    ID3D12CommandQueue* queue, DmlAllocator* allocator,
+    DmlDescriptorAllocator* descriptor_allocator)
     : queue_(std::make_shared<DmlCommandQueue>(queue)),
-      dml_recorder_(d3d12_device, dml_device, queue_, allocator) {
+      dml_recorder_(d3d12_device, dml_device, queue_, allocator,
+                    descriptor_allocator) {
   DML_CHECK_SUCCEEDED(
       dml_device->GetParentDevice(IID_PPV_ARGS(d3d_device_.GetAddressOf())));
 }
@@ -62,12 +63,12 @@ DmlGpuEvent DmlExecutionContextImpl::FillBufferWithPattern(
 DmlGpuEvent DmlExecutionContextImpl::InitializeOperator(
     IDMLCompiledOperator* op,
     const DML_BINDING_DESC& persistent_resource_binding,
-    const DML_BINDING_DESC& input_array_binding) {
+    const DML_BINDING_DESC& input_array_binding, DmlEventQueue* event_queue) {
   assert(!closed_);
   SetCommandRecorder(&dml_recorder_);
 
   dml_recorder_.InitializeOperator(op, persistent_resource_binding,
-                                   input_array_binding);
+                                   input_array_binding, event_queue);
 
   return GetCurrentCompletionEvent();
 }

@@ -33,7 +33,8 @@ class DmlExecutionContextImpl {
  public:
   // Constructs an DmlExecutionContext that executes on the supplied queue.
   DmlExecutionContextImpl(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                          ID3D12CommandQueue* queue, DmlAllocator* allocator);
+                          ID3D12CommandQueue* queue, DmlAllocator* allocator,
+                          DmlDescriptorAllocator* descriptor_allocator);
 
   // Waits for flushed work, discards unflushed work, and discards associated
   // references to prevent circular references. Must be the last call on the
@@ -58,7 +59,7 @@ class DmlExecutionContextImpl {
   DmlGpuEvent InitializeOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
-      const DML_BINDING_DESC& input_array_binding);
+      const DML_BINDING_DESC& input_array_binding, DmlEventQueue* event_queue);
 
   DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
                               IDMLBindingTable* binding_table,
@@ -100,7 +101,8 @@ class DmlExecutionContextImpl {
 class DmlExecutionContext {
  public:
   DmlExecutionContext(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                      ID3D12CommandQueue* queue, DmlAllocator* allocator);
+                      ID3D12CommandQueue* queue, DmlAllocator* allocator,
+                      DmlDescriptorAllocator* descriptor_allocator);
 
   void Close() {
     std::unique_lock<std::mutex> lock(mutex_);
@@ -129,10 +131,10 @@ class DmlExecutionContext {
   DmlGpuEvent InitializeOperator(
       IDMLCompiledOperator* op,
       const DML_BINDING_DESC& persistent_resource_binding,
-      const DML_BINDING_DESC& input_array_binding) {
+      const DML_BINDING_DESC& input_array_binding, DmlEventQueue* event_queue) {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->InitializeOperator(op, persistent_resource_binding,
-                                     input_array_binding);
+                                     input_array_binding, event_queue);
   }
 
   DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
