@@ -132,7 +132,7 @@ namespace tensorflow {
 
   auto execution_context = absl::make_unique<DmlExecutionContext>(
       d3d_device.Get(), dml_device.Get(), command_queue.Get(),
-      dml_allocator.get());
+      dml_allocator.get(), descriptor_allocator.get());
 
   auto event_queue = absl::make_unique<DmlEventQueue>();
 

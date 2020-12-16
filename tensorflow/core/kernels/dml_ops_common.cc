@@ -228,8 +228,6 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
 
   // Create the persistent resource, if necessary
 
-  DML_BINDING_PROPERTIES binding_props = compiled_op_->GetBindingProperties();
-
   if (binding_props.PersistentResourceSize != 0) {
     VLOG(2) << "Allocating"
             << strings::HumanReadableNumBytes(

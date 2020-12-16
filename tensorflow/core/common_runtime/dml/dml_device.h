@@ -52,6 +52,10 @@ class DmlDevice : public LocalDevice {
     return state_->readback_heap.get();
   }
 
+  DmlEventQueue* GetEventQueue() const {
+    return state_->event_queue.get();
+  }
+
  public:  // tensorflow::Device overrides
   Status Sync() override;
   Allocator* GetAllocator(AllocatorAttributes attributes) override;

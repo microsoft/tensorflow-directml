@@ -92,7 +92,8 @@ void DmlKernelConstruction::InitializeOperator(
   }
 
   device_->GetExecutionContext()->InitializeOperator(
-      op, persistent_binding_desc, input_binding_desc);
+      op, persistent_binding_desc, input_binding_desc,
+      device_->GetEventQueue());
 }
 
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {
