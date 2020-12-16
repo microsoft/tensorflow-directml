@@ -263,6 +263,22 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
   DML_BINDING_PROPERTIES exec_binding_props =
       compiled_op_->GetBindingProperties();
 
+  // Unfortunately we have to use make_shared here to make it copyable, so it
+  // can be captured in the lambda below
+  auto descriptor_range = std::make_shared<DescriptorAllocation>(
+      ctx->AllocateDescriptors(exec_binding_props.RequiredDescriptorCount));
+
+  D3D12DescriptorHandles descriptor_handles =
+      descriptor_range->GetDescriptorHandles();
+
+  DML_BINDING_TABLE_DESC bind_table_desc = {};
+  bind_table_desc.Dispatchable = compiled_op_.Get();
+  bind_table_desc.CPUDescriptorHandle = descriptor_handles.cpu;
+  bind_table_desc.GPUDescriptorHandle = descriptor_handles.gpu;
+  bind_table_desc.SizeInDescriptors =
+      exec_binding_props.RequiredDescriptorCount;
+  DML_CHECK_SUCCEEDED(binding_table_->Reset(&bind_table_desc));
+
   // Create a temporary resource for executing the op, if it's required.
   UINT64 temporary_resource_size = exec_binding_props.TemporaryResourceSize;
   DmlBuffer temp_resource;
@@ -282,11 +298,19 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
     temp_resource_binding = temp_resource.GetBufferBinding();
   }
 
-  return ctx->BindAndExecuteOperator(
-      compiled_op_.Get(), binding_table_.Get(),
-      descriptors_for_binding_table_.GetDescriptorHandles().heap,
+  DmlGpuEvent gpu_event = ctx->BindAndExecuteOperator(
+      compiled_op_.Get(), binding_table_.Get(), descriptor_handles.heap,
       temp_resource_binding ? &*temp_resource_binding : nullptr,
       GetPersistentResourceBinding(), input_bindings, output_bindings);
+
+  // Transfer ownership of the descriptor range to a lambda, and enqueue it to
+  // be released when the execution completes on the GPU
+  ctx->EnqueueCallbackForGpuEvent(gpu_event,
+                                  [p = std::move(descriptor_range)]() mutable {
+                                    p.reset();  // Release the descriptor range
+                                  });
+
+  return gpu_event;
 }
 
 absl::InlinedVector<D3D12BufferRegion, 8> DmlKernel::CreateInputBuffers(

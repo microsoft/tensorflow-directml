@@ -56,9 +56,15 @@ class DmlKernelConstruction {
   // the pool.
   DescriptorAllocation AllocateDescriptors(size_t size_in_descriptors) const;
 
-  // Initializes a given DML operator on the GPU. Note that this merely queues
-  // the initialization; the returned event will enter the signaled state when
-  // it completes.
+  // Enqueues a callback to fire when the given GpuEvent enters the signaled
+  // state. Note that the callback may be invoked on an arbitrary thread, so it
+  // must be thread-safe.
+  void EnqueueCallbackForGpuEvent(DmlGpuEvent gpu_event,
+                                  std::function<void()> callback) const;
+
+  // Initializes a given DML operator on the GPU. Note that this merely
+  // queues the initialization; the returned event will enter the signaled
+  // state when it completes.
   void InitializeOperator(
       IDMLCompiledOperator* op,
       _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
@@ -146,6 +152,12 @@ class DmlKernelContext {
   // When the returned object is destructed, the descriptors are freed back to
   // the pool.
   DescriptorAllocation AllocateDescriptors(size_t size_in_descriptors) const;
+
+  // Enqueues a callback to fire when the given GpuEvent enters the signaled
+  // state. Note that the callback may be invoked on an arbitrary thread, so it
+  // must be thread-safe.
+  void EnqueueCallbackForGpuEvent(DmlGpuEvent gpu_event,
+                                  std::function<void()> callback) const;
 
   // Executes a DML operator. Note that this merely queues the execution; the
   // returned event will enter the signaled state when it completes.

@@ -137,9 +137,9 @@ void DmlCommandRecorder::InitializeOperator(
 
   // Enqueue an event to ensure that the relevant initialization state lives at
   // least until the operation completes execution on the GPU.
-  auto on_initialize_completed = [init_state]() mutable {
+  auto on_initialize_completed = [state = std::move(init_state)]() mutable {
     // Free the initialization state
-    init_state.reset();
+    state.reset();
   };
   event_queue->Enqueue(queue_->GetNextCompletionEvent(),
                        std::move(on_initialize_completed));

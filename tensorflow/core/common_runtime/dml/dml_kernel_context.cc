@@ -70,6 +70,11 @@ DescriptorAllocation DmlKernelConstruction::AllocateDescriptors(
   return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
 }
 
+void DmlKernelConstruction::EnqueueCallbackForGpuEvent(
+    DmlGpuEvent gpu_event, std::function<void()> callback) const {
+  device_->GetEventQueue()->Enqueue(gpu_event, callback);
+}
+
 void DmlKernelConstruction::InitializeOperator(
     IDMLCompiledOperator* op,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
@@ -191,6 +196,11 @@ D3D12BufferRegion DmlKernelContext::CreateBufferForTensor(
 DescriptorAllocation DmlKernelContext::AllocateDescriptors(
     size_t size_in_descriptors) const {
   return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
+}
+
+void DmlKernelContext::EnqueueCallbackForGpuEvent(
+    DmlGpuEvent gpu_event, std::function<void()> callback) const {
+  device_->GetEventQueue()->Enqueue(gpu_event, callback);
 }
 
 DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(

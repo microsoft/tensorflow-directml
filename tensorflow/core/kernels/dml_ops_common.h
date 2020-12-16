@@ -180,10 +180,6 @@ class DmlKernel {
 
  private:
   Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op_;
-
-  // An owning range of descriptors allocated to this kernel for execution, and
-  // the DML binding table associated with that descriptor range.
-  DescriptorAllocation descriptors_for_binding_table_;
   Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_;
 
   DmlBuffer persistent_resource_;
