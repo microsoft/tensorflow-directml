@@ -40,6 +40,16 @@ DmlEventQueue::~DmlEventQueue() {
 void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event,
                             std::function<void()> done_callback) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
+
+  if (!shared_state_->events.empty()) {
+    // Sanity: double check that we're only using one fence at a time, because
+    // otherwise monotonically increasing fence values no longer describe a
+    // linear timeline...
+    const DmlGpuEvent& existing_event = shared_state_->events.top().gpu_event;
+    ID3D12Fence* existing_fence = existing_event.fence.Get();
+    CHECK(existing_fence == gpu_event.fence.Get());
+  }
+
   shared_state_->events.push({std::move(gpu_event), std::move(done_callback)});
   shared_state_->new_event_enqueued.notify_all();
 }
@@ -62,7 +72,7 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event,
     }
 
     assert(!state->events.empty());
-    Event event = std::move(state->events.front());
+    Event event = state->events.top();
     state->events.pop();
 
     // We've taken ownership of the event, which means we can now unlock the

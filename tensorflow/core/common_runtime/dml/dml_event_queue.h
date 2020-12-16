@@ -40,13 +40,18 @@ class DmlEventQueue {
   struct Event {
     DmlGpuEvent gpu_event;
     std::function<void()> done_callback;
+
+    // Orders Events by ascending fence value.
+    bool operator<(const Event& other) const {
+      return (this->gpu_event.fence_value < other.gpu_event.fence_value);
+    }
   };
 
   // State shared with the background thread. Protected by `mutex`.
   struct SharedState {
     std::mutex mutex;
     std::condition_variable new_event_enqueued;
-    std::queue<Event> events;
+    std::priority_queue<Event> events;
     bool exit_requested = false;
   };
 
