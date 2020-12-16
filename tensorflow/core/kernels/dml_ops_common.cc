@@ -202,12 +202,6 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
 
   compiled_op_ = compiled_op;
 
-  // Create a binding table for execution, but not actually attached to a
-  // descriptor range (yet). The binding table will be set to a descriptor range
-  // in Compute().
-  DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateBindingTable(
-      nullptr, IID_PPV_ARGS(&binding_table_)));
-
   input_descs_ = std::move(tensor_descs.inputs);
   output_descs_ = std::move(tensor_descs.outputs);
   output_refs_forwarding_ = std::move(tensor_descs.output_refs_forwarding);
@@ -277,7 +271,10 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
   bind_table_desc.GPUDescriptorHandle = descriptor_handles.gpu;
   bind_table_desc.SizeInDescriptors =
       exec_binding_props.RequiredDescriptorCount;
-  DML_CHECK_SUCCEEDED(binding_table_->Reset(&bind_table_desc));
+
+  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table;
+  DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateBindingTable(
+      &bind_table_desc, IID_PPV_ARGS(&binding_table)));
 
   // Create a temporary resource for executing the op, if it's required.
   UINT64 temporary_resource_size = exec_binding_props.TemporaryResourceSize;
@@ -299,12 +296,14 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
   }
 
   DmlGpuEvent gpu_event = ctx->BindAndExecuteOperator(
-      compiled_op_.Get(), binding_table_.Get(), descriptor_handles.heap,
+      compiled_op_.Get(), binding_table.Get(), descriptor_handles.heap,
       temp_resource_binding ? &*temp_resource_binding : nullptr,
       GetPersistentResourceBinding(), input_bindings, output_bindings);
 
   // Transfer ownership of the descriptor range to a lambda, and enqueue it to
-  // be released when the execution completes on the GPU
+  // be released when the execution completes on the GPU. Note that we don't
+  // need to keep the binding table alive - recall that lifetime is tied to the
+  // underlying descriptors, not the binding table itself.
   ctx->EnqueueCallbackForGpuEvent(gpu_event,
                                   [p = std::move(descriptor_range)]() mutable {
                                     p.reset();  // Release the descriptor range

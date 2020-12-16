@@ -180,7 +180,6 @@ class DmlKernel {
 
  private:
   Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op_;
-  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_;
 
   DmlBuffer persistent_resource_;
   absl::optional<DML_BUFFER_BINDING> persistent_resource_binding_;
