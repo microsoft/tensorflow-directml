@@ -42,10 +42,13 @@ class DmlCommandRecorder {
                           const DML_BINDING_DESC& input_array_binding,
                           DmlEventQueue* event_queue);
 
+  // Executes a DML operator with the given bindings. The supplied descriptor
+  // heap must match the heap associated with the binding table. Callers should
+  // ensure that the descriptors in the heap that are associated with the
+  // binding table live at least until the execution completes on the GPU.
   void ExecuteOperator(IDMLCompiledOperator* op,
-                       const DML_BINDING_DESC& persistent_resource_binding,
-                       absl::Span<const DML_BINDING_DESC> input_bindings,
-                       absl::Span<const DML_BINDING_DESC> output_bindings);
+                       IDMLBindingTable* binding_table,
+                       ID3D12DescriptorHeap* descriptor_heap);
 
   void CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
                         D3D12_RESOURCE_STATES dst_state,

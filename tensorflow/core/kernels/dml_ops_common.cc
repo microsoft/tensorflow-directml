@@ -205,12 +205,13 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   // Set up binding table for execution
 
   DML_BINDING_PROPERTIES binding_props = compiled_op_->GetBindingProperties();
-  execution_descriptors_ =
+  descriptors_for_binding_table_ =
       ctx->AllocateDescriptors(binding_props.RequiredDescriptorCount);
-  assert(execution_descriptors_.SizeInDescriptors() ==
+  assert(descriptors_for_binding_table_.SizeInDescriptors() ==
          binding_props.RequiredDescriptorCount);
 
-  auto descriptor_handles = execution_descriptors_.GetDescriptorHandles();
+  auto descriptor_handles =
+      descriptors_for_binding_table_.GetDescriptorHandles();
 
   DML_BINDING_TABLE_DESC binding_table_desc = {};
   binding_table_desc.Dispatchable = compiled_op_.Get();
@@ -218,7 +219,7 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   binding_table_desc.GPUDescriptorHandle = descriptor_handles.gpu;
   binding_table_desc.SizeInDescriptors = binding_props.RequiredDescriptorCount;
   DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateBindingTable(
-      &binding_table_desc, IID_PPV_ARGS(&execution_binding_table_)));
+      &binding_table_desc, IID_PPV_ARGS(&binding_table_)));
 
   input_descs_ = std::move(tensor_descs.inputs);
   output_descs_ = std::move(tensor_descs.outputs);
@@ -264,9 +265,33 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(DmlKernelContext* ctx) const {
   auto input_bindings = dml_util::GetBufferBindings(input_buffers);
   auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
-  return ctx->ExecuteOperator(compiled_op_.Get(),
-                              GetPersistentResourceBinding(), input_bindings,
-                              output_bindings);
+  DML_BINDING_PROPERTIES exec_binding_props =
+      compiled_op_->GetBindingProperties();
+
+  // Create a temporary resource for executing the op, if it's required.
+  UINT64 temporary_resource_size = exec_binding_props.TemporaryResourceSize;
+  DmlBuffer temp_resource;
+  absl::optional<DML_BUFFER_BINDING> temp_resource_binding;
+  if (temporary_resource_size > 0) {
+    // Allocate a temporary buffer and keep a use on it until the end of this
+    // method. The buffer resource will still be alive (managed by the pool);
+    // freeing allows the resource to be shared with other operators, but
+    // because the allocator is multi-threaded we need to at least keep a use on
+    // it until we're done with it locally to prevent the buffer being reused.
+    temp_resource = ctx->AllocateDefaultBuffer(temporary_resource_size);
+    if (!temp_resource) {
+      return errors::ResourceExhausted("OOM when allocating a buffer of ",
+                                       temporary_resource_size, " bytes");
+    }
+
+    temp_resource_binding = temp_resource.GetBufferBinding();
+  }
+
+  return ctx->BindAndExecuteOperator(
+      compiled_op_.Get(), binding_table_.Get(),
+      descriptors_for_binding_table_.GetDescriptorHandles().heap,
+      temp_resource_binding ? &*temp_resource_binding : nullptr,
+      GetPersistentResourceBinding(), input_bindings, output_bindings);
 }
 
 absl::InlinedVector<D3D12BufferRegion, 8> DmlKernel::CreateInputBuffers(

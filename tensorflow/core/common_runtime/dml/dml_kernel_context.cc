@@ -192,16 +192,29 @@ DescriptorAllocation DmlKernelContext::AllocateDescriptors(
   return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
 }
 
-DmlGpuEvent DmlKernelContext::ExecuteOperator(
-    IDMLCompiledOperator* op,
+DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
+    IDMLCompiledOperator* op, IDMLBindingTable* binding_table,
+    ID3D12DescriptorHeap* heap_for_binding_table,
+    _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
     absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
     absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings) {
-  // Set up the persistent resource binding
-  DML_BINDING_DESC persistent_binding_desc = {};
+  // Bind the temporary resource
+  if (temporary_resource_binding) {
+    DML_BINDING_DESC binding_desc = {};
+    binding_desc = {DML_BINDING_TYPE_BUFFER, temporary_resource_binding};
+    binding_table->BindTemporaryResource(&binding_desc);
+  } else {
+    binding_table->BindTemporaryResource(nullptr);
+  }
+
+  // Bind the persistent resource
   if (persistent_resource_binding) {
-    persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
-                               persistent_resource_binding};
+    DML_BINDING_DESC binding_desc = {};
+    binding_desc = {DML_BINDING_TYPE_BUFFER, persistent_resource_binding};
+    binding_table->BindPersistentResource(&binding_desc);
+  } else {
+    binding_table->BindPersistentResource(nullptr);
   }
 
   // Set up the input bindings
@@ -214,6 +227,8 @@ DmlGpuEvent DmlKernelContext::ExecuteOperator(
 
     input_binding_descs.push_back(desc);
   }
+  binding_table->BindInputs(static_cast<UINT>(input_binding_descs.size()),
+                            input_binding_descs.data());
 
   // Set up the output bindings
   absl::InlinedVector<DML_BINDING_DESC, 4> output_binding_descs;
@@ -225,9 +240,11 @@ DmlGpuEvent DmlKernelContext::ExecuteOperator(
 
     output_binding_descs.push_back(desc);
   }
+  binding_table->BindOutputs(static_cast<UINT>(output_binding_descs.size()),
+                             output_binding_descs.data());
 
   return device_->GetExecutionContext()->ExecuteOperator(
-      op, persistent_binding_desc, input_binding_descs, output_binding_descs);
+      op, binding_table, heap_for_binding_table);
 }
 
 DmlGpuEvent DmlKernelContext::GetCurrentCompletionEvent() const {

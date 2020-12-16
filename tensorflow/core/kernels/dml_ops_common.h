@@ -176,8 +176,8 @@ class DmlKernel {
 
   // An owning range of descriptors allocated to this kernel for execution, and
   // the DML binding table associated with that descriptor range.
-  DescriptorAllocation execution_descriptors_;
-  Microsoft::WRL::ComPtr<IDMLBindingTable> execution_binding_table_;
+  DescriptorAllocation descriptors_for_binding_table_;
+  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_;
 
   DmlBuffer persistent_resource_;
   absl::optional<DML_BUFFER_BINDING> persistent_resource_binding_;
