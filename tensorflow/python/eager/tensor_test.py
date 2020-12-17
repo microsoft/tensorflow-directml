@@ -406,7 +406,7 @@ class TFETensorTest(test_util.TensorFlowTestCase):
   @test_util.run_gpu_only
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testMemoryviewCopyToCPU(self):
-    with ops.device("/device:GPU:0"):
+    with ops.device(test_util.gpu_device_type()):
       t = constant_op.constant([0.0])
     self.assertAllEqual(
         np.array(memoryview(t)), np.array([0.0], dtype=np.float32))
