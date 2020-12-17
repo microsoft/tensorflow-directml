@@ -31,8 +31,11 @@ namespace tensorflow {
 
 BFCAllocator::BFCAllocator(SubAllocator* sub_allocator, size_t total_memory,
                            bool allow_growth, const string& name,
-                           bool garbage_collection, size_t max_allocation_size)
+                           bool garbage_collection,
+                           size_t min_alloc_size_exponent,
+                           size_t max_allocation_size)
     : garbage_collection_(garbage_collection),
+      min_alloc_size_exponent_(min_alloc_size_exponent),
       max_allocation_size_bytes_(max_allocation_size),
       sub_allocator_(sub_allocator),
       name_(name),
@@ -65,7 +68,7 @@ BFCAllocator::BFCAllocator(SubAllocator* sub_allocator, size_t total_memory,
             << strings::HumanReadableNumBytes(bin_size);
     new (BinFromIndex(b)) Bin(this, bin_size);
     CHECK_EQ(BinForSize(bin_size), BinFromIndex(b));
-    CHECK_EQ(BinForSize(bin_size + 255), BinFromIndex(b));
+    CHECK_EQ(BinForSize(bin_size + MinAllocationSize() - 1), BinFromIndex(b));
     CHECK_EQ(BinForSize(bin_size * 2 - 1), BinFromIndex(b));
     if (b + 1 < kNumBins) {
       CHECK_NE(BinForSize(bin_size * 2), BinFromIndex(b));
@@ -100,8 +103,9 @@ const BFCAllocator::Chunk* BFCAllocator::ChunkFromHandle(ChunkHandle h) const {
 
 bool BFCAllocator::Extend(size_t alignment, size_t rounded_bytes) {
   size_t available_bytes = memory_limit_ - total_region_allocated_bytes_;
-  // Rounds available_bytes down to the nearest multiple of kMinAllocationSize.
-  available_bytes = (available_bytes / kMinAllocationSize) * kMinAllocationSize;
+  // Rounds available_bytes down to the nearest multiple of MinAllocationSize().
+  available_bytes =
+      (available_bytes / MinAllocationSize()) * MinAllocationSize();
 
   // Do we have enough space to handle the client's request?
   // If not, fail immediately.
@@ -159,7 +163,7 @@ bool BFCAllocator::Extend(size_t alignment, size_t rounded_bytes) {
 
   VLOG(1) << "Allocated memory at " << mem_addr << " to "
           << static_cast<void*>(static_cast<char*>(mem_addr) + bytes);
-  region_manager_.AddAllocationRegion(mem_addr, bytes);
+  region_manager_.AddAllocationRegion(mem_addr, bytes, min_alloc_size_exponent_);
 
   // Create one large chunk for the whole memory space that will
   // be chunked later.
@@ -263,12 +267,11 @@ void* BFCAllocator::AllocateRaw(size_t unused_alignment, size_t num_bytes,
   }
 }
 
-// static
 size_t BFCAllocator::RoundedBytes(size_t bytes) {
   size_t rounded_bytes =
-      (kMinAllocationSize *
-       ((bytes + kMinAllocationSize - 1) / kMinAllocationSize));
-  DCHECK_EQ(size_t{0}, rounded_bytes % kMinAllocationSize);
+      (MinAllocationSize() *
+       ((bytes + MinAllocationSize() - 1) / MinAllocationSize()));
+  DCHECK_EQ(size_t{0}, rounded_bytes % MinAllocationSize());
   return rounded_bytes;
 }
 
@@ -379,8 +382,8 @@ void* BFCAllocator::AllocateRawInternal(size_t unused_alignment,
     return nullptr;
   }
 
-  // First, always allocate memory of at least kMinAllocationSize
-  // bytes, and always allocate multiples of kMinAllocationSize bytes
+  // First, always allocate memory of at least MinAllocationSize()
+  // bytes, and always allocate multiples of MinAllocationSize() bytes
   // so all memory addresses are nicely byte aligned.
   size_t rounded_bytes = RoundedBytes(num_bytes);
 

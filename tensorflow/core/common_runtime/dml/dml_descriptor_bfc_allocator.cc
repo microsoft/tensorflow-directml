@@ -21,7 +21,8 @@ DmlDescriptorAllocator::DmlDescriptorAllocator(
     D3D12DescriptorHeapAllocator* heap_allocator, const string& name)
     : BFCAllocator(new SubAllocatorWrapper(heap_allocator),
                    kMaxTotalDescriptors, kAllowGrowth, name,
-                   kEnableGarbageCollection, kMaxAllocationSizeInDescriptors),
+                   kEnableGarbageCollection, 0,
+                   kMaxAllocationSizeInDescriptors),
       heap_allocator_(heap_allocator) {}
 
 DescriptorAllocation DmlDescriptorAllocator::Alloc(size_t size_in_descriptors) {

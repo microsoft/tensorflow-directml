@@ -50,6 +50,7 @@ class BFCAllocator : public Allocator {
   BFCAllocator(SubAllocator* sub_allocator, size_t total_memory,
                bool allow_growth, const string& name,
                bool garbage_collection = false,
+               size_t min_alloc_size_exponent = 8,
                size_t max_allocation_size = -1);
   ~BFCAllocator() override;
 
@@ -220,9 +221,6 @@ class BFCAllocator : public Allocator {
         : bin_size(bs), free_chunks(ChunkComparator(allocator)) {}
   };
 
-  static const size_t kMinAllocationBits = 8;
-  static const size_t kMinAllocationSize = 1 << kMinAllocationBits;
-
   // BFCAllocator allocates memory into a collection of disjoint
   // AllocationRegions.  Each AllocationRegion corresponds to one call to
   // SubAllocator::Alloc().  (Actually, if a subsequent call to
@@ -236,14 +234,17 @@ class BFCAllocator : public Allocator {
   // This class is thread-compatible.
   class AllocationRegion {
    public:
-    AllocationRegion(void* ptr, size_t memory_size)
-        : ptr_(ptr),
+    AllocationRegion(void* ptr, size_t memory_size,
+                     size_t min_alloc_size_exponent)
+        : min_alloc_size_exponent_(min_alloc_size_exponent),
+          ptr_(ptr),
           memory_size_(memory_size),
           end_ptr_(
               static_cast<void*>(static_cast<char*>(ptr_) + memory_size_)) {
-      DCHECK_EQ(0, memory_size % kMinAllocationSize);
+      const size_t min_allocation_size = (1 << min_alloc_size_exponent);
+      DCHECK_EQ(0, memory_size % min_allocation_size);
       const size_t n_handles =
-          (memory_size + kMinAllocationSize - 1) / kMinAllocationSize;
+          (memory_size + min_allocation_size - 1) / min_allocation_size;
       handles_.reset(new ChunkHandle[n_handles]);
       for (size_t i = 0; i < n_handles; i++) {
         handles_[i] = kInvalidChunkHandle;
@@ -268,6 +269,7 @@ class BFCAllocator : public Allocator {
 
    private:
     void Swap(AllocationRegion* other) {
+      std::swap(min_alloc_size_exponent_, other->min_alloc_size_exponent_);
       std::swap(ptr_, other->ptr_);
       std::swap(memory_size_, other->memory_size_);
       std::swap(end_ptr_, other->end_ptr_);
@@ -279,16 +281,19 @@ class BFCAllocator : public Allocator {
       std::uintptr_t base_int = reinterpret_cast<std::uintptr_t>(ptr_);
       DCHECK_GE(p_int, base_int);
       DCHECK_LT(p_int, base_int + memory_size_);
-      return static_cast<size_t>(((p_int - base_int) >> kMinAllocationBits));
+      return static_cast<size_t>(
+          ((p_int - base_int) >> min_alloc_size_exponent_));
     }
+
+    size_t min_alloc_size_exponent_;
 
     // Metadata about the allocation region.
     void* ptr_ = nullptr;
     size_t memory_size_ = 0;
     void* end_ptr_ = nullptr;
 
-    // Array of size "memory_size / kMinAllocationSize".  It is
-    // indexed by (p-base) / kMinAllocationSize, contains ChunkHandle
+    // Array of size "memory_size / MinAllocationSize()".  It is
+    // indexed by (p-base) / MinAllocationSize(), contains ChunkHandle
     // for the memory allocation represented by "p"
     std::unique_ptr<ChunkHandle[]> handles_;
 
@@ -305,11 +310,13 @@ class BFCAllocator : public Allocator {
     RegionManager() {}
     ~RegionManager() {}
 
-    void AddAllocationRegion(void* ptr, size_t memory_size) {
+    void AddAllocationRegion(void* ptr, size_t memory_size,
+                             size_t min_alloc_size_exponent) {
       // Insert sorted by end_ptr
       auto entry =
           std::upper_bound(regions_.begin(), regions_.end(), ptr, &Comparator);
-      regions_.insert(entry, AllocationRegion(ptr, memory_size));
+      regions_.insert(
+          entry, AllocationRegion(ptr, memory_size, min_alloc_size_exponent));
     }
 
     std::vector<AllocationRegion>::iterator RemoveAllocationRegion(
@@ -353,8 +360,8 @@ class BFCAllocator : public Allocator {
     std::vector<AllocationRegion> regions_;
   };
 
-  // Returns 'bytes' rounded up to the next highest kMinAllocationSize.
-  static size_t RoundedBytes(size_t bytes);
+  // Returns 'bytes' rounded up to the next highest MinAllocationSize().
+  size_t RoundedBytes(size_t bytes);
 
   // Try to add a new memory region that can satisfy an allocation of
   // 'rounded_bytes' bytes.  Returns true on success and false on
@@ -432,6 +439,10 @@ class BFCAllocator : public Allocator {
     size_t total_chunks_in_bin = 0;
   };
 
+  size_t min_alloc_size_exponent_;
+
+  size_t MinAllocationSize() const { return (1 << min_alloc_size_exponent_); }
+
   // Computes and returns a BinDebugInfo for each Bin.
   std::array<BinDebugInfo, kNumBins> get_bin_debug_info()
       EXCLUSIVE_LOCKS_REQUIRED(lock_);
@@ -467,11 +478,10 @@ class BFCAllocator : public Allocator {
   Bin* BinFromIndex(BinNum index) {
     return reinterpret_cast<Bin*>(&(bins_space_[index * sizeof(Bin)]));
   }
-  size_t BinNumToSize(BinNum index) {
-    return static_cast<size_t>(256) << index;
-  }
+  size_t BinNumToSize(BinNum index) { return MinAllocationSize() << index; }
   BinNum BinNumForSize(size_t bytes) {
-    uint64 v = std::max<size_t>(bytes, 256) >> kMinAllocationBits;
+    uint64 v = std::max<size_t>(bytes, MinAllocationSize()) >>
+               min_alloc_size_exponent_;
     int b = std::min(kNumBins - 1, Log2FloorNonZero(v));
     return b;
   }
