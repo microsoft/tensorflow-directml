@@ -17,7 +17,7 @@ limitations under the License.
 
 #include <condition_variable>
 #include <functional>
-#include <queue>
+#include <set>
 #include <thread>
 
 #include "dml_common.h"
@@ -34,6 +34,9 @@ class DmlEventQueue {
 
   // Enqueues an arbitrary callback to fire once the given GPU event becomes
   // signaled. The callback is invoked asynchronously, on an arbitrary thread.
+  // If there are multiple callbacks enqueued for a single fence value, those
+  // callbacks are executed in the order they were queued. This method is
+  // thread-safe.
   void Enqueue(DmlGpuEvent gpu_event, std::function<void()> done_callback);
 
  private:
@@ -41,10 +44,9 @@ class DmlEventQueue {
     DmlGpuEvent gpu_event;
     std::function<void()> done_callback;
 
-    // Orders Events by descending fence value, so that priority_queue::top
-    // returns the smallest value.
+    // Orders Events by ascending fence value.
     bool operator<(const Event& other) const {
-      return (this->gpu_event.fence_value > other.gpu_event.fence_value);
+      return (this->gpu_event.fence_value < other.gpu_event.fence_value);
     }
   };
 
@@ -52,7 +54,7 @@ class DmlEventQueue {
   struct SharedState {
     std::mutex mutex;
     std::condition_variable new_event_enqueued;
-    std::priority_queue<Event> events;
+    std::multiset<Event> events;
     bool exit_requested = false;
   };
 

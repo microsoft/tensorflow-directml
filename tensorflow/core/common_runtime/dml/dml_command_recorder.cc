@@ -139,7 +139,8 @@ void DmlCommandRecorder::InitializeOperator(
   // least until the operation completes execution on the GPU.
   auto on_initialize_completed = [state = std::move(init_state)]() mutable {
     // Free the initialization state
-    state.reset();
+    state->initializer = nullptr;
+    state->descriptor_range.Reset();
   };
   event_queue->Enqueue(queue_->GetNextCompletionEvent(),
                        std::move(on_initialize_completed));

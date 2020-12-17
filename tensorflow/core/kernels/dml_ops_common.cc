@@ -306,7 +306,7 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
   // underlying descriptors, not the binding table itself.
   ctx->EnqueueCallbackForGpuEvent(gpu_event,
                                   [p = std::move(descriptor_range)]() mutable {
-                                    p.reset();  // Release the descriptor range
+                                    p->Reset();  // Release the descriptor range
                                   });
 
   return gpu_event;

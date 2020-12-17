@@ -38,11 +38,7 @@ DescriptorAllocation::DescriptorAllocation(DmlDescriptorAllocator* allocator,
                                            void* p, size_t size_in_descriptors)
     : allocator_(allocator), p_(p), size_in_descriptors_(size_in_descriptors) {}
 
-DescriptorAllocation ::~DescriptorAllocation() {
-  if (allocator_ && p_) {
-    allocator_->DeallocateRaw(p_);
-  }
-}
+DescriptorAllocation ::~DescriptorAllocation() { Reset(); }
 
 DescriptorAllocation::DescriptorAllocation(DescriptorAllocation&& x) {
   *this = std::move(x);
@@ -66,6 +62,14 @@ D3D12DescriptorHandles DescriptorAllocation::GetDescriptorHandles() const {
     return D3D12DescriptorHandles{nullptr, UINT64(-1), SIZE_T(-1)};
   }
   return allocator_->GetDescriptorHandles(p_);
+}
+void DescriptorAllocation::Reset() {
+  if (allocator_ && p_) {
+    allocator_->DeallocateRaw(p_);
+  }
+  allocator_ = nullptr;
+  p_ = nullptr;
+  size_in_descriptors_ = 0;
 }
 
 }  // namespace tensorflow

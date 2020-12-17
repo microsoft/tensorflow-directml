@@ -45,16 +45,21 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event,
     // Sanity: double check that we're only using one fence at a time, because
     // otherwise monotonically increasing fence values no longer describe a
     // linear timeline...
-    const DmlGpuEvent& existing_event = shared_state_->events.top().gpu_event;
+    const DmlGpuEvent& existing_event = shared_state_->events.begin()->gpu_event;
     ID3D12Fence* existing_fence = existing_event.fence.Get();
     CHECK(existing_fence == gpu_event.fence.Get());
   }
 
-  shared_state_->events.push({std::move(gpu_event), std::move(done_callback)});
+  shared_state_->events.insert(
+      {std::move(gpu_event), std::move(done_callback)});
   shared_state_->new_event_enqueued.notify_all();
 }
 
 /*static*/ void DmlEventQueue::ThreadProc(std::shared_ptr<SharedState> state) {
+  // A list of events that all share the same fence value (and therefore, will
+  // always be signaled together)
+  std::vector<Event> next_events;
+
   while (true) {
     std::unique_lock<std::mutex> lock(state->mutex);
     if (state->exit_requested) {
@@ -72,17 +77,27 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event,
     }
 
     assert(!state->events.empty());
-    Event event = state->events.top();
-    state->events.pop();
 
-    // We've taken ownership of the event, which means we can now unlock the
+    // Take all the events off the top of the queue that have the same fence
+    // value. This is an optimization; processing events in bulk rather than
+    // one-by-one reduces contention on the lock.
+    auto range = state->events.equal_range(*state->events.begin());
+    std::move(range.first, range.second, std::back_inserter(next_events));
+    state->events.erase(range.first, range.second);
+
+    // We've taken ownership of the events, which means we can now unlock the
     // shared state
     lock.unlock();
 
-    // Handle the event by blocking until it's signaled, then invoking the
+    // Handle the events by blocking until it's signaled, then invoking the
     // "done" callback
-    event.gpu_event.WaitForSignal();
-    event.done_callback();
+    next_events.front().gpu_event.WaitForSignal();
+    for (const auto& event : next_events) {
+      assert(event.gpu_event.IsSignaled());
+      event.done_callback();
+    }
+
+    next_events.clear();
   }
 }
 

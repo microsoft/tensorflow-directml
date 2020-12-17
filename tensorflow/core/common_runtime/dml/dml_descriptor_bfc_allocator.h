@@ -41,6 +41,8 @@ class DescriptorAllocation {
   D3D12DescriptorHandles GetDescriptorHandles() const;
   size_t SizeInDescriptors() const { return size_in_descriptors_; }
 
+  void Reset(); // Releases the descriptors back to the allocator.
+
   explicit operator bool() const { return (allocator_ && p_); }
 
  private:
