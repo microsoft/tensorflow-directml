@@ -56,6 +56,8 @@ DescriptorAllocation& DescriptorAllocation::operator=(
     x.p_ = nullptr;
     x.size_in_descriptors_ = 0;
   }
+
+  return *this;
 }
 
 D3D12DescriptorHandles DescriptorAllocation::GetDescriptorHandles() const {
