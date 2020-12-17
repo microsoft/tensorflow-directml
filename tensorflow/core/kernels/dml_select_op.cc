@@ -30,7 +30,7 @@ struct SimpleTernary {
   dml::TensorDesc::Dimensions output_shape;
 };
 
-// Attempts to coalesce dimensions that are not broadcast to work with DML's 4D
+// Attempts to coalesce dimensions that are not broadcast to work with DML's 8D
 // tensor limitation. Requires all shapes to have the same rank.
 absl::optional<SimpleTernary> SimplifyTernary(const TensorShape& cond_shape,
                                               const TensorShape& then_shape,
