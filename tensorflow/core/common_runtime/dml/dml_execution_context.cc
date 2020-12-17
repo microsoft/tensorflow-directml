@@ -19,20 +19,19 @@ limitations under the License.
 
 namespace tensorflow {
 
-DmlExecutionContext::DmlExecutionContext(
-    ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-    ID3D12CommandQueue* queue, DmlAllocator* allocator,
-    DmlDescriptorAllocator* descriptor_allocator)
-    : impl_(absl::make_unique<DmlExecutionContextImpl>(
-          d3d12_device, dml_device, queue, allocator, descriptor_allocator)) {}
+DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d12_device,
+                                         IDMLDevice* dml_device,
+                                         ID3D12CommandQueue* queue,
+                                         DmlAllocator* allocator)
+    : impl_(absl::make_unique<DmlExecutionContextImpl>(d3d12_device, dml_device,
+                                                       queue, allocator)) {}
 
-DmlExecutionContextImpl::DmlExecutionContextImpl(
-    ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-    ID3D12CommandQueue* queue, DmlAllocator* allocator,
-    DmlDescriptorAllocator* descriptor_allocator)
+DmlExecutionContextImpl::DmlExecutionContextImpl(ID3D12Device* d3d12_device,
+                                                 IDMLDevice* dml_device,
+                                                 ID3D12CommandQueue* queue,
+                                                 DmlAllocator* allocator)
     : queue_(std::make_shared<DmlCommandQueue>(queue)),
-      dml_recorder_(d3d12_device, dml_device, queue_, allocator,
-                    descriptor_allocator) {
+      dml_recorder_(d3d12_device, dml_device, queue_, allocator) {
   DML_CHECK_SUCCEEDED(
       dml_device->GetParentDevice(IID_PPV_ARGS(d3d_device_.GetAddressOf())));
 }

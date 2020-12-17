@@ -33,8 +33,7 @@ class DmlCommandRecorder {
  public:
   DmlCommandRecorder(ID3D12Device* d3d_device, IDMLDevice* device,
                      std::shared_ptr<DmlCommandQueue> command_queue,
-                     DmlAllocator* allocator,
-                     DmlDescriptorAllocator* descriptor_allocator);
+                     DmlAllocator* allocator);
 
   // Unlike ExecuteOperator(), this will set up the descriptors and binding
   // table for you, and automatically release them (using the given event queue)
@@ -86,7 +85,6 @@ class DmlCommandRecorder {
   ID3D12DescriptorHeap* current_descriptor_heap_ = nullptr;
 
   DmlAllocator* allocator_;
-  DmlDescriptorAllocator* descriptor_allocator_;
   DmlCommandAllocatorRing<2> command_allocator_ring_;
 
   // The command list currently being recorded into, and whether any command

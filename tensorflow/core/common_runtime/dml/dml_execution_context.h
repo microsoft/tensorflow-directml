@@ -33,8 +33,7 @@ class DmlExecutionContextImpl {
  public:
   // Constructs an DmlExecutionContext that executes on the supplied queue.
   DmlExecutionContextImpl(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                          ID3D12CommandQueue* queue, DmlAllocator* allocator,
-                          DmlDescriptorAllocator* descriptor_allocator);
+                          ID3D12CommandQueue* queue, DmlAllocator* allocator);
 
   // Waits for flushed work, discards unflushed work, and discards associated
   // references to prevent circular references. Must be the last call on the
@@ -101,8 +100,7 @@ class DmlExecutionContextImpl {
 class DmlExecutionContext {
  public:
   DmlExecutionContext(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                      ID3D12CommandQueue* queue, DmlAllocator* allocator,
-                      DmlDescriptorAllocator* descriptor_allocator);
+                      ID3D12CommandQueue* queue, DmlAllocator* allocator);
 
   void Close() {
     std::unique_lock<std::mutex> lock(mutex_);
