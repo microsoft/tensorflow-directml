@@ -135,7 +135,8 @@ namespace tensorflow {
       d3d_device.Get(), dml_device.Get(), command_queue.Get(),
       dml_allocator.get());
 
-  auto event_queue = absl::make_unique<DmlEventQueue>();
+  auto event_queue = absl::make_unique<DmlEventQueue>(
+      execution_context->GetCurrentCompletionEvent().fence.Get());
 
   auto upload_heap = absl::make_unique<DmlUploadHeap>(d3d_device.Get(),
                                                       execution_context.get());

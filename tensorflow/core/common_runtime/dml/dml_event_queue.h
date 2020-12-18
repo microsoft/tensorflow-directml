@@ -17,7 +17,7 @@ limitations under the License.
 
 #include <condition_variable>
 #include <functional>
-#include <set>
+#include <map>
 #include <thread>
 
 #include "dml_common.h"
@@ -25,11 +25,15 @@ limitations under the License.
 
 namespace tensorflow {
 
-// Allows for queueing CPU work in response to a signaled GPU event.
+// Allows for queueing CPU work in response to a signaled GPU event. Each
+// instance of this queue can only be used with a single fence, and the fence's
+// signaled values are assumed to only ever increase in a monotonic fashion.
 // This class is thread-safe.
 class DmlEventQueue {
  public:
-  DmlEventQueue();
+  using DoneCallback = std::function<void()>;
+
+  explicit DmlEventQueue(ID3D12Fence* fence);
   ~DmlEventQueue();
 
   // Enqueues an arbitrary callback to fire once the given GPU event becomes
@@ -37,24 +41,26 @@ class DmlEventQueue {
   // If there are multiple callbacks enqueued for a single fence value, those
   // callbacks are executed in the order they were queued. This method is
   // thread-safe.
-  void Enqueue(DmlGpuEvent gpu_event, std::function<void()> done_callback);
+  void Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback);
 
  private:
   struct Event {
-    DmlGpuEvent gpu_event;
-    std::function<void()> done_callback;
-
-    // Orders Events by ascending fence value.
-    bool operator<(const Event& other) const {
-      return (this->gpu_event.fence_value < other.gpu_event.fence_value);
-    }
+    DoneCallback done_callback;
   };
 
   // State shared with the background thread. Protected by `mutex`.
   struct SharedState {
+    // The fence associated with this queue.
+    Microsoft::WRL::ComPtr<ID3D12Fence> fence;
     std::mutex mutex;
-    std::condition_variable new_event_enqueued;
-    std::multiset<Event> events;
+    std::condition_variable new_event_enqueued;  // An event that fires whenever
+                                                 // a new event is added.
+    std::multimap<uint64_t, Event> events_by_fence_value;
+
+    // The current fence value that the thread is waiting to be signaled. This
+    // value is guaranteed to be <= fence->GetCompletedValue().
+    uint64_t current_awaited_fence_value = 0;
+
     bool exit_requested = false;
   };
 
