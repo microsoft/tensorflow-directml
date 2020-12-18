@@ -17,7 +17,6 @@ limitations under the License.
 
 #include "dml_bfc_allocator.h"
 #include "dml_buffer.h"
-#include "dml_descriptor_bfc_allocator.h"
 #include "dml_util.h"
 
 namespace tensorflow {

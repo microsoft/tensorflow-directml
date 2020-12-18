@@ -26,7 +26,6 @@ namespace tensorflow {
 
 class DmlCommandQueue;
 class DmlAllocator;
-class DmlDescriptorAllocator;
 class DmlEventQueue;
 
 class DmlCommandRecorder {
