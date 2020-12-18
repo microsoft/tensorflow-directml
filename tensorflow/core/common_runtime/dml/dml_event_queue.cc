@@ -130,7 +130,7 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
 
     // We require monotonically increasing fence values; time is not allowed to
     // go backward!
-    CHECK(state->fence->GetCompletedValue() > next_fence_value);
+    CHECK(state->fence->GetCompletedValue() >= next_fence_value);
   }
 }
 
