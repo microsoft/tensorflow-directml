@@ -195,10 +195,13 @@ class SelectInitHelper : public BaseSelectInitHelper {
     }
 
     const uint32_t batch_size = static_cast<uint32_t>(then_shape.dim_size(0));
-    const uint32_t outer_dims_size =
-        then_shape.num_elements() / then_shape.dim_size(0);
+    TensorShape flat_outer_shape = ComputeFlatOuterDims(then_shape, 2);
 
-    dml::TensorDesc::Dimensions simple_shape({batch_size, outer_dims_size});
+    dml::TensorDesc::Dimensions simple_shape({
+        batch_size,
+        static_cast<uint32_t>(flat_outer_shape.dim_size(1)),
+    });
+
     simple_ternary_.cond_shape = {batch_size, 1};
     simple_ternary_.then_shape = simple_shape;
     simple_ternary_.else_shape = simple_shape;

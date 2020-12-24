@@ -154,4 +154,21 @@ std::vector<TensorShape> BatchNormGradShapeHelper::GetOutputShapes(
   };
 }
 
+TensorShape ComputeFlatOuterDims(const TensorShape& orig, int64 num_out_dims) {
+  TensorShape out_dims;
+
+  for (int64 out_dim = 0; out_dim < num_out_dims - 1; ++out_dim) {
+    int64 new_dim_size = out_dim >= orig.dims() ? 1 : orig.dim_size(out_dim);
+    out_dims.AddDim(new_dim_size);
+  }
+
+  int64 last_dim_size = 1;
+  for (int64 in_dim = num_out_dims - 1; in_dim < orig.dims(); ++in_dim) {
+    last_dim_size *= orig.dim_size(in_dim);
+  }
+  out_dims.AddDim(last_dim_size);
+
+  return out_dims;
+}
+
 }  // namespace tensorflow
