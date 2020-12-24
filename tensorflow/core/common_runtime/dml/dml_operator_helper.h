@@ -187,5 +187,6 @@ absl::InlinedVector<T, 5> IntTensorToVec(const tensorflow::Tensor& tensor) {
 }
 
 TensorShape BroadcastTensorShapes(absl::Span<const TensorShape> shapes);
+TensorShape ComputeFlatOuterDims(const TensorShape& orig, int64 num_out_dims);
 
 }  // namespace tensorflow
