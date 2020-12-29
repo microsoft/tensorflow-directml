@@ -117,6 +117,11 @@ class MixedPrecisionTest(test.TestCase, parameterized.TestCase):
     self.assertFalse(config.get_optimizer_experimental_options()
                      .get('auto_mixed_precision', False))
 
+  # DML doesn't have float16 optimizations in grappler yet, so we wouldn't
+  # overflow in this case
+  # TODO #26542950: Enable Tensorcore specific grappler optimizations
+  # TFDML #26542950
+  @test_util.skip_dml
   @test_util.run_gpu_only
   @test_util.run_in_graph_and_eager_modes
   def test_grappler_pass_enabled(self):
