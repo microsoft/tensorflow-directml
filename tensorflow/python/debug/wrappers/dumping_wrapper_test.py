@@ -376,7 +376,7 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     dump_dirs = glob.glob(os.path.join(self.session_root, "run_*"))
     self.assertEqual(1, len(dump_dirs))
     dump = debug_data.DebugDumpDir(dump_dirs[0])
-    self.assertEqual(1, dump.size)
+    self.assertEqual(2, dump.size)
     self.assertEqual("delta", dump.dumped_tensor_data[0].node_name)
 
   def testDumpingWrapperWithEmptyFetchWorks(self):
