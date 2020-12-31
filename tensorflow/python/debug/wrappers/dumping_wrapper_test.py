@@ -378,8 +378,6 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
       self.assertEqual(repr(self.inc_v), dump.run_fetches_info)
       self.assertEqual(repr(None), dump.run_feed_keys_info)
 
-  # TFDML #25509707
-  @test_util.skip_dml
   def testDumpingFromMultipleThreadsObeysThreadNameFilter(self):
     sess = dumping_wrapper.DumpingDebugWrapperSession(
         self.sess, session_root=self.session_root, log_usage=False,
@@ -398,7 +396,12 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     dump_dirs = glob.glob(os.path.join(self.session_root, "run_*"))
     self.assertEqual(1, len(dump_dirs))
     dump = debug_data.DebugDumpDir(dump_dirs[0])
-    self.assertEqual(1, dump.size)
+
+    if test_util.is_gpu_available():
+      self.assertGreaterEqual(2, dump.size)
+    else:
+      self.assertEqual(1, dump.size)
+
     self.assertEqual("delta", dump.dumped_tensor_data[0].node_name)
 
   def testDumpingWrapperWithEmptyFetchWorks(self):
