@@ -20,6 +20,7 @@ limitations under the License.
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
 #include "tensorflow/core/util/matmul_bcast.h"
+#include "tensorflow/core/kernels/fused_eigen_output_kernels.h"
 
 namespace tensorflow {
 
@@ -380,6 +381,97 @@ TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
       Name("BatchMatMulV2").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlBatchMatMulKernel<BatchMatMulV2InitHelper>,     \
                        BatchMatMulShapeHelper<BatchMatMulV2InitHelper>>);
+TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+class FusedMatMulInitHelper : public MatMulInitHelper {
+ public:
+  struct Attributes : public MatMulInitHelper::Attributes {
+    explicit Attributes(OpKernelConstruction* ctx)
+        : MatMulInitHelper::Attributes(ctx) {
+      using FCT = FusedComputationType;
+      std::vector<FusedComputationPattern> patterns = {
+          {FCT::kBiasAdd, {"BiasAdd"}},
+          {FCT::kBiasAddWithRelu, {"BiasAdd", "Relu"}},
+          {FCT::kBiasAddWithRelu6, {"BiasAdd", "Relu6"}},
+          {FCT::kBiasAddWithElu, {"BiasAdd", "Elu"}},
+      };
+
+      OP_REQUIRES_OK(ctx,
+                     InitializeFusedComputation(ctx, "DmlFusedConv2d", patterns,
+                                                &fused_computation_type,
+                                                &fused_computation_args));
+    }
+
+    FusedComputationType fused_computation_type;
+    FusedComputationArgs fused_computation_args;
+  };
+
+  FusedMatMulInitHelper(OpKernelContext* ctx,
+                        std::shared_ptr<const Attributes> attr)
+      : MatMulInitHelper(ctx, attr), attr_(attr) {
+  }
+
+  FusedComputationType GetFusedComputationType() const {
+    return attr_->fused_computation_type;
+  }
+
+  FusedComputationArgs GetFusedComputationArgs() const {
+    return attr_->fused_computation_args;
+  }
+
+ private:
+  const std::shared_ptr<const Attributes> attr_;
+};
+
+class DmlFusedMatMulKernel : public DmlKernel {
+ public:
+  using InitHelper = FusedMatMulInitHelper;
+
+  explicit DmlFusedMatMulKernel(DmlKernelConstruction* ctx,
+                                const InitHelper* init_helper) {
+    CHECK(ctx->GetInputCount() > 2);
+    CHECK(ctx->GetOutputCount() == 1);
+
+    DmlKernelParams params;
+    params.kernel_input_indices = {
+        0, 1, 2
+    };
+
+    const auto fused_computation_type = init_helper->GetFusedComputationType();
+    const auto fused_computation_args = init_helper->GetFusedComputationArgs();
+
+    DmlKernelTensors tensors = GetTensorInfos(ctx, params);
+
+    // TODO: fuse with activation as well
+
+    auto input_descs = GetDmlTensorDescs(tensors.inputs);
+    auto output_descs = GetDmlTensorDescs(tensors.outputs);
+
+    DML_GEMM_OPERATOR_DESC gemm_desc = {};
+    gemm_desc.ATensor = &input_descs[0];
+    gemm_desc.BTensor = &input_descs[1];
+    gemm_desc.CTensor = &input_descs[2];
+    gemm_desc.OutputTensor = &output_descs[0];
+    gemm_desc.TransA = init_helper->TransposeA()
+                           ? DML_MATRIX_TRANSFORM_TRANSPOSE
+                           : DML_MATRIX_TRANSFORM_NONE;
+    gemm_desc.TransB = init_helper->TransposeB()
+                           ? DML_MATRIX_TRANSFORM_TRANSPOSE
+                           : DML_MATRIX_TRANSFORM_NONE;
+    gemm_desc.Alpha = 1.0f;
+    gemm_desc.Beta = 0.0f;
+    gemm_desc.FusedActivation = nullptr;
+
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_GEMM, &gemm_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
+  }
+};
+
+#define DML_REGISTER_KERNEL(type)                                        \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("_FusedMatMul").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      DmlKernelWrapper<DmlFusedMatMulKernel, MatMulShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
