@@ -286,6 +286,12 @@ bool IsCpuCompatibleMatMul(const NodeDef* matmul) {
 #endif  // !INTEL_MKL
 }
 
+bool IsGpuCompatibleMatMul(const NodeDef* matmul) {
+  DCHECK(IsMatMul(*matmul)) << "Expected MatMul op";
+  return NodeIsOnGpu(matmul) && IsGpuCompatibleDataType(matmul) &&
+         IsGpuCompatibleDataFormat(matmul);
+}
+
 // Checks if we can rewrite a pattern to the `_Fused{Conv2D,MatMul}` on CPU.
 template <typename Pattern>
 bool IsCpuCompatible(const RemapperContext& ctx, const Pattern& matched) {
@@ -337,8 +343,16 @@ bool IsGpuCompatible(const RemapperContext& ctx,
                                                     &task, &device) &&
                    absl::StartsWith(device, DEVICE_DML);
 
-  return is_on_dml && IsConv2D(contraction_node) &&
-         IsGpuCompatibleConv2D(&contraction_node);
+  if (is_on_dml) {
+    if (IsConv2D(contraction_node) && IsGpuCompatibleConv2D(&contraction_node)) {
+      return true;
+    }
+    if (IsMatMul(contraction_node) && IsGpuCompatibleMatMul(&contraction_node)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 bool IsGpuCompatible(const RemapperContext& ctx,
                      const ContractionWithSqueezeAndBiasAdd& matched) {
