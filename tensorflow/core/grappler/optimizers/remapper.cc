@@ -310,6 +310,7 @@ bool IsGpuCompatible(const RemapperContext& ctx,
                      const ContractionWithBiasAddAndActivation& matched) {
   const GraphDef* graph = ctx.graph_view.graph();
   const NodeDef& contraction_node = graph->node(matched.contraction);
+  if (IsMatMul(contraction_node)) return true;
   if (!IsConv2D(contraction_node)) return false;
 
   const std::vector<OpInfo::TensorProperties>& input_props =
