@@ -46,17 +46,18 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
   def setUp(self):
     self.session_root = tempfile.mkdtemp()
 
-    self.v = variables.VariableV1(10.0, dtype=dtypes.float32, name="v")
-    self.delta = constant_op.constant(1.0, dtype=dtypes.float32, name="delta")
-    self.eta = constant_op.constant(-1.4, dtype=dtypes.float32, name="eta")
-    self.inc_v = state_ops.assign_add(self.v, self.delta, name="inc_v")
-    self.dec_v = state_ops.assign_add(self.v, self.eta, name="dec_v")
+    with test_util.device(use_gpu=False):
+      self.v = variables.VariableV1(10.0, dtype=dtypes.float32, name="v")
+      self.delta = constant_op.constant(1.0, dtype=dtypes.float32, name="delta")
+      self.eta = constant_op.constant(-1.4, dtype=dtypes.float32, name="eta")
+      self.inc_v = state_ops.assign_add(self.v, self.delta, name="inc_v")
+      self.dec_v = state_ops.assign_add(self.v, self.eta, name="dec_v")
 
-    self.ph = array_ops.placeholder(dtypes.float32, shape=(), name="ph")
-    self.inc_w_ph = state_ops.assign_add(self.v, self.ph, name="inc_w_ph")
+      self.ph = array_ops.placeholder(dtypes.float32, shape=(), name="ph")
+      self.inc_w_ph = state_ops.assign_add(self.v, self.ph, name="inc_w_ph")
 
-    self.sess = session.Session()
-    self.sess.run(self.v.initializer)
+      self.sess = session.Session()
+      self.sess.run(self.v.initializer)
 
   def tearDown(self):
     ops.reset_default_graph()
@@ -376,12 +377,7 @@ class DumpingDebugWrapperSessionTest(test_util.TensorFlowTestCase):
     dump_dirs = glob.glob(os.path.join(self.session_root, "run_*"))
     self.assertEqual(1, len(dump_dirs))
     dump = debug_data.DebugDumpDir(dump_dirs[0])
-
-    if test_util.is_gpu_available():
-      self.assertGreaterEqual(2, dump.size)
-    else:
-      self.assertEqual(1, dump.size)
-
+    self.assertEqual(1, dump.size)
     self.assertEqual("delta", dump.dumped_tensor_data[0].node_name)
 
   def testDumpingWrapperWithEmptyFetchWorks(self):
