@@ -46,7 +46,7 @@ class SoftDevicePlacementTest(test.TestCase):
   @test_util.run_gpu_only
   def testUnsupportedDevice(self):
     gpu_type = test_util.gpu_device_type()
-    a = constant_op.constant(1.0)
+    a = constant_op.constant(1)
     b = constant_op.constant(2)
     s = constant_op.constant(list('hello world'))
     with ops.device('%s:0' % gpu_type):
@@ -82,7 +82,7 @@ class SoftDevicePlacementTest(test.TestCase):
     a = constant_op.constant(1)
     b = constant_op.constant(2)
     with ops.device('CPU:0'):
-      with ops.device('GPU:42' % gpu_type):
+      with ops.device('%s:42' % gpu_type):
         c = a + b
     # We don't support nested device placement right now.
     self.assertIn('%s:0' % gpu_type, c.device)
