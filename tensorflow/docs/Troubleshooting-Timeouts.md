@@ -28,13 +28,15 @@ pip install tensorflow-directml --upgrade
 
 ### #2: Ensure your GPU drivers are up-to-date
 
-We recommend using the latest stable drivers from your GPU vendor wherever possible. GPU driver updates can be downloaded from the following locations:
+When running tensorflow-directml on native Windows we recommend using the latest stable drivers from your GPU vendor wherever possible. GPU driver updates can be downloaded from the following locations:
 
 * **For AMD GPUs:** [AMD Drivers and Support](https://www.amd.com/en/support)
 * **For Intel GPUs:** [Intel Download Center](https://downloadcenter.intel.com/)
 * **For NVIDIA GPUs:** [NVIDIA Driver Downloads](https://www.nvidia.com/Download/index.aspx)
 
-### #3: Exclude smaller GPUs from being used with DirectML
+If running tensorflow-directml inside of the Windows Subsystem for Linux (WSL) follow the [Enable TensorFlow with DirectML in WSL 2](https://docs.microsoft.com/en-us/windows/win32/direct3d12/gpu-tensorflow-wsl#install-the-preview-gpu-driver) guidance to install the approraite drivers.
+
+### #3: Target a specific GPU with DirectML
 
 By default, all compatible GPUs are made available to be used by DirectML. This means that both integrated and discrete GPUs can be used with DirectML.
 
