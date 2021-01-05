@@ -46,8 +46,8 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
   // otherwise monotonically increasing fence values no longer describe a
   // linear timeline...
   CHECK(state->fence.Get() == gpu_event.fence.Get());
-  CHECK(state->fence->GetCompletedValue() + 1 >=
-        state->current_awaited_fence_value);
+  DCHECK(state->fence->GetCompletedValue() + 1 >=
+         state->current_awaited_fence_value);
 
   // If the thread is currently waiting on a fence value less or equal than the
   // supplied gpu_event, it means the fence may or may not be signaled, and

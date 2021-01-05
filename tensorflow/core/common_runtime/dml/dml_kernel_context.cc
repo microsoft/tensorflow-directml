@@ -72,7 +72,7 @@ DescriptorAllocation DmlKernelConstruction::AllocateDescriptors(
 
 void DmlKernelConstruction::EnqueueCallbackForGpuEvent(
     DmlGpuEvent gpu_event, std::function<void()> callback) const {
-  device_->GetEventQueue()->Enqueue(gpu_event, callback);
+  device_->GetEventQueue()->Enqueue(std::move(gpu_event), std::move(callback));
 }
 
 void DmlKernelConstruction::InitializeOperator(
@@ -200,7 +200,7 @@ DescriptorAllocation DmlKernelContext::AllocateDescriptors(
 
 void DmlKernelContext::EnqueueCallbackForGpuEvent(
     DmlGpuEvent gpu_event, std::function<void()> callback) const {
-  device_->GetEventQueue()->Enqueue(gpu_event, callback);
+  device_->GetEventQueue()->Enqueue(std::move(gpu_event), std::move(callback));
 }
 
 DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
