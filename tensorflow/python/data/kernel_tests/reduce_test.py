@@ -192,8 +192,6 @@ class ReduceTest(test_base.DatasetTestBase, parameterized.TestCase):
     self.assertEqual(self.evaluate(fn()), b"hello")
     self.assertEqual(self.evaluate(counter_var), 4)
 
-  # TFDML #25564515
-  @test_util.skip_dml
   def testStateOnGPU(self):
     if not test_util.is_gpu_available():
       self.skipTest("No GPUs available.")
@@ -201,7 +199,7 @@ class ReduceTest(test_base.DatasetTestBase, parameterized.TestCase):
     state = constant_op.constant(0, dtype=dtypes.int64)
 
     def reduce_fn(state, value):
-      with ops.device("/gpu:0"):
+      with ops.device(test_util.gpu_device_name()):
         return state + value
 
     for i in range(10):
