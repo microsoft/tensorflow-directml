@@ -58,7 +58,7 @@ class DmlEventQueue {
     std::multimap<uint64_t, Event> events_by_fence_value;
 
     // The current fence value that the thread is waiting to be signaled. This
-    // value is guaranteed to be <= fence->GetCompletedValue().
+    // value is guaranteed to be <= fence->GetCompletedValue()+1.
     uint64_t current_awaited_fence_value = 0;
 
     bool exit_requested = false;

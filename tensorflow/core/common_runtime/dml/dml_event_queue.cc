@@ -40,26 +40,29 @@ DmlEventQueue::~DmlEventQueue() {
 
 void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
+  const auto& state = shared_state_;
 
   // Sanity: double check that we're only using one fence at a time, because
   // otherwise monotonically increasing fence values no longer describe a
   // linear timeline...
-  CHECK(shared_state_->fence.Get() == gpu_event.fence.Get());
+  CHECK(state->fence.Get() == gpu_event.fence.Get());
+  CHECK(state->fence->GetCompletedValue() + 1 >=
+        state->current_awaited_fence_value);
 
   // If the thread is currently waiting on a fence value less or equal than the
   // supplied gpu_event, it means the fence may or may not be signaled, and
   // therefore should be queued to be processed by the thread. Otherwise, if the
   // fence value is greater, it means it's definitely already been signaled and
   // the callback should be invoked immediately.
-  if (shared_state_->current_awaited_fence_value <= gpu_event.fence_value) {
+  if (state->current_awaited_fence_value <= gpu_event.fence_value) {
     // Queue the event and notify the thread.
-    shared_state_->events_by_fence_value.emplace(gpu_event.fence_value,
-                                                 Event{std::move(done_callback)});
-    shared_state_->new_event_enqueued.notify_all();
+    state->events_by_fence_value.emplace(gpu_event.fence_value,
+                                         Event{std::move(done_callback)});
+    state->new_event_enqueued.notify_all();
   } else {
-    // We're going to execute the callback immediately; we can release the lock
-    // now
-    lock.unlock();
+    // Sanity: all prior events in the queue should have been processed already
+    DCHECK(state->events_by_fence_value.lower_bound(gpu_event.fence_value) ==
+           state->events_by_fence_value.begin());
 
     done_callback();
   }
@@ -84,8 +87,8 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
       continue;
     }
 
-    assert(!state->events.empty());
-    assert(events_to_process.empty());
+    DCHECK(!state->events_by_fence_value.empty());
+    DCHECK(events_to_process.empty());
 
     // Decide the next fence value to wait on. Using GetCompletedValue + 1
     // ensures that *any* signal wakes this thread (assuming monotonically
@@ -107,18 +110,18 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
     // Move the signaled events into the vector
     events_to_process.reserve(std::distance(begin, end));
     for (auto it = begin; it != end; ++it) {
+      DCHECK(it->first < next_fence_value);
       events_to_process.push_back(std::move(it->second));
     }
     state->events_by_fence_value.erase(begin, end);
-
-    // We've taken ownership of the events, which means we can now unlock the
-    // shared state
-    lock.unlock();
 
     // Process the events by invoking their done callback
     for (const auto& event : events_to_process) {
       event.done_callback();
     }
+
+    // We've finished processing the events, so we can unlock the mutex now.
+    lock.unlock();
 
     events_to_process.clear();
 
