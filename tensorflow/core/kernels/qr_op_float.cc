@@ -33,20 +33,4 @@ REGISTER_KERNEL_BUILDER(Name("Qr")
                         QrOp<float>);
 #endif
 
-#ifdef TENSORFLOW_USE_DIRECTML
-// For now, register QR as a CPU kernel for DML to follow the same registration
-// as the GPU. If the cuSolver bug ever get fixed we may want to implement our
-// own DML kernel to stay on par with CUDA, but in the meantime it's probably
-// not worth it to spend time on this kernel. Registering this kernel with CPU
-// memory for DML devices fixes co-location issues seen with some Random kernels
-// (e.g. RandomStandardNormal)
-REGISTER_KERNEL_BUILDER(Name("Qr")
-                            .Device(DEVICE_DML)
-                            .TypeConstraint<float>("T")
-                            .HostMemory("input")
-                            .HostMemory("q")
-                            .HostMemory("r"),
-                        QrOp<float>);
-#endif
-
 }  // namespace tensorflow
