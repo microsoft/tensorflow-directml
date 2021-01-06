@@ -5598,8 +5598,6 @@ tf_dml_cc_test(
         "//tensorflow/core:testlib",
         "//tensorflow/core/kernels:dml_ops",
         "//tensorflow/core/kernels:stateless_random_ops",
-        "//tensorflow/core/kernels:list_kernels",
-        "//tensorflow/core/kernels:tensor_array",
     ],
     extra_copts = if_windows([
         "-DDML_BUILD_WINDOWS",

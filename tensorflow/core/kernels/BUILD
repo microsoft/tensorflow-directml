@@ -8163,8 +8163,8 @@ tf_kernel_library(
         "dml_tensor_array.h",
         "dml_matrix_diag_helpers.h",
         "dml_extract_patches_helpers.h",
+        "list_kernels.h",
         "//tensorflow/core/kernels/data:optional_ops.h",
-        "//tensorflow/core/kernels:list_kernels.h",
     ],
     deps = NN_DEPS + [
         "//tensorflow/core:dml_runtime",
@@ -8176,6 +8176,8 @@ tf_kernel_library(
         ":pooling_ops",
         ":rnn_ops",
         ":fused_batch_norm_op",
+        ":list_kernels",
+        ":tensor_array",
     ],
     copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
