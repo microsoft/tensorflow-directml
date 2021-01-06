@@ -8164,6 +8164,7 @@ tf_kernel_library(
         "dml_matrix_diag_helpers.h",
         "dml_extract_patches_helpers.h",
         "//tensorflow/core/kernels/data:optional_ops.h",
+        "//tensorflow/core/kernels:list_kernels.h",
     ],
     deps = NN_DEPS + [
         "//tensorflow/core:dml_runtime",
