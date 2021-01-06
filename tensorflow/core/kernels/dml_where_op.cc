@@ -165,8 +165,8 @@ static Status ComputeNonzeroCoordinates(OpKernelContext* ctx,
       num_nonzero_elements_tensor.tensor, "",
       static_cast<Device*>(ctx->device()), &num_nonzero_elements_tensor_cpu,
       [&note, ctx](const Status& copy_status) {
-        note.Notify();
         OP_REQUIRES_OK(ctx, copy_status);
+        note.Notify();
       });
 
   note.WaitForNotification();

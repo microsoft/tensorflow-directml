@@ -60,28 +60,25 @@ DmlGpuEvent DmlExecutionContextImpl::FillBufferWithPattern(
 }
 
 DmlGpuEvent DmlExecutionContextImpl::InitializeOperator(
-    IDMLCompiledOperator* op,
+    IDMLOperatorInitializer* initializer,
     const DML_BINDING_DESC& persistent_resource_binding,
     const DML_BINDING_DESC& input_array_binding) {
   assert(!closed_);
   SetCommandRecorder(&dml_recorder_);
 
-  dml_recorder_.InitializeOperator(op, persistent_resource_binding,
+  dml_recorder_.InitializeOperator(initializer, persistent_resource_binding,
                                    input_array_binding);
 
   return GetCurrentCompletionEvent();
 }
 
 DmlGpuEvent DmlExecutionContextImpl::ExecuteOperator(
-    IDMLCompiledOperator* op,
-    const DML_BINDING_DESC& persistent_resource_binding,
-    absl::Span<const DML_BINDING_DESC> input_bindings,
-    absl::Span<const DML_BINDING_DESC> output_bindings) {
+    IDMLCompiledOperator* op, IDMLBindingTable* binding_table,
+    ID3D12DescriptorHeap* descriptor_heap) {
   assert(!closed_);
   SetCommandRecorder(&dml_recorder_);
 
-  dml_recorder_.ExecuteOperator(op, persistent_resource_binding, input_bindings,
-                                output_bindings);
+  dml_recorder_.ExecuteOperator(op, binding_table, descriptor_heap);
 
   return GetCurrentCompletionEvent();
 }
