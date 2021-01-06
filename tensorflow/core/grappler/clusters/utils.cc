@@ -154,15 +154,15 @@ DeviceProperties GetLocalGPUInfo(PlatformGpuId platform_gpu_id) {
   return device;
 }
 
-DeviceProperties GetLocalDMLInfo(int device_id) {
+DeviceProperties GetLocalDMLInfo(uint32_t adapter_index) {
   DeviceProperties device;
   device.set_type("DML");
 
 #if TENSORFLOW_USE_DIRECTML
   const auto& device_cache = DmlDeviceCache::Instance();
-  CHECK(device_id >= 0 && device_id < device_cache.GetAdapterCount());
+  CHECK(adapter_index >= 0 && adapter_index < device_cache.GetAdapterCount());
 
-  const auto& adapter = device_cache.GetAdapter(device_id);
+  const auto& adapter = device_cache.GetAdapter(adapter_index);
   device.set_model(adapter.Name());
   device.set_vendor(GetVendorName(adapter.VendorID()));
 
@@ -183,8 +183,6 @@ DeviceProperties GetLocalDMLInfo(int device_id) {
   auto& device_env = *device.mutable_environment();
   device_env["vendor_id"] =
       strings::StrCat(strings::Hex(vendor_id, strings::kZeroPad4));
-  device_env["device_id"] =
-      strings::StrCat(strings::Hex(adapter.DeviceID(), strings::kZeroPad4));
   device_env["driver_version"] = strings::StrCat(
       driver_ver.a, ".", driver_ver.b, ".", driver_ver.c, ".", driver_ver.d);
 #endif  // TENSORFLOW_USE_DIRECTML
@@ -212,7 +210,16 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
       return GetLocalGPUInfo(PlatformGpuId(0));
     }
   } else if (device.type == "DML") {
-    return GetLocalDMLInfo(device.has_id ? device.id : 0);
+    uint32_t adapter_index = 0;
+    if (device.has_id) {
+      Status s = DmlDeviceCache::Instance().GetAdapterIndexFromDeviceId(
+          device.id, &adapter_index);
+      if (!s.ok()) {
+        LOG(ERROR) << s;
+        return unknown;
+      }
+    }
+    return GetLocalDMLInfo(adapter_index);
   }
   return unknown;
 }
