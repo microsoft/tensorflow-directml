@@ -51,7 +51,7 @@ absl::optional<SimplePad> SimplifyPad(const TensorShape& input_shape,
                                       const Tensor& paddings_tensor,
                                       bool constant_pad,
                                       size_t min_output_size = 4,
-                                      size_t max_output_size = 5) {
+                                      size_t max_output_size = 8) {
   auto paddings = paddings_tensor.matrix<Tpadding>();
   DCHECK(input_shape.dims() == paddings.dimension(0));
 
