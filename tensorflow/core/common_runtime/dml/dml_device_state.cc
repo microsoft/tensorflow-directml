@@ -123,11 +123,20 @@ namespace tensorflow {
   auto dml_allocator = absl::make_unique<DmlAllocator>(
       heap_allocator.get(), memory_limit_in_bytes, gpu_options, "DmlAllocator");
 
+  auto descriptor_heap_allocator =
+      absl::make_unique<D3D12DescriptorHeapAllocator>(
+          d3d_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+          D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE);
+
+  auto descriptor_allocator = absl::make_unique<DmlDescriptorAllocator>(
+      descriptor_heap_allocator.get(), "DmlDescriptorAllocator");
+
   auto execution_context = absl::make_unique<DmlExecutionContext>(
       d3d_device.Get(), dml_device.Get(), command_queue.Get(),
       dml_allocator.get());
 
-  auto event_queue = absl::make_unique<DmlEventQueue>();
+  auto event_queue = absl::make_unique<DmlEventQueue>(
+      execution_context->GetCurrentCompletionEvent().fence.Get());
 
   auto upload_heap = absl::make_unique<DmlUploadHeap>(d3d_device.Get(),
                                                       execution_context.get());
@@ -148,6 +157,8 @@ namespace tensorflow {
   state->event_queue = std::move(event_queue);
   state->heap_allocator = std::move(heap_allocator);
   state->dml_allocator = std::move(dml_allocator);
+  state->descriptor_heap_allocator = std::move(descriptor_heap_allocator);
+  state->descriptor_allocator = std::move(descriptor_allocator);
   state->upload_heap = std::move(upload_heap);
   state->readback_heap = std::move(readback_heap);
   state->kernel_manager = std::move(kernel_manager);

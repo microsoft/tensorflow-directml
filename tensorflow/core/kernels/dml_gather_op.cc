@@ -327,12 +327,11 @@ class DmlGatherKernel : public DmlKernel {
     auto input_bindings = dml_util::GetBufferBindings(input_buffers);
     auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
-    DmlGpuEvent gpu_event =
-        ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                             input_bindings, output_bindings);
+    auto gpu_event_or_status =
+        DmlKernel::Compute(ctx, input_bindings, output_bindings);
 
     init_helper->Unlock();
-    return gpu_event;
+    return gpu_event_or_status;
   }
 };
 

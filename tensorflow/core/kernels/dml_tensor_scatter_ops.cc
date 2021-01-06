@@ -323,8 +323,7 @@ class DmlTensorScatterBinaryKernel : public DmlKernel {
     ctx->ZeroBuffer(empty_buffer.Resource(), empty_buffer.Offset(),
                     empty_buffer.SizeInBytes());
 
-    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                                input_bindings, output_bindings);
+    return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 
  private:

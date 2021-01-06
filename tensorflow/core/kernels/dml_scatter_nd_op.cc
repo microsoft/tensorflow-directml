@@ -288,8 +288,7 @@ class DmlScatterNdKernel : public DmlKernel {
     ctx->ZeroBuffer(params_buffer.Resource(), params_buffer.Offset(),
                     params_buffer.SizeInBytes());
 
-    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                                input_bindings, output_bindings);
+    return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 
  private:

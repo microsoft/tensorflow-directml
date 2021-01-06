@@ -203,8 +203,8 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     ctx->CopyHostToBuffer(input_state_buffer.Resource(),
                           input_state_buffer.Offset(), byte_span);
 
-    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                                input_bindings, output_bindings);
+    
+    return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 };
 
@@ -355,8 +355,7 @@ class DmlRandomUniformKernel : public DmlKernel {
     ctx->CopyHostToBuffer(state_buffer_->Resource(), state_buffer_->Offset(),
                           byte_span);
 
-    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                                input_bindings, output_bindings);
+    return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 };
 

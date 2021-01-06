@@ -26,6 +26,7 @@ namespace tensorflow {
 
 class DmlCommandQueue;
 class DmlAllocator;
+class DmlEventQueue;
 
 class DmlCommandRecorder {
  public:
@@ -33,14 +34,17 @@ class DmlCommandRecorder {
                      std::shared_ptr<DmlCommandQueue> command_queue,
                      DmlAllocator* allocator);
 
-  void InitializeOperator(IDMLCompiledOperator* op,
-                            const DML_BINDING_DESC& persistent_resource_binding,
-                            const DML_BINDING_DESC& input_array_binding);
+  void InitializeOperator(IDMLOperatorInitializer* initializer,
+                          const DML_BINDING_DESC& persistent_resource_binding,
+                          const DML_BINDING_DESC& input_array_binding);
 
+  // Executes a DML operator with the given bindings. The supplied descriptor
+  // heap must match the heap associated with the binding table. Callers should
+  // ensure that the descriptors in the heap that are associated with the
+  // binding table live at least until the execution completes on the GPU.
   void ExecuteOperator(IDMLCompiledOperator* op,
-                       const DML_BINDING_DESC& persistent_resource_binding,
-                       absl::Span<const DML_BINDING_DESC> input_bindings,
-                       absl::Span<const DML_BINDING_DESC> output_bindings);
+                       IDMLBindingTable* binding_table,
+                       ID3D12DescriptorHeap* descriptor_heap);
 
   void CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
                         D3D12_RESOURCE_STATES dst_state,
@@ -67,7 +71,6 @@ class DmlCommandRecorder {
   std::shared_ptr<DmlCommandQueue> queue_;
   Microsoft::WRL::ComPtr<ID3D12Device> d3d_device_;
   Microsoft::WRL::ComPtr<IDMLDevice> dml_device_;
-  Microsoft::WRL::ComPtr<IDMLOperatorInitializer> initializer_;
   Microsoft::WRL::ComPtr<IDMLCommandRecorder> recorder_;
 
   // Descriptors are allocated from a pool. The current heap pointer is only

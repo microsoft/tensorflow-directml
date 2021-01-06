@@ -19,6 +19,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_buffer.h"
 #include "tensorflow/core/common_runtime/dml/dml_buffer_region.h"
 #include "tensorflow/core/common_runtime/dml/dml_common.h"
+#include "tensorflow/core/common_runtime/dml/dml_descriptor_bfc_allocator.h"
 #include "tensorflow/core/common_runtime/dml/dml_gpu_event.h"
 #include "tensorflow/core/framework/op_kernel.h"
 
@@ -50,11 +51,22 @@ class DmlKernelConstruction {
   // Retrives the D3D12 default heap buffer backing the specified tensor.
   D3D12BufferRegion CreateBufferForTensor(const Tensor& tensor) const;
 
-  // Initializes a given DML operator on the GPU. Note that this merely queues
-  // the initialization; the returned event will enter the signaled state when
-  // it completes.
-  void InitializeOperator(
-      IDMLCompiledOperator* op,
+  // Allocates a range of D3D12 descriptors at least size_in_descriptors large.
+  // When the returned object is destructed, the descriptors are freed back to
+  // the pool.
+  DescriptorAllocation AllocateDescriptors(size_t size_in_descriptors) const;
+
+  // Enqueues a callback to fire when the given GpuEvent enters the signaled
+  // state. Note that the callback may be invoked on an arbitrary thread, so it
+  // must be thread-safe.
+  void EnqueueCallbackForGpuEvent(DmlGpuEvent gpu_event,
+                                  std::function<void()> callback) const;
+
+  // Initializes a given DML operator on the GPU. Note that this merely
+  // queues the initialization; the returned event will enter the signaled
+  // state when it completes.
+  DmlGpuEvent InitializeOperator(
+      IDMLOperatorInitializer* initializer,
       _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
       absl::Span<const DML_BUFFER_BINDING> input_bindings);
 
@@ -136,10 +148,23 @@ class DmlKernelContext {
   // Retrives the D3D12 default heap buffer backing the specified tensor.
   D3D12BufferRegion CreateBufferForTensor(const Tensor& tensor) const;
 
+  // Allocates a range of D3D12 descriptors at least size_in_descriptors large.
+  // When the returned object is destructed, the descriptors are freed back to
+  // the pool.
+  DescriptorAllocation AllocateDescriptors(size_t size_in_descriptors) const;
+
+  // Enqueues a callback to fire when the given GpuEvent enters the signaled
+  // state. Note that the callback may be invoked on an arbitrary thread, so it
+  // must be thread-safe.
+  void EnqueueCallbackForGpuEvent(DmlGpuEvent gpu_event,
+                                  std::function<void()> callback) const;
+
   // Executes a DML operator. Note that this merely queues the execution; the
   // returned event will enter the signaled state when it completes.
-  DmlGpuEvent ExecuteOperator(
-      IDMLCompiledOperator* op,
+  DmlGpuEvent BindAndExecuteOperator(
+      IDMLCompiledOperator* op, IDMLBindingTable* binding_table,
+      ID3D12DescriptorHeap* heap_for_binding_table,
+      _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
       _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
       absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
       absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings);

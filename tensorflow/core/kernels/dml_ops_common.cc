@@ -201,6 +201,7 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
 #endif
 
   compiled_op_ = compiled_op;
+
   input_descs_ = std::move(tensor_descs.inputs);
   output_descs_ = std::move(tensor_descs.outputs);
   output_refs_forwarding_ = std::move(tensor_descs.output_refs_forwarding);
@@ -230,11 +231,26 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
 
   // Initialize the operator
 
+  ComPtr<IDMLOperatorInitializer> initializer;
+
   // We don't supply any input bindings, because we never set OWNED_BY_DML
   absl::Span<const DML_BUFFER_BINDING> input_init_bindings = {};
 
-  ctx->InitializeOperator(compiled_op_.Get(), GetPersistentResourceBinding(),
-                          input_init_bindings);
+  // Reset the initializer to reference the input operator.
+  IDMLCompiledOperator* ops[] = {compiled_op_.Get()};
+  DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateOperatorInitializer(
+      ABSL_ARRAYSIZE(ops), ops, IID_PPV_ARGS(&initializer)));
+
+  auto init_gpu_event = ctx->InitializeOperator(
+      initializer.Get(), GetPersistentResourceBinding(), input_init_bindings);
+
+  // Enqueue an event to ensure that the relevant initialization state lives at
+  // least until the operation completes execution on the GPU.
+  auto on_initialize_completed = [p = std::move(initializer)]() mutable {
+    // Free the initialization state
+    p = nullptr;
+  };
+  ctx->EnqueueCallbackForGpuEvent(init_gpu_event, on_initialize_completed);
 }
 
 StatusOr<DmlGpuEvent> DmlKernel::Compute(DmlKernelContext* ctx) const {
@@ -245,9 +261,70 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(DmlKernelContext* ctx) const {
   auto input_bindings = dml_util::GetBufferBindings(input_buffers);
   auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
-  return ctx->ExecuteOperator(compiled_op_.Get(),
-                              GetPersistentResourceBinding(), input_bindings,
-                              output_bindings);
+  return Compute(ctx, input_bindings, output_bindings);
+}
+
+StatusOr<DmlGpuEvent> DmlKernel::Compute(
+    DmlKernelContext* ctx,
+    absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
+    absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings)
+    const {
+  DML_BINDING_PROPERTIES exec_binding_props =
+      compiled_op_->GetBindingProperties();
+
+  // Unfortunately we have to use make_shared here to make it copyable, so it
+  // can be captured in the lambda below
+  auto descriptor_range = std::make_shared<DescriptorAllocation>(
+      ctx->AllocateDescriptors(exec_binding_props.RequiredDescriptorCount));
+
+  D3D12DescriptorHandles descriptor_handles =
+      descriptor_range->GetDescriptorHandles();
+
+  DML_BINDING_TABLE_DESC bind_table_desc = {};
+  bind_table_desc.Dispatchable = compiled_op_.Get();
+  bind_table_desc.CPUDescriptorHandle = descriptor_handles.cpu;
+  bind_table_desc.GPUDescriptorHandle = descriptor_handles.gpu;
+  bind_table_desc.SizeInDescriptors =
+      exec_binding_props.RequiredDescriptorCount;
+
+  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table;
+  DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateBindingTable(
+      &bind_table_desc, IID_PPV_ARGS(&binding_table)));
+
+  // Create a temporary resource for executing the op, if it's required.
+  UINT64 temporary_resource_size = exec_binding_props.TemporaryResourceSize;
+  DmlBuffer temp_resource;
+  absl::optional<DML_BUFFER_BINDING> temp_resource_binding;
+  if (temporary_resource_size > 0) {
+    // Allocate a temporary buffer and keep a use on it until the end of this
+    // method. The buffer resource will still be alive (managed by the pool);
+    // freeing allows the resource to be shared with other operators, but
+    // because the allocator is multi-threaded we need to at least keep a use on
+    // it until we're done with it locally to prevent the buffer being reused.
+    temp_resource = ctx->AllocateDefaultBuffer(temporary_resource_size);
+    if (!temp_resource) {
+      return errors::ResourceExhausted("OOM when allocating a buffer of ",
+                                       temporary_resource_size, " bytes");
+    }
+
+    temp_resource_binding = temp_resource.GetBufferBinding();
+  }
+
+  DmlGpuEvent gpu_event = ctx->BindAndExecuteOperator(
+      compiled_op_.Get(), binding_table.Get(), descriptor_handles.heap,
+      temp_resource_binding ? &*temp_resource_binding : nullptr,
+      GetPersistentResourceBinding(), input_bindings, output_bindings);
+
+  // Transfer ownership of the descriptor range to a lambda, and enqueue it to
+  // be released when the execution completes on the GPU. Note that we don't
+  // need to keep the binding table alive - recall that lifetime is tied to the
+  // underlying descriptors, not the binding table itself.
+  ctx->EnqueueCallbackForGpuEvent(gpu_event,
+                                  [p = std::move(descriptor_range)]() mutable {
+                                    p->Reset();  // Release the descriptor range
+                                  });
+
+  return gpu_event;
 }
 
 absl::InlinedVector<D3D12BufferRegion, 8> DmlKernel::CreateInputBuffers(

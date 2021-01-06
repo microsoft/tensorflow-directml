@@ -56,15 +56,13 @@ class DmlExecutionContextImpl {
           value /* Data type agnostic value, treated as raw bits */);
 
   DmlGpuEvent InitializeOperator(
-      IDMLCompiledOperator* op,
+      IDMLOperatorInitializer* initializer,
       const DML_BINDING_DESC& persistent_resource_binding,
       const DML_BINDING_DESC& input_array_binding);
 
-  DmlGpuEvent ExecuteOperator(
-      IDMLCompiledOperator* op,
-      const DML_BINDING_DESC& persistent_resource_binding,
-      absl::Span<const DML_BINDING_DESC> input_bindings,
-      absl::Span<const DML_BINDING_DESC> output_bindings);
+  DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
+                              IDMLBindingTable* binding_table,
+                              ID3D12DescriptorHeap* descriptor_heap);
 
   DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
@@ -129,22 +127,19 @@ class DmlExecutionContext {
   }
 
   DmlGpuEvent InitializeOperator(
-      IDMLCompiledOperator* op,
+      IDMLOperatorInitializer* initializer,
       const DML_BINDING_DESC& persistent_resource_binding,
       const DML_BINDING_DESC& input_array_binding) {
     std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->InitializeOperator(op, persistent_resource_binding,
+    return impl_->InitializeOperator(initializer, persistent_resource_binding,
                                      input_array_binding);
   }
 
-  DmlGpuEvent ExecuteOperator(
-      IDMLCompiledOperator* op,
-      const DML_BINDING_DESC& persistent_resource_binding,
-      absl::Span<const DML_BINDING_DESC> input_bindings,
-      absl::Span<const DML_BINDING_DESC> output_bindings) {
+  DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
+                              IDMLBindingTable* binding_table,
+                              ID3D12DescriptorHeap* descriptor_heap) {
     std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->ExecuteOperator(op, persistent_resource_binding,
-                                  input_bindings, output_bindings);
+    return impl_->ExecuteOperator(op, binding_table, descriptor_heap);
   }
 
   DmlGpuEvent ResourceBarrier(

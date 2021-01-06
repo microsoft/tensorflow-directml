@@ -26,6 +26,8 @@ class DmlExecutionContext;
 class DmlEventQueue;
 class D3D12HeapAllocator;
 class DmlAllocator;
+class D3D12DescriptorHeapAllocator;
+class DmlDescriptorAllocator;
 class DmlUploadHeap;
 class DmlReadbackHeap;
 class DmlKernelManager;
@@ -54,6 +56,8 @@ struct DmlDeviceState {
   std::unique_ptr<DmlEventQueue> event_queue;
   std::unique_ptr<D3D12HeapAllocator> heap_allocator;
   std::unique_ptr<DmlAllocator> dml_allocator;
+  std::unique_ptr<D3D12DescriptorHeapAllocator> descriptor_heap_allocator;
+  std::unique_ptr<DmlDescriptorAllocator> descriptor_allocator;
   std::unique_ptr<DmlUploadHeap> upload_heap;
   std::unique_ptr<DmlReadbackHeap> readback_heap;
   std::unique_ptr<DmlKernelManager> kernel_manager;

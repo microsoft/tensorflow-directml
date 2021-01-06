@@ -239,8 +239,11 @@ class DmlTrainingKernel : public DmlKernel {
 
     assert(output_bindings.size() == variable_tensor_indices.size());
 
-    DmlGpuEvent gpu_event =
-        ExecuteOperator(ctx, input_bindings, output_bindings);
+    auto status_or_gpu_event =
+        DmlKernel::Compute(ctx, input_bindings, output_bindings);
+    if (!status_or_gpu_event.ok()) {
+      return status_or_gpu_event;
+    }
 
     if (!inplace_allowed_) {
       // Copy the intermediate buffers back to their respective inputs.
@@ -262,19 +265,10 @@ class DmlTrainingKernel : public DmlKernel {
                                 output_bindings[output_index]->SizeInBytes);
       }
 
-      gpu_event = ctx->InsertUavBarrier();
+      status_or_gpu_event = ctx->InsertUavBarrier();
     }
 
-    return gpu_event;
-  }
-
-  DmlGpuEvent ExecuteOperator(
-      DmlKernelContext* ctx,
-      absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
-      absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings)
-      const {
-    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                                input_bindings, output_bindings);
+    return status_or_gpu_event;
   }
 
  private:
@@ -493,7 +487,7 @@ class DmlApplyAdamKernel : public DmlTrainingKernel {
         input_bindings[2],  // OutputSecondMoment
     };
 
-    return ExecuteOperator(ctx, input_bindings, output_bindings);
+    return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 
  private:
