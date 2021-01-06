@@ -168,6 +168,22 @@ uint64_t DmlAdapterImpl::QueryAvailableLocalMemory() const {
   return info.Budget;
 }
 
+bool IsSoftwareAdapter(IDXGIAdapter1* adapter) {
+  // The only way this can fail is if a nullptr is passed in, so
+  // using DML_CHECK_SUCCEEDED is OK.
+  DXGI_ADAPTER_DESC1 desc = {};
+  DML_CHECK_SUCCEEDED(adapter->GetDesc1(&desc));
+
+  // See here for documentation on filtering WARP adapter:
+  // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
+  const bool is_basic_render_driver_vendor_id =
+      desc.VendorId == static_cast<UINT>(VendorID::kMicrosoft);
+  const bool is_basic_render_driver_device_id = desc.DeviceId == 0x8c;
+
+  return desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ||
+         (is_basic_render_driver_vendor_id && is_basic_render_driver_device_id);
+};
+
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
   ComPtr<IDXGIFactory4> dxgi_factory;
   HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgi_factory));
@@ -177,23 +193,6 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
   }
 
   std::vector<DmlAdapterImpl> adapter_infos;
-
-  auto IsSoftwareAdapter = [](IDXGIAdapter1* adapter) -> bool {
-    // The only way this can fail is if a nullptr is passed in, so
-    // using DML_CHECK_SUCCEEDED is OK.
-    DXGI_ADAPTER_DESC1 desc = {};
-    DML_CHECK_SUCCEEDED(adapter->GetDesc1(&desc));
-
-    // See here for documentation on filtering WARP adapter:
-    // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
-    const bool is_basic_render_driver_vendor_id =
-        desc.VendorId == static_cast<UINT>(VendorID::kMicrosoft);
-    const bool is_basic_render_driver_device_id = desc.DeviceId == 0x8c;
-
-    return desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ||
-           (is_basic_render_driver_vendor_id &&
-            is_basic_render_driver_device_id);
-  };
 
   ComPtr<IDXGIFactory6> dxgi_factory6;
   if (SUCCEEDED(dxgi_factory.As(&dxgi_factory6))) {
@@ -226,7 +225,8 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
          DXGI_ERROR_NOT_FOUND;
          adapter_index++) {
       // We can't assume the ordering of hardware and software adapters, so keep
-      // looping.
+      // looping. This path should only execute on Windows 10 version 1709 or
+      // earlier; IDD adapters do not exist when taking this code path
       if (IsSoftwareAdapter(adapter.Get())) {
         continue;
       }
