@@ -168,47 +168,73 @@ uint64_t DmlAdapterImpl::QueryAvailableLocalMemory() const {
   return info.Budget;
 }
 
-std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
-  ComPtr<IDXGIFactory6> dxgi_factory;
-  DML_CHECK_SUCCEEDED(CreateDXGIFactory(IID_PPV_ARGS(&dxgi_factory)));
+bool IsSoftwareAdapter(IDXGIAdapter1* adapter) {
+  // The only way this can fail is if a nullptr is passed in, so
+  // using DML_CHECK_SUCCEEDED is OK.
+  DXGI_ADAPTER_DESC1 desc = {};
+  DML_CHECK_SUCCEEDED(adapter->GetDesc1(&desc));
 
-  const D3D_FEATURE_LEVEL min_feature_level = D3D_FEATURE_LEVEL_11_0;
+  // See here for documentation on filtering WARP adapter:
+  // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
+  const bool is_basic_render_driver_vendor_id =
+      desc.VendorId == static_cast<UINT>(VendorID::kMicrosoft);
+  const bool is_basic_render_driver_device_id = desc.DeviceId == 0x8c;
+
+  return desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ||
+         (is_basic_render_driver_vendor_id && is_basic_render_driver_device_id);
+};
+
+std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
+  ComPtr<IDXGIFactory4> dxgi_factory;
+  HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgi_factory));
+  if (FAILED(hr)) {
+    LOG(WARNING) << "CreateDXGIFactory failed with HRESULT " << hr;
+    return {};
+  }
+
   std::vector<DmlAdapterImpl> adapter_infos;
 
-  uint32_t adapter_index = 0;
-  ComPtr<IDXGIAdapter1> adapter;
-  while (dxgi_factory->EnumAdapterByGpuPreference(
+  ComPtr<IDXGIFactory6> dxgi_factory6;
+  if (SUCCEEDED(dxgi_factory.As(&dxgi_factory6))) {
+    // Enumerate adapters by performance. This only works in Windows 10 Version
+    // 1803 and later.
+    ComPtr<IDXGIAdapter1> adapter;
+    for (uint32_t adapter_index = 0;
+         dxgi_factory6->EnumAdapterByGpuPreference(
              adapter_index, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-             IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND) {
-    DXGI_ADAPTER_DESC1 desc = {};
-    DML_CHECK_SUCCEEDED(adapter->GetDesc1(&desc));
-
-    // Since we enumerate by performance, we can ignore everything that comes
-    // after the first software adapter, which includes the IDD adapters. This
-    // is necessary for now because IDD adapters don't have the
-    // DXGI_ADAPTER_FLAG_SOFTWARE flag, even though they run on software.
-    // TFDML #21433167
-
-    // See here for documentation on filtering WARP adapter:
-    // https://docs.microsoft.com/en-us/windows/desktop/direct3ddxgi/d3d10-graphics-programming-guide-dxgi#new-info-about-enumerating-adapters-for-windows-8
-    const bool is_basic_render_driver_vendor_id =
-        desc.VendorId == static_cast<UINT>(VendorID::kMicrosoft);
-    const bool is_basic_render_driver_device_id = desc.DeviceId == 0x8c;
-
-    if (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE ||
-        (is_basic_render_driver_vendor_id &&
-         is_basic_render_driver_device_id)) {
-      break;
+             IID_PPV_ARGS(&adapter)) != DXGI_ERROR_NOT_FOUND;
+         adapter_index++) {
+      // Since we enumerate by performance, we can ignore everything that comes
+      // after the first software adapter, which includes the IDD adapters. This
+      // is necessary for now because IDD adapters don't have the
+      // DXGI_ADAPTER_FLAG_SOFTWARE flag, even though they run on software.
+      // TFDML #21433167
+      if (IsSoftwareAdapter(adapter.Get())) {
+        break;
+      }
+      if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                                      IID_ID3D12Device, nullptr))) {
+        adapter_infos.emplace_back(adapter.Get());
+      }
     }
-
-    HRESULT hr = D3D12CreateDevice(adapter.Get(), min_feature_level,
-                                   IID_ID3D12Device, nullptr);
-    if (SUCCEEDED(hr)) {
-      adapter_infos.emplace_back(adapter.Get());
+  } else {
+    // Enumerate adapters without ordering.
+    ComPtr<IDXGIAdapter1> adapter;
+    for (uint32_t adapter_index = 0;
+         dxgi_factory->EnumAdapters1(adapter_index, &adapter) !=
+         DXGI_ERROR_NOT_FOUND;
+         adapter_index++) {
+      // We can't assume the ordering of hardware and software adapters, so keep
+      // looping. This path should only execute on Windows 10 version 1709 or
+      // earlier; IDD adapters do not exist when taking this code path
+      if (IsSoftwareAdapter(adapter.Get())) {
+        continue;
+      }
+      if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
+                                      IID_ID3D12Device, nullptr))) {
+        adapter_infos.emplace_back(adapter.Get());
+      }
     }
-
-    ++adapter_index;
-    adapter = nullptr;
   }
 
   return FilterAdapterListFromEnvVar(adapter_infos);
