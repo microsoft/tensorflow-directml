@@ -56,9 +56,9 @@ class DmlExecutionContextImpl {
           value /* Data type agnostic value, treated as raw bits */);
 
   DmlGpuEvent InitializeOperator(
-      IDMLCompiledOperator* op,
+      IDMLOperatorInitializer* initializer,
       const DML_BINDING_DESC& persistent_resource_binding,
-      const DML_BINDING_DESC& input_array_binding, DmlEventQueue* event_queue);
+      const DML_BINDING_DESC& input_array_binding);
 
   DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
                               IDMLBindingTable* binding_table,
@@ -127,12 +127,12 @@ class DmlExecutionContext {
   }
 
   DmlGpuEvent InitializeOperator(
-      IDMLCompiledOperator* op,
+      IDMLOperatorInitializer* initializer,
       const DML_BINDING_DESC& persistent_resource_binding,
-      const DML_BINDING_DESC& input_array_binding, DmlEventQueue* event_queue) {
+      const DML_BINDING_DESC& input_array_binding) {
     std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->InitializeOperator(op, persistent_resource_binding,
-                                     input_array_binding, event_queue);
+    return impl_->InitializeOperator(initializer, persistent_resource_binding,
+                                     input_array_binding);
   }
 
   DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,

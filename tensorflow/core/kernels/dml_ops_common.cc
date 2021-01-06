@@ -231,11 +231,26 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
 
   // Initialize the operator
 
+  ComPtr<IDMLOperatorInitializer> initializer;
+
   // We don't supply any input bindings, because we never set OWNED_BY_DML
   absl::Span<const DML_BUFFER_BINDING> input_init_bindings = {};
 
-  ctx->InitializeOperator(compiled_op_.Get(), GetPersistentResourceBinding(),
-                          input_init_bindings);
+  // Reset the initializer to reference the input operator.
+  IDMLCompiledOperator* ops[] = {compiled_op_.Get()};
+  DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateOperatorInitializer(
+      ABSL_ARRAYSIZE(ops), ops, IID_PPV_ARGS(&initializer)));
+
+  auto init_gpu_event = ctx->InitializeOperator(
+      initializer.Get(), GetPersistentResourceBinding(), input_init_bindings);
+
+  // Enqueue an event to ensure that the relevant initialization state lives at
+  // least until the operation completes execution on the GPU.
+  auto on_initialize_completed = [p = std::move(initializer)]() mutable {
+    // Free the initialization state
+    p = nullptr;
+  };
+  ctx->EnqueueCallbackForGpuEvent(init_gpu_event, on_initialize_completed);
 }
 
 StatusOr<DmlGpuEvent> DmlKernel::Compute(DmlKernelContext* ctx) const {

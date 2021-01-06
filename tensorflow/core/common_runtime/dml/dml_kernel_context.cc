@@ -75,8 +75,8 @@ void DmlKernelConstruction::EnqueueCallbackForGpuEvent(
   device_->GetEventQueue()->Enqueue(std::move(gpu_event), std::move(callback));
 }
 
-void DmlKernelConstruction::InitializeOperator(
-    IDMLCompiledOperator* op,
+DmlGpuEvent DmlKernelConstruction::InitializeOperator(
+    IDMLOperatorInitializer* initializer,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
     absl::Span<const DML_BUFFER_BINDING> input_bindings) {
   // Set up the persistent resource binding
@@ -96,9 +96,8 @@ void DmlKernelConstruction::InitializeOperator(
     input_binding_desc = {DML_BINDING_TYPE_BUFFER_ARRAY, &input_array_binding};
   }
 
-  device_->GetExecutionContext()->InitializeOperator(
-      op, persistent_binding_desc, input_binding_desc,
-      device_->GetEventQueue());
+  return device_->GetExecutionContext()->InitializeOperator(
+      initializer, persistent_binding_desc, input_binding_desc);
 }
 
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {

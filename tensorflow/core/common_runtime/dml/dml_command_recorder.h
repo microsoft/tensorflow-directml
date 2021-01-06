@@ -34,13 +34,9 @@ class DmlCommandRecorder {
                      std::shared_ptr<DmlCommandQueue> command_queue,
                      DmlAllocator* allocator);
 
-  // Unlike ExecuteOperator(), this will set up the descriptors and binding
-  // table for you, and automatically release them (using the given event queue)
-  // whenever the initialization completes on the GPU.
-  void InitializeOperator(IDMLCompiledOperator* op,
+  void InitializeOperator(IDMLOperatorInitializer* initializer,
                           const DML_BINDING_DESC& persistent_resource_binding,
-                          const DML_BINDING_DESC& input_array_binding,
-                          DmlEventQueue* event_queue);
+                          const DML_BINDING_DESC& input_array_binding);
 
   // Executes a DML operator with the given bindings. The supplied descriptor
   // heap must match the heap associated with the binding table. Callers should

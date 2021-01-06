@@ -38,17 +38,10 @@ DmlCommandRecorder::DmlCommandRecorder(
 }
 
 void DmlCommandRecorder::InitializeOperator(
-    IDMLCompiledOperator* op,
+    IDMLOperatorInitializer* initializer,
     const DML_BINDING_DESC& persistent_resource_binding,
-    const DML_BINDING_DESC& input_array_binding, DmlEventQueue* event_queue) {
+    const DML_BINDING_DESC& input_array_binding) {
   if (!status_.ok()) return;
-
-  Microsoft::WRL::ComPtr<IDMLOperatorInitializer> initializer;
-
-  // Reset the initializer to reference the input operator.
-  IDMLCompiledOperator* ops[] = {op};
-  DML_CHECK_SUCCEEDED(dml_device_->CreateOperatorInitializer(
-      ABSL_ARRAYSIZE(ops), ops, IID_PPV_ARGS(&initializer)));
 
   DML_BINDING_PROPERTIES init_binding_props =
       initializer->GetBindingProperties();
@@ -59,7 +52,7 @@ void DmlCommandRecorder::InitializeOperator(
 
   // Create a binding table for initialization.
   DML_BINDING_TABLE_DESC binding_table_desc = {};
-  binding_table_desc.Dispatchable = initializer.Get();
+  binding_table_desc.Dispatchable = initializer;
   binding_table_desc.CPUDescriptorHandle = descriptor_range.cpu_handle;
   binding_table_desc.GPUDescriptorHandle = descriptor_range.gpu_handle;
   binding_table_desc.SizeInDescriptors = num_descriptors;
@@ -106,7 +99,7 @@ void DmlCommandRecorder::InitializeOperator(
 
   // Record the initialization work.
   SetDescriptorHeap(descriptor_range.heap);
-  recorder_->RecordDispatch(current_command_list_.Get(), initializer.Get(),
+  recorder_->RecordDispatch(current_command_list_.Get(), initializer,
                             binding_table.Get());
 
   // Barrier if there's an output (i.e. persistent resource), or if any temps
@@ -118,15 +111,6 @@ void DmlCommandRecorder::InitializeOperator(
         CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
     current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
   }
-
-  // Enqueue an event to ensure that the relevant initialization state lives at
-  // least until the operation completes execution on the GPU.
-  auto on_initialize_completed = [p = std::move(initializer)]() mutable {
-    // Free the initialization state
-    p = nullptr;
-  };
-  event_queue->Enqueue(queue_->GetNextCompletionEvent(),
-                       std::move(on_initialize_completed));
 
   OnCommandRecorded();
 }

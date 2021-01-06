@@ -60,14 +60,14 @@ DmlGpuEvent DmlExecutionContextImpl::FillBufferWithPattern(
 }
 
 DmlGpuEvent DmlExecutionContextImpl::InitializeOperator(
-    IDMLCompiledOperator* op,
+    IDMLOperatorInitializer* initializer,
     const DML_BINDING_DESC& persistent_resource_binding,
-    const DML_BINDING_DESC& input_array_binding, DmlEventQueue* event_queue) {
+    const DML_BINDING_DESC& input_array_binding) {
   assert(!closed_);
   SetCommandRecorder(&dml_recorder_);
 
-  dml_recorder_.InitializeOperator(op, persistent_resource_binding,
-                                   input_array_binding, event_queue);
+  dml_recorder_.InitializeOperator(initializer, persistent_resource_binding,
+                                   input_array_binding);
 
   return GetCurrentCompletionEvent();
 }
