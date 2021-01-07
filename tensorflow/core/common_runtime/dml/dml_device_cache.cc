@@ -120,6 +120,53 @@ const DmlAdapter& DmlDeviceCache::GetAdapter(uint32_t adapter_index) const {
   return adapters_[adapter_index];
 }
 
+Status DmlDeviceCache::MapDeviceIdToAdapterIndex(int device_id,
+                                                 uint32_t adapter_index) {
+  // Try to insert the device_id -> adapter_index mapping. This will fail if the
+  // device_id has already been mapped, but that's OK so long as the mapping
+  // remains the same.
+  absl::optional<uint32_t> prev_adapter_index;
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto result =
+        device_id_to_adapter_index_map_.insert({device_id, adapter_index});
+    if (!result.second) {
+      prev_adapter_index = result.first->second;
+    }
+  }
+
+  if (prev_adapter_index && (*prev_adapter_index != adapter_index)) {
+    return errors::AlreadyExists(
+        "TensorFlow device (DML:", device_id,
+        ") is being mapped to "
+        "multiple DML devices (",
+        adapter_index, " now, and ", *prev_adapter_index,
+        " previously), which is not supported. "
+        "This may be the result of providing different GPU configurations "
+        "(ConfigProto.gpu_options, for example different visible_device_list)"
+        " when creating multiple Sessions in the same process. This is not "
+        " currently supported, see "
+        "https://github.com/tensorflow/tensorflow/issues/19083");
+  }
+
+  return Status::OK();
+}
+
+Status DmlDeviceCache::GetAdapterIndexFromDeviceId(int device_id,
+                                                   uint32_t* adapter_index) {
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto result = device_id_to_adapter_index_map_.find(device_id);
+    if (result != device_id_to_adapter_index_map_.end()) {
+      *adapter_index = result->second;
+      return Status::OK();
+    }
+  }
+
+  return errors::NotFound("TensorFlow device DML:", device_id,
+                          " was not registered");
+}
+
 DmlDeviceCache::DmlDeviceCache() : adapters_(FilterAdapters()) {
   device_states_.resize(adapters_.size());
 

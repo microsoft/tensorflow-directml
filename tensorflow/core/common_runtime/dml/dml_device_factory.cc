@@ -169,8 +169,7 @@ class DmlDeviceFactory : public DeviceFactory {
         } else {
           // No per_process_gpu_memory_fraction was specified: use a memory
           // limit equal to the AVAILALBLE GPU memory
-          uint64_t available_gpu_memory =
-              adapter.QueryAvailableLocalMemory();
+          uint64_t available_gpu_memory = adapter.QueryAvailableLocalMemory();
 
           memory_limit = available_gpu_memory;
         }
@@ -179,8 +178,11 @@ class DmlDeviceFactory : public DeviceFactory {
             device_cache.GetOrCreateDeviceState(i, gpu_options, memory_limit);
 
         auto dml_device =
-            CreateDevice(options, name_prefix, virtual_device_index++,
+            CreateDevice(options, name_prefix, virtual_device_index,
                          device_state, memory_limit);
+
+        TF_RETURN_IF_ERROR(
+            device_cache.MapDeviceIdToAdapterIndex(virtual_device_index++, i));
 
         devices->push_back(std::move(dml_device));
       } else {
@@ -195,8 +197,11 @@ class DmlDeviceFactory : public DeviceFactory {
           const DmlDeviceState* device_state =
               device_cache.GetOrCreateDeviceState(i, gpu_options, memory_limit);
           auto dml_device =
-              CreateDevice(options, name_prefix, virtual_device_index++,
+              CreateDevice(options, name_prefix, virtual_device_index,
                            device_state, memory_limit);
+
+          TF_RETURN_IF_ERROR(device_cache.MapDeviceIdToAdapterIndex(
+              virtual_device_index++, i));
 
           devices->push_back(std::move(dml_device));
         }
