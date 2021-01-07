@@ -175,11 +175,10 @@ class DmlReduceKernel : public DmlKernel {
       DmlKernelTensors tensors;
       tensors.outputs.resize(1);
 
-      constexpr uint32_t dml_output_shape[] = {1u};
-
       tensors.outputs[0].emplace();
-      tensors.outputs[0]->desc = DmlTensorDesc::Create(
-          output_type, dml_output_shape, dml_output_shape);
+      tensors.outputs[0]->desc =
+          DmlTensorDesc::Create(output_type, ctx->GetOutputTensorShape(0),
+                                ctx->GetOutputTensorShape(0));
       tensors.outputs[0]->kernel_index = 0;
 
       auto output_descs = GetDmlTensorDescs(tensors.outputs);
