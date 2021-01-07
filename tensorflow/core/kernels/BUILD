@@ -8176,8 +8176,6 @@ tf_kernel_library(
         ":pooling_ops",
         ":rnn_ops",
         ":fused_batch_norm_op",
-        ":list_kernels",
-        ":tensor_array",
     ],
     copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
