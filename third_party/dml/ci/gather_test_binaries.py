@@ -112,6 +112,15 @@ def main():
               "dml",
           ]
       ),
+      (
+          f"//tensorflow/c/...",
+          TargetKind.CC_TEST,
+          None,
+          [
+              "-no_dml",
+              "-manual",
+          ]
+      ),
   ]
 
   for _, _, _, tag_filters in test_groups:
