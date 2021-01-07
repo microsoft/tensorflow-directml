@@ -38,7 +38,7 @@ parameters:
 - name: testGroups
   displayName: Test Groups
   type: object
-  default: [python, core]
+  default: [python, core, c]
 
 - name: enableTests
   displayName: Enable Tests

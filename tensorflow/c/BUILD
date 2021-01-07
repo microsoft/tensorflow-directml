@@ -427,6 +427,7 @@ tf_cc_test(
         ":env",
         ":kernels",
     ],
+    tags = ["no_windows"], # Uses UNIX system headers
 )
 
 tf_cuda_cc_test(
@@ -444,6 +445,7 @@ tf_cuda_cc_test(
     }),
     tags = [
         "noasan",
+        "no_dml", # XLA-related build breaks
     ],
     # We must ensure that the dependencies can be dynamically linked since
     # the shared library must be able to use core:framework.
