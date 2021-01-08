@@ -450,13 +450,15 @@ class DmlFusedMatMulKernel : public DmlKernel {
     }
 
     DmlKernelParams params;
-    params.kernel_input_indices = {0, 1, 2};
-
-    // TODO: ensure C (bias) shape is correct
-    // need to massage C tensor size to match product of A and B accounting for
-    // transposes
+    params.kernel_input_indices = {0, 1};
 
     DmlKernelTensors tensors = GetTensorInfos(ctx, params);
+    tensors.inputs.emplace_back();
+    tensors.inputs[2]->kernel_index = 2;
+    tensors.inputs[2]->desc = DmlTensorDesc::Create(
+      ctx->GetInputDataType(2), 
+      ctx->GetOutputTensorShape(0), 
+      ctx->GetInputTensorShape(2));
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
