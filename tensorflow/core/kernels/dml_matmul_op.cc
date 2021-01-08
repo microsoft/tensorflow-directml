@@ -19,8 +19,8 @@ limitations under the License.
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
-#include "tensorflow/core/util/matmul_bcast.h"
 #include "tensorflow/core/kernels/fused_eigen_output_kernels.h"
+#include "tensorflow/core/util/matmul_bcast.h"
 
 namespace tensorflow {
 
@@ -389,16 +389,14 @@ class FusedMatMulInitHelper : public MatMulInitHelper {
   struct Attributes : public MatMulInitHelper::Attributes {
     explicit Attributes(OpKernelConstruction* ctx)
         : MatMulInitHelper::Attributes(ctx) {
-      using FCT = FusedComputationType;
       std::vector<FusedComputationPattern> patterns = {
-          {FCT::kBiasAdd, {"BiasAdd"}},
-          {FCT::kBiasAddWithRelu, {"BiasAdd", "Relu"}},
-          {FCT::kBiasAddWithRelu6, {"BiasAdd", "Relu6"}},
-          {FCT::kBiasAddWithElu, {"BiasAdd", "Elu"}},
+          {FusedComputationType::kBiasAdd, {"BiasAdd"}},
+          {FusedComputationType::kBiasAddWithRelu, {"BiasAdd", "Relu"}},
+          {FusedComputationType::kBiasAddWithElu, {"BiasAdd", "Elu"}},
       };
 
       OP_REQUIRES_OK(ctx,
-                     InitializeFusedComputation(ctx, "DmlFusedConv2d", patterns,
+                     InitializeFusedComputation(ctx, "DmlFusedMatMul", patterns,
                                                 &fused_computation_type,
                                                 &fused_computation_args));
     }
@@ -409,8 +407,7 @@ class FusedMatMulInitHelper : public MatMulInitHelper {
 
   FusedMatMulInitHelper(OpKernelContext* ctx,
                         std::shared_ptr<const Attributes> attr)
-      : MatMulInitHelper(ctx, attr), attr_(attr) {
-  }
+      : MatMulInitHelper(ctx, attr), attr_(attr) {}
 
   FusedComputationType GetFusedComputationType() const {
     return attr_->fused_computation_type;
@@ -434,9 +431,7 @@ class DmlFusedMatMulKernel : public DmlKernel {
     CHECK(ctx->GetOutputCount() == 1);
 
     DmlKernelParams params;
-    params.kernel_input_indices = {
-        0, 1, 2
-    };
+    params.kernel_input_indices = {0, 1, 2};
 
     const auto fused_computation_type = init_helper->GetFusedComputationType();
     const auto fused_computation_args = init_helper->GetFusedComputationArgs();
