@@ -308,12 +308,6 @@ bool IsCpuCompatibleMatMul(const NodeDef* matmul) {
 #endif  // !INTEL_MKL
 }
 
-bool IsGpuCompatibleMatMul(const NodeDef* matmul) {
-  DCHECK(IsMatMul(*matmul)) << "Expected MatMul op";
-  return NodeIsOnGpu(matmul) && IsGpuCompatibleDataType(matmul) &&
-         IsGpuCompatibleDataFormat(matmul);
-}
-
 bool IsDmlCompatibleMatMul(const NodeDef* matmul) {
   DCHECK(IsMatMul(*matmul)) << "Expected MatMul op";
   return NodeIsOnDml(matmul) && IsDmlCompatibleDataType(matmul);
