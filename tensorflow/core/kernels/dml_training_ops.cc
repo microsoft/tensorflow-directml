@@ -1246,10 +1246,6 @@ class DmlApplyKerasMomentumKernel : public DmlTrainingKernel {
 
 #define REGISTER_KERNEL(type)                                                  \
   REGISTER_KERNEL_BUILDER(                                                     \
-      Name("ApplyKerasMomentum").Device(DEVICE_DML).TypeConstraint<type>("T"), \
-      DmlKernelWrapper<DmlApplyKerasMomentumKernel,                            \
-                       GetBroadcastedOutputShapeHelper>);                      \
-  REGISTER_KERNEL_BUILDER(                                                     \
       Name("ResourceApplyKerasMomentum")                                       \
           .Device(DEVICE_DML)                                                  \
           .HostMemory("var")                                                   \

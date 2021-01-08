@@ -128,6 +128,13 @@ def build_tests(args):
                 "-manual",
                 "dml",
             ],
+        ),
+        (
+            "//tensorflow/c/...",
+            [
+                "-no_dml",
+                "-manual",
+            ],
         )
     ]
 
