@@ -395,6 +395,9 @@ class FusedMatMulInitHelper : public MatMulInitHelper {
           {FusedComputationType::kBiasAddWithElu, {"BiasAdd", "Elu"}},
       };
 
+      // Only used for FusedBatchNorm
+      FusedComputationArgs fused_computation_args;
+
       OP_REQUIRES_OK(ctx,
                      InitializeFusedComputation(ctx, "DmlFusedMatMul", patterns,
                                                 &fused_computation_type,
@@ -402,7 +405,6 @@ class FusedMatMulInitHelper : public MatMulInitHelper {
     }
 
     FusedComputationType fused_computation_type;
-    FusedComputationArgs fused_computation_args;
   };
 
   FusedMatMulInitHelper(OpKernelContext* ctx,
@@ -411,10 +413,6 @@ class FusedMatMulInitHelper : public MatMulInitHelper {
 
   FusedComputationType GetFusedComputationType() const {
     return attr_->fused_computation_type;
-  }
-
-  FusedComputationArgs GetFusedComputationArgs() const {
-    return attr_->fused_computation_args;
   }
 
  private:
@@ -431,18 +429,11 @@ class DmlFusedMatMulKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 3);
     CHECK(ctx->GetOutputCount() == 1);
 
-    const auto fused_computation_type = init_helper->GetFusedComputationType();
-    const auto fused_computation_args = init_helper->GetFusedComputationArgs();
-
-    // BiasAddArgs<T> bias_add_args;
-    // if (BiasAddArgs<T>::IsSupported(fused_computation_type)) {
-    //   OP_REQUIRES_OK(context, InitBiasAddArgs(context, &bias_add_args));
-    // }
-
     DML_OPERATOR_DESC fused_op_desc = {};
     DML_ACTIVATION_RELU_OPERATOR_DESC relu_desc = {};
     DML_ACTIVATION_ELU_OPERATOR_DESC elu_desc = {};
 
+    const auto fused_computation_type = init_helper->GetFusedComputationType();
     DCHECK(BiasAddArgs<T>::IsSupported(fused_computation_type));
     switch (fused_computation_type) {
       case FusedComputationType::kBiasAdd:
