@@ -363,7 +363,7 @@ bool IsGpuCompatible(const RemapperContext& ctx,
   return false;
 }
 
-// Checks if we can rewrite a pattern to the `_FusedConv2D` on GPU device.
+// Checks if we can rewrite a pattern to the `_Fused{Conv2D,MatMul}` on DML.
 bool IsDmlCompatible(const RemapperContext& ctx,
                      const ContractionWithBiasAddAndActivation& matched) {
   const GraphDef* graph = ctx.graph_view.graph();
