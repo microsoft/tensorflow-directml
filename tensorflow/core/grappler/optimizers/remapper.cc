@@ -371,7 +371,7 @@ bool IsDmlCompatible(const RemapperContext& ctx,
 
   if (IsConv2D(contraction_node)) {
     // TODO(justoeck): keep the same heuristics as GPU for now, but we should
-    // revisit if these apply to DirectML.
+    // revisit if these apply to DirectML. #31294633
     const std::vector<OpInfo::TensorProperties>& input_props =
         ctx.graph_properties.GetInputProperties(contraction_node.name());
     const TensorShapeProto& filter_shape =
@@ -382,13 +382,9 @@ bool IsDmlCompatible(const RemapperContext& ctx,
                            filter_shape.dim(1).size() != 1 &&  //
                            filter_shape.dim(2).size() != 1;
 
-    // Grappler only attempts to fuse relu, relu6, or elu; of these, DML
-    // Conv2D supports fused relu and elu.
-    const NodeDef& activation_node = graph->node(matched.activation);
-    bool is_relu_or_elu = IsRelu(activation_node) || IsElu(activation_node);
-    return is_relu_or_elu && is_spatial_conv &&
-           IsDmlCompatibleConv2D(&contraction_node);
+    return is_spatial_conv && IsDmlCompatibleConv2D(&contraction_node);
   } else if (IsMatMul(contraction_node)) {
+    // DML's _FusedMatMul kernel does not support relu6.
     const NodeDef& activation_node = graph->node(matched.activation);
     bool is_relu_or_elu = IsRelu(activation_node) || IsElu(activation_node);
     return is_relu_or_elu && IsDmlCompatibleMatMul(&contraction_node);
