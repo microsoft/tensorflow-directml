@@ -175,7 +175,9 @@ class DmlReduceKernel : public DmlKernel {
       DmlKernelTensors tensors;
       tensors.outputs.resize(1);
 
-      constexpr uint32_t dml_output_shape[] = {1u};
+      TensorShape dml_output_shape({
+          ctx->GetOutputTensorShape(0).num_elements(),
+      });
 
       tensors.outputs[0].emplace();
       tensors.outputs[0]->desc = DmlTensorDesc::Create(
