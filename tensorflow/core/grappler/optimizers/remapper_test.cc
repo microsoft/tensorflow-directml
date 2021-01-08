@@ -527,7 +527,7 @@ TEST_F(RemapperTest, FuseMatMulWithBias) {
 
   // Place all nodes on CPU.
   for (int i = 0; i < item.graph.node_size(); ++i) {
-    item.graph.mutable_node(i)->set_device("/device:CPU:0");
+    item.graph.mutable_node(i)->set_device("/device:DML:0");
   }
 
   Remapper optimizer(RewriterConfig::ON);

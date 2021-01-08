@@ -419,7 +419,6 @@ class FusedMatMulInitHelper : public MatMulInitHelper {
   const std::shared_ptr<const Attributes> attr_;
 };
 
-template <typename T>
 class DmlFusedMatMulKernel : public DmlKernel {
  public:
   using InitHelper = FusedMatMulInitHelper;
@@ -434,7 +433,6 @@ class DmlFusedMatMulKernel : public DmlKernel {
     DML_ACTIVATION_ELU_OPERATOR_DESC elu_desc = {};
 
     const auto fused_computation_type = init_helper->GetFusedComputationType();
-    DCHECK(BiasAddArgs<T>::IsSupported(fused_computation_type));
     switch (fused_computation_type) {
       case FusedComputationType::kBiasAdd:
         break;
@@ -449,16 +447,33 @@ class DmlFusedMatMulKernel : public DmlKernel {
         break;
     }
 
-    DmlKernelParams params;
-    params.kernel_input_indices = {0, 1};
+    DmlTensorInfo a;
+    a.kernel_index = 0;
+    a.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0),
+                                   ctx->GetInputTensorShape(0),
+                                   ctx->GetInputTensorShape(0));
 
-    DmlKernelTensors tensors = GetTensorInfos(ctx, params);
-    tensors.inputs.emplace_back();
-    tensors.inputs[2]->kernel_index = 2;
-    tensors.inputs[2]->desc = DmlTensorDesc::Create(
-      ctx->GetInputDataType(2), 
-      ctx->GetOutputTensorShape(0), 
-      ctx->GetInputTensorShape(2));
+    DmlTensorInfo b;
+    b.kernel_index = 1;
+    b.desc = DmlTensorDesc::Create(ctx->GetInputDataType(1),
+                                   ctx->GetInputTensorShape(1),
+                                   ctx->GetInputTensorShape(1));
+
+    DmlTensorInfo c;
+    c.kernel_index = 2;
+    c.desc = DmlTensorDesc::Create(ctx->GetInputDataType(2),
+                                   ctx->GetOutputTensorShape(0),
+                                   ctx->GetInputTensorShape(2));
+
+    DmlTensorInfo output;
+    output.kernel_index = 0;
+    output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0),
+                                        ctx->GetOutputTensorShape(0),
+                                        ctx->GetOutputTensorShape(0));
+
+    DmlKernelTensors tensors;
+    tensors.inputs = {a, b, c};
+    tensors.outputs = {output};
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
@@ -486,7 +501,7 @@ class DmlFusedMatMulKernel : public DmlKernel {
 #define DML_REGISTER_KERNEL(type)                                        \
   REGISTER_KERNEL_BUILDER(                                               \
       Name("_FusedMatMul").Device(DEVICE_DML).TypeConstraint<type>("T"), \
-      DmlKernelWrapper<DmlFusedMatMulKernel<type>, MatMulShapeHelper>);
+      DmlKernelWrapper<DmlFusedMatMulKernel, MatMulShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
