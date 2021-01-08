@@ -23,11 +23,6 @@ Originally developed by researchers and engineers from the Google Brain team
 within Google's AI organization, it comes with strong support for machine
 learning and deep learning and the flexible numerical computation core is used
 across many other scientific domains.
-
-This version of TensorFlow leverages DirectML for hardware acceleration on
-Windows 10 and the Windows Subsystem for Linux (WSL).
-
-TensorFlow, the TensorFlow logo and any related marks are trademarks of Google Inc.
 """
 
 from __future__ import absolute_import
@@ -52,34 +47,38 @@ DOCLINES = __doc__.split('\n')
 # result for pip.
 # Also update tensorflow/tensorflow.bzl and
 # tensorflow/core/public/version.h
-_VERSION = '1.15.5.dev0'
+_VERSION = '2.1.2'
 
 REQUIRED_PACKAGES = [
     'absl-py >= 0.7.0',
     'astor >= 0.6.0',
     'backports.weakref >= 1.0rc1;python_version<"3.4"',
     'enum34 >= 1.1.6;python_version<"3.4"',
-    # functools comes with python3, need to install the backport for python2
-    'functools32 >= 3.2.3;python_version<"3"',
     'gast == 0.2.2',
     'google_pasta >= 0.1.6',
     'keras_applications >= 1.0.8',
-    'keras_preprocessing >= 1.0.5',
-    # mock comes with unittest.mock for python3, need to install for python2
-    'mock >= 2.0.0;python_version<"3"',
+    'keras_preprocessing == 1.1.0',
     'numpy >= 1.16.0, < 1.19.0',
     'opt_einsum >= 2.3.2',
-    'six >= 1.10.0',
-    'protobuf >= 3.6.1',
-    'tensorboard >= 1.15.0, < 1.16.0',
-    'tensorflow-estimator == 1.15.1',
+    'protobuf >= 3.8.0',
+    'tensorboard >= 2.1.0, < 2.2.0',
+    'tensorflow_estimator >= 2.1.0rc0, < 2.2.0',
     'termcolor >= 1.1.0',
+    'wrapt >= 1.11.1',
     # python3 requires wheel 0.26
     'wheel >= 0.26;python_version>="3"',
     'wheel;python_version<"3"',
+<<<<<<< HEAD
+    # mock comes with unittest.mock for python3, need to install for python2
+    'mock >= 2.0.0;python_version<"3"',
+    # functools comes with python3, need to install the backport for python2
+    'functools32 >= 3.2.3;python_version<"3"',
+    'six >= 1.12.0',
+=======
     'wrapt >= 1.11.1',
     # Pin h5py to at most 2.10.0 as newer versions break old keras tests
     'h5py <= 2.10.0',
+>>>>>>> 03d7ca7871b (Add upper bound to `h5py`.)
 ]
 
 if sys.byteorder == 'little':
@@ -99,7 +98,7 @@ if '--project_name' in sys.argv:
 if 'tf_nightly' in project_name:
   for i, pkg in enumerate(REQUIRED_PACKAGES):
     if 'tensorboard' in pkg:
-      REQUIRED_PACKAGES[i] = 'tb-nightly >= 1.15.0a0, < 1.16.0a0'
+      REQUIRED_PACKAGES[i] = 'tb-nightly >= 2.1.0a0, < 2.2.0a0'
     elif 'tensorflow_estimator' in pkg and '2.0' in project_name:
       REQUIRED_PACKAGES[i] = 'tensorflow-estimator-2.0-preview'
     elif 'tensorflow_estimator' in pkg:
@@ -244,12 +243,8 @@ for path in so_lib_paths:
 
 if os.name == 'nt':
   EXTENSION_NAME = 'python/_pywrap_tensorflow_internal.pyd'
-  matches.extend(['../' + x for x in find_files("DirectML.*.dll", "tensorflow_core/python")])
-  matches.extend(['../' + x for x in find_files("DirectML_*.txt", "tensorflow_core/python")])
 else:
   EXTENSION_NAME = 'python/_pywrap_tensorflow_internal.so'
-  matches.extend(['../' + x for x in find_files("libdirectml.*.so", "tensorflow_core")])
-  matches.extend(['../' + x for x in find_files("DirectML_*.txt", "tensorflow_core")])
 
 headers = (
     list(find_files('*.h', 'tensorflow_core/core')) +
@@ -267,10 +262,10 @@ setup(
     version=_VERSION.replace('-', ''),
     description=DOCLINES[0],
     long_description='\n'.join(DOCLINES[2:]),
-    url='https://github.com/microsoft/tensorflow-directml',
-    download_url='https://github.com/microsoft/tensorflow-directml/releases',
-    author='Microsoft Corporation',
-    author_email='askdirectml@microsoft.com',
+    url='https://www.tensorflow.org/',
+    download_url='https://github.com/tensorflow/tensorflow/tags',
+    author='Google Inc.',
+    author_email='packages@tensorflow.org',
     # Contained modules and scripts.
     packages=find_packages(),
     entry_points={
@@ -294,12 +289,15 @@ setup(
     },
     # PyPI package information.
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Intended Audience :: Education',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: Apache Software License',
+        'Programming Language :: Python :: 2',
+        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
@@ -311,5 +309,5 @@ setup(
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
     license='Apache 2.0',
-    keywords='tensorflow tensor machine learning directml directx d3d12',
+    keywords='tensorflow tensor machine learning',
 )
