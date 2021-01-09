@@ -255,7 +255,7 @@ bool IsDmlCompatibleDataType(const NodeDef* contraction,
                              const string& type_attr = "T") {
   DataType dtype = GetDataTypeFromAttr(*contraction, type_attr);
   if (IsConv2D(*contraction) || IsMatMul(*contraction)) {
-    return dtype == DT_FLOAT || dtype == DT_HALF;
+    return dtype == DT_FLOAT;
   } else {
     return false;
   }
@@ -1066,7 +1066,7 @@ bool FindFusedBatchNormEx(const RemapperContext& ctx, int node_index,
       if (!valid_channel_dim) return false;
 
       // cuDNN must support CUDNN_BATCHNORM_SPATIAL_PERSISTENT mode.
-      if (!BatchnormSpatialPersistentEnabled()) return false;
+      if (NodeIsOnGpu(fused_batch_norm_node_def) && !BatchnormSpatialPersistentEnabled()) return false;
     }
 
     // FusedBatchNormV2 and V3 have an extra type parameter.
