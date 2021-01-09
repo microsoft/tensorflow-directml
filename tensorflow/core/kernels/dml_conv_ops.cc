@@ -659,7 +659,8 @@ class DmlFusedConv2DKernel : public DmlKernel {
   REGISTER_KERNEL_BUILDER(                                               \
       Name("_FusedConv2D").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlFusedConv2DKernel<type>, ConvShapeHelper>);
-TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+// FusedConv2D only supports float32
+TF_CALL_float(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 class DmlConv2DBackpropInputKernel : public DmlKernel {

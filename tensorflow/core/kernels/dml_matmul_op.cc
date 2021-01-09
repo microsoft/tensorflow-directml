@@ -502,7 +502,8 @@ class DmlFusedMatMulKernel : public DmlKernel {
   REGISTER_KERNEL_BUILDER(                                               \
       Name("_FusedMatMul").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlFusedMatMulKernel, MatMulShapeHelper>);
-TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+// _FusedMatMul only supports float32
+TF_CALL_float(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow

@@ -1029,9 +1029,9 @@ bool FindFusedBatchNormEx(const RemapperContext& ctx, int node_index,
     const auto* fused_batch_norm_node_def = fused_batch_norm.node();
     if (!IsFusedBatchNorm(*fused_batch_norm_node_def)) return false;
 
-    // We fuse FusedBatchNorm only on GPU, because on CPU we fuse it with
+    // We fuse FusedBatchNorm only on GPU/DML, because on CPU we fuse it with
     // contraction (MatMul or Conv2D node).
-    if (!NodeIsOnGpu(fused_batch_norm_node_def)) return false;
+    if (NodeIsOnCpu(fused_batch_norm_node_def)) return false;
 
     DataType t_dtype = GetDataTypeFromAttr(*fused_batch_norm_node_def, "T");
     if (t_dtype != DT_FLOAT && t_dtype != DT_HALF) return false;
