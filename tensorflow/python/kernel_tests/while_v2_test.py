@@ -71,8 +71,6 @@ def fill(shape):  # pylint: disable=invalid-name
 
 class WhileV2Test(test.TestCase, parameterized.TestCase):
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSingleLoopVar(self):
     x = constant_op.constant(2.)
@@ -83,8 +81,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
       self.assertEqual(self.evaluate(ret), 16.)
       self.assertSequenceEqual(self.evaluate(grad), [32.])
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_v1_only("b/120545219")
   def testReturnSameStructureTrue(self):
     x = constant_op.constant(2.)
@@ -144,8 +140,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
       loop[0].op.run()
       self.assertAllEqual(self.evaluate(v), 2.0)
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMultipleLoopVarsBasic(self):
     x = constant_op.constant(5.)
@@ -188,8 +182,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
       self.assertSequenceEqual(self.evaluate(ret), [45., 3.])
       self.assertSequenceEqual(self.evaluate(grad), [9.])
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMultipleLoopVars(self):
     x = constant_op.constant(5.)
@@ -233,8 +225,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
     with self.cached_session() as sess:
       self.assertAllEqual(sess.run(grad), 4.0)
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testMultipleWhileLoops(self):
     x = constant_op.constant(2.)
@@ -359,8 +349,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
       self.assertIs(while_4.control_inputs[0], while_3)
       self.assertEmpty(while_stateless.control_inputs)
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testDoubleDerivative(self):
     x = constant_op.constant(2.)
@@ -665,8 +653,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
     index = GetInputIndex(while_op, v)
     self._assertNotAccumulated(while_op, index)
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testCaptureExternalTensorInCond(self):
     x = constant_op.constant(2.)
@@ -680,8 +666,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
       self.assertEqual(self.evaluate(ret), 18.)
       self.assertSequenceEqual(self.evaluate(grad), [9.])
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testCaptureExternalTensorInBody(self):
     x = constant_op.constant(2.)
@@ -693,8 +677,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
       self.assertEqual(self.evaluate(ret), 18.)
       self.assertSequenceEqual(self.evaluate(grad), [9.])
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testLoopWithTensorListPushBack(self):
     x = constant_op.constant(2.)
@@ -718,8 +700,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
       self.assertEqual(sess.run(ret[0]), 16.)
       self.assertSequenceEqual(self.evaluate(grad), [32.])
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testDuplicateAccumulator(self):
     x = constant_op.constant(2.)
@@ -864,8 +844,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
     self.assertAllClose([2.0, 4.0, 6.0, 8.0, 10.0, 12.0], self.evaluate(r))
     self.assertAllClose(21.0, self.evaluate(grad))
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testNestedWhile(self):
     # Compute sum of geometric progression: n^0 + n^1 + ... + n^m
@@ -890,8 +868,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
       self.assertEqual(self.evaluate(result), 364.)
       self.assertSequenceEqual(self.evaluate(grad), [547.])
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testIdentityNodeInBody(self):
 
@@ -1001,8 +977,6 @@ class WhileV2Test(test.TestCase, parameterized.TestCase):
             array_ops.zeros([5, 3, 4], dtype=dtypes.float32),
         ])
 
-  # TFDML #25565084
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testExternalColocationGrad(self):
     external_t = constant_op.constant(2.)

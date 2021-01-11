@@ -467,8 +467,6 @@ class OnesTest(test.TestCase):
   def testConst(self):
     self.assertTrue(np.array_equal(self._Ones([2, 3]), np.array([[1] * 3] * 2)))
 
-  # TFDML #25508969
-  @test_util.skip_dml
   def testScalar(self):
     self.assertEqual(1, self._Ones([]))
     self.assertEqual(1, self._Ones(()))
@@ -586,8 +584,6 @@ class FillTest(test.TestCase):
       with self.assertRaises(errors_impl.InvalidArgumentError):
         array_ops.fill(shape, 7)
 
-  # TFDML #25508951
-  @test_util.skip_dml
   def testShapeFunctionEdgeCases(self):
     # Non-vector dimensions.
     with self.assertRaises(errors_impl.InvalidArgumentError):

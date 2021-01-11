@@ -155,8 +155,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
         ))
     self.assertAllClose([2. * 5. + 3. * 4.], self.evaluate(vp))
 
-  # TFDML #25509753
-  @test_util.skip_dml
   def testForwardGradientFunctionUsedByAccumulatorForOps(self):
     previous_fn = forwardprop._forward_gradient
     try:
@@ -172,8 +170,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
     finally:
       pywrap_tensorflow.TFE_Py_RegisterForwardGradientFunction(previous_fn)
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testFunctionCacheLimited(self):
     # Every time this test is executed, it will create a slightly larger Tensor
@@ -188,8 +184,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
       y = x + x
     self.assertAllClose(2. * array_ops.ones_like(x), acc.jvp(y))
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testMultipleWatchesAdd(self):
     x = constant_op.constant(-2.)
@@ -202,8 +196,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
     self.assertAllClose(21., acc.jvp(x))
     self.assertAllClose(21. * 3., acc.jvp(y))
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testDeadTensorsJVPCleared(self):
     x = array_ops.ones([100])
@@ -226,8 +218,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
       self.assertIsNone(derived_tensor_weak())
       self.assertIsNone(derived_tensor_grad_weak())
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testJVPManual(self):
     primal, tangent = _jvp(math_ops.sin, (constant_op.constant(0.1),),
@@ -235,8 +225,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
     self.assertAllClose(math_ops.sin(0.1), primal)
     self.assertAllClose(math_ops.cos(0.1) * 0.2, tangent)
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testNumericHigherOrder(self):
 
@@ -248,8 +236,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
     _test_gradients(
         self, f, [constant_op.constant([[2.0, 3.0], [1.0, 4.0]])], order=3)
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testCustomGradient(self):
 
@@ -263,8 +249,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
 
     _test_gradients(self, f, [constant_op.constant([1., 2.])], order=3)
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testCustomGradientRecomputeGrad(self):
 
@@ -274,8 +258,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
 
     _test_gradients(self, f, [constant_op.constant([1.])], order=3)
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @parameterized.named_parameters(
       [("Order{}".format(order), order, expected)
        for order, expected in enumerate(_X11_35_DERIVATIVES)])
@@ -300,8 +282,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
       f = _forwardgrad(f)
     self.assertAllClose(expected, f(primal))
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @parameterized.named_parameters(
       [("Function", def_function.function),
        ("NoFunction", lambda f: f)])
@@ -348,8 +328,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
     self.assertAllClose(3.5 * 1.1 ** 2.5, inner_jvp)
     self.assertAllClose(3.5 * 2.5 * 1.1 ** 1.5, outer_jvp)
 
-  # TFDML #25509753
-  @test_util.skip_dml
   def testFunctionGrad(self):
 
     @def_function.function
@@ -362,8 +340,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
         [constant_op.constant([1., 2.])],
         order=3)
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testHVPMemory(self):
 
@@ -374,8 +350,6 @@ class ForwardpropTest(test.TestCase, parameterized.TestCase):
     tangents = constant_op.constant([3., 4., 5.])
     _hvp(fun, (primals,), (tangents,))
 
-  # TFDML #25509753
-  @test_util.skip_dml
   @test_util.assert_no_new_pyobjects_executing_eagerly
   def testHVPCorrectness(self):
 

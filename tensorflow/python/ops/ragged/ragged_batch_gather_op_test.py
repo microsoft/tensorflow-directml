@@ -37,8 +37,6 @@ from tensorflow.python.platform import googletest
 class RaggedBatchGatherOpTest(test_util.TensorFlowTestCase,
                               parameterized.TestCase):
 
-  # TFDML #25576407
-  @test_util.skip_dml
   @parameterized.parameters([
       #=========================================================================
       # Docstring Example
@@ -152,8 +150,6 @@ class RaggedBatchGatherOpTest(test_util.TensorFlowTestCase,
     result = ragged_batch_gather_ops.batch_gather(params, indices)
     self.assertAllEqual(result, expected)
 
-  # TFDML #25564373
-  @test_util.skip_dml
   @parameterized.parameters([
       # Docstring example:
       dict(

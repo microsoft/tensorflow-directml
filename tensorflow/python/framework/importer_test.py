@@ -1235,8 +1235,6 @@ class ImportGraphDefTest(test.TestCase):
         self.assertEqual(sess.run("external:0"), 11)
         self.assertEqual(sess.run("outer:0"), 21)
 
-  # TFDML #25562813
-  @test_util.skip_dml
   def testImportInsideDefun(self):
     g = ops.Graph()
     with g.as_default():

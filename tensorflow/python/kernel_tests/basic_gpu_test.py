@@ -54,8 +54,6 @@ class GPUBinaryOpsTest(test.TestCase):
 
     self.assertAllClose(tf_cpu, tf_gpu)
 
-  # TFDML #25508846
-  @test_util.skip_dml
   def testFloatBasic(self):
     x = np.linspace(-5, 20, 15).reshape(1, 3, 5).astype(np.float32)
     y = np.linspace(20, -5, 15).reshape(1, 3, 5).astype(np.float32)
@@ -133,8 +131,6 @@ class MathBuiltinUnaryTest(test.TestCase):
     self._compare(data, np.tanh, math_ops.tanh, use_gpu)
     self._compare(data, np.arctanh, math_ops.atanh, use_gpu)
 
-  # TFDML #25508857
-  @test_util.skip_dml
   def testTypes(self):
     for dtype in [np.float32]:
       self._testDtype(dtype, use_gpu=True)

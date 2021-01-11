@@ -367,8 +367,6 @@ class BatchNormalizationTest(test.TestCase):
         self._test_inference(
             x_shape, dtype, [2], np.float32, use_gpu=True, data_format='NCHW')
 
-  # TFDML #25564197
-  @test_util.skip_dml
   def testInferenceShape4(self):
     x_shape = [27, 131, 127, 6]
     for dtype in [np.float16, np.float32]:
@@ -423,8 +421,6 @@ class BatchNormalizationTest(test.TestCase):
         self._test_training(
             x_shape, dtype, [2], np.float32, use_gpu=True, data_format='NCHW')
 
-  # TFDML #25564197
-  @test_util.skip_dml
   def testTrainingShape4(self):
     x_shape = [27, 131, 127, 6]
     for dtype in [np.float16, np.float32]:
@@ -624,8 +620,6 @@ class BatchNormalizationTest(test.TestCase):
     }
     self._testBatchNormGradGrad(config)
 
-  # TFDML #25564197
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testBatchNormGradGradConfig3(self):
     config = {
@@ -635,8 +629,6 @@ class BatchNormalizationTest(test.TestCase):
     }
     self._testBatchNormGradGrad(config)
 
-  # TFDML #25564197
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testBatchNormGradGradConfig4(self):
     config = {

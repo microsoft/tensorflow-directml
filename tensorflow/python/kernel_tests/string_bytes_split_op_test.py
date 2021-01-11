@@ -31,8 +31,6 @@ from tensorflow.python.platform import test
 class StringsToBytesOpTest(test_util.TensorFlowTestCase,
                            parameterized.TestCase):
 
-  # TFDML #25576346
-  @test_util.skip_dml
   @parameterized.parameters(
       # Scalar input -> vector output
       (b'hello', [b'h', b'e', b'l', b'l', b'o']),

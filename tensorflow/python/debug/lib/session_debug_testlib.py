@@ -266,8 +266,6 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
       self.assertEqual("DebugNumericSummary;%s;0" % debug_urls[0],
                        debug_ops_spec[0].decode("utf-8"))
 
-  # TFDML #25510608
-  @test_util.skip_dml
   def testConcurrentDumpingToPathsWithOverlappingParentDirsWorks(self):
     results = self._generate_dump_from_simple_addition_graph()
     self.assertTrue(results.dump.loaded_partition_graphs())
@@ -305,8 +303,6 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
         results.dump.get_dump_sizes_bytes("%s/read" % results.v_name, 0,
                                           "DebugIdentity")[0], 0)
 
-  # TFDML #25576363
-  @test_util.skip_dml
   def testGetOpTypeWorks(self):
     results = self._generate_dump_from_simple_addition_graph()
 

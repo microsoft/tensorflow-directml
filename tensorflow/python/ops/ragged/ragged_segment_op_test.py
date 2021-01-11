@@ -79,8 +79,6 @@ class RaggedSegmentOpsTest(test_util.TensorFlowTestCase,
              if values]
             for grouped_row in grouped]
 
-  # TFDML #25510442
-  @test_util.skip_dml
   @parameterized.parameters(
       (ragged_math_ops.segment_sum, sum, [0, 0, 1, 1, 2, 2]),
       (ragged_math_ops.segment_sum, sum, [0, 0, 0, 1, 1, 1]),
@@ -113,8 +111,6 @@ class RaggedSegmentOpsTest(test_util.TensorFlowTestCase,
     segmented = segment_op(rt, segment_ids, num_segments)
     self.assertAllEqual(segmented, expected)
 
-  # TFDML #25510427
-  @test_util.skip_dml
   @parameterized.parameters(
       (ragged_math_ops.segment_sum, sum, [0, 0, 1, 1, 2, 2]),
       (ragged_math_ops.segment_sum, sum, [0, 0, 0, 1, 1, 1]),

@@ -560,8 +560,6 @@ class RNNTest(keras_parameterized.TestCase):
     y_np_3 = model.predict([x_np, s_np, c_np])
     self.assertAllClose(y_np, y_np_3, atol=1e-4)
 
-  # TFDML #25610889
-  @test_util.skip_dml
   def test_rnn_cell_with_non_keras_constants_and_initial_state(self):
     # Test basic case.
     x = keras.Input((None, 5))

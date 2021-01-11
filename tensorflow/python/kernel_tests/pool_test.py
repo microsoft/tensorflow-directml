@@ -247,8 +247,6 @@ class PoolingTest(test.TestCase):
                     dilation_rate=[1, 1, 1],
                     strides=strides)
 
-  # TFDML #25564273
-  @test_util.skip_dml
   # "NC*" format is currently not supported on SYCL.
   @test_util.run_gpu_only(skip_devices=["SYCL"])
   def testPoolNC(self):

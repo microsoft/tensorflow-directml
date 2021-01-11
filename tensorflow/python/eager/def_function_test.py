@@ -248,8 +248,6 @@ class DefFunctionTest(test.TestCase):
     self.assertEqual(func().numpy(), 9)
     self.assertEqual(func(y=8).numpy(), 11)
 
-  # TFDML #25562739
-  @test_util.skip_dml
   def test_functools_partial_keywords(self):
     def f(x, y):
       return x + y
@@ -266,8 +264,6 @@ class DefFunctionTest(test.TestCase):
         functools.partial(f, constant_op.constant(1)))
     self.assertAllEqual(func(5), 6)
 
-  # TFDML #25562699
-  @test_util.skip_dml
   def test_complicated_partial_with_defaults(self):
 
     def identity(*args):

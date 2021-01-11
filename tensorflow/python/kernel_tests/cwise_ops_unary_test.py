@@ -569,8 +569,6 @@ class UnaryOpTest(test.TestCase):
           for analytical, numerical in grads:
             self.assertAllClose(analytical, numerical, rtol=tol, atol=tol)
 
-  # TFDML #25509545
-  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def testComplexAbsGradGrad(self):
 

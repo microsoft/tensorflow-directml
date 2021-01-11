@@ -518,8 +518,6 @@ class LSTMV2Test(keras_parameterized.TestCase):
     self.assertAllClose(y, y_ref)
     self.assertAllClose(layer.get_weights(), new_layer.get_weights())
 
-  # TFDML #25563771
-  @test_util.skip_dml
   def test_lstm_output_on_multiple_kernel(self):
     input_shape = 10
     rnn_state_size = 8

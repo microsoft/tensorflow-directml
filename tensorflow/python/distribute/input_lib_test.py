@@ -518,8 +518,6 @@ class DistributedIteratorMultiWorkerTest(
         ])
     ]
 
-  # TFDML #25509938
-  @test_util.skip_dml
   @combinations.generate(combinations.combine(
       mode=["graph"],
       input_type=["dataset"],
@@ -553,8 +551,6 @@ class DistributedIteratorMultiWorkerTest(
                                  dataset_or_input_fn, worker_devices,
                                  expected_values, strategy, sess)
 
-  # TFDML #25509938
-  @test_util.skip_dml
   @combinations.generate(
       combinations.combine(
           mode=["graph"],
@@ -637,8 +633,6 @@ class DistributedIteratorMultiWorkerTest(
           strategy,
           sess=sess)
 
-  # TFDML #25509938
-  @test_util.skip_dml
   @combinations.generate(
       combinations.combine(
           mode=["graph"],
