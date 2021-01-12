@@ -222,105 +222,110 @@ TEST_F(RemapperTest, FusedBatchNormNCHW) {
 TEST_F(RemapperTest, FuseBatchNormWithRelu) {
   using ::tensorflow::ops::Placeholder;
 
-  for (bool is_training : {true, false}) {
-    tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+  for (const string& device : {"/device:GPU:0", "/device:DML:0"}) {
+    for (bool is_training : {true, false}) {
+      tensorflow::Scope s = tensorflow::Scope::NewRootScope();
 
 #if !defined(GOOGLE_CUDA) || !(CUDNN_VERSION >= 7402)
-    if (is_training) {
-      LOG(INFO) << "Skip FuseBatchNormWithRelu"
-                << "[is_training=" << is_training << "] "
-                << "test. It requires CUDNN_VERSION >= 7402.";
-      continue;
-    }
+      if (is_training && device == "/device:GPU:0") {
+        LOG(INFO) << "Skip FuseBatchNormWithRelu"
+                  << "[is_training=" << is_training << "] "
+                  << "test. It requires CUDNN_VERSION >= 7402.";
+        continue;
+      }
 #endif
 
 #if !defined(GOOGLE_CUDA)
-    if (!is_training) {
-      LOG(INFO) << "Skip FuseBatchNormWithRelu"
-                << "[is_training=" << is_training << "]";
-      continue;
-    }
+      if (!is_training && device == "/device:GPU:0") {
+        LOG(INFO) << "Skip FuseBatchNormWithRelu"
+                  << "[is_training=" << is_training << "]";
+        continue;
+      }
 #endif
 
-    const int num_channels = 24;
+      const int num_channels = 24;
 
-    TensorShape channel_shape({num_channels});
-    TensorShape empty_shape({0});
+      TensorShape channel_shape({num_channels});
+      TensorShape empty_shape({0});
 
-    auto input = Placeholder(s.WithOpName("input"), DT_FLOAT,
-                             ops::Placeholder::Shape({2, 8, 8, num_channels}));
-    auto input_cast = ops::Cast(s.WithOpName("input_cast"), input, DT_HALF);
-    auto scale = Placeholder(s.WithOpName("scale"), DT_FLOAT);
-    auto offset = Placeholder(s.WithOpName("offset"), DT_FLOAT);
-    auto mean = Placeholder(s.WithOpName("mean"), DT_FLOAT);
-    auto var = Placeholder(s.WithOpName("var"), DT_FLOAT);
+      auto input =
+          Placeholder(s.WithOpName("input"), DT_FLOAT,
+                      ops::Placeholder::Shape({2, 8, 8, num_channels}));
+      auto input_cast = ops::Cast(s.WithOpName("input_cast"), input, DT_HALF);
+      auto scale = Placeholder(s.WithOpName("scale"), DT_FLOAT);
+      auto offset = Placeholder(s.WithOpName("offset"), DT_FLOAT);
+      auto mean = Placeholder(s.WithOpName("mean"), DT_FLOAT);
+      auto var = Placeholder(s.WithOpName("var"), DT_FLOAT);
 
-    float epsilon = 0.1f;
-    auto fbn = ops::FusedBatchNormV3(
-        s.WithOpName("fused_batch_norm"), input_cast, scale, offset, mean, var,
-        ops::FusedBatchNormV3::IsTraining(is_training)
-            .Epsilon(epsilon)
-            .DataFormat("NHWC"));
-    auto relu = ops::Relu(s.WithOpName("relu"), fbn.y);
-    auto fetch = ops::Identity(s.WithOpName("fetch"), relu);
+      float epsilon = 0.1f;
+      auto fbn =
+          ops::FusedBatchNormV3(s.WithOpName("fused_batch_norm"), input_cast,
+                                scale, offset, mean, var,
+                                ops::FusedBatchNormV3::IsTraining(is_training)
+                                    .Epsilon(epsilon)
+                                    .DataFormat("NHWC"));
+      auto relu = ops::Relu(s.WithOpName("relu"), fbn.y);
+      auto fetch = ops::Identity(s.WithOpName("fetch"), relu);
 
-    auto input_t = GenerateRandomTensor<DT_FLOAT>({2, 8, 8, num_channels});
-    auto scale_t = GenerateRandomTensor<DT_FLOAT>(channel_shape);
-    auto offset_t = GenerateRandomTensor<DT_FLOAT>(channel_shape);
-    auto mean_t = GenerateRandomTensor<DT_FLOAT>(is_training ? empty_shape
-                                                             : channel_shape);
-    auto var_t = GenerateRandomTensor<DT_FLOAT>(is_training ? empty_shape
-                                                            : channel_shape);
+      auto input_t = GenerateRandomTensor<DT_FLOAT>({2, 8, 8, num_channels});
+      auto scale_t = GenerateRandomTensor<DT_FLOAT>(channel_shape);
+      auto offset_t = GenerateRandomTensor<DT_FLOAT>(channel_shape);
+      auto mean_t = GenerateRandomTensor<DT_FLOAT>(is_training ? empty_shape
+                                                               : channel_shape);
+      auto var_t = GenerateRandomTensor<DT_FLOAT>(is_training ? empty_shape
+                                                              : channel_shape);
 
-    GrapplerItem item;
-    item.fetch = {"fetch"};
-    item.feed = {{"input", input_t},
-                 {"scale", scale_t},
-                 {"offset", offset_t},
-                 {"mean", mean_t},
-                 {"var", var_t}};
-    TF_ASSERT_OK(s.ToGraphDef(&item.graph));
+      GrapplerItem item;
+      item.fetch = {"fetch"};
+      item.feed = {{"input", input_t},
+                   {"scale", scale_t},
+                   {"offset", offset_t},
+                   {"mean", mean_t},
+                   {"var", var_t}};
+      TF_ASSERT_OK(s.ToGraphDef(&item.graph));
 
-    // Place all nodes on GPU.
-    for (int i = 0; i < item.graph.node_size(); ++i) {
-      item.graph.mutable_node(i)->set_device("/device:GPU:0");
-    }
-
-    Remapper optimizer(RewriterConfig::AGGRESSIVE);  // trust placeholders shape
-    GraphDef output;
-    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
-
-    int found = 0;
-    for (const NodeDef& node : output.node()) {
-      if (node.name() == "relu") {
-        EXPECT_EQ(node.op(), "Identity");
-        ASSERT_EQ(node.input_size(), 1);
-        EXPECT_EQ(node.input(0), "fused_batch_norm");
-        found++;
+      for (int i = 0; i < item.graph.node_size(); ++i) {
+        item.graph.mutable_node(i)->set_device(device);
       }
-      if (node.name() == "fused_batch_norm") {
-        EXPECT_EQ(node.op(), "_FusedBatchNormEx");
-        ASSERT_EQ(node.input_size(), 5);
-        EXPECT_EQ(node.input(0), "input_cast");
-        EXPECT_EQ(node.input(1), "scale");
-        EXPECT_EQ(node.input(2), "offset");
-        EXPECT_EQ(node.input(3), "mean");
-        EXPECT_EQ(node.input(4), "var");
 
-        auto attr = node.attr();
-        EXPECT_EQ(attr["num_side_inputs"].i(), 0);
-        EXPECT_EQ(attr["activation_mode"].s(), "Relu");
-        found++;
+      Remapper optimizer(
+          RewriterConfig::AGGRESSIVE);  // trust placeholders shape
+      GraphDef output;
+      TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+      int found = 0;
+      for (const NodeDef& node : output.node()) {
+        if (node.name() == "relu") {
+          EXPECT_EQ(node.op(), "Identity");
+          ASSERT_EQ(node.input_size(), 1);
+          EXPECT_EQ(node.input(0), "fused_batch_norm");
+          found++;
+        }
+        if (node.name() == "fused_batch_norm") {
+          EXPECT_EQ(node.op(), "_FusedBatchNormEx");
+          ASSERT_EQ(node.input_size(), 5);
+          EXPECT_EQ(node.input(0), "input_cast");
+          EXPECT_EQ(node.input(1), "scale");
+          EXPECT_EQ(node.input(2), "offset");
+          EXPECT_EQ(node.input(3), "mean");
+          EXPECT_EQ(node.input(4), "var");
+
+          auto attr = node.attr();
+          EXPECT_EQ(attr["num_side_inputs"].i(), 0);
+          EXPECT_EQ(attr["activation_mode"].s(), "Relu");
+          found++;
+        }
       }
-    }
-    EXPECT_EQ(found, 2);
+      EXPECT_EQ(found, 2);
 
-    if (GetNumAvailableGPUs() > 0) {
-      auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
-      ASSERT_EQ(tensors_expected.size(), 1);
-      auto tensors = EvaluateNodes(output, item.fetch, item.feed);
-      ASSERT_EQ(tensors.size(), 1);
-      test::ExpectClose(tensors[0], tensors_expected[0], 1e-2, /*rtol=*/1e-2);
+      if (GetNumAvailableGPUs() > 0) {
+        auto tensors_expected =
+            EvaluateNodes(item.graph, item.fetch, item.feed);
+        ASSERT_EQ(tensors_expected.size(), 1);
+        auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+        ASSERT_EQ(tensors.size(), 1);
+        test::ExpectClose(tensors[0], tensors_expected[0], 1e-2, /*rtol=*/1e-2);
+      }
     }
   }
 }
@@ -328,111 +333,117 @@ TEST_F(RemapperTest, FuseBatchNormWithRelu) {
 TEST_F(RemapperTest, FuseBatchNormWithAddAndRelu) {
   using ::tensorflow::ops::Placeholder;
 
-  for (bool is_training : {true, false}) {
-    tensorflow::Scope s = tensorflow::Scope::NewRootScope();
+  for (const string& device : {"/device:GPU:0", "/device:DML:0"}) {
+    for (bool is_training : {true, false}) {
+      tensorflow::Scope s = tensorflow::Scope::NewRootScope();
 
 #if !defined(GOOGLE_CUDA) || !(CUDNN_VERSION >= 7402)
-    if (is_training) {
-      LOG(INFO) << "Skip FuseBatchNormWithAddAndRelu"
-                << "[is_training=" << is_training << "] "
-                << "test. It requires CUDNN_VERSION >= 7402.";
-      continue;
-    }
+      if (is_training) {
+        LOG(INFO) << "Skip FuseBatchNormWithAddAndRelu"
+                  << "[is_training=" << is_training << "] "
+                  << "test. It requires CUDNN_VERSION >= 7402.";
+        continue;
+      }
 #endif
 
 #if !defined(GOOGLE_CUDA)
-    if (!is_training) {
-      LOG(INFO) << "Skip FuseBatchNormWithAddAndRelu"
-                << "[is_training=" << is_training << "]";
-      continue;
-    }
+      if (!is_training) {
+        LOG(INFO) << "Skip FuseBatchNormWithAddAndRelu"
+                  << "[is_training=" << is_training << "]";
+        continue;
+      }
 #endif
 
-    const int num_channels = 24;
+      const int num_channels = 24;
 
-    TensorShape input_shape({2, 8, 8, num_channels});
-    TensorShape channel_shape({num_channels});
-    TensorShape empty_shape({0});
+      TensorShape input_shape({2, 8, 8, num_channels});
+      TensorShape channel_shape({num_channels});
+      TensorShape empty_shape({0});
 
-    auto input = Placeholder(s.WithOpName("input"), DT_FLOAT,
-                             ops::Placeholder::Shape(input_shape));
-    auto input_cast = ops::Cast(s.WithOpName("input_cast"), input, DT_HALF);
-    auto scale = Placeholder(s.WithOpName("scale"), DT_FLOAT);
-    auto offset = Placeholder(s.WithOpName("offset"), DT_FLOAT);
-    auto mean = Placeholder(s.WithOpName("mean"), DT_FLOAT);
-    auto var = Placeholder(s.WithOpName("var"), DT_FLOAT);
-    auto side_input = Placeholder(s.WithOpName("side_input"), DT_FLOAT,
-                                  ops::Placeholder::Shape(input_shape));
-    auto side_input_cast =
-        ops::Cast(s.WithOpName("side_input_cast"), side_input, DT_HALF);
+      auto input = Placeholder(s.WithOpName("input"), DT_FLOAT,
+                               ops::Placeholder::Shape(input_shape));
+      auto input_cast = ops::Cast(s.WithOpName("input_cast"), input, DT_HALF);
+      auto scale = Placeholder(s.WithOpName("scale"), DT_FLOAT);
+      auto offset = Placeholder(s.WithOpName("offset"), DT_FLOAT);
+      auto mean = Placeholder(s.WithOpName("mean"), DT_FLOAT);
+      auto var = Placeholder(s.WithOpName("var"), DT_FLOAT);
+      auto side_input = Placeholder(s.WithOpName("side_input"), DT_FLOAT,
+                                    ops::Placeholder::Shape(input_shape));
+      auto side_input_cast =
+          ops::Cast(s.WithOpName("side_input_cast"), side_input, DT_HALF);
 
-    float epsilon = 0.1f;
-    auto fbn = ops::FusedBatchNormV3(
-        s.WithOpName("fused_batch_norm"), input_cast, scale, offset, mean, var,
-        ops::FusedBatchNormV3::IsTraining(is_training)
-            .Epsilon(epsilon)
-            .DataFormat("NHWC"));
-    auto add = ops::Add(s.WithOpName("add"), fbn.y, side_input_cast);
-    auto relu = ops::Relu(s.WithOpName("relu"), add);
-    auto fetch = ops::Identity(s.WithOpName("fetch"), relu);
+      float epsilon = 0.1f;
+      auto fbn =
+          ops::FusedBatchNormV3(s.WithOpName("fused_batch_norm"), input_cast,
+                                scale, offset, mean, var,
+                                ops::FusedBatchNormV3::IsTraining(is_training)
+                                    .Epsilon(epsilon)
+                                    .DataFormat("NHWC"));
+      auto add = ops::Add(s.WithOpName("add"), fbn.y, side_input_cast);
+      auto relu = ops::Relu(s.WithOpName("relu"), add);
+      auto fetch = ops::Identity(s.WithOpName("fetch"), relu);
 
-    auto input_t = GenerateRandomTensor<DT_FLOAT>(input_shape);
-    auto scale_t = GenerateRandomTensor<DT_FLOAT>(channel_shape);
-    auto offset_t = GenerateRandomTensor<DT_FLOAT>(channel_shape);
-    auto mean_t = GenerateRandomTensor<DT_FLOAT>(is_training ? empty_shape
-                                                             : channel_shape);
-    auto var_t = GenerateRandomTensor<DT_FLOAT>(is_training ? empty_shape
-                                                            : channel_shape);
-    auto side_input_t = GenerateRandomTensor<DT_FLOAT>({2, 8, 8, num_channels});
+      auto input_t = GenerateRandomTensor<DT_FLOAT>(input_shape);
+      auto scale_t = GenerateRandomTensor<DT_FLOAT>(channel_shape);
+      auto offset_t = GenerateRandomTensor<DT_FLOAT>(channel_shape);
+      auto mean_t = GenerateRandomTensor<DT_FLOAT>(is_training ? empty_shape
+                                                               : channel_shape);
+      auto var_t = GenerateRandomTensor<DT_FLOAT>(is_training ? empty_shape
+                                                              : channel_shape);
+      auto side_input_t =
+          GenerateRandomTensor<DT_FLOAT>({2, 8, 8, num_channels});
 
-    GrapplerItem item;
-    item.fetch = {"fetch"};
-    item.feed = {{"input", input_t},   {"scale", scale_t},
-                 {"offset", offset_t}, {"mean", mean_t},
-                 {"var", var_t},       {"side_input", side_input_t}};
-    TF_ASSERT_OK(s.ToGraphDef(&item.graph));
+      GrapplerItem item;
+      item.fetch = {"fetch"};
+      item.feed = {{"input", input_t},   {"scale", scale_t},
+                   {"offset", offset_t}, {"mean", mean_t},
+                   {"var", var_t},       {"side_input", side_input_t}};
+      TF_ASSERT_OK(s.ToGraphDef(&item.graph));
 
-    // Place all nodes on GPU.
-    for (int i = 0; i < item.graph.node_size(); ++i) {
-      item.graph.mutable_node(i)->set_device("/device:GPU:0");
-    }
-
-    Remapper optimizer(RewriterConfig::AGGRESSIVE);  // trust placeholders shape
-    GraphDef output;
-    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
-
-    int found = 0;
-    for (const NodeDef& node : output.node()) {
-      if (node.name() == "relu") {
-        EXPECT_EQ(node.op(), "Identity");
-        ASSERT_EQ(node.input_size(), 1);
-        EXPECT_EQ(node.input(0), "fused_batch_norm");
-        found++;
+      // Place all nodes on GPU.
+      for (int i = 0; i < item.graph.node_size(); ++i) {
+        item.graph.mutable_node(i)->set_device(device);
       }
-      if (node.name() == "fused_batch_norm") {
-        EXPECT_EQ(node.op(), "_FusedBatchNormEx");
-        ASSERT_EQ(node.input_size(), 6);
-        EXPECT_EQ(node.input(0), "input_cast");
-        EXPECT_EQ(node.input(1), "scale");
-        EXPECT_EQ(node.input(2), "offset");
-        EXPECT_EQ(node.input(3), "mean");
-        EXPECT_EQ(node.input(4), "var");
-        EXPECT_EQ(node.input(5), "side_input_cast");
 
-        auto attr = node.attr();
-        EXPECT_EQ(attr["num_side_inputs"].i(), 1);
-        EXPECT_EQ(attr["activation_mode"].s(), "Relu");
-        found++;
+      Remapper optimizer(
+          RewriterConfig::AGGRESSIVE);  // trust placeholders shape
+      GraphDef output;
+      TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+      int found = 0;
+      for (const NodeDef& node : output.node()) {
+        if (node.name() == "relu") {
+          EXPECT_EQ(node.op(), "Identity");
+          ASSERT_EQ(node.input_size(), 1);
+          EXPECT_EQ(node.input(0), "fused_batch_norm");
+          found++;
+        }
+        if (node.name() == "fused_batch_norm") {
+          EXPECT_EQ(node.op(), "_FusedBatchNormEx");
+          ASSERT_EQ(node.input_size(), 6);
+          EXPECT_EQ(node.input(0), "input_cast");
+          EXPECT_EQ(node.input(1), "scale");
+          EXPECT_EQ(node.input(2), "offset");
+          EXPECT_EQ(node.input(3), "mean");
+          EXPECT_EQ(node.input(4), "var");
+          EXPECT_EQ(node.input(5), "side_input_cast");
+
+          auto attr = node.attr();
+          EXPECT_EQ(attr["num_side_inputs"].i(), 1);
+          EXPECT_EQ(attr["activation_mode"].s(), "Relu");
+          found++;
+        }
       }
-    }
-    EXPECT_EQ(found, 2);
+      EXPECT_EQ(found, 2);
 
-    if (GetNumAvailableGPUs() > 0) {
-      auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
-      ASSERT_EQ(tensors_expected.size(), 1);
-      auto tensors = EvaluateNodes(output, item.fetch, item.feed);
-      ASSERT_EQ(tensors.size(), 1);
-      test::ExpectClose(tensors[0], tensors_expected[0], 1e-2, /*rtol=*/1e-2);
+      if (GetNumAvailableGPUs() > 0) {
+        auto tensors_expected =
+            EvaluateNodes(item.graph, item.fetch, item.feed);
+        ASSERT_EQ(tensors_expected.size(), 1);
+        auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+        ASSERT_EQ(tensors.size(), 1);
+        test::ExpectClose(tensors[0], tensors_expected[0], 1e-2, /*rtol=*/1e-2);
+      }
     }
   }
 }
@@ -464,39 +475,41 @@ TEST_F(RemapperTest, FuseConv2DWithBias) {
   item.feed = {{"input", input_t}, {"filter", filter_t}, {"bias", bias_t}};
   TF_ASSERT_OK(s.ToGraphDef(&item.graph));
 
-  // Place all nodes on CPU.
-  for (int i = 0; i < item.graph.node_size(); ++i) {
-    item.graph.mutable_node(i)->set_device("/device:CPU:0");
-  }
-
-  Remapper optimizer(RewriterConfig::ON);
-  GraphDef output;
-  TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
-
-  int found = 0;
-  for (const NodeDef& node : output.node()) {
-    if (node.name() == "bias_add") {
-      EXPECT_EQ(node.op(), "_FusedConv2D");
-      ASSERT_GE(node.input_size(), 3);
-      EXPECT_EQ(node.input(0), "input");
-      EXPECT_EQ(node.input(1), "filter");
-
-      EXPECT_EQ(node.attr().at("num_args").i(), 1);
-      EXPECT_EQ(node.input(2), "bias");
-
-      const auto fused_ops = node.attr().at("fused_ops").list().s();
-      ASSERT_EQ(fused_ops.size(), 1);
-      EXPECT_EQ(fused_ops[0], "BiasAdd");
-      found++;
+  // DML doesn't fuse because of the filter shape in this test: #31294633
+  for (const string& device : {"/device:CPU:0" /*, "/device:DML:0"*/}) {
+    for (int i = 0; i < item.graph.node_size(); ++i) {
+      item.graph.mutable_node(i)->set_device(device);
     }
-  }
-  EXPECT_EQ(found, 1);
 
-  auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
-  ASSERT_EQ(tensors_expected.size(), 1);
-  auto tensors = EvaluateNodes(output, item.fetch, item.feed);
-  ASSERT_EQ(tensors.size(), 1);
-  test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+    Remapper optimizer(RewriterConfig::ON);
+    GraphDef output;
+    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+    int found = 0;
+    for (const NodeDef& node : output.node()) {
+      if (node.name() == "bias_add") {
+        EXPECT_EQ(node.op(), "_FusedConv2D");
+        ASSERT_GE(node.input_size(), 3);
+        EXPECT_EQ(node.input(0), "input");
+        EXPECT_EQ(node.input(1), "filter");
+
+        EXPECT_EQ(node.attr().at("num_args").i(), 1);
+        EXPECT_EQ(node.input(2), "bias");
+
+        const auto fused_ops = node.attr().at("fused_ops").list().s();
+        ASSERT_EQ(fused_ops.size(), 1);
+        EXPECT_EQ(fused_ops[0], "BiasAdd");
+        found++;
+      }
+    }
+    EXPECT_EQ(found, 1);
+
+    auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
+    ASSERT_EQ(tensors_expected.size(), 1);
+    auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+    ASSERT_EQ(tensors.size(), 1);
+    test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+  }
 }
 
 TEST_F(RemapperTest, FuseMatMulWithBias) {
@@ -525,39 +538,40 @@ TEST_F(RemapperTest, FuseMatMulWithBias) {
   item.feed = {{"lhs", lhs_t}, {"rhs", rhs_t}, {"bias", bias_t}};
   TF_ASSERT_OK(s.ToGraphDef(&item.graph));
 
-  // Place all nodes on CPU.
-  for (int i = 0; i < item.graph.node_size(); ++i) {
-    item.graph.mutable_node(i)->set_device("/device:CPU:0");
-  }
-
-  Remapper optimizer(RewriterConfig::ON);
-  GraphDef output;
-  TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
-
-  int found = 0;
-  for (const NodeDef& node : output.node()) {
-    if (node.name() == "bias_add") {
-      EXPECT_EQ(node.op(), "_FusedMatMul");
-      ASSERT_GE(node.input_size(), 3);
-      EXPECT_EQ(node.input(0), "lhs");
-      EXPECT_EQ(node.input(1), "rhs");
-
-      EXPECT_EQ(node.attr().at("num_args").i(), 1);
-      EXPECT_EQ(node.input(2), "bias");
-
-      const auto fused_ops = node.attr().at("fused_ops").list().s();
-      ASSERT_EQ(fused_ops.size(), 1);
-      EXPECT_EQ(fused_ops[0], "BiasAdd");
-      found++;
+  for (const string& device : {"/device:CPU:0", "/device:DML:0"}) {
+    for (int i = 0; i < item.graph.node_size(); ++i) {
+      item.graph.mutable_node(i)->set_device(device);
     }
-  }
-  EXPECT_EQ(1, found);
 
-  auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
-  ASSERT_EQ(tensors_expected.size(), 1);
-  auto tensors = EvaluateNodes(output, item.fetch, item.feed);
-  ASSERT_EQ(tensors.size(), 1);
-  test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+    Remapper optimizer(RewriterConfig::ON);
+    GraphDef output;
+    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+    int found = 0;
+    for (const NodeDef& node : output.node()) {
+      if (node.name() == "bias_add") {
+        EXPECT_EQ(node.op(), "_FusedMatMul");
+        ASSERT_GE(node.input_size(), 3);
+        EXPECT_EQ(node.input(0), "lhs");
+        EXPECT_EQ(node.input(1), "rhs");
+
+        EXPECT_EQ(node.attr().at("num_args").i(), 1);
+        EXPECT_EQ(node.input(2), "bias");
+
+        const auto fused_ops = node.attr().at("fused_ops").list().s();
+        ASSERT_EQ(fused_ops.size(), 1);
+        EXPECT_EQ(fused_ops[0], "BiasAdd");
+        found++;
+      }
+    }
+    EXPECT_EQ(1, found);
+
+    auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
+    ASSERT_EQ(tensors_expected.size(), 1);
+    auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+    ASSERT_EQ(tensors.size(), 1);
+    test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+  }
 }
 
 TEST_F(RemapperTest, FuseConv2DWithBiasAndActivation) {
@@ -603,40 +617,42 @@ TEST_F(RemapperTest, FuseConv2DWithBiasAndActivation) {
     item.feed = {{"input", input_t}, {"filter", filter_t}, {"bias", bias_t}};
     TF_ASSERT_OK(s.ToGraphDef(&item.graph));
 
-    // Place all nodes on CPU.
-    for (int i = 0; i < item.graph.node_size(); ++i) {
-      item.graph.mutable_node(i)->set_device("/device:CPU:0");
-    }
-
-    Remapper optimizer(RewriterConfig::ON);
-    GraphDef output;
-    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
-
-    int found = 0;
-    for (const NodeDef& node : output.node()) {
-      if (node.name() == "activation") {
-        EXPECT_EQ(node.op(), "_FusedConv2D");
-        ASSERT_GE(node.input_size(), 3);
-        EXPECT_EQ(node.input(0), "input");
-        EXPECT_EQ(node.input(1), "filter");
-
-        EXPECT_EQ(node.attr().at("num_args").i(), 1);
-        EXPECT_EQ(node.input(2), "bias");
-
-        const auto fused_ops = node.attr().at("fused_ops").list().s();
-        ASSERT_EQ(fused_ops.size(), 2);
-        EXPECT_EQ(fused_ops[0], "BiasAdd");
-        EXPECT_EQ(fused_ops[1], activation);
-        found++;
+    // DML doesn't fuse because of the filter shape in this test: #31294633
+    for (const string& device : {"/device:CPU:0" /*, "/device:DML:0"*/}) {
+      for (int i = 0; i < item.graph.node_size(); ++i) {
+        item.graph.mutable_node(i)->set_device(device);
       }
-    }
-    EXPECT_EQ(found, 1);
 
-    auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
-    ASSERT_EQ(tensors_expected.size(), 1);
-    auto tensors = EvaluateNodes(output, item.fetch, item.feed);
-    ASSERT_EQ(tensors.size(), 1);
-    test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+      Remapper optimizer(RewriterConfig::ON);
+      GraphDef output;
+      TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+      int found = 0;
+      for (const NodeDef& node : output.node()) {
+        if (node.name() == "activation") {
+          EXPECT_EQ(node.op(), "_FusedConv2D");
+          ASSERT_GE(node.input_size(), 3);
+          EXPECT_EQ(node.input(0), "input");
+          EXPECT_EQ(node.input(1), "filter");
+
+          EXPECT_EQ(node.attr().at("num_args").i(), 1);
+          EXPECT_EQ(node.input(2), "bias");
+
+          const auto fused_ops = node.attr().at("fused_ops").list().s();
+          ASSERT_EQ(fused_ops.size(), 2);
+          EXPECT_EQ(fused_ops[0], "BiasAdd");
+          EXPECT_EQ(fused_ops[1], activation);
+          found++;
+        }
+      }
+      EXPECT_EQ(found, 1);
+
+      auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
+      ASSERT_EQ(tensors_expected.size(), 1);
+      auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+      ASSERT_EQ(tensors.size(), 1);
+      test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+    }
   }
 }
 
@@ -681,40 +697,46 @@ TEST_F(RemapperTest, FuseMatMulWithBiasAndActivation) {
     item.feed = {{"lhs", lhs_t}, {"rhs", rhs_t}, {"bias", bias_t}};
     TF_ASSERT_OK(s.ToGraphDef(&item.graph));
 
-    // Place all nodes on CPU.
-    for (int i = 0; i < item.graph.node_size(); ++i) {
-      item.graph.mutable_node(i)->set_device("/device:CPU:0");
-    }
-
-    Remapper optimizer(RewriterConfig::ON);
-    GraphDef output;
-    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
-
-    int found = 0;
-    for (const NodeDef& node : output.node()) {
-      if (node.name() == "activation") {
-        EXPECT_EQ(node.op(), "_FusedMatMul");
-        ASSERT_GE(node.input_size(), 3);
-        EXPECT_EQ(node.input(0), "lhs");
-        EXPECT_EQ(node.input(1), "rhs");
-
-        EXPECT_EQ(node.attr().at("num_args").i(), 1);
-        EXPECT_EQ(node.input(2), "bias");
-
-        const auto fused_ops = node.attr().at("fused_ops").list().s();
-        ASSERT_EQ(fused_ops.size(), 2);
-        EXPECT_EQ(fused_ops[0], "BiasAdd");
-        EXPECT_EQ(fused_ops[1], activation);
-        found++;
+    for (const string& device : {"/device:CPU:0", "/device:DML:0"}) {
+      // DML doesn't support fusing relu6
+      if (device == "/device:DML:0" && activation == "Relu6") {
+        continue;
       }
-    }
-    EXPECT_EQ(1, found);
 
-    auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
-    ASSERT_EQ(tensors_expected.size(), 1);
-    auto tensors = EvaluateNodes(output, item.fetch, item.feed);
-    ASSERT_EQ(tensors.size(), 1);
-    test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+      for (int i = 0; i < item.graph.node_size(); ++i) {
+        item.graph.mutable_node(i)->set_device(device);
+      }
+
+      Remapper optimizer(RewriterConfig::ON);
+      GraphDef output;
+      TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+      int found = 0;
+      for (const NodeDef& node : output.node()) {
+        if (node.name() == "activation") {
+          EXPECT_EQ(node.op(), "_FusedMatMul");
+          ASSERT_GE(node.input_size(), 3);
+          EXPECT_EQ(node.input(0), "lhs");
+          EXPECT_EQ(node.input(1), "rhs");
+
+          EXPECT_EQ(node.attr().at("num_args").i(), 1);
+          EXPECT_EQ(node.input(2), "bias");
+
+          const auto fused_ops = node.attr().at("fused_ops").list().s();
+          ASSERT_EQ(fused_ops.size(), 2);
+          EXPECT_EQ(fused_ops[0], "BiasAdd");
+          EXPECT_EQ(fused_ops[1], activation);
+          found++;
+        }
+      }
+      EXPECT_EQ(1, found);
+
+      auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
+      ASSERT_EQ(tensors_expected.size(), 1);
+      auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+      ASSERT_EQ(tensors.size(), 1);
+      test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+    }
   }
 }
 
@@ -758,42 +780,44 @@ TEST_F(RemapperTest, FuseConv2DWithBatchNorm) {
                {"mean", mean_t},   {"variance", variance_t}};
   TF_ASSERT_OK(s.ToGraphDef(&item.graph));
 
-  // Place all nodes on CPU.
-  for (int i = 0; i < item.graph.node_size(); ++i) {
-    item.graph.mutable_node(i)->set_device("/device:CPU:0");
-  }
-
-  Remapper optimizer(RewriterConfig::ON);
-  GraphDef output;
-  TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
-
-  int found = 0;
-  for (const NodeDef& node : output.node()) {
-    if (node.name() == "batch_norm") {
-      EXPECT_EQ(node.op(), "_FusedConv2D");
-      ASSERT_GE(node.input_size(), 6);
-      EXPECT_EQ(node.input(0), "input");
-      EXPECT_EQ(node.input(1), "filter");
-
-      EXPECT_EQ(node.attr().at("num_args").i(), 4);
-      EXPECT_EQ(node.input(2), "scale");
-      EXPECT_EQ(node.input(3), "offset");
-      EXPECT_EQ(node.input(4), "mean");
-      EXPECT_EQ(node.input(5), "variance");
-
-      const auto fused_ops = node.attr().at("fused_ops").list().s();
-      ASSERT_EQ(fused_ops.size(), 1);
-      EXPECT_EQ(fused_ops[0], "FusedBatchNorm");
-      found++;
+  // DML doesn't fuse because of the filter shape in this test: #31294633
+  for (const string& device : {"/device:CPU:0" /*, "/device:DML:0"*/}) {
+    for (int i = 0; i < item.graph.node_size(); ++i) {
+      item.graph.mutable_node(i)->set_device(device);
     }
-  }
-  EXPECT_EQ(found, 1);
 
-  auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
-  ASSERT_EQ(tensors_expected.size(), 1);
-  auto tensors = EvaluateNodes(output, item.fetch, item.feed);
-  ASSERT_EQ(tensors.size(), 1);
-  test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+    Remapper optimizer(RewriterConfig::ON);
+    GraphDef output;
+    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+    int found = 0;
+    for (const NodeDef& node : output.node()) {
+      if (node.name() == "batch_norm") {
+        EXPECT_EQ(node.op(), "_FusedConv2D");
+        ASSERT_GE(node.input_size(), 6);
+        EXPECT_EQ(node.input(0), "input");
+        EXPECT_EQ(node.input(1), "filter");
+
+        EXPECT_EQ(node.attr().at("num_args").i(), 4);
+        EXPECT_EQ(node.input(2), "scale");
+        EXPECT_EQ(node.input(3), "offset");
+        EXPECT_EQ(node.input(4), "mean");
+        EXPECT_EQ(node.input(5), "variance");
+
+        const auto fused_ops = node.attr().at("fused_ops").list().s();
+        ASSERT_EQ(fused_ops.size(), 1);
+        EXPECT_EQ(fused_ops[0], "FusedBatchNorm");
+        found++;
+      }
+    }
+    EXPECT_EQ(found, 1);
+
+    auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
+    ASSERT_EQ(tensors_expected.size(), 1);
+    auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+    ASSERT_EQ(tensors.size(), 1);
+    test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+  }
 }
 
 TEST_F(RemapperTest, FuseConv2DWithBatchNormAndActivation) {
@@ -851,43 +875,45 @@ TEST_F(RemapperTest, FuseConv2DWithBatchNormAndActivation) {
                  {"mean", mean_t},   {"variance", variance_t}};
     TF_ASSERT_OK(s.ToGraphDef(&item.graph));
 
-    // Place all nodes on CPU.
-    for (int i = 0; i < item.graph.node_size(); ++i) {
-      item.graph.mutable_node(i)->set_device("/device:CPU:0");
-    }
-
-    Remapper optimizer(RewriterConfig::ON);
-    GraphDef output;
-    TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
-
-    int found = 0;
-    for (const NodeDef& node : output.node()) {
-      if (node.name() == "activation") {
-        EXPECT_EQ(node.op(), "_FusedConv2D");
-        ASSERT_GE(node.input_size(), 6);
-        EXPECT_EQ(node.input(0), "input");
-        EXPECT_EQ(node.input(1), "filter");
-
-        EXPECT_EQ(node.attr().at("num_args").i(), 4);
-        EXPECT_EQ(node.input(2), "scale");
-        EXPECT_EQ(node.input(3), "offset");
-        EXPECT_EQ(node.input(4), "mean");
-        EXPECT_EQ(node.input(5), "variance");
-
-        const auto fused_ops = node.attr().at("fused_ops").list().s();
-        ASSERT_EQ(fused_ops.size(), 2);
-        EXPECT_EQ(fused_ops[0], "FusedBatchNorm");
-        EXPECT_EQ(fused_ops[1], activation);
-        found++;
+    // DML doesn't fuse because of the filter shape in this test: #31294633
+    for (const string& device : {"/device:CPU:0" /*, "/device:DML:0"*/}) {
+      for (int i = 0; i < item.graph.node_size(); ++i) {
+        item.graph.mutable_node(i)->set_device(device);
       }
-    }
-    EXPECT_EQ(found, 1);
 
-    auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
-    ASSERT_EQ(tensors_expected.size(), 1);
-    auto tensors = EvaluateNodes(output, item.fetch, item.feed);
-    ASSERT_EQ(tensors.size(), 1);
-    test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+      Remapper optimizer(RewriterConfig::ON);
+      GraphDef output;
+      TF_ASSERT_OK(optimizer.Optimize(nullptr, item, &output));
+
+      int found = 0;
+      for (const NodeDef& node : output.node()) {
+        if (node.name() == "activation") {
+          EXPECT_EQ(node.op(), "_FusedConv2D");
+          ASSERT_GE(node.input_size(), 6);
+          EXPECT_EQ(node.input(0), "input");
+          EXPECT_EQ(node.input(1), "filter");
+
+          EXPECT_EQ(node.attr().at("num_args").i(), 4);
+          EXPECT_EQ(node.input(2), "scale");
+          EXPECT_EQ(node.input(3), "offset");
+          EXPECT_EQ(node.input(4), "mean");
+          EXPECT_EQ(node.input(5), "variance");
+
+          const auto fused_ops = node.attr().at("fused_ops").list().s();
+          ASSERT_EQ(fused_ops.size(), 2);
+          EXPECT_EQ(fused_ops[0], "FusedBatchNorm");
+          EXPECT_EQ(fused_ops[1], activation);
+          found++;
+        }
+      }
+      EXPECT_EQ(found, 1);
+
+      auto tensors_expected = EvaluateNodes(item.graph, item.fetch, item.feed);
+      ASSERT_EQ(tensors_expected.size(), 1);
+      auto tensors = EvaluateNodes(output, item.fetch, item.feed);
+      ASSERT_EQ(tensors.size(), 1);
+      test::ExpectTensorNear<float>(tensors[0], tensors_expected[0], 1e-6);
+    }
   }
 }
 
