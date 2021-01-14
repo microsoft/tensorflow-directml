@@ -69,7 +69,7 @@ class DmlCastKernel : public DmlKernel {
     // is not 0.0 to True.
     if (output_dtype == DT_BOOL &&
         (input_dtype == DT_HALF || input_dtype == DT_FLOAT)) {
-      input_tensor = dml::Ceil(input_tensor);
+      input_tensor = dml::Ceil(dml::Abs(input_tensor));
     }
 
     auto result =
