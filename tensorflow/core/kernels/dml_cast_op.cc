@@ -72,8 +72,14 @@ class DmlCastKernel : public DmlKernel {
       input_tensor = dml::Ceil(dml::Abs(input_tensor));
     }
 
-    auto result =
-        dml::Cast(input_tensor, GetDmlDataTypeFromTfDataType(output_dtype));
+    // TFDML #24881131
+    // 64-bit data support should be revisited once DML supports these types
+    DML_TENSOR_DATA_TYPE dml_out_dtype =
+        Is64BitIntegerType(output_dtype)
+            ? DML_TENSOR_DATA_TYPE_UINT32
+            : GetDmlDataTypeFromTfDataType(output_dtype);
+
+    auto result = dml::Cast(input_tensor, dml_out_dtype);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
