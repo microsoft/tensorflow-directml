@@ -33,13 +33,21 @@ class DmlCastKernel : public DmlKernel {
 
     DataType input_dtype = ctx->GetInputDataType(0);
     DataType output_dtype = ctx->GetOutputDataType(0);
+    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
+    DML_TENSOR_DATA_TYPE dml_out_dtype = DML_TENSOR_DATA_TYPE_UNKNOWN;
 
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee
     // that our output tensor's memory is zero'd, we need to do so manually
     // prior to performing the cast.
     if (Is64BitIntegerType(output_dtype)) {
+      // TFDML #24881131
+      // 64-bit data support should be revisited once DML supports these types
       zero_outputs_ = true;
+      out_policy = GetEmulatedInt64TensorPolicy();
+      dml_out_dtype = DML_TENSOR_DATA_TYPE_UINT32;
+    } else {
+      dml_out_dtype = GetDmlDataTypeFromTfDataType(output_dtype);
     }
 
     // Tensor shape doesn't matter for Cast, so don't bother with DML's 4D
@@ -60,8 +68,7 @@ class DmlCastKernel : public DmlKernel {
     tensors.inputs = {input};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-
-    auto scope = dml::Graph(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
 
     // Bool is a special case since it doesn't behave the same as uint8. The
@@ -72,8 +79,7 @@ class DmlCastKernel : public DmlKernel {
       input_tensor = dml::Ceil(dml::Abs(input_tensor));
     }
 
-    auto result =
-        dml::Cast(input_tensor, GetDmlDataTypeFromTfDataType(output_dtype));
+    auto result = dml::Cast(input_tensor, dml_out_dtype);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
