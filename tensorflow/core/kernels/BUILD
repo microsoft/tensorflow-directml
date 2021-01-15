@@ -8102,6 +8102,7 @@ tf_kernel_library(
         "dml_gather_nd_op.cc",
         "dml_scatter_nd_op.cc",
         "dml_scatter_update_ops.cc",
+        "dml_resource_scatter_ops.cc",
         "dml_segment_reduction_ops.cc",
         "dml_tensor_scatter_ops.cc",
         "dml_scan_ops.cc",
