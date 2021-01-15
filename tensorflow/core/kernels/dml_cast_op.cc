@@ -68,7 +68,6 @@ class DmlCastKernel : public DmlKernel {
     tensors.inputs = {input};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-
     auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
 
