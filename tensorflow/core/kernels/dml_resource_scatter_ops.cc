@@ -24,42 +24,10 @@ limitations under the License.
 
 namespace tensorflow {
 
-// Check whether updates.shape = indices.shape + params.shape[1:]
-static bool ValidRefShapes(const Tensor& params, const Tensor& updates,
-                           const Tensor& indices) {
-  if (updates.dims() == 0) return true;
-  if (updates.dims() != indices.dims() + params.dims() - 1) return false;
-  for (int d = 0; d < indices.dims(); d++) {
-    if (updates.dim_size(d) != indices.dim_size(d)) {
-      return false;
-    }
-  }
-  for (int d = 1; d < params.dims(); d++) {
-    if (params.dim_size(d) != updates.dim_size(d - 1 + indices.dims())) {
-      return false;
-    }
-  }
-  return true;
-}
-
 static Status ValidateRefScatter(const Tensor& params, const Tensor& indices,
                                  const Tensor& updates) {
   if (!params.IsInitialized()) {
     return errors::FailedPrecondition("Null ref for params");
-  }
-
-  if (!TensorShapeUtils::IsVectorOrHigher(params.shape())) {
-    return errors::InvalidArgument("params must be at least 1-D, got shape ",
-                                   params.shape().DebugString());
-  }
-
-  if (!ValidRefShapes(params, updates, indices)) {
-    return errors::InvalidArgument(
-        "Must have updates.shape = indices.shape + "
-        "params.shape[1:] or updates.shape = [], got ",
-        "updates.shape ", updates.shape().DebugString(), ", indices.shape ",
-        indices.shape().DebugString(), ", params.shape ",
-        params.shape().DebugString());
   }
 
   return Status::OK();
@@ -100,78 +68,6 @@ static Status ValidateCommonScatter(const Tensor& params,
                                    DataTypeString(DataTypeToEnum<Index>::v()),
                                    " indexing: ", params.dim_size(0), " > ",
                                    std::numeric_limits<Index>::max());
-  }
-
-  return Status::OK();
-}
-template <typename Index>
-static Status ValidateInputs(const TensorShape& params_shape,
-                             const Tensor& indices, const Tensor& updates) {
-  const TensorShape& indices_shape(indices.shape());
-  const TensorShape& updates_shape(updates.shape());
-
-  if (!TensorShapeUtils::IsVectorOrHigher(params_shape)) {
-    return errors::InvalidArgument("Output must be at least 1-D, ",
-                                   "got shape: ", params_shape.DebugString());
-  }
-
-  if (!ValidEmptyOutputShape(params_shape.num_elements(),
-                             indices_shape.num_elements(),
-                             updates_shape.num_elements())) {
-    return errors::InvalidArgument(
-        "Indices and updates specified for empty output.  indices shape: ",
-        indices.shape().DebugString());
-  }
-
-  if (updates.dim_size(0) != indices.dim_size(0)) {
-    return errors::InvalidArgument(
-        "The outermost dimension of updates and indices ",
-        "must match. Got indices.shape ", indices_shape.DebugString(),
-        ", updates.shape ", updates_shape.DebugString());
-  }
-  TF_RETURN_IF_ERROR(ValidateUpdateShape(params_shape, indices, updates));
-
-  // Check that we have enough index space
-  const int64 N_big = indices.NumElements();
-  if (N_big > std::numeric_limits<Index>::max()) {
-    return errors::InvalidArgument("indices has too many elements for ",
-                                   DataTypeString(DataTypeToEnum<Index>::v()),
-                                   " indexing: ", N_big, " > ",
-                                   std::numeric_limits<Index>::max());
-  }
-  if (params_shape.dim_size(0) > std::numeric_limits<Index>::max()) {
-    return errors::InvalidArgument("params_shape[0] too large for ",
-                                   DataTypeString(DataTypeToEnum<Index>::v()),
-                                   " indexing: ", params_shape.dim_size(0),
-                                   " > ", std::numeric_limits<Index>::max());
-  }
-
-  // Calculate the number of dimensions in indices
-  int64 slice_dim = (indices_shape.dims() > 1)
-                        ? indices_shape.dim_size(indices_shape.dims() - 1)
-                        : 1;
-
-  // Calculate the number of elements that make up each slice of our updated
-  // tensor. This allows us to work with flattened tensors and copy over whole
-  // slices at a time.
-  Index total_nd = params_shape.dims();
-
-  int64 slice_size = 1;
-  for (int64 i = slice_dim; i < total_nd; ++i) {
-    slice_size *= params_shape.dim_size(i);
-  }
-
-  if (slice_size > std::numeric_limits<Index>::max()) {
-    return errors::InvalidArgument(
-        "slice size is too large for indexing: ", slice_size, " > ",
-        std::numeric_limits<Index>::max());
-  }
-
-  if (slice_dim > 7) {
-    return errors::InvalidArgument(
-        "Only indices.shape[-1] values between 0 and 7 "
-        "are currently supported.  Requested rank: ",
-        slice_dim);
   }
 
   return Status::OK();
