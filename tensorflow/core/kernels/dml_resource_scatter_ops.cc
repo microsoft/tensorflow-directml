@@ -74,12 +74,12 @@ static Status ValidateCommonScatter(const Tensor& params,
 }
 
 template <typename Index>
-class ResourceScatterInitHelper : public InitializationHelper {
+class ResourceScatterNDInitHelper : public InitializationHelper {
  public:
   using Attributes = EmptyAttributes;
 
-  explicit ResourceScatterInitHelper(OpKernelContext* ctx,
-                                     std::shared_ptr<const Attributes> attr) {
+  explicit ResourceScatterNDInitHelper(OpKernelContext* ctx,
+                                       std::shared_ptr<const Attributes> attr) {
     DCHECK(ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE);
 
     if (!ctx->input_is_ref(0)) {
@@ -121,12 +121,12 @@ class ResourceScatterInitHelper : public InitializationHelper {
 };
 
 template <typename Index>
-class DmlResourceScatterUpdateKernel : public DmlKernel {
+class DmlResourceScatterNDUpdateKernel : public DmlKernel {
  public:
-  using InitHelper = ResourceScatterInitHelper<Index>;
+  using InitHelper = ResourceScatterNDInitHelper<Index>;
 
-  DmlResourceScatterUpdateKernel(DmlKernelConstruction* ctx,
-                                 const InitHelper* init_helper) {
+  DmlResourceScatterNDUpdateKernel(DmlKernelConstruction* ctx,
+                                   const InitHelper* init_helper) {
     const Tensor params_tensor =
         init_helper->GetParamsTensor(ctx->GetOpKernelContext());
 
@@ -192,40 +192,18 @@ class DmlResourceScatterUpdateKernel : public DmlKernel {
     };
 
     DmlGpuEvent gpu_event;
-    bool inplace_allowed = true;
-    if (inplace_allowed) {
-      absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
-          input_bindings[0],
-      };
 
-      auto status_or_event =
-          DmlKernel::Compute(ctx, input_bindings, output_bindings);
-      if (!status_or_event.ok()) {
-        return status_or_event;
-      }
+    absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
+        input_bindings[0],
+    };
 
-      gpu_event = status_or_event.ValueOrDie();
-    } else {
-      DmlBuffer output_buffer =
-          ctx->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
-
-      absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
-          output_buffer.GetBufferBinding(),
-      };
-
-      auto status_or_event =
-          DmlKernel::Compute(ctx, input_bindings, output_bindings);
-      if (!status_or_event.ok()) {
-        return status_or_event;
-      }
-
-      ctx->CopyBufferToBuffer(input_buffers[0].Resource(),
-                              input_buffers[0].Offset(),
-                              output_buffer.Resource(), output_buffer.Offset(),
-                              output_buffer.SizeInBytes());
-
-      gpu_event = ctx->InsertUavBarrier();
+    auto status_or_event =
+        DmlKernel::Compute(ctx, input_bindings, output_bindings);
+    if (!status_or_event.ok()) {
+      return status_or_event;
     }
+
+    gpu_event = status_or_event.ValueOrDie();
 
     init_helper->Unlock();
     return gpu_event;
@@ -233,12 +211,12 @@ class DmlResourceScatterUpdateKernel : public DmlKernel {
 };
 
 template <typename Index, typename BinaryOp>
-class DmlResourceScatterBinaryKernel : public DmlKernel {
+class DmlResourceScatterNDBinaryKernel : public DmlKernel {
  public:
-  using InitHelper = ResourceScatterInitHelper<Index>;
+  using InitHelper = ResourceScatterNDInitHelper<Index>;
 
-  DmlResourceScatterBinaryKernel(DmlKernelConstruction* ctx,
-                                 const InitHelper* init_helper) {
+  DmlResourceScatterNDBinaryKernel(DmlKernelConstruction* ctx,
+                                   const InitHelper* init_helper) {
     const Tensor params_tensor =
         init_helper->GetParamsTensor(ctx->GetOpKernelContext());
 
@@ -326,40 +304,25 @@ class DmlResourceScatterBinaryKernel : public DmlKernel {
                     empty_buffer.SizeInBytes());
 
     DmlGpuEvent gpu_event;
-    bool inplace_allowed = false;
-    if (inplace_allowed) {
-      absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
-          input_bindings[0],
-      };
+    DmlBuffer output_buffer =
+        ctx->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
 
-      auto status_or_event =
-          DmlKernel::Compute(ctx, input_bindings, output_bindings);
-      if (!status_or_event.ok()) {
-        return status_or_event;
-      }
+    absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
+        output_buffer.GetBufferBinding(),
+    };
 
-      gpu_event = status_or_event.ValueOrDie();
-    } else {
-      DmlBuffer output_buffer =
-          ctx->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
-
-      absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
-          output_buffer.GetBufferBinding(),
-      };
-
-      auto status_or_event =
-          DmlKernel::Compute(ctx, input_bindings, output_bindings);
-      if (!status_or_event.ok()) {
-        return status_or_event;
-      }
-
-      ctx->CopyBufferToBuffer(input_buffers[0].Resource(),
-                              input_buffers[0].Offset(),
-                              output_buffer.Resource(), output_buffer.Offset(),
-                              output_buffer.SizeInBytes());
-
-      gpu_event = ctx->InsertUavBarrier();
+    auto status_or_event =
+        DmlKernel::Compute(ctx, input_bindings, output_bindings);
+    if (!status_or_event.ok()) {
+      return status_or_event;
     }
+
+    ctx->CopyBufferToBuffer(input_buffers[0].Resource(),
+                            input_buffers[0].Offset(), output_buffer.Resource(),
+                            output_buffer.Offset(),
+                            output_buffer.SizeInBytes());
+
+    gpu_event = ctx->InsertUavBarrier();
     init_helper->Unlock();
     return gpu_event;
   }
@@ -368,105 +331,105 @@ class DmlResourceScatterBinaryKernel : public DmlKernel {
   uint64_t empty_buffer_size_ = 0;
 };
 
-#define DML_REGISTER_KERNELS(type)                                            \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ScatterNdUpdate")                                                 \
-          .Device(DEVICE_DML)                                                 \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int32>("Tindices"),                                 \
-      DmlKernelWrapper<DmlResourceScatterUpdateKernel<int32>,                 \
-                       GetOutputShapeAsInputShapeHelper>)                     \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ScatterNdUpdate")                                                 \
-          .Device(DEVICE_DML)                                                 \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int64>("Tindices"),                                 \
-      DmlKernelWrapper<DmlResourceScatterUpdateKernel<int64>,                 \
-                       GetOutputShapeAsInputShapeHelper>)                     \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ResourceScatterNdUpdate")                                         \
-          .Device(DEVICE_DML)                                                 \
-          .HostMemory("ref")                                                  \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int32>("Tindices"),                                 \
-      DmlKernelWrapper<DmlResourceScatterUpdateKernel<int32>,                 \
-                       NoOutputShapeHelper, DmlKernelCachePolicy::Never>)     \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ResourceScatterNdUpdate")                                         \
-          .Device(DEVICE_DML)                                                 \
-          .HostMemory("ref")                                                  \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int64>("Tindices"),                                 \
-      DmlKernelWrapper<DmlResourceScatterUpdateKernel<int64>,                 \
-                       NoOutputShapeHelper, DmlKernelCachePolicy::Never>)     \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ScatterNdAdd")                                                    \
-          .Device(DEVICE_DML)                                                 \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int32>("Tindices"),                                 \
-      DmlKernelWrapper<                                                       \
-          DmlResourceScatterBinaryKernel<int32, std::plus<dml::Expression>>,  \
-          GetOutputShapeAsInputShapeHelper>)                                  \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ScatterNdAdd")                                                    \
-          .Device(DEVICE_DML)                                                 \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int64>("Tindices"),                                 \
-      DmlKernelWrapper<                                                       \
-          DmlResourceScatterBinaryKernel<int64, std::plus<dml::Expression>>,  \
-          GetOutputShapeAsInputShapeHelper>)                                  \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ScatterNdSub")                                                    \
-          .Device(DEVICE_DML)                                                 \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int32>("Tindices"),                                 \
-      DmlKernelWrapper<                                                       \
-          DmlResourceScatterBinaryKernel<int32, std::minus<dml::Expression>>, \
-          GetOutputShapeAsInputShapeHelper>)                                  \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ScatterNdSub")                                                    \
-          .Device(DEVICE_DML)                                                 \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int64>("Tindices"),                                 \
-      DmlKernelWrapper<                                                       \
-          DmlResourceScatterBinaryKernel<int64, std::minus<dml::Expression>>, \
-          GetOutputShapeAsInputShapeHelper>)                                  \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ResourceScatterNdAdd")                                            \
-          .HostMemory("ref")                                                  \
-          .Device(DEVICE_DML)                                                 \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int32>("Tindices"),                                 \
-      DmlKernelWrapper<                                                       \
-          DmlResourceScatterBinaryKernel<int32, std::plus<dml::Expression>>,  \
-          NoOutputShapeHelper, DmlKernelCachePolicy::Never>)                  \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ResourceScatterNdAdd")                                            \
-          .HostMemory("ref")                                                  \
-          .Device(DEVICE_DML)                                                 \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int64>("Tindices"),                                 \
-      DmlKernelWrapper<                                                       \
-          DmlResourceScatterBinaryKernel<int64, std::plus<dml::Expression>>,  \
-          NoOutputShapeHelper, DmlKernelCachePolicy::Never>)                  \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ResourceScatterNdSub")                                            \
-          .Device(DEVICE_DML)                                                 \
-          .HostMemory("ref")                                                  \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int32>("Tindices"),                                 \
-      DmlKernelWrapper<                                                       \
-          DmlResourceScatterBinaryKernel<int32, std::minus<dml::Expression>>, \
-          NoOutputShapeHelper, DmlKernelCachePolicy::Never>)                  \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("ResourceScatterNdSub")                                            \
-          .Device(DEVICE_DML)                                                 \
-          .HostMemory("ref")                                                  \
-          .TypeConstraint<type>("T")                                          \
-          .TypeConstraint<int64>("Tindices"),                                 \
-      DmlKernelWrapper<                                                       \
-          DmlResourceScatterBinaryKernel<int64, std::minus<dml::Expression>>, \
-          NoOutputShapeHelper, DmlKernelCachePolicy::Never>)
+#define DML_REGISTER_KERNELS(type)                                             \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ScatterNdUpdate")                                                  \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int32>("Tindices"),                                  \
+      DmlKernelWrapper<DmlResourceScatterNDUpdateKernel<int32>,                \
+                       GetOutputShapeAsInputShapeHelper>)                      \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ScatterNdUpdate")                                                  \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int64>("Tindices"),                                  \
+      DmlKernelWrapper<DmlResourceScatterNDUpdateKernel<int64>,                \
+                       GetOutputShapeAsInputShapeHelper>)                      \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ResourceScatterNdUpdate")                                          \
+          .Device(DEVICE_DML)                                                  \
+          .HostMemory("ref")                                                   \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int32>("Tindices"),                                  \
+      DmlKernelWrapper<DmlResourceScatterNDUpdateKernel<int32>,                \
+                       NoOutputShapeHelper, DmlKernelCachePolicy::Never>)      \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ResourceScatterNdUpdate")                                          \
+          .Device(DEVICE_DML)                                                  \
+          .HostMemory("ref")                                                   \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int64>("Tindices"),                                  \
+      DmlKernelWrapper<DmlResourceScatterNDUpdateKernel<int64>,                \
+                       NoOutputShapeHelper, DmlKernelCachePolicy::Never>)      \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ScatterNdAdd")                                                     \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int32>("Tindices"),                                  \
+      DmlKernelWrapper<                                                        \
+          DmlResourceScatterNDBinaryKernel<int32, std::plus<dml::Expression>>, \
+          GetOutputShapeAsInputShapeHelper>)                                   \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ScatterNdAdd")                                                     \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int64>("Tindices"),                                  \
+      DmlKernelWrapper<                                                        \
+          DmlResourceScatterNDBinaryKernel<int64, std::plus<dml::Expression>>, \
+          GetOutputShapeAsInputShapeHelper>)                                   \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ScatterNdSub")                                                     \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int32>("Tindices"),                                  \
+      DmlKernelWrapper<DmlResourceScatterNDBinaryKernel<                       \
+                           int32, std::minus<dml::Expression>>,                \
+                       GetOutputShapeAsInputShapeHelper>)                      \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ScatterNdSub")                                                     \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int64>("Tindices"),                                  \
+      DmlKernelWrapper<DmlResourceScatterNDBinaryKernel<                       \
+                           int64, std::minus<dml::Expression>>,                \
+                       GetOutputShapeAsInputShapeHelper>)                      \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ResourceScatterNdAdd")                                             \
+          .HostMemory("ref")                                                   \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int32>("Tindices"),                                  \
+      DmlKernelWrapper<                                                        \
+          DmlResourceScatterNDBinaryKernel<int32, std::plus<dml::Expression>>, \
+          NoOutputShapeHelper, DmlKernelCachePolicy::Never>)                   \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ResourceScatterNdAdd")                                             \
+          .HostMemory("ref")                                                   \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int64>("Tindices"),                                  \
+      DmlKernelWrapper<                                                        \
+          DmlResourceScatterNDBinaryKernel<int64, std::plus<dml::Expression>>, \
+          NoOutputShapeHelper, DmlKernelCachePolicy::Never>)                   \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ResourceScatterNdSub")                                             \
+          .Device(DEVICE_DML)                                                  \
+          .HostMemory("ref")                                                   \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int32>("Tindices"),                                  \
+      DmlKernelWrapper<DmlResourceScatterNDBinaryKernel<                       \
+                           int32, std::minus<dml::Expression>>,                \
+                       NoOutputShapeHelper, DmlKernelCachePolicy::Never>)      \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("ResourceScatterNdSub")                                             \
+          .Device(DEVICE_DML)                                                  \
+          .HostMemory("ref")                                                   \
+          .TypeConstraint<type>("T")                                           \
+          .TypeConstraint<int64>("Tindices"),                                  \
+      DmlKernelWrapper<DmlResourceScatterNDBinaryKernel<                       \
+                           int64, std::minus<dml::Expression>>,                \
+                       NoOutputShapeHelper, DmlKernelCachePolicy::Never>)
 
 TF_CALL_float(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
