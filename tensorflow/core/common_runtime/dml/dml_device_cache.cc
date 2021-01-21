@@ -35,11 +35,19 @@ static bool SupportsAllDataTypes(const DmlAdapter& adapter) {
                                         : D3D_FEATURE_LEVEL_11_0;
 
   ComPtr<ID3D12Device> d3d12_device;
-  DML_CHECK_SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
-                                        IID_PPV_ARGS(&d3d12_device)));
+  if (!SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
+                                   IID_PPV_ARGS(&d3d12_device)))) {
+    LOG(WARNING) << "Could not create Direct3D device for adapter: "
+                 << adapter.Name();
+  }
 
   ComPtr<IDMLDevice> dml_device =
-      CreateDmlDevice(d3d12_device.Get(), DML_CREATE_DEVICE_FLAG_NONE);
+      TryCreateDmlDevice(d3d12_device.Get(), DML_CREATE_DEVICE_FLAG_NONE);
+  if (!dml_device) {
+    LOG(WARNING) << "Could not create DirectML device for adapter: "
+                 << adapter.Name();
+    return false;
+  }
 
   std::array<DML_TENSOR_DATA_TYPE, 8> data_types = {
       DML_TENSOR_DATA_TYPE_FLOAT32, DML_TENSOR_DATA_TYPE_FLOAT16,
@@ -50,19 +58,33 @@ static bool SupportsAllDataTypes(const DmlAdapter& adapter) {
 
   return std::all_of(
       data_types.begin(), data_types.end(),
-      [&dml_device](DML_TENSOR_DATA_TYPE data_type) {
+      [&dml_device, &adapter](DML_TENSOR_DATA_TYPE data_type) {
         DML_FEATURE_QUERY_TENSOR_DATA_TYPE_SUPPORT query{data_type};
         DML_FEATURE_DATA_TENSOR_DATA_TYPE_SUPPORT support;
 
-        DML_CHECK_SUCCEEDED(dml_device->CheckFeatureSupport(
+        auto hr = dml_device->CheckFeatureSupport(
             DML_FEATURE_TENSOR_DATA_TYPE_SUPPORT, sizeof(query), &query,
-            sizeof(support), &support));
+            sizeof(support), &support);
+        if (FAILED(hr)) {
+          LOG(WARNING) << "CheckFeatureSupport (data type = " << data_type
+                       << ") failed for adapter: " << adapter.Name();
+          return false;
+        }
 
-        return support.IsSupported;
+        return static_cast<bool>(support.IsSupported);
       });
 }
 
 static std::vector<DmlAdapter> FilterAdapters() {
+  // Fail early if DirectML library cannot be located or loaded.
+  auto dml_handle_or =
+      stream_executor::internal::CachedDsoLoader::GetDirectMLDsoHandle();
+  if (!dml_handle_or.ok()) {
+    LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH="
+                 << getenv("TF_DIRECTML_PATH");
+    return {};
+  }
+
   std::vector<DmlAdapter> adapters = EnumerateAdapters();
   adapters.erase(std::remove_if(adapters.begin(), adapters.end(),
                                 [](const DmlAdapter& adapter) {
