@@ -40,6 +40,7 @@ static bool SupportsAllDataTypes(const DmlAdapter& adapter) {
                                    IID_PPV_ARGS(&d3d12_device)))) {
     LOG(WARNING) << "Could not create Direct3D device for adapter: "
                  << adapter.Name();
+    return false;
   }
 
   ComPtr<IDMLDevice> dml_device =
