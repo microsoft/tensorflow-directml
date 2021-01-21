@@ -26,8 +26,14 @@ Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(
   auto dml_handle_or =
       stream_executor::internal::CachedDsoLoader::GetDirectMLDsoHandle();
   if (!dml_handle_or.ok()) {
-    LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH="
-                 << getenv("TF_DIRECTML_PATH");
+    auto path = getenv("TF_DIRECTML_PATH");
+    if (path) {
+      LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
+                   << path;
+    } else {
+      LOG(WARNING) << "Could not load DirectML.";
+    }
+
     return nullptr;
   }
 
@@ -57,8 +63,13 @@ Microsoft::WRL::ComPtr<IDMLDevice> CreateDmlDevice(
   auto dml_device = TryCreateDmlDevice(d3d12_device, dml_flags);
 
   if (!dml_device) {
-    LOG(FATAL) << "Could not load DirectML. TF_DIRECTML_PATH="
-               << getenv("TF_DIRECTML_PATH");
+    auto path = getenv("TF_DIRECTML_PATH");
+    if (path) {
+      LOG(FATAL) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
+                 << path;
+    } else {
+      LOG(FATAL) << "Could not load DirectML.";
+    }
   }
 
   return dml_device;

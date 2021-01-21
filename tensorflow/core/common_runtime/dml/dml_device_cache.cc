@@ -18,6 +18,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_adapter.h"
 #include "tensorflow/core/common_runtime/dml/dml_adapter_impl.h"
 #include "tensorflow/core/common_runtime/dml/dml_device.h"
+#include "tensorflow/stream_executor/platform/default/dso_loader.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -80,8 +81,14 @@ static std::vector<DmlAdapter> FilterAdapters() {
   auto dml_handle_or =
       stream_executor::internal::CachedDsoLoader::GetDirectMLDsoHandle();
   if (!dml_handle_or.ok()) {
-    LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH="
-                 << getenv("TF_DIRECTML_PATH");
+    auto path = getenv("TF_DIRECTML_PATH");
+    if (path) {
+      LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
+                   << path;
+    } else {
+      LOG(WARNING) << "Could not load DirectML.";
+    }
+
     return {};
   }
 
