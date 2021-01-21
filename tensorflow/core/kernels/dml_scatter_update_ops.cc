@@ -23,6 +23,7 @@ limitations under the License.
 #include "tensorflow/core/framework/resource_var.h"
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
+#include "tensorflow/core/lib/gtl/cleanup.h"
 
 namespace tensorflow {
 
@@ -120,6 +121,7 @@ class ScatterUpdateInitializationHelper : public InitializationHelper {
       OP_REQUIRES_OK(
           ctx, LookupResource(ctx, HandleFromInput(ctx, 0), &params_resource_));
       params_resource_->mu()->lock_shared();
+      locked_ = true;
     }
 
     const Tensor params = GetParamsTensor(ctx);
@@ -145,13 +147,15 @@ class ScatterUpdateInitializationHelper : public InitializationHelper {
   }
 
   void Unlock() const {
-    if (params_resource_) {
+    if (params_resource_ && locked_) {
       params_resource_->mu()->unlock_shared();
+      locked_ = false;
     }
   }
 
  private:
   core::RefCountPtr<Var> params_resource_;
+  mutable bool locked_ = false;
 };
 
 struct ScatterUpdateOperation {
@@ -364,6 +368,9 @@ class DmlScatterUpdateKernel : public DmlKernel {
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     auto init_helper = ctx->GetInitializationHelper<InitHelper>();
 
+    auto lock_cleanup =
+        gtl::MakeCleanup([init_helper] { init_helper->Unlock(); });
+
     const Tensor params_tensor =
         init_helper->GetParamsTensor(ctx->GetOpKernelContext());
 
@@ -417,7 +424,6 @@ class DmlScatterUpdateKernel : public DmlKernel {
       gpu_event = ctx->InsertUavBarrier();
     }
 
-    init_helper->Unlock();
     return gpu_event;
   }
 };
