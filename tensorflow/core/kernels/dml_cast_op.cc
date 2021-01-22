@@ -31,12 +31,23 @@ class DmlCastKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 1);
     CHECK(ctx->GetOutputCount() == 1);
 
+    DataType input_dtype = ctx->GetInputDataType(0);
+    DataType output_dtype = ctx->GetOutputDataType(0);
+    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
+    DML_TENSOR_DATA_TYPE dml_out_dtype = DML_TENSOR_DATA_TYPE_UNKNOWN;
+
     // Currently, 64-bit integers in DML are emulated using 32-bit integers
     // using striding to emulate a larger type. Because we can't guarantee
     // that our output tensor's memory is zero'd, we need to do so manually
     // prior to performing the cast.
-    if (Is64BitIntegerType(ctx->GetOutputDataType(0))) {
+    if (Is64BitIntegerType(output_dtype)) {
+      // TFDML #24881131
+      // 64-bit data support should be revisited once DML supports these types
       zero_outputs_ = true;
+      out_policy = GetEmulatedInt64TensorPolicy();
+      dml_out_dtype = DML_TENSOR_DATA_TYPE_UINT32;
+    } else {
+      dml_out_dtype = GetDmlDataTypeFromTfDataType(output_dtype);
     }
 
     // Tensor shape doesn't matter for Cast, so don't bother with DML's 4D
@@ -45,27 +56,35 @@ class DmlCastKernel : public DmlKernel {
 
     DmlTensorInfo input;
     input.kernel_index = 0;
-    input.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0), tensor_shape,
-                                       tensor_shape);
+    input.desc = DmlTensorDesc::Create(input_dtype, tensor_shape, tensor_shape);
 
     DmlTensorInfo output;
     output.kernel_index = 0;
-    output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), tensor_shape,
-                                        tensor_shape);
+    output.desc =
+        DmlTensorDesc::Create(output_dtype, tensor_shape, tensor_shape);
 
     DmlKernelTensors tensors;
     tensors.outputs = {output};
     tensors.inputs = {input};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
 
-    DML_CAST_OPERATOR_DESC cast_desc = {};
-    cast_desc.InputTensor = inputs.data();
-    cast_desc.OutputTensor = outputs.data();
+    // Bool is a special case since it doesn't behave the same as uint8. The
+    // uint8 version simply drops the decimals, but bool converts anything that
+    // is not 0.0 to True.
+    if (output_dtype == DT_BOOL &&
+        (input_dtype == DT_HALF || input_dtype == DT_FLOAT)) {
+      input_tensor = dml::Ceil(dml::Abs(input_tensor));
+    }
 
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CAST, &cast_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
+    auto result = dml::Cast(input_tensor, dml_out_dtype);
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
