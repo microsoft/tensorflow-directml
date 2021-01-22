@@ -21,24 +21,56 @@ limitations under the License.
 
 namespace tensorflow {
 
-Microsoft::WRL::ComPtr<IDMLDevice> CreateDmlDevice(
+Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(
     ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags) {
   auto dml_handle_or =
       stream_executor::internal::CachedDsoLoader::GetDirectMLDsoHandle();
   if (!dml_handle_or.ok()) {
-    LOG(FATAL) << "Could not load DirectML. TF_DIRECTML_PATH="
-               << getenv("TF_DIRECTML_PATH");
+    auto path = getenv("TF_DIRECTML_PATH");
+    if (path) {
+      LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
+                   << path;
+    } else {
+      LOG(WARNING) << "Could not load DirectML.";
+    }
+
+    return nullptr;
   }
 
   using DMLCreateDeviceFn = decltype(DMLCreateDevice);
 
   DMLCreateDeviceFn* dmlCreateDevice;
-  Env::Default()->GetSymbolFromLibrary(
+  auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
       dml_handle_or.ValueOrDie(), "DMLCreateDevice", (void**)&dmlCreateDevice);
+  if (!get_symbol_status.ok()) {
+    LOG(WARNING) << "Could not find symbol DMLCreateDevice. ";
+    return nullptr;
+  }
 
   Microsoft::WRL::ComPtr<IDMLDevice> dml_device;
-  DML_CHECK_SUCCEEDED(
-      dmlCreateDevice(d3d12_device, dml_flags, IID_PPV_ARGS(&dml_device)));
+  HRESULT create_device_hr =
+      dmlCreateDevice(d3d12_device, dml_flags, IID_PPV_ARGS(&dml_device));
+  if (FAILED(create_device_hr)) {
+    LOG(WARNING) << "DMLCreateDevice failed with HRESULT " << create_device_hr;
+    return {};
+  }
+
+  return dml_device;
+}
+
+Microsoft::WRL::ComPtr<IDMLDevice> CreateDmlDevice(
+    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags) {
+  auto dml_device = TryCreateDmlDevice(d3d12_device, dml_flags);
+
+  if (!dml_device) {
+    auto path = getenv("TF_DIRECTML_PATH");
+    if (path) {
+      LOG(FATAL) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
+                 << path;
+    } else {
+      LOG(FATAL) << "Could not load DirectML.";
+    }
+  }
 
   return dml_device;
 }
