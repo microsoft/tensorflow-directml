@@ -18,6 +18,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/framework/bounds_check.h"
 #include "tensorflow/core/framework/register_types.h"
+#include "tensorflow/core/kernels/conv_grad_ops.h"
 #include "tensorflow/core/kernels/conv_ops.h"
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
@@ -1344,6 +1345,599 @@ class DmlDepthwiseConv2DBackpropInputKernel : public DmlKernel {
           .HostMemory("input_sizes"),                         \
       DmlKernelWrapper<DmlDepthwiseConv2DBackpropInputKernel, \
                        GetOutputShapeFromDimsTensorHelper<int32, 0>>);
+TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+template <bool HasDataFormatAttribute>
+struct Conv3DAttributes {
+  explicit Conv3DAttributes(OpKernelConstruction* context) {
+    if constexpr (HasDataFormatAttribute) {
+      string data_format_str;
+      OP_REQUIRES_OK(context,
+                     context->GetAttr("data_format", &data_format_str));
+      OP_REQUIRES(context, FormatFromString(data_format_str, &data_format),
+                  errors::InvalidArgument("Invalid data format"));
+    } else {
+      // V2 conv3d grad ops have a data format attribute but the original ops
+      // assume NHWC format.
+      data_format = FORMAT_NHWC;
+    }
+
+    std::vector<int32> strides;
+    OP_REQUIRES_OK(context, context->GetAttr("strides", &strides));
+    OP_REQUIRES(context, strides.size() == 5,
+                errors::InvalidArgument("Sliding window strides field must "
+                                        "specify 5 dimensions"));
+
+    int32 stride_n = GetTensorDim(strides, data_format, 'N');
+    int32 stride_c = GetTensorDim(strides, data_format, 'C');
+    stride_d = GetTensorDim(strides, data_format, '0');
+    stride_h = GetTensorDim(strides, data_format, '1');
+    stride_w = GetTensorDim(strides, data_format, '2');
+
+    OP_REQUIRES(
+        context, (stride_n == 1 && stride_c == 1),
+        errors::InvalidArgument("Current implementation does not yet support "
+                                "strides in the batch and depth dimensions."));
+    OP_REQUIRES(
+        context, (stride_d > 0 && stride_h > 0 && stride_w > 0),
+        errors::InvalidArgument("Spatial strides should be larger than 0."));
+
+    std::vector<int32> dilations;
+    OP_REQUIRES_OK(context, context->GetAttr("dilations", &dilations));
+    OP_REQUIRES(context, dilations.size() == 5,
+                errors::InvalidArgument("Dilation rates field must "
+                                        "specify 5 dimensions"));
+
+    int32 dilation_n = GetTensorDim(dilations, data_format, 'N');
+    int32 dilation_c = GetTensorDim(dilations, data_format, 'C');
+    dilation_d = GetTensorDim(dilations, data_format, '0');
+    dilation_h = GetTensorDim(dilations, data_format, '1');
+    dilation_w = GetTensorDim(dilations, data_format, '2');
+
+    OP_REQUIRES(context, (dilation_n == 1 && dilation_c == 1),
+                errors::InvalidArgument(
+                    "Current implementation does not yet support "
+                    "dilation rates in the batch and depth dimensions."));
+    OP_REQUIRES(
+        context, (dilation_d > 0 && dilation_h > 0 && dilation_w > 0),
+        errors::InvalidArgument("Dilated rates should be larger than 0."));
+    OP_REQUIRES_OK(context, context->GetAttr("padding", &padding));
+  }
+
+  TensorFormat data_format;
+  Padding padding;
+  int32 stride_d;
+  int32 stride_h;
+  int32 stride_w;
+  int32 dilation_d;
+  int32 dilation_h;
+  int32 dilation_w;
+};
+
+class Conv3DInitHelper : public InitializationHelper {
+ public:
+  using Attributes = Conv3DAttributes<true>;
+
+  Conv3DInitHelper(OpKernelContext* context,
+                   std::shared_ptr<const Attributes> attr)
+      : attr_(attr) {
+    // Input tensor is of the following dimensions:
+    // [ batch, in_z, in_y, in_x, in_channels ]
+    const Tensor& input = context->input(0);
+
+    // Input filter is of the following dimensions:
+    // [ filter_z, filter_y, filter_x, in_channels, out_channels]
+    const Tensor& filter = context->input(1);
+
+    // NOTE: The ordering of the spatial dimensions is arbitrary, but has to be
+    // kept consistent between input/filter/output.
+    OP_REQUIRES(context, input.dims() == 5,
+                errors::InvalidArgument("input must be 5-dimensional"));
+    OP_REQUIRES(context, filter.dims() == 5,
+                errors::InvalidArgument("filter must be 5-dimensional"));
+
+    const int64 in_batch = GetTensorDim(input, attr->data_format, 'N');
+    const int64 in_channels = GetTensorDim(input, attr->data_format, 'C');
+    const int64 in_depth = GetTensorDim(input, attr->data_format, '0');
+    const int64 in_height = GetTensorDim(input, attr->data_format, '1');
+    const int64 in_width = GetTensorDim(input, attr->data_format, '2');
+
+    const int64 filter_depth = filter.dim_size(0);
+    const int64 filter_height = filter.dim_size(1);
+    const int64 filter_width = filter.dim_size(2);
+    const int64 filter_channels = filter.dim_size(3);
+    const int64 out_channels = filter.dim_size(4);
+
+    OP_REQUIRES(context, in_channels % filter_channels == 0,
+                errors::InvalidArgument(
+                    "Input depth must be evenly divisible by filter depth: ",
+                    in_channels, " vs ", filter_channels));
+
+    // Dimension order for these arrays is: z, y, x.
+    std::array<int64, 3> input_size = {{in_depth, in_height, in_width}};
+    std::array<int64, 3> filter_size = {
+        {filter_depth, filter_height, filter_width}};
+    std::array<int64, 3> dilations = {
+        {attr->dilation_d, attr->dilation_h, attr->dilation_w}};
+    std::array<int64, 3> strides = {
+        {attr->stride_d, attr->stride_h, attr->stride_w}};
+
+    std::array<int64, 3> out, padding;
+
+    OP_REQUIRES_OK(
+        context, Get3dOutputSizeV2(input_size, filter_size, dilations, strides,
+                                   attr->padding, &out, &padding));
+
+    batch_size_ = static_cast<uint32_t>(in_batch);
+    in_channels_ = static_cast<uint32_t>(in_channels);
+    in_depth_ = static_cast<uint32_t>(in_depth);
+    in_height_ = static_cast<uint32_t>(in_height);
+    in_width_ = static_cast<uint32_t>(in_width);
+    filter_channels_ = static_cast<uint32_t>(filter_channels);
+    filter_depth_ = static_cast<uint32_t>(filter_depth);
+    filter_height_ = static_cast<uint32_t>(filter_height);
+    filter_width_ = static_cast<uint32_t>(filter_width);
+    out_channels_ = static_cast<uint32_t>(out_channels);
+    out_depth_ = static_cast<uint32_t>(out[0]);
+    out_height_ = static_cast<uint32_t>(out[1]);
+    out_width_ = static_cast<uint32_t>(out[2]);
+    strides_[0] = attr->stride_d;
+    strides_[1] = attr->stride_h;
+    strides_[2] = attr->stride_w;
+    dilations_[0] = attr->dilation_d;
+    dilations_[1] = attr->dilation_h;
+    dilations_[2] = attr->dilation_w;
+    start_padding_[0] = static_cast<uint32_t>(padding[0]);
+    start_padding_[1] = static_cast<uint32_t>(padding[1]);
+    start_padding_[2] = static_cast<uint32_t>(padding[2]);
+  }
+
+  TensorFormat GetDataFormat() const { return attr_->data_format; }
+
+  uint32_t GetBatchSize() const { return batch_size_; }
+  uint32_t GetInChannels() const { return in_channels_; }
+  uint32_t GetInDepth() const { return in_depth_; }
+  uint32_t GetInHeight() const { return in_height_; }
+  uint32_t GetInWidth() const { return in_width_; }
+  uint32_t GetFilterChannels() const { return filter_channels_; }
+  uint32_t GetFilterDepth() const { return filter_depth_; }
+  uint32_t GetFilterHeight() const { return filter_height_; }
+  uint32_t GetFilterWidth() const { return filter_width_; }
+  uint32_t GetOutChannels() const { return out_channels_; }
+  uint32_t GetOutDepth() const { return out_depth_; }
+  uint32_t GetOutHeight() const { return out_height_; }
+  uint32_t GetOutWidth() const { return out_width_; }
+  const std::array<uint32_t, 3>& GetStrides() const { return strides_; }
+  const std::array<uint32_t, 3>& GetDilations() const { return dilations_; }
+  const std::array<uint32_t, 3>& GetStartPadding() const {
+    return start_padding_;
+  }
+  const std::array<uint32_t, 3>& GetEndPadding() const { return end_padding_; }
+  const std::array<uint32_t, 3>& GetOutPadding() const { return out_padding_; }
+  uint32_t GetGroupCount() const { return in_channels_ / filter_channels_; }
+
+ private:
+  const std::shared_ptr<const Attributes> attr_;
+  uint32_t batch_size_;
+  uint32_t in_channels_;
+  uint32_t in_depth_;
+  uint32_t in_height_;
+  uint32_t in_width_;
+  uint32_t filter_channels_;
+  uint32_t filter_depth_;
+  uint32_t filter_height_;
+  uint32_t filter_width_;
+  uint32_t out_channels_;
+  uint32_t out_depth_;
+  uint32_t out_height_;
+  uint32_t out_width_;
+  std::array<uint32_t, 3> strides_;
+  std::array<uint32_t, 3> dilations_;
+  std::array<uint32_t, 3> start_padding_;
+  std::array<uint32_t, 3> end_padding_ = {0, 0, 0};
+  std::array<uint32_t, 3> out_padding_ = {0, 0, 0};
+};
+
+class Conv3DShapeHelper : public ShapeHelper {
+ public:
+  std::vector<TensorShape> GetOutputShapes(
+      OpKernelContext* ctx,
+      const InitializationHelper* initialization_helper) const override {
+    auto init_helper =
+        static_cast<const Conv3DInitHelper*>(initialization_helper);
+
+    TensorShape out_shape = ShapeFromFormat(
+        init_helper->GetDataFormat(), init_helper->GetBatchSize(),
+        {init_helper->GetOutDepth(), init_helper->GetOutHeight(),
+         init_helper->GetOutWidth()},
+        init_helper->GetOutChannels());
+
+    return {std::move(out_shape)};
+  }
+};
+
+class DmlConv3DKernel : public DmlKernel {
+ public:
+  using InitHelper = Conv3DInitHelper;
+
+  explicit DmlConv3DKernel(DmlKernelConstruction* ctx,
+                           const InitHelper* init_helper) {
+    CHECK(ctx->GetInputCount() == 2);
+    CHECK(ctx->GetOutputCount() == 1);
+
+    // 3D conv requires 5D tensors
+    static const uint32_t kDimensionCount = 5;
+    static const uint32_t kSpatialDimensionCount = 3;
+
+    CHECK(ctx->GetInputTensorShape(0).dims() == kDimensionCount);
+    CHECK(ctx->GetInputTensorShape(1).dims() == kDimensionCount);
+    CHECK(ctx->GetOutputTensorShape(0).dims() == kDimensionCount);
+
+    DmlKernelParams params;
+    params.kernel_input_indices = {
+        0, 1,
+        absl::nullopt  // We don't use the DML bias tensor
+    };
+
+    using namespace DmlTensorAxes;
+
+    auto filter_layout = {D, H, W, C, N};
+
+    auto input_output_layout =
+        GetDmlTensorLayout(init_helper->GetDataFormat(), kDimensionCount);
+
+    DmlKernelTensors tensors = GetTensorInfos(ctx, params);
+    tensors.inputs[0]->desc =
+        CreateTensorDescFromInput(ctx, 0, input_output_layout);
+    tensors.inputs[1]->desc = CreateTensorDescFromInput(ctx, 1, filter_layout);
+    tensors.outputs[0]->desc =
+        CreateTensorDescFromOutput(ctx, 0, input_output_layout);
+
+    auto input_descs = GetDmlTensorDescs(tensors.inputs);
+    auto output_descs = GetDmlTensorDescs(tensors.outputs);
+
+    DML_CONVOLUTION_OPERATOR_DESC conv_desc = {};
+    conv_desc.InputTensor = &input_descs[0];
+    conv_desc.FilterTensor = &input_descs[1];
+    conv_desc.BiasTensor = nullptr;
+    conv_desc.OutputTensor = &output_descs[0];
+    conv_desc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
+    conv_desc.Direction = DML_CONVOLUTION_DIRECTION_FORWARD;
+    conv_desc.DimensionCount = kSpatialDimensionCount;
+    conv_desc.Strides = init_helper->GetStrides().data();
+    conv_desc.Dilations = init_helper->GetDilations().data();
+    conv_desc.StartPadding = init_helper->GetStartPadding().data();
+    conv_desc.EndPadding = init_helper->GetEndPadding().data();
+    conv_desc.OutputPadding = init_helper->GetOutPadding().data();
+    conv_desc.GroupCount = init_helper->GetGroupCount();
+    conv_desc.FusedActivation = nullptr;
+
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CONVOLUTION, &conv_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
+  }
+};
+
+#define DML_REGISTER_KERNEL(type)                                  \
+  REGISTER_KERNEL_BUILDER(                                         \
+      Name("Conv3D").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      DmlKernelWrapper<DmlConv3DKernel, Conv3DShapeHelper>);
+TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+template <bool HasDataFormatAttribute, bool BackpropInput>
+class Conv3DGradInitHelper : public InitializationHelper {
+ public:
+  using Attributes = Conv3DAttributes<HasDataFormatAttribute>;
+
+  Conv3DGradInitHelper(OpKernelContext* context,
+                       std::shared_ptr<const Attributes> attr)
+      : attr_(attr) {
+    StringPiece label;
+    TensorShape input_shape;
+    TensorShape filter_shape;
+    if constexpr (BackpropInput) {
+      label = "Conv3DBackpropInputOp";
+      const Tensor& input_sizes = context->input(0);
+      OP_REQUIRES_OK(context,
+                     context->op_kernel().MakeShape(input_sizes, &input_shape));
+      filter_shape = context->input(1).shape();
+    } else {
+      label = "Conv3DBackpropFilterOp";
+      input_shape = context->input(0).shape();
+      const Tensor& filter_sizes = context->input(1);
+      OP_REQUIRES_OK(
+          context, context->op_kernel().MakeShape(filter_sizes, &filter_shape));
+    }
+
+    const TensorShape& out_backprop_shape = context->input(2).shape();
+
+    std::vector<int32> strides;
+    std::vector<int32> dilations;
+    if (attr->data_format == FORMAT_NCHW) {
+      strides = {1, 1, attr->stride_d, attr->stride_h, attr->stride_w};
+      dilations = {1, 1, attr->dilation_d, attr->dilation_h, attr->dilation_w};
+    } else {
+      strides = {1, attr->stride_d, attr->stride_h, attr->stride_w, 1};
+      dilations = {1, attr->dilation_d, attr->dilation_h, attr->dilation_w, 1};
+    }
+
+    ConvBackpropDimensions dims;
+    OP_REQUIRES_OK(
+        context, ConvBackpropComputeDimensionsV2(
+                     label, /*num_spatial_dims=*/3, input_shape, filter_shape,
+                     out_backprop_shape, dilations, strides, attr->padding, {},
+                     attr->data_format, &dims));
+
+    uint32_t pad_d = static_cast<uint32_t>(dims.SpatialPadding(attr->padding, 0));
+    uint32_t pad_h = static_cast<uint32_t>(dims.SpatialPadding(attr->padding, 1));
+    uint32_t pad_w = static_cast<uint32_t>(dims.SpatialPadding(attr->padding, 2));
+
+    batch_size_ = static_cast<uint32_t>(dims.batch_size);
+    in_channels_ = static_cast<uint32_t>(dims.in_depth);
+    in_depth_ = static_cast<uint32_t>(dims.input_size(0));
+    in_height_ = static_cast<uint32_t>(dims.input_size(1));
+    in_width_ = static_cast<uint32_t>(dims.input_size(2));
+    filter_channels_ = static_cast<uint32_t>(filter_shape.dim_size(3));
+    filter_depth_ = static_cast<uint32_t>(dims.filter_size(0));
+    filter_height_ = static_cast<uint32_t>(dims.filter_size(1));
+    filter_width_ = static_cast<uint32_t>(dims.filter_size(2));
+    out_channels_ = static_cast<uint32_t>(dims.out_depth);
+    out_depth_ = static_cast<uint32_t>(dims.output_size(0));
+    out_height_ = static_cast<uint32_t>(dims.output_size(1));
+    out_width_ = static_cast<uint32_t>(dims.output_size(2));
+    strides_[0] = attr->stride_d;
+    strides_[1] = attr->stride_h;
+    strides_[2] = attr->stride_w;
+    dilations_[0] = attr->dilation_d;
+    dilations_[1] = attr->dilation_h;
+    dilations_[2] = attr->dilation_w;
+    start_padding_[0] = pad_d / 2;
+    start_padding_[1] = pad_h / 2;
+    start_padding_[2] = pad_w / 2;
+    end_padding_[0] = pad_d / 2 + pad_d % 2;
+    end_padding_[1] = pad_h / 2 + pad_h % 2;
+    end_padding_[2] = pad_w / 2 + pad_w % 2;
+  }
+
+  TensorFormat GetDataFormat() const { return attr_->data_format; }
+
+  uint32_t GetBatchSize() const { return batch_size_; }
+  uint32_t GetInChannels() const { return in_channels_; }
+  uint32_t GetInDepth() const { return in_depth_; }
+  uint32_t GetInHeight() const { return in_height_; }
+  uint32_t GetInWidth() const { return in_width_; }
+  uint32_t GetFilterChannels() const { return filter_channels_; }
+  uint32_t GetFilterDepth() const { return filter_depth_; }
+  uint32_t GetFilterHeight() const { return filter_height_; }
+  uint32_t GetFilterWidth() const { return filter_width_; }
+  uint32_t GetOutChannels() const { return out_channels_; }
+  uint32_t GetOutDepth() const { return out_depth_; }
+  uint32_t GetOutHeight() const { return out_height_; }
+  uint32_t GetOutWidth() const { return out_width_; }
+  const std::array<uint32_t, 3>& GetStrides() const { return strides_; }
+  const std::array<uint32_t, 3>& GetDilations() const { return dilations_; }
+  const std::array<uint32_t, 3>& GetStartPadding() const {
+    return start_padding_;
+  }
+  const std::array<uint32_t, 3>& GetEndPadding() const { return end_padding_; }
+  const std::array<uint32_t, 3>& GetOutPadding() const { return out_padding_; }
+  uint32_t GetGroupCount() const { return in_channels_ / filter_channels_; }
+
+ private:
+  const std::shared_ptr<const Attributes> attr_;
+  uint32_t batch_size_;
+  uint32_t in_channels_;
+  uint32_t in_depth_;
+  uint32_t in_height_;
+  uint32_t in_width_;
+  uint32_t filter_channels_;
+  uint32_t filter_depth_;
+  uint32_t filter_height_;
+  uint32_t filter_width_;
+  uint32_t out_channels_;
+  uint32_t out_depth_;
+  uint32_t out_height_;
+  uint32_t out_width_;
+  std::array<uint32_t, 3> strides_;
+  std::array<uint32_t, 3> dilations_;
+  std::array<uint32_t, 3> start_padding_;
+  std::array<uint32_t, 3> end_padding_;
+  std::array<uint32_t, 3> out_padding_ = {0, 0, 0};
+};
+
+template <bool HasDataFormatAttribute>
+class DmlConv3DBackpropInputKernel : public DmlKernel {
+ public:
+  using InitHelper = Conv3DGradInitHelper<HasDataFormatAttribute, true>;
+
+  explicit DmlConv3DBackpropInputKernel(DmlKernelConstruction* ctx,
+                                        const InitHelper* init_helper) {
+    CHECK(ctx->GetInputCount() == 3);
+    CHECK(ctx->GetOutputCount() == 1);
+
+    // 3D conv requires 5D tensors
+    static const uint32_t kDimensionCount = 5;
+    static const uint32_t kSpatialDimensionCount = 3;
+
+    auto& input_sizes = ctx->GetConstantInputTensor(0);
+    TensorShape input_shape;
+    TF_CHECK_OK(
+        TensorShapeUtils::MakeShape(input_sizes.vec<int32>(), &input_shape));
+
+    DmlKernelParams params;
+    params.kernel_input_indices = {
+        2, 1,
+        absl::nullopt  // We don't use the DML bias tensor
+    };
+
+    DmlKernelTensors tensors = GetTensorInfos(ctx, params);
+
+    using namespace DmlTensorAxes;
+
+    // The dimensions of the filter tensor are laid out a little differently
+    // than what DML expects.
+    auto filter_layout = {D, H, W, C, N};
+
+    // The layout of the input/output tensors is determined by the
+    // "data_format" attribute
+    auto input_output_layout =
+        GetDmlTensorLayout(init_helper->GetDataFormat(), kDimensionCount);
+
+    tensors.inputs[0]->desc =
+        CreateTensorDescFromInput(ctx, 2, input_output_layout);
+    tensors.inputs[1]->desc = CreateTensorDescFromInput(ctx, 1, filter_layout);
+    tensors.outputs[0]->desc =
+        CreateTensorDescFromOutput(ctx, 0, input_output_layout);
+
+    auto input_descs = GetDmlTensorDescs(tensors.inputs);
+    auto output_descs = GetDmlTensorDescs(tensors.outputs);
+
+    DML_CONVOLUTION_OPERATOR_DESC conv_desc = {};
+    conv_desc.InputTensor = &input_descs[0];
+    conv_desc.FilterTensor = &input_descs[1];
+    conv_desc.BiasTensor = nullptr;
+    conv_desc.OutputTensor = &output_descs[0];
+
+    // Note DML_CONVOLUTION_MODE_CROSS_CORRELATION automatically rotates
+    // filter 180 when operating in DML_CONVOLUTION_DIRECTION_BACKWARD.
+    // Hence we do not need to specify DML_CONVOLUTION_MODE_CONVOLUTION here.
+    conv_desc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
+    conv_desc.Direction = DML_CONVOLUTION_DIRECTION_BACKWARD;
+    conv_desc.DimensionCount = kSpatialDimensionCount;
+    conv_desc.Strides = init_helper->GetStrides().data();
+    conv_desc.Dilations = init_helper->GetDilations().data();
+    conv_desc.StartPadding = init_helper->GetStartPadding().data();
+    conv_desc.EndPadding = init_helper->GetEndPadding().data();
+    conv_desc.OutputPadding = init_helper->GetOutPadding().data();
+    conv_desc.GroupCount = init_helper->GetGroupCount();
+    conv_desc.FusedActivation = nullptr;
+
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CONVOLUTION, &conv_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
+  }
+};
+
+#define DML_REGISTER_KERNEL(type)                               \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("Conv3DBackpropInput")                               \
+          .Device(DEVICE_DML)                                   \
+          .TypeConstraint<type>("T"),                           \
+      DmlKernelWrapper<DmlConv3DBackpropInputKernel<false>,     \
+                       GetOutputShapeFromInputShapeHelper<0>>); \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("Conv3DBackpropInputV2")                             \
+          .Device(DEVICE_DML)                                   \
+          .TypeConstraint<type>("T")                            \
+          .HostMemory("input_sizes"),                           \
+      DmlKernelWrapper<DmlConv3DBackpropInputKernel<true>,      \
+                       GetOutputShapeFromDimsTensorHelper<int32, 0>>);
+TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+template <bool HasDataFormatAttribute>
+class DmlConv3DBackpropFilterKernel : public DmlKernel {
+ public:
+  using InitHelper = Conv3DGradInitHelper<HasDataFormatAttribute, false>;
+
+  explicit DmlConv3DBackpropFilterKernel(DmlKernelConstruction* ctx,
+                                         const InitHelper* init_helper) {
+    CHECK(ctx->GetInputCount() == 3);
+    CHECK(ctx->GetOutputCount() == 1);
+
+    // 2D conv requires 4D tensors
+    static const uint32_t kDimensionCount = 5;
+    static const uint32_t kSpatialDimensionCount = 3;
+
+    auto& filter_sizes = ctx->GetConstantInputTensor(1);
+    TensorShape filter_shape;
+    TF_CHECK_OK(
+        TensorShapeUtils::MakeShape(filter_sizes.vec<int32>(), &filter_shape));
+
+    DmlKernelParams params;
+    params.kernel_input_indices = {
+        0, 2,
+        absl::nullopt  // We don't use the DML bias tensor
+    };
+
+    using namespace DmlTensorAxes;
+
+    // The dimensions of the filter tensor are laid out a little differently
+    // than what DML expects. Note order of C and N
+    // are reversed as we convolve with the backprop_output
+    // which has N channels, where N is the number of output
+    // feature maps in the forward conv2d case.
+    auto filter_layout = {D, H, W, N, C};
+
+    // The layout of the input/output tensors is determined by the
+    // "data_format" attribute
+    auto input_output_layout =
+        GetDmlTensorLayout(init_helper->GetDataFormat(), kDimensionCount);
+
+    // Swap N and C channels. Note: Channel 'N' of output
+    // contains the 'K' feature maps produced in the forward
+    // direction. Swapping is required because we
+    // convolve the incoming backprop_output gradient containing K
+    //  features with the 'K' channelled filter
+    switch (init_helper->GetDataFormat()) {
+      case FORMAT_NHWC:
+        std::swap(input_output_layout[0], input_output_layout[4]);
+        break;
+
+      case FORMAT_NCHW:
+        std::swap(input_output_layout[0], input_output_layout[1]);
+        break;
+    }
+
+    DmlKernelTensors tensors = GetTensorInfos(ctx, params);
+    tensors.inputs[0]->desc =
+        CreateTensorDescFromInput(ctx, 0, input_output_layout);
+    tensors.inputs[1]->desc =
+        CreateTensorDescFromInput(ctx, 2, input_output_layout);
+
+    // The output tensor gets the filter_layout as we are computing the
+    // back-prop for the filter.
+    tensors.outputs[0]->desc =
+        CreateTensorDescFromOutput(ctx, 0, filter_layout);
+
+    auto input_descs = GetDmlTensorDescs(tensors.inputs);
+    auto output_descs = GetDmlTensorDescs(tensors.outputs);
+
+    DML_CONVOLUTION_OPERATOR_DESC conv_desc = {};
+    conv_desc.InputTensor = &input_descs[0];
+    conv_desc.FilterTensor = &input_descs[1];
+    conv_desc.BiasTensor = nullptr;
+    conv_desc.OutputTensor = &output_descs[0];
+    conv_desc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
+    conv_desc.Direction = DML_CONVOLUTION_DIRECTION_FORWARD;
+    conv_desc.DimensionCount = kSpatialDimensionCount;
+    conv_desc.Strides = init_helper->GetStrides().data();
+    conv_desc.Dilations = init_helper->GetDilations().data();
+    conv_desc.StartPadding = init_helper->GetStartPadding().data();
+    conv_desc.EndPadding = init_helper->GetEndPadding().data();
+    conv_desc.OutputPadding = init_helper->GetOutPadding().data();
+    conv_desc.GroupCount = init_helper->GetGroupCount();
+    conv_desc.FusedActivation = nullptr;
+
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CONVOLUTION, &conv_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
+  }
+};
+
+#define DML_REGISTER_KERNEL(type)                               \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("Conv3DBackpropFilter")                              \
+          .Device(DEVICE_DML)                                   \
+          .TypeConstraint<type>("T"),                           \
+      DmlKernelWrapper<DmlConv3DBackpropFilterKernel<false>,    \
+                       GetOutputShapeFromInputShapeHelper<1>>); \
+  REGISTER_KERNEL_BUILDER(                                      \
+      Name("Conv3DBackpropFilterV2")                            \
+          .Device(DEVICE_DML)                                   \
+          .TypeConstraint<type>("T")                            \
+          .HostMemory("filter_sizes"),                          \
+      DmlKernelWrapper<DmlConv3DBackpropFilterKernel<true>,     \
+                       GetOutputShapeFromDimsTensorHelper<int32, 1>>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
