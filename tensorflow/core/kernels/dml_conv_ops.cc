@@ -1911,8 +1911,9 @@ class DmlConv3DBackpropFilterKernel : public DmlKernel {
     conv_desc.Mode = DML_CONVOLUTION_MODE_CROSS_CORRELATION;
     conv_desc.Direction = DML_CONVOLUTION_DIRECTION_FORWARD;
     conv_desc.DimensionCount = kSpatialDimensionCount;
-    conv_desc.Strides = init_helper->GetStrides().data();
-    conv_desc.Dilations = init_helper->GetDilations().data();
+    // Not a typo: strides and dilations are swapped when computing filter backprop:
+    conv_desc.Strides = init_helper->GetDilations().data();
+    conv_desc.Dilations = init_helper->GetStrides().data();
     conv_desc.StartPadding = init_helper->GetStartPadding().data();
     conv_desc.EndPadding = init_helper->GetEndPadding().data();
     conv_desc.OutputPadding = init_helper->GetOutPadding().data();
