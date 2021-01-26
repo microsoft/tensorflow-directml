@@ -107,7 +107,7 @@ class GetOutputShapeFromInputShapeHelper : public ShapeHelper {
  public:
   std::vector<TensorShape> GetOutputShapes(
       OpKernelContext* ctx,
-      const InitializationHelper* initialization_helper) const {
+      const InitializationHelper* initialization_helper) const override {
     const Tensor& input_tensor =
         ctx->input_is_ref(input_tensor_index)
             ? ctx->mutable_input(input_tensor_index, false)
