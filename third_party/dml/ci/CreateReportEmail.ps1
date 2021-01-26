@@ -11,6 +11,7 @@ param
     [Parameter(Mandatory)][string]$BuildArtifactsPath,
     [Parameter(Mandatory)][string]$PipelineRunID,
     [Parameter(Mandatory)][string]$AccessToken,
+    [Parameter(Mandatory)][string]$OutputHtmlPath,
     [string]$EmailTo
 )
 
@@ -428,26 +429,20 @@ if ($TestsArtifactsExist)
     $Html += "</table><br>"
 }
 
+$Html | Out-File $OutputHtmlPath -Encoding utf8
+Write-Host "##vso[task.uploadsummary]$(Resolve-Path $OutputHtmlPath)"
+
 # ---------------------------------------------------------------------------------------------------------------------
-# Email
+# Email Variables
 # ---------------------------------------------------------------------------------------------------------------------
 
 if ($EmailTo)
 {
-    $OverallResult = if ($TestRunResult) { $TestRunResult } else { $BuildResult }
-    $MailArgs = 
-    @{
-        'From'="$env:USERNAME@microsoft.com";
-        'To'=@($EmailTo);
-        'Subject'="$($Run.Definition.Name) ($ShortBranchName) - $($OverallResult)";
-        'Body'="$Html";
-        'BodyAsHtml'=$True;
-        'Priority'='Normal';
-        'SmtpServer'='smtphost.redmond.corp.microsoft.com'
-    }
+    # Save comma-separated list of email addresses in the "emailTo" ADO pipeline variable.
+    Write-Host "##vso[task.setVariable variable=emailTo;isOutput=true]$EmailTo"
     
-    Send-MailMessage @MailArgs
+    # Save email title in the "emailSubject" ADO pipeline variable.
+    $OverallResult = if ($TestRunResult) { $TestRunResult } else { $BuildResult }
+    $EmailSubject = "$($Run.Definition.Name) (${env:BUILD_REASON}:$ShortBranchName) - $($OverallResult)"
+    Write-Host "##vso[task.setVariable variable=emailSubject;isOutput=true]$emailSubject"
 }
-
-$Html | Out-File "Summary.md" -Encoding utf8
-Write-Host "##vso[task.uploadsummary]$(Resolve-Path Summary.md)"
