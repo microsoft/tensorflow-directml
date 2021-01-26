@@ -19,14 +19,6 @@ limitations under the License.
 
 namespace tensorflow {
 
-std::vector<TensorShape> GetOutputShapeAsInputShapeHelper::GetOutputShapes(
-    OpKernelContext* ctx,
-    const InitializationHelper* initialization_helper) const {
-  const Tensor& input_tensor =
-      ctx->input_is_ref(0) ? ctx->mutable_input(0, false) : ctx->input(0);
-  return {input_tensor.shape()};
-}
-
 static TensorShape BroadcastTensorShape(const TensorShape& input_shape_0,
                                         const TensorShape& input_shape_1) {
   if (input_shape_0 == input_shape_1) {

@@ -102,12 +102,21 @@ class ScalarOutputShapeHelper : public ShapeHelper {
   };
 };
 
-class GetOutputShapeAsInputShapeHelper : public ShapeHelper {
+template <int input_tensor_index>
+class GetOutputShapeFromInputShapeHelper : public ShapeHelper {
  public:
   std::vector<TensorShape> GetOutputShapes(
       OpKernelContext* ctx,
-      const InitializationHelper* initialization_helper) const override;
+      const InitializationHelper* initialization_helper) const override {
+    const Tensor& input_tensor =
+        ctx->input_is_ref(input_tensor_index)
+            ? ctx->mutable_input(input_tensor_index, false)
+            : ctx->input(input_tensor_index);
+    return {input_tensor.shape()};
+  }
 };
+
+using GetOutputShapeAsInputShapeHelper = GetOutputShapeFromInputShapeHelper<0>;
 
 class BroadcastedOutputShapeInitHelper : public InitializationHelper {
  public:
