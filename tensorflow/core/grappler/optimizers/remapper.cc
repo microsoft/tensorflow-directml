@@ -370,19 +370,7 @@ bool IsDmlCompatible(const RemapperContext& ctx,
   const NodeDef& contraction_node = graph->node(matched.contraction);
 
   if (IsConv2D(contraction_node)) {
-    // TODO(justoeck): keep the same heuristics as GPU for now, but we should
-    // revisit if these apply to DirectML. #31294633
-    const std::vector<OpInfo::TensorProperties>& input_props =
-        ctx.graph_properties.GetInputProperties(contraction_node.name());
-    const TensorShapeProto& filter_shape =
-        input_props.size() >= 2 ? input_props[1].shape() : TensorShapeProto();
-    bool is_spatial_conv = Rank(filter_shape) == 4 &&          //
-                           IsKnown(filter_shape.dim(1)) &&     //
-                           IsKnown(filter_shape.dim(2)) &&     //
-                           filter_shape.dim(1).size() != 1 &&  //
-                           filter_shape.dim(2).size() != 1;
-
-    return is_spatial_conv && IsDmlCompatibleConv2D(&contraction_node);
+    return IsDmlCompatibleConv2D(&contraction_node);
   } else if (IsMatMul(contraction_node)) {
     // DML's _FusedMatMul kernel does not support relu6.
     const NodeDef& activation_node = graph->node(matched.activation);
