@@ -23,25 +23,27 @@ limitations under the License.
 
 namespace tensorflow {
 
+struct LRNAttributes {
+  explicit LRNAttributes(OpKernelConstruction* ctx) {
+    OP_REQUIRES_OK(ctx, ctx->GetAttr("depth_radius", &depth_radius));
+    OP_REQUIRES(ctx,
+                FastBoundsCheck(depth_radius, std::numeric_limits<int>::max()),
+                errors::InvalidArgument("depth_radius = ", depth_radius,
+                                        " larger than int max"));
+    OP_REQUIRES_OK(ctx, ctx->GetAttr("bias", &bias));
+    OP_REQUIRES_OK(ctx, ctx->GetAttr("alpha", &alpha));
+    OP_REQUIRES_OK(ctx, ctx->GetAttr("beta", &beta));
+  }
+
+  int64 depth_radius;
+  float bias;
+  float alpha;
+  float beta;
+};
+
 class LRNInitHelper : public InitializationHelper {
  public:
-  struct Attributes {
-    explicit Attributes(OpKernelConstruction* ctx) {
-      OP_REQUIRES_OK(ctx, ctx->GetAttr("depth_radius", &depth_radius));
-      OP_REQUIRES(
-          ctx, FastBoundsCheck(depth_radius, std::numeric_limits<int>::max()),
-          errors::InvalidArgument("depth_radius = ", depth_radius,
-                                  " larger than int max"));
-      OP_REQUIRES_OK(ctx, ctx->GetAttr("bias", &bias));
-      OP_REQUIRES_OK(ctx, ctx->GetAttr("alpha", &alpha));
-      OP_REQUIRES_OK(ctx, ctx->GetAttr("beta", &beta));
-    }
-
-    int64 depth_radius;
-    float bias;
-    float alpha;
-    float beta;
-  };
+  using Attributes = LRNAttributes;
 
   LRNInitHelper(OpKernelContext* ctx, std::shared_ptr<const Attributes> attr)
       : attr_(attr) {
@@ -124,6 +126,129 @@ class DmlLRNKernel : public DmlKernel {
   REGISTER_KERNEL_BUILDER(                                      \
       Name("LRN").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlLRNKernel, GetOutputShapeAsInputShapeHelper>)
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_half(REGISTER_KERNEL);
+#undef REGISTER_KERNEL
+
+class LRNGradInitHelper : public InitializationHelper {
+ public:
+  using Attributes = LRNAttributes;
+
+  LRNGradInitHelper(OpKernelContext* context,
+                std::shared_ptr<const Attributes> attr)
+      : attr_(attr) {
+    const Tensor& in_grads = context->input(0);
+    const Tensor& in_image = context->input(1);
+    const Tensor& out_image = context->input(2);
+
+    OP_REQUIRES(context, in_grads.dims() == 4 && in_image.dims() == 4,
+                errors::InvalidArgument("inputs must be 4-dimensional"));
+    const int64 batch = in_grads.dim_size(0);
+    const int64 rows = in_grads.dim_size(1);
+    const int64 cols = in_grads.dim_size(2);
+    const int64 depth = in_grads.dim_size(3);
+    OP_REQUIRES(
+        context,
+        in_image.dim_size(0) == batch && in_image.dim_size(1) == rows &&
+            in_image.dim_size(2) == cols && in_image.dim_size(3) == depth &&
+            out_image.dim_size(0) == batch && out_image.dim_size(1) == rows &&
+            out_image.dim_size(2) == cols && out_image.dim_size(3) == depth,
+        errors::InvalidArgument(
+            "input_grads, input_image, and out_image should have the same "
+            "shape"));
+  }
+
+  int64 GetDepthRadius() const { return attr_->depth_radius; }
+  float GetBias() const { return attr_->bias; }
+  float GetAlpha() const { return attr_->alpha; }
+  float GetBeta() const { return attr_->beta; }
+
+ private:
+  const std::shared_ptr<const Attributes> attr_;
+};
+
+// **********************
+// TODO: REMOVE
+// **********************
+enum DML_PREVIEW_OPERATOR_TYPE {
+  DML_PREVIEW_OPERATOR_FIRST = 0xC0000000,
+  DML_PREVIEW_OPERATOR_LOCAL_RESPONSE_NORMALIZATION_GRAD,
+};
+
+struct DML_PREVIEW_LOCAL_RESPONSE_NORMALIZATION_GRAD_OPERATOR_DESC {
+  const DML_TENSOR_DESC* InputTensor;
+  const DML_TENSOR_DESC* InputGradientTensor;
+  const DML_TENSOR_DESC* OutputGradientTensor;
+  BOOL CrossChannel;
+  UINT LocalSize;
+  FLOAT Alpha;
+  FLOAT Beta;
+  FLOAT Bias;
+};
+// **********************
+
+class DmlLRNGradKernel : public DmlKernel {
+ public:
+  using InitHelper = LRNGradInitHelper;
+
+  explicit DmlLRNGradKernel(DmlKernelConstruction* ctx,
+                            const InitHelper* init_helper) {
+    DCHECK(ctx->GetInputCount() == 3);
+    DCHECK(ctx->GetOutputCount() == 1);
+
+    const TensorShape& tensor_shape = ctx->GetInputTensorShape(0);
+
+    const auto tensor_layout =
+        GetDmlTensorLayout(FORMAT_NHWC, tensor_shape.dims());
+
+    DmlTensorInfo input;
+    input.kernel_index = 1;
+    input.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0), tensor_shape,
+                                       tensor_shape, tensor_layout);
+
+    DmlTensorInfo inputGradient;
+    inputGradient.kernel_index = 0;
+    inputGradient.desc = DmlTensorDesc::Create(
+        ctx->GetInputDataType(0), tensor_shape, tensor_shape, tensor_layout);
+
+    DmlTensorInfo outputGradient;
+    outputGradient.kernel_index = 0;
+    outputGradient.desc = DmlTensorDesc::Create(
+        ctx->GetOutputDataType(0), tensor_shape, tensor_shape, tensor_layout);
+
+    DmlKernelTensors tensors;
+    tensors.inputs = {input, inputGradient};
+    tensors.outputs = {outputGradient};
+
+    auto inputs = GetDmlTensorDescs(tensors.inputs);
+    auto outputs = GetDmlTensorDescs(tensors.outputs);
+
+    uint32_t local_size = init_helper->GetDepthRadius() * 2 + 1;
+
+    // DML divides Alpha by LocalSize, but tensorflow's Alpha already contains
+    // that division
+    float dml_alpha = init_helper->GetAlpha() * local_size;
+
+    DML_PREVIEW_LOCAL_RESPONSE_NORMALIZATION_GRAD_OPERATOR_DESC lrn_desc = {};
+    lrn_desc.InputTensor = &inputs[0];
+    lrn_desc.InputGradientTensor = &inputs[1];
+    lrn_desc.OutputGradientTensor = &outputs[0];
+    lrn_desc.CrossChannel = true;
+    lrn_desc.LocalSize = local_size;
+    lrn_desc.Alpha = dml_alpha;
+    lrn_desc.Beta = init_helper->GetBeta();
+    lrn_desc.Bias = init_helper->GetBias();
+
+    DML_OPERATOR_DESC op_desc = {
+        static_cast<DML_OPERATOR_TYPE>(DML_PREVIEW_OPERATOR_LOCAL_RESPONSE_NORMALIZATION_GRAD), &lrn_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
+  }
+};
+
+#define REGISTER_KERNEL(type)                                       \
+  REGISTER_KERNEL_BUILDER(                                          \
+      Name("LRNGrad").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      DmlKernelWrapper<DmlLRNGradKernel, GetOutputShapeAsInputShapeHelper>)
 TF_CALL_float(REGISTER_KERNEL);
 TF_CALL_half(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
