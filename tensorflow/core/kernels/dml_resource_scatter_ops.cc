@@ -81,9 +81,11 @@ class ResourceScatterNDInitHelper : public InitializationHelper {
 
   explicit ResourceScatterNDInitHelper(OpKernelContext* ctx,
                                        std::shared_ptr<const Attributes> attr) {
-    DCHECK(ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE);
+    if (ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE) {
+      isTensorInput_ = false;
+    }
 
-    if (!ctx->input_is_ref(0)) {
+    if (!ctx->input_is_ref(0) && ctx->input(0).dtype() == DT_RESOURCE) {
       OP_REQUIRES_OK(
           ctx, LookupResource(ctx, HandleFromInput(ctx, 0), &params_resource_));
       params_resource_->mu()->lock_shared();
@@ -100,16 +102,18 @@ class ResourceScatterNDInitHelper : public InitializationHelper {
 
     OP_REQUIRES_OK(ctx, ValidateCommonScatter<Index>(params, indices));
 
-    if (!ctx->input_is_ref(0)) {
+    if (!ctx->input_is_ref(0) && ctx->input(0).dtype() == DT_RESOURCE) {
       OP_REQUIRES_OK(ctx, ValidateResourceScatter(indices, updates));
     }
   }
 
   Tensor GetParamsTensor(OpKernelContext* ctx) const {
-    DCHECK(ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE);
-
-    return params_resource_ ? *params_resource_->tensor()
-                            : ctx->mutable_input(0, false);
+    if (isTensorInput_) {
+      return ctx->input(0);
+    } else {
+      return params_resource_ ? *params_resource_->tensor()
+                              : ctx->mutable_input(0, false);
+    }
   }
 
   void Unlock() const {
@@ -119,11 +123,14 @@ class ResourceScatterNDInitHelper : public InitializationHelper {
     }
   }
 
+  bool IsTensorInput() const { return isTensorInput_; }
+
   virtual ~ResourceScatterNDInitHelper() { Unlock(); }
 
  private:
   core::RefCountPtr<Var> params_resource_;
   mutable bool locked_ = false;
+  mutable bool isTensorInput_ = true;
 };
 
 template <typename Index>
@@ -156,7 +163,7 @@ class DmlResourceScatterNDUpdateKernel : public DmlKernel {
     tensors.inputs = {in_out_tensor, indices_tensor, updates_tensor};
     tensors.outputs = {in_out_tensor};
 
-    if (params_tensor.dtype() != DT_RESOURCE) {
+    if (ctx->GetOpKernelContext()->input_is_ref(0)) {
       // The input ref and the output ref must refer to the same memory
       tensors.output_refs_forwarding = {0};
     }
@@ -253,7 +260,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
                       empty_tensor};
     tensors.outputs = {in_out_tensor};
 
-    if (params_tensor.dtype() != DT_RESOURCE) {
+    if (ctx->GetOpKernelContext()->input_is_ref(0)) {
       // The input ref and the output ref must refer to the same memory
       tensors.output_refs_forwarding = {0};
     }
@@ -315,24 +322,34 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
                     empty_buffer.SizeInBytes());
 
     DmlGpuEvent gpu_event;
-    DmlBuffer output_buffer =
-        ctx->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
+    absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 1> output_bindings;
+    const bool isTensorInput = init_helper->IsTensorInput();
+    if (isTensorInput) {
+      D3D12BufferRegion output_buffer =
+          ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
+      output_bindings.push_back(output_buffer.GetBufferBinding());
 
-    absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
-        output_buffer.GetBufferBinding(),
-    };
+      auto status_or_event =
+          DmlKernel::Compute(ctx, input_bindings, output_bindings);
+      if (!status_or_event.ok()) {
+        return status_or_event;
+      }
 
-    auto status_or_event =
-        DmlKernel::Compute(ctx, input_bindings, output_bindings);
-    if (!status_or_event.ok()) {
-      return status_or_event;
+    } else {
+      DmlBuffer output_buffer =
+          ctx->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
+      output_bindings.push_back(output_buffer.GetBufferBinding());
+
+      auto status_or_event =
+          DmlKernel::Compute(ctx, input_bindings, output_bindings);
+      if (!status_or_event.ok()) {
+        return status_or_event;
+      }
+      ctx->CopyBufferToBuffer(input_buffers[0].Resource(),
+                              input_buffers[0].Offset(),
+                              output_buffer.Resource(), output_buffer.Offset(),
+                              output_buffer.SizeInBytes());
     }
-
-    ctx->CopyBufferToBuffer(input_buffers[0].Resource(),
-                            input_buffers[0].Offset(), output_buffer.Resource(),
-                            output_buffer.Offset(),
-                            output_buffer.SizeInBytes());
-
     gpu_event = ctx->InsertUavBarrier();
     return gpu_event;
   }
@@ -381,7 +398,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
           DmlResourceScatterNDBinaryKernel<int32, std::plus<dml::Expression>>, \
           GetOutputShapeAsInputShapeHelper>)                                   \
   REGISTER_KERNEL_BUILDER(                                                     \
-      Name("ScatterNdAdd")                                                     \
+      Name("ScatterNdNonAliasingAdd")                                          \
           .Device(DEVICE_DML)                                                  \
           .TypeConstraint<type>("T")                                           \
           .TypeConstraint<int64>("Tindices"),                                  \
@@ -397,7 +414,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
           DmlResourceScatterNDBinaryKernel<int32, std::plus<dml::Expression>>, \
           GetOutputShapeAsInputShapeHelper>)                                   \
   REGISTER_KERNEL_BUILDER(                                                     \
-      Name("ScatterNdNonAliasingAdd")                                          \
+      Name("ScatterNdAdd")                                                     \
           .Device(DEVICE_DML)                                                  \
           .TypeConstraint<type>("T")                                           \
           .TypeConstraint<int64>("Tindices"),                                  \
