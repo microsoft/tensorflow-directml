@@ -77,8 +77,23 @@ struct DmlGpuEvent {
     WaitForSingleObject(h.get(), INFINITE);
 #else
     // Nullptr event blocks CPU until completion (creates and waits on an event
-    // internally)
-    DML_CHECK_SUCCEEDED(fence->SetEventOnCompletion(fence_value, nullptr));
+    // internally).  This API returns an errur on WSL if the fence value
+    // is not reached after 10 seconds (although this may be changed in future versions 
+    // of the WSL kernel). To work around this, failing calls are re-issued
+    // if they took a minimum length of time (arbitrarily, 1 second). 
+    while (true) {
+      auto start_time = std::chrono::high_resolution_clock::now();
+      HRESULT hr = fence->SetEventOnCompletion(fence_value, nullptr);
+      if (SUCCEEDED(hr)) {
+        break;
+      }
+
+      auto end_time = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> wait_seconds = end_time - start_time;
+      if (wait_seconds.count() < 1.0) {
+        DML_CHECK_SUCCEEDED(hr);
+      }
+  }
 #endif
   }
 };
