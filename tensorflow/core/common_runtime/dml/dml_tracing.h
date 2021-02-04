@@ -12,5 +12,11 @@ class DmlTracing {
  public:
   static DmlTracing& Instance();
 
-  void LogKernelCompute(const std::string& name);
+  void LogSessionRunStart();
+  void LogSessionRunEnd();
+  void LogDeviceFillContextMap();
+  void LogExecutionContextCopyBufferRegion();
+  void LogExecutionContextFillBufferWithPattern();
+  void LogExecutionContextFlush();
+  void LogKernelCompute(const std::string& op_type, const std::string& op_name);
 };

@@ -17,8 +17,8 @@ limitations under the License.
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 
 #include "tensorflow/core/common_runtime/dml/dml_operator_helper.h"
-#include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/common_runtime/dml/dml_tracing.h"
+#include "tensorflow/core/common_runtime/dml/dml_util.h"
 
 namespace tensorflow {
 
@@ -29,7 +29,8 @@ DmlKernelWrapperBase::DmlKernelWrapperBase(OpKernelConstruction* ctx,
       node_def_(std::make_shared<NodeDef>(ctx->def())) {}
 
 void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
-  DmlTracing::Instance().LogKernelCompute(ctx->op_kernel().name());
+  DmlTracing::Instance().LogKernelCompute(ctx->op_kernel().type_string(),
+                                          ctx->op_kernel().name());
 
   const DmlDevice* dml_device = static_cast<const DmlDevice*>(ctx->device());
   const DmlKernelManager& kernel_manager = *dml_device->GetKernelManager();

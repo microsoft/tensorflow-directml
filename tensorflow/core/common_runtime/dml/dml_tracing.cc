@@ -1,6 +1,9 @@
 #if _WIN32
+// clang-format off
 #include <Windows.h>
 #include <TraceLoggingProvider.h>
+#include <evntrace.h>
+// clang-format on
 #else
 // No-op macros for WSL
 #define TRACELOGGING_DECLARE_PROVIDER
@@ -10,8 +13,6 @@
 #define TraceLoggingWrite
 #define TraceLoggingValue
 #endif
-
-#include <cstdio>
 
 #include "dml_tracing.h"
 
@@ -31,7 +32,35 @@ DmlTracing::~DmlTracing() { TraceLoggingUnregister(g_providerHandle); }
   return traceLogger;
 }
 
-void DmlTracing::LogKernelCompute(const std::string& name) {
+void DmlTracing::LogSessionRunStart() {
+  TraceLoggingWrite(g_providerHandle, "SessionRun",
+                    TraceLoggingOpcode(EVENT_TRACE_TYPE_START));
+}
+
+void DmlTracing::LogSessionRunEnd() {
+  TraceLoggingWrite(g_providerHandle, "SessionRun",
+                    TraceLoggingOpcode(EVENT_TRACE_TYPE_STOP));
+}
+
+void DmlTracing::LogDeviceFillContextMap() {
+  TraceLoggingWrite(g_providerHandle, "DeviceFillContextMap");
+}
+
+void DmlTracing::LogExecutionContextCopyBufferRegion() {
+  TraceLoggingWrite(g_providerHandle, "ExecutionContextCopyBufferRegion");
+}
+
+void DmlTracing::LogExecutionContextFillBufferWithPattern() {
+  TraceLoggingWrite(g_providerHandle, "ExecutionContextFillBufferWithPattern");
+}
+
+void DmlTracing::LogExecutionContextFlush() {
+  TraceLoggingWrite(g_providerHandle, "ExecutionContextFlush");
+}
+
+void DmlTracing::LogKernelCompute(const std::string& op_type,
+                                  const std::string& op_name) {
   TraceLoggingWrite(g_providerHandle, "KernelCompute",
-                    TraceLoggingString(name.c_str(), "OpName"));
+                    TraceLoggingString(op_type.c_str(), "Type"),
+                    TraceLoggingString(op_name.c_str(), "Name"));
 }
