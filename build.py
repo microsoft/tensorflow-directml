@@ -238,9 +238,19 @@ def create_package(args):
   if sys.platform == "win32":
     build_pip_package_path += ".exe"
 
+  # The build_pip_package target invokes a bash shell script that, among other things,
+  # copies files needed for the package to a temporary directory. On Windows the temp
+  # directory is somewhere in the msys2 environment, and we recently started to see
+  # strange permission issues with the temp directories created in this environment.
+  # The workaround is to prepare package sources in a fixed location on the host OS
+  # file system.
+  src_path = os.path.join(args.build_output, "python_package_src")
+  if os.path.exists(src_path):
+    shutil.rmtree(src_path)
+
   dst_path = os.path.join(args.build_output, "python_package")
 
-  cl = [build_pip_package_path, "--dst", dst_path, "--directml"]
+  cl = [build_pip_package_path, "--src", src_path, "--dst", dst_path, "--directml"]
 
   subprocess.run(
       " ".join(cl),
