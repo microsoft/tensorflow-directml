@@ -39,8 +39,7 @@ $PipelineDuration = (Get-Date) - [datetime]$Run.StartTime
 # e.g. refs/heads/master -> master
 $ShortBranchName = $Run.SourceBranch -replace '^refs/heads/'
 
-$Organization = $env:SYSTEM_COLLECTIONURI -replace "^https://dev.azure.com/(\w+)/.*", '$1'
-$RunUrl = "https://dev.azure.com/$Organization/$env:SYSTEM_TEAMPROJECT/_build/results?buildId=$($PipelineRunID)"
+$RunUrl = "$env:SYSTEM_COLLECTIONURI$env:SYSTEM_TEAMPROJECT/_build/results?buildId=$($PipelineRunID)"
 
 # Only get commits associated with this build if there was at least one earlier successful build of this branch.
 $FirstRunOnBranch = $Ado.InvokeProjectApi("build/builds?definitions=$($Run.definition.id)&branchName=$($Run.SourceBranch)&`$top=1&resultFilter=succeeded&api-version=5.0", "GET", $null).Count -eq 0
