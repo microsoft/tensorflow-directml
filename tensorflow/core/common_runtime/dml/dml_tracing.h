@@ -14,7 +14,6 @@ class DmlTracing {
 
   void LogSessionRunStart();
   void LogSessionRunEnd();
-  void LogDeviceFillContextMap();
   void LogExecutionContextCopyBufferRegion();
   void LogExecutionContextFillBufferWithPattern();
   void LogExecutionContextFlush();
