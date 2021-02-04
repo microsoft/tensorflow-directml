@@ -398,7 +398,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
           DmlResourceScatterNDBinaryKernel<int32, std::plus<dml::Expression>>, \
           GetOutputShapeAsInputShapeHelper>)                                   \
   REGISTER_KERNEL_BUILDER(                                                     \
-      Name("ScatterNdNonAliasingAdd")                                          \
+      Name("ScatterNdAdd")                                                     \
           .Device(DEVICE_DML)                                                  \
           .TypeConstraint<type>("T")                                           \
           .TypeConstraint<int64>("Tindices"),                                  \
@@ -414,7 +414,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
           DmlResourceScatterNDBinaryKernel<int32, std::plus<dml::Expression>>, \
           GetOutputShapeAsInputShapeHelper>)                                   \
   REGISTER_KERNEL_BUILDER(                                                     \
-      Name("ScatterNdAdd")                                                     \
+      Name("ScatterNdNonAliasingAdd")                                          \
           .Device(DEVICE_DML)                                                  \
           .TypeConstraint<type>("T")                                           \
           .TypeConstraint<int64>("Tindices"),                                  \
