@@ -77,7 +77,7 @@ struct DmlGpuEvent {
     WaitForSingleObject(h.get(), INFINITE);
 #else
     // Nullptr event blocks CPU until completion (creates and waits on an event
-    // internally).  This API returns an errur on WSL if the fence value
+    // internally).  This API returns an error on WSL if the fence value
     // is not reached after 10 seconds (although this may be changed in future versions 
     // of the WSL kernel). To work around this, failing calls are re-issued
     // if they took a minimum length of time (arbitrarily, 1 second). 
