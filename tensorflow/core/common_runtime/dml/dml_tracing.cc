@@ -12,6 +12,10 @@
 #define TraceLoggingUnregister
 #define TraceLoggingWrite
 #define TraceLoggingValue
+#define TraceLoggingString
+#define TraceLoggingOpcode
+#define EVENT_TRACE_TYPE_START
+#define EVENT_TRACE_TYPE_STOP
 #endif
 
 #include "dml_tracing.h"
