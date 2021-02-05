@@ -167,26 +167,6 @@ class LRNGradInitHelper : public InitializationHelper {
   const std::shared_ptr<const Attributes> attr_;
 };
 
-// **********************
-// TODO: REMOVE
-// **********************
-enum DML_PREVIEW_OPERATOR_TYPE {
-  DML_PREVIEW_OPERATOR_FIRST = 0xC0000000,
-  DML_PREVIEW_OPERATOR_LOCAL_RESPONSE_NORMALIZATION_GRAD,
-};
-
-struct DML_PREVIEW_LOCAL_RESPONSE_NORMALIZATION_GRAD_OPERATOR_DESC {
-  const DML_TENSOR_DESC* InputTensor;
-  const DML_TENSOR_DESC* InputGradientTensor;
-  const DML_TENSOR_DESC* OutputGradientTensor;
-  BOOL CrossChannel;
-  UINT LocalSize;
-  FLOAT Alpha;
-  FLOAT Beta;
-  FLOAT Bias;
-};
-// **********************
-
 class DmlLRNGradKernel : public DmlKernel {
  public:
   using InitHelper = LRNGradInitHelper;
