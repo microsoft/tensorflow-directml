@@ -6,14 +6,14 @@
 // clang-format on
 #else
 // No-op macros for WSL
-#define TRACELOGGING_DECLARE_PROVIDER
-#define TRACELOGGING_DEFINE_PROVIDER
-#define TraceLoggingRegister
-#define TraceLoggingUnregister
-#define TraceLoggingWrite
-#define TraceLoggingValue
-#define TraceLoggingString
-#define TraceLoggingOpcode
+#define TRACELOGGING_DECLARE_PROVIDER(...)
+#define TRACELOGGING_DEFINE_PROVIDER(...)
+#define TraceLoggingRegister(...)
+#define TraceLoggingUnregister(...)
+#define TraceLoggingWrite(...)
+#define TraceLoggingValue(...)
+#define TraceLoggingString(...)
+#define TraceLoggingOpcode(...)
 #define EVENT_TRACE_TYPE_START
 #define EVENT_TRACE_TYPE_STOP
 #endif
