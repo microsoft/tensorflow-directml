@@ -3776,6 +3776,7 @@ cc_library(
         "common_runtime/dml/dml_adapter.cc",
         "common_runtime/dml/dml_adapter_impl.cc",
         "common_runtime/dml/dml_error_handling.cc",
+        "common_runtime/dml/dml_tracing.cc",
     ],
     hdrs = [
         "common_runtime/dml/dml_common.h",
@@ -3783,6 +3784,7 @@ cc_library(
         "common_runtime/dml/dml_adapter.h",
         "common_runtime/dml/dml_adapter_impl.h",
         "common_runtime/dml/dml_adapter_heuristics.h",
+        "common_runtime/dml/dml_tracing.h",
     ],
     linkstatic = 1,
     deps = [

@@ -16,6 +16,7 @@ limitations under the License.
 #include "dml_execution_context.h"
 
 #include "dml_bfc_allocator.h"
+#include "dml_tracing.h"
 
 namespace tensorflow {
 
@@ -41,6 +42,7 @@ DmlGpuEvent DmlExecutionContextImpl::CopyBufferRegion(
     D3D12_RESOURCE_STATES dst_state, ID3D12Resource* src_buffer,
     uint64_t src_offset, D3D12_RESOURCE_STATES src_state, uint64_t byte_count) {
   assert(!closed_);
+  DmlTracing::Instance().LogExecutionContextCopyBufferRegion();
 
   SetCommandRecorder(&dml_recorder_);
   dml_recorder_.CopyBufferRegion(dst_buffer, dst_offset, dst_state, src_buffer,
@@ -53,6 +55,8 @@ DmlGpuEvent DmlExecutionContextImpl::FillBufferWithPattern(
     absl::Span<const uint8_t>
         value /* Data type agnostic value, treated as raw bits */) {
   assert(!closed_);
+  DmlTracing::Instance().LogExecutionContextFillBufferWithPattern();
+
   SetCommandRecorder(&dml_recorder_);
   dml_recorder_.FillBufferWithPattern(dst, dst_offset, dst_size_in_bytes,
                                       value);
@@ -100,6 +104,7 @@ void DmlExecutionContextImpl::SetCommandRecorder(
 
 StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
   assert(!closed_);
+  DmlTracing::Instance().LogExecutionContextFlush();
 
   if (!current_recorder_) {
     // Nothing to flush

@@ -21,6 +21,7 @@ limitations under the License.
 #include "dml_event_queue.h"
 #include "dml_kernel_manager.h"
 #include "dml_readback_heap.h"
+#include "dml_tracing.h"
 #include "dml_upload_heap.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/framework/device_base.h"
@@ -179,6 +180,7 @@ Status DmlDevice::FillContextMap(const Graph* graph,
 }
 
 void DmlDevice::DebugOnSessionRunStart() {
+  DmlTracing::Instance().LogSessionRunStart();
   if (state_->sharing_contract) {
     state_->sharing_contract->BeginCapturableWork(
         PIX_EVAL_CAPTURABLE_WORK_GUID);
@@ -186,6 +188,7 @@ void DmlDevice::DebugOnSessionRunStart() {
 }
 
 void DmlDevice::DebugOnSessionRunEnd() {
+  DmlTracing::Instance().LogSessionRunEnd();
   if (state_->sharing_contract) {
     state_->sharing_contract->EndCapturableWork(PIX_EVAL_CAPTURABLE_WORK_GUID);
   }
