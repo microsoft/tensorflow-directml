@@ -46,4 +46,5 @@ xcuserdata
 
 # DML
 /dml_build
+/tfdml_test
 !third_party/dml/ci/build

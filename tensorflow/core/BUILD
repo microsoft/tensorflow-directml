@@ -3804,6 +3804,7 @@ cc_library(
         "d3d12.lib", 
         "dxgi.lib", 
         "pathcch.lib",
+        "advapi32.lib",
     ]) + if_not_windows([
         "-ld3d12",
         "-ldxcore",
