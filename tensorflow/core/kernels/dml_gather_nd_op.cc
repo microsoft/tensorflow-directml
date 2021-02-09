@@ -288,17 +288,23 @@ class DmlGatherNdKernel : public DmlKernel {
     const Tensor params_tensor =
         init_helper->GetParamsTensor(ctx->GetOpKernelContext());
 
+    const Tensor& indices_tensor = ctx->GetInputTensor(1);
+    int64 last_indices_dim = indices_tensor.dim_size(indices_tensor.dims() - 1);
+
     // Create input buffers
-    D3D12BufferRegion input_buffers[] = {
-        ctx->CreateBufferForTensor(params_tensor),
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(1)),
-    };
+    absl::InlinedVector<D3D12BufferRegion, 2> input_buffers;
+    input_buffers.push_back(ctx->CreateBufferForTensor(params_tensor));
 
     // Create input bindings
-    absl::optional<DML_BUFFER_BINDING> input_bindings[] = {
-        input_buffers[0].GetBufferBinding(),
-        input_buffers[1].GetBufferBinding(),
-    };
+    absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 2> input_bindings;
+    input_bindings.push_back(input_buffers[0].GetBufferBinding());
+
+    // When last_indices_dim == 0, we use a tile instead of a gather, and
+    // therefore we don't need a second input
+    if (last_indices_dim != 0) {
+      input_buffers.push_back(ctx->CreateBufferForTensor(indices_tensor));
+      input_bindings.push_back(input_buffers[1].GetBufferBinding());
+    }
 
     DmlGpuEvent gpu_event;
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 1> output_bindings;
