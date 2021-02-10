@@ -205,6 +205,8 @@ class DmlSegmentReductionKernel : public DmlKernel {
   }
 };
 
+// The memory of this implementation is too big at the moment, so we should
+// revisit this operator later if we want to support it with a new DML API
 /*
 #define REGISTER_UNSORTED_SEGMENT_REDUCTION_KERNEL_INDEX(type, name, op,  \
                                                          index_type)      \
