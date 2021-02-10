@@ -205,6 +205,7 @@ class DmlSegmentReductionKernel : public DmlKernel {
   }
 };
 
+/*
 #define REGISTER_UNSORTED_SEGMENT_REDUCTION_KERNEL_INDEX(type, name, op,  \
                                                          index_type)      \
   REGISTER_KERNEL_BUILDER(Name(name)                                      \
@@ -251,5 +252,6 @@ TF_CALL_int32(REGISTER_UNSORTED_SEGMENT_REDUCTION_DML_KERNEL);
 #undef REGISTER_UNSORTED_SEGMENT_REDUCTION_KERNEL
 #undef REGISTER_UNSORTED_SEGMENT_REDUCTION_KERNEL_INDEX
 #undef REGISTER_UNSORTED_SEGMENT_REDUCTION_DML_KERNEL
+*/
 
 }  // namespace tensorflow
