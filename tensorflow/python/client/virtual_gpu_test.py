@@ -51,8 +51,11 @@ class VirtualGpuTestUtil(object):
     self._visible_device_list = [
         i for i in range(len(self._virtual_devices_per_gpu))
     ]
+
+    gpu_prefix = '/%s:' % test_util.gpu_device_type()
+
     gpu_devices = [
-        ('/gpu:' + str(i)) for i in range(sum(self._virtual_devices_per_gpu))
+        (gpu_prefix + str(i)) for i in range(sum(self._virtual_devices_per_gpu))
     ]
     self.devices = ['/cpu:0'] + gpu_devices
     self._num_devices = len(self.devices)
@@ -206,8 +209,6 @@ class VirtualGpuTest(test_util.TensorFlowTestCase):
       # adding virtual devices in the future, thus must be called within a
       # context of a session within which virtual devices are created. Same in
       # the following test case.
-      if not test.is_gpu_available(cuda_only=True):
-        self.skipTest('No GPU available')
       run_options = config_pb2.RunOptions(
           trace_level=config_pb2.RunOptions.FULL_TRACE)
       run_metadata = config_pb2.RunMetadata()
@@ -227,16 +228,19 @@ class VirtualGpuTest(test_util.TensorFlowTestCase):
     self.assertTrue(run_metadata.HasField('step_stats'))
     step_stats = run_metadata.step_stats
     devices = [d.device for d in step_stats.dev_stats]
+
+    gpu_prefix = (
+        '/job:localhost/replica:0/task:0/device:%s'
+        % test_util.gpu_device_type())
+
     self.assertTrue('/job:localhost/replica:0/task:0/device:CPU:0' in devices)
-    self.assertTrue('/job:localhost/replica:0/task:0/device:GPU:0' in devices)
-    self.assertTrue('/job:localhost/replica:0/task:0/device:GPU:1' in devices)
-    self.assertTrue('/job:localhost/replica:0/task:0/device:GPU:2' in devices)
+    self.assertTrue('%s:0' % gpu_prefix in devices)
+    self.assertTrue('%s:1' % gpu_prefix in devices)
+    self.assertTrue('%s:2' % gpu_prefix in devices)
 
   @test_util.deprecated_graph_mode_only
   def testLargeRandomGraph(self):
     with self.session(config=self._util.config) as sess:
-      if not test.is_gpu_available(cuda_only=True):
-        self.skipTest('No GPU available')
       for _ in range(5):
         if not self._util.TestRandomGraph(sess):
           return

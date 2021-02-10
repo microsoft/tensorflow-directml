@@ -577,7 +577,7 @@ class SlotColocationTest(test.TestCase, parameterized.TestCase):
     # Slot variables are created the first time optimizer is used on some
     # variable. This tests that slot variables will be colocated with the base
     # variable.
-    with ops.device("/device:GPU:0"):
+    with ops.device(test_util.gpu_device_name()):
       # Note that for eager execution, minimize expects a function instead of a
       # Tensor.
       opt_op = opt.minimize(loss, [var0, var1])
