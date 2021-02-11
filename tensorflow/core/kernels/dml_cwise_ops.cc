@@ -713,6 +713,8 @@ REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad, y * (-0.5f * x) * (x * x),
                                            kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(ReciprocalGrad, -y* x* x,
                                            kNchwDimensionCount)
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(InvGrad, -y* x* x,
+                                           kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SoftplusGrad, x / (dml::Exp(-y) + 1),
                                            kNchwDimensionCount)
 // softsigngrad(gradients, features) = gradients / (1 + abs(features)) ** 2
