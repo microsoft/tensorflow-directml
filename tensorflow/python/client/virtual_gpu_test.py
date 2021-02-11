@@ -209,6 +209,8 @@ class VirtualGpuTest(test_util.TensorFlowTestCase):
       # adding virtual devices in the future, thus must be called within a
       # context of a session within which virtual devices are created. Same in
       # the following test case.
+      if not test.is_gpu_available():
+        self.skipTest('No GPU available')
       run_options = config_pb2.RunOptions(
           trace_level=config_pb2.RunOptions.FULL_TRACE)
       run_metadata = config_pb2.RunMetadata()
@@ -241,6 +243,8 @@ class VirtualGpuTest(test_util.TensorFlowTestCase):
   @test_util.deprecated_graph_mode_only
   def testLargeRandomGraph(self):
     with self.session(config=self._util.config) as sess:
+      if not test.is_gpu_available():
+        self.skipTest('No GPU available')
       for _ in range(5):
         if not self._util.TestRandomGraph(sess):
           return
