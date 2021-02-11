@@ -65,7 +65,7 @@ class MemoryOptimizerSwapTest(test.TestCase):
   @test_util.run_v1_only('b/120545219')
   def testSimpleSwap(self):
     """Check that the swap annotations are followed."""
-    with ops.device('/gpu:0'):
+    with ops.device(test_util.gpu_device_name()):
       a = variables.VariableV1(10, name='a')
       b = variables.VariableV1(20, name='b')
       c = math_ops.add_n([a, b], name='c')
