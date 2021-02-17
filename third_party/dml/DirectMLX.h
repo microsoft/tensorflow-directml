@@ -2644,6 +2644,48 @@ namespace dml
         return output;
     }
 
+    inline Expression BatchNormalizationGrad(
+        Expression inputX,
+        Expression inputYBackprop,
+        Expression mean,
+        Expression variance,
+        Expression scale,
+        float epsilon,
+        Expression &outputScaleGradient,
+        Expression &outputBiasGradient)
+    {
+        dml::detail::GraphBuilder* builder = mean.Impl()->GetGraphBuilder();
+        TensorDesc inputXTensor = inputX.Impl()->GetOutputDesc();
+        TensorDesc inputYBackpropTensor = inputYBackprop.Impl()->GetOutputDesc();
+        TensorDesc meanTensor = mean.Impl()->GetOutputDesc();
+        TensorDesc varianceTensor = variance.Impl()->GetOutputDesc();
+        TensorDesc scaleTensor = scale.Impl()->GetOutputDesc();
+        TensorDesc outputTensor(inputXTensor.dataType, inputXTensor.sizes, builder->GetTensorPolicy());
+        TensorDesc outputScaleTensor(meanTensor.dataType, meanTensor.sizes, builder->GetTensorPolicy());
+        TensorDesc outputBiasTensor(meanTensor.dataType, meanTensor.sizes, builder->GetTensorPolicy());
+
+        DML_PREVIEW_BATCH_NORMALIZATION_GRAD_OPERATOR_DESC bng_desc = {};
+        bng_desc.InputTensor = inputXTensor.AsPtr<DML_TENSOR_DESC>();
+        bng_desc.InputGradientTensor = inputYBackpropTensor.AsPtr<DML_TENSOR_DESC>();
+        bng_desc.MeanTensor = meanTensor.AsPtr<DML_TENSOR_DESC>();
+        bng_desc.VarianceTensor = varianceTensor.AsPtr<DML_TENSOR_DESC>();
+        bng_desc.ScaleTensor = scaleTensor.AsPtr<DML_TENSOR_DESC>();
+        bng_desc.Epsilon = epsilon;
+        
+        bng_desc.OutputGradientTensor = outputTensor.AsPtr<DML_TENSOR_DESC>();
+        bng_desc.OutputScaleGradientTensor = outputScaleTensor.AsPtr<DML_TENSOR_DESC>();
+        bng_desc.OutputBiasGradientTensor = outputBiasTensor.AsPtr<DML_TENSOR_DESC>();
+        
+        dml::detail::NodeOutput* const inputs[] = { inputX.Impl(), inputYBackprop.Impl(), mean.Impl(), variance.Impl(), scale.Impl() };
+        dml::detail::NodeID node = builder->CreateOperatorNode((DML_OPERATOR_TYPE)DML_PREVIEW_OPERATOR_BATCH_NORMALIZATION_GRAD, &bng_desc, inputs);
+        
+        dml::Expression x_backprop = builder->CreateNodeOutput(node, 0, *bng_desc.OutputGradientTensor);
+        outputScaleGradient = builder->CreateNodeOutput(node, 1, *bng_desc.OutputScaleGradientTensor);
+        outputBiasGradient = builder->CreateNodeOutput(node, 2, *bng_desc.OutputBiasGradientTensor);
+
+        return x_backprop;
+    }
+
     inline Expression MeanVarianceNormalization(
         Expression input,
         Optional<Expression> scale,
