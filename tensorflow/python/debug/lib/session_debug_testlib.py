@@ -173,8 +173,8 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
 
   def _generate_dump_from_simple_addition_graph(self):
     with session.Session(config=no_rewrite_session_config()) as sess:
-      u_init_val = np.array([[5.0, 3.0], [-1.0, 0.0]])
-      v_init_val = np.array([[2.0], [-1.0]])
+      u_init_val = np.array([[5.0, 3.0], [-1.0, 0.0]], dtype=np.float32)
+      v_init_val = np.array([[2.0], [-1.0]], dtype=np.float32)
 
       # Use node names with overlapping namespace (i.e., parent directory) to
       # test concurrent, non-racing directory creation.

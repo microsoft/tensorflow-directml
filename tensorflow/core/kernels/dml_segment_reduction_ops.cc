@@ -205,6 +205,9 @@ class DmlSegmentReductionKernel : public DmlKernel {
   }
 };
 
+// The memory of this implementation is too big at the moment, so we should
+// revisit this operator later if we want to support it with a new DML API
+/*
 #define REGISTER_UNSORTED_SEGMENT_REDUCTION_KERNEL_INDEX(type, name, op,  \
                                                          index_type)      \
   REGISTER_KERNEL_BUILDER(Name(name)                                      \
@@ -251,5 +254,6 @@ TF_CALL_int32(REGISTER_UNSORTED_SEGMENT_REDUCTION_DML_KERNEL);
 #undef REGISTER_UNSORTED_SEGMENT_REDUCTION_KERNEL
 #undef REGISTER_UNSORTED_SEGMENT_REDUCTION_KERNEL_INDEX
 #undef REGISTER_UNSORTED_SEGMENT_REDUCTION_DML_KERNEL
+*/
 
 }  // namespace tensorflow

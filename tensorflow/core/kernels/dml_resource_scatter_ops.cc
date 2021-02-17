@@ -49,9 +49,37 @@ static Status ValidateResourceScatter(const Tensor& indices,
   return Status::OK();
 }
 
+static bool ValidEmptyOutputShape(int64 num_inputs, int64 num_indices,
+                                  int64 num_updates) {
+  if (num_indices == 0 && num_updates == 0) {
+    return true;  // regardless of num_inputs ?= 0, covers both cases
+  }
+  // now we want all 3 tensors to have values
+  return (num_inputs != 0 && num_indices != 0 && num_updates != 0);
+}
+
 template <typename Index>
-static Status ValidateCommonScatter(const Tensor& params,
-                                    const Tensor& indices) {
+static Status ValidateCommonScatter(const Tensor& params, const Tensor& indices,
+                                    const Tensor& updates) {
+  if (!TensorShapeUtils::IsVectorOrHigher(params.shape())) {
+    return errors::InvalidArgument("Output must be at least 1-D, ",
+                                   "got shape: ", params.shape().DebugString());
+  }
+
+  if (!ValidEmptyOutputShape(params.NumElements(), indices.NumElements(),
+                             updates.NumElements())) {
+    return errors::InvalidArgument(
+        "Indices and updates specified for empty output.  indices shape: ",
+        indices.shape().DebugString());
+  }
+
+  if (updates.dim_size(0) != indices.dim_size(0)) {
+    return errors::InvalidArgument(
+        "The outermost dimension of updates and indices ",
+        "must match. Got indices.shape ", indices.shape().DebugString(),
+        ", updates.shape ", updates.shape().DebugString());
+  }
+
   // Check that we have enough index space
   const int64 N_big = indices.NumElements();
 
@@ -100,7 +128,7 @@ class ResourceScatterNDInitHelper : public InitializationHelper {
       OP_REQUIRES_OK(ctx, ValidateRefScatter(params, indices, updates));
     }
 
-    OP_REQUIRES_OK(ctx, ValidateCommonScatter<Index>(params, indices));
+    OP_REQUIRES_OK(ctx, ValidateCommonScatter<Index>(params, indices, updates));
 
     if (!ctx->input_is_ref(0) && ctx->input(0).dtype() == DT_RESOURCE) {
       OP_REQUIRES_OK(ctx, ValidateResourceScatter(indices, updates));
