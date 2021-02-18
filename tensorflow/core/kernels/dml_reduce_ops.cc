@@ -73,6 +73,12 @@ class ReduceInitializationHelper : public InitializationHelper {
     const Tensor& axes_tensor = ctx->input(1);
     OP_REQUIRES_OK(ctx, reduction_helper_.Simplify(data_tensor, axes_tensor,
                                                    attr->keep_dims));
+
+    OP_REQUIRES(
+        ctx, reduction_helper_.data_reshape().dims() <= 8,
+        errors::InvalidArgument(
+            "DML doesn't support more than 8 dimensions for Reduction after "
+            "simplifying the inputs and collapsing axes together."));
   }
 
   const ReductionHelper& GetReductionHelper() const {
@@ -275,10 +281,10 @@ class DmlReduceKernel : public DmlKernel {
     // The input shape after adjacent reduction axes have been collapsed.
     const TensorShape& input_shape = reduce_helper.data_reshape();
 
-    // DML's reduction operator only supports up to 4 dimensions
-    CHECK(input_shape.dims() <= kNchwDimensionCount);
-
-    uint32_t reduce_axis_offset = kNchwDimensionCount - input_shape.dims();
+    uint32_t reduce_axis_offset =
+        input_shape.dims() >= kNchwDimensionCount
+            ? 0
+            : kNchwDimensionCount - input_shape.dims();
 
     // Compute the DML reduce axes based on the input shape. If
     // reduce_first_axis() is true we reduce over axes 0 and 2, otherwise we
@@ -487,6 +493,23 @@ TF_CALL_uint32(DML_REGISTER_KERNELS);
 TF_CALL_float(DML_REGISTER_KERNELS);
 TF_CALL_half(DML_REGISTER_KERNELS);
 TF_CALL_uint32(DML_REGISTER_KERNELS);
+#undef DML_REGISTER_KERNELS
+
+#define DML_REGISTER_KERNELS(type)                                          \
+  REGISTER_KERNEL_BUILDER(Name("EuclideanNorm")                             \
+                              .Device(DEVICE_DML)                           \
+                              .TypeConstraint<type>("T")                    \
+                              .TypeConstraint<int32>("Tidx")                \
+                              .HostMemory("reduction_indices"),             \
+                          DmlReduceWrapper<DML_REDUCE_FUNCTION_L2, int32>); \
+  REGISTER_KERNEL_BUILDER(Name("EuclideanNorm")                             \
+                              .Device(DEVICE_DML)                           \
+                              .TypeConstraint<type>("T")                    \
+                              .TypeConstraint<int64>("Tidx")                \
+                              .HostMemory("reduction_indices"),             \
+                          DmlReduceWrapper<DML_REDUCE_FUNCTION_L2, int64>);
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 #define DML_REGISTER_KERNELS(type)                          \
