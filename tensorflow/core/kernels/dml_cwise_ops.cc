@@ -1338,4 +1338,16 @@ TF_CALL_int16(DML_REGISTER_KERNEL);
 TF_CALL_int32(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
+#define DML_REGISTER_KERNEL(type)                                              \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("TruncateDiv").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
+      DmlKernelWrapper<DmlBinaryKernel<DML_OPERATOR_ELEMENT_WISE_DIVIDE,       \
+                                       DML_ELEMENT_WISE_DIVIDE_OPERATOR_DESC>, \
+                       GetBroadcastedOutputShapeHelper>);
+TF_CALL_uint8(DML_REGISTER_KERNEL);
+TF_CALL_uint16(DML_REGISTER_KERNEL);
+TF_CALL_int16(DML_REGISTER_KERNEL);
+TF_CALL_int64(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
 }  // namespace tensorflow
