@@ -661,9 +661,6 @@ REGISTER_DML_FLOAT_OP_KERNEL(Square, DmlUnaryScaleBiasKernel,
 REGISTER_DML_FLOAT_OP_KERNEL(Pow, DmlBinaryKernel,
                              DML_OPERATOR_ELEMENT_WISE_POW,
                              DML_ELEMENT_WISE_POW_OPERATOR_DESC)
-REGISTER_DML_FLOAT_OP_KERNEL(Round, DmlUnaryKernel,
-                             DML_OPERATOR_ELEMENT_WISE_ROUND,
-                             DML_ELEMENT_WISE_ROUND_OPERATOR_DESC)
 REGISTER_DML_FLOAT_OP_KERNEL(Softplus, DmlUnaryKernel,
                              DML_OPERATOR_ACTIVATION_SOFTPLUS,
                              DML_ACTIVATION_SOFTPLUS_OPERATOR_DESC, 1)
@@ -709,7 +706,7 @@ REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(TanhGrad, y*(1 - x * x),
                                            kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SqrtGrad, y * 0.5f / x,
                                            kNchwDimensionCount)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad, y * (-0.5f * x) * (x * x),
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad, y*(-0.5f * x) * (x * x),
                                            kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(ReciprocalGrad, -y* x* x,
                                            kNchwDimensionCount)
@@ -1345,6 +1342,60 @@ TF_CALL_uint8(DML_REGISTER_KERNEL);
 TF_CALL_uint16(DML_REGISTER_KERNEL);
 TF_CALL_int16(DML_REGISTER_KERNEL);
 TF_CALL_int64(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+class DmlRoundKernel : public DmlKernel {
+ public:
+  using InitHelper = ElementWiseInitHelper<UINT32_MAX>;
+
+  explicit DmlRoundKernel(DmlKernelConstruction* ctx,
+                          const InitHelper* init_helper) {
+    TensorShape tensor_shape({ctx->GetOutputTensorShape(0).num_elements()});
+    DmlKernelTensors tensors =
+        CreateKernelTensors(ctx, {tensor_shape}, tensor_shape);
+    auto inputs = GetDmlTensorDescs(tensors.inputs);
+    auto outputs = GetDmlTensorDescs(tensors.outputs);
+
+    DML_ELEMENT_WISE_ROUND_OPERATOR_DESC round_desc;
+    round_desc.InputTensor = inputs.data();
+    round_desc.OutputTensor = outputs.data();
+    round_desc.RoundingMode = DML_ROUNDING_MODE_HALVES_TO_NEAREST_EVEN;
+
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_ROUND, &round_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
+  }
+
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
+    // Currently, 64-bit integers in DML are emulated using 32-bit integers
+    // using striding to emulate a larger type. Because we can't guarantee that
+    // our output tensor's memory is zero'd, we need to do so manually prior to
+    // running running gather.
+    Tensor* output = ctx->GetOutputTensor(0);
+
+    if (Is64BitIntegerType(output->dtype())) {
+      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    }
+
+    return DmlKernel::Compute(ctx);
+  }
+};
+
+#define DML_REGISTER_KERNEL(type)                                 \
+  REGISTER_KERNEL_BUILDER(                                        \
+      Name("Round").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      DmlKernelWrapper<DmlRoundKernel, GetBroadcastedOutputShapeHelper>);
+TF_CALL_half(DML_REGISTER_KERNEL);
+TF_CALL_float(DML_REGISTER_KERNEL);
+TF_CALL_int32(DML_REGISTER_KERNEL);
+TF_CALL_int64(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+#define DML_REGISTER_KERNEL(type)                                \
+  REGISTER_KERNEL_BUILDER(                                       \
+      Name("Rint").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      DmlKernelWrapper<DmlRoundKernel, GetBroadcastedOutputShapeHelper>);
+TF_CALL_half(DML_REGISTER_KERNEL);
+TF_CALL_float(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow
