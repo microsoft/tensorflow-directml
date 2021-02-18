@@ -709,7 +709,7 @@ REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(TanhGrad, y*(1 - x * x),
                                            kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SqrtGrad, y * 0.5f / x,
                                            kNchwDimensionCount)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad, y * (-0.5f * x) * (x * x),
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad, y*(-0.5f * x) * (x * x),
                                            kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(ReciprocalGrad, -y* x* x,
                                            kNchwDimensionCount)
@@ -1333,6 +1333,18 @@ TF_CALL_uint32(DML_REGISTER_KERNEL);
 TF_CALL_int8(DML_REGISTER_KERNEL);
 TF_CALL_int16(DML_REGISTER_KERNEL);
 TF_CALL_int32(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+#define DML_REGISTER_KERNEL(type)                                              \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("TruncateDiv").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
+      DmlKernelWrapper<DmlBinaryKernel<DML_OPERATOR_ELEMENT_WISE_DIVIDE,       \
+                                       DML_ELEMENT_WISE_DIVIDE_OPERATOR_DESC>, \
+                       GetBroadcastedOutputShapeHelper>);
+TF_CALL_uint8(DML_REGISTER_KERNEL);
+TF_CALL_uint16(DML_REGISTER_KERNEL);
+TF_CALL_int16(DML_REGISTER_KERNEL);
+TF_CALL_int64(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow
