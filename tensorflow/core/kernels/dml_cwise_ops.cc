@@ -664,6 +664,9 @@ REGISTER_DML_FLOAT_OP_KERNEL(Pow, DmlBinaryKernel,
 REGISTER_DML_FLOAT_OP_KERNEL(Round, DmlUnaryKernel,
                              DML_OPERATOR_ELEMENT_WISE_ROUND,
                              DML_ELEMENT_WISE_ROUND_OPERATOR_DESC)
+REGISTER_DML_FLOAT_OP_KERNEL(Rint, DmlUnaryKernel,
+                             DML_OPERATOR_ELEMENT_WISE_ROUND,
+                             DML_ELEMENT_WISE_ROUND_OPERATOR_DESC)
 REGISTER_DML_FLOAT_OP_KERNEL(Softplus, DmlUnaryKernel,
                              DML_OPERATOR_ACTIVATION_SOFTPLUS,
                              DML_ACTIVATION_SOFTPLUS_OPERATOR_DESC, 1)
@@ -709,7 +712,7 @@ REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(TanhGrad, y*(1 - x * x),
                                            kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SqrtGrad, y * 0.5f / x,
                                            kNchwDimensionCount)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad, y * (-0.5f * x) * (x * x),
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad, y*(-0.5f * x) * (x * x),
                                            kNchwDimensionCount)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(ReciprocalGrad, -y* x* x,
                                            kNchwDimensionCount)
