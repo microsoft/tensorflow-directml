@@ -35,10 +35,7 @@ from tensorflow.python.ops import variables
 from tensorflow.python.platform import test
 
 # The maximum input rank to test.
-if test_util.gpu_device_type() == "DML":
-  _MAX_RANK = 4 # DML only supports up to 4D reduction
-else:
-  _MAX_RANK = 5
+_MAX_RANK = 5
 
 
 def _powerset(iterable):
