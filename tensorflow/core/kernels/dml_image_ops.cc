@@ -474,12 +474,16 @@ struct DmlAdjustContrastFunctorV2 {
   REGISTER_KERNEL_BUILDER(                                                    \
       Name("AdjustContrast").Device(DEVICE_DML).TypeConstraint<type>("T"),    \
       DmlKernelWrapper<DmlAdjustImageClampedKernel<DmlAdjustContrastFunctor>, \
-                       GetOutputShapeAsInputShapeHelper>)                     \
-  REGISTER_KERNEL_BUILDER(                                                    \
-      Name("AdjustContrastv2").Device(DEVICE_DML).TypeConstraint<type>("T"),  \
-      DmlKernelWrapper<DmlAdjustImageKernel<DmlAdjustContrastFunctorV2>,      \
                        GetOutputShapeAsInputShapeHelper>)
-TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL)
+TF_CALL_float(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+#define DML_REGISTER_KERNEL(type)                                            \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name("AdjustContrastv2").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      DmlKernelWrapper<DmlAdjustImageKernel<DmlAdjustContrastFunctorV2>,     \
+                       GetOutputShapeAsInputShapeHelper>)
+TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow
