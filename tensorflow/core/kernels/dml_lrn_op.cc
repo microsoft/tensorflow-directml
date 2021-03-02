@@ -135,7 +135,7 @@ class LRNGradInitHelper : public InitializationHelper {
   using Attributes = LRNAttributes;
 
   LRNGradInitHelper(OpKernelContext* context,
-                std::shared_ptr<const Attributes> attr)
+                    std::shared_ptr<const Attributes> attr)
       : attr_(attr) {
     const Tensor& in_grads = context->input(0);
     const Tensor& in_image = context->input(1);
@@ -209,7 +209,7 @@ class DmlLRNGradKernel : public DmlKernel {
     // that division
     float dml_alpha = init_helper->GetAlpha() * local_size;
 
-    DML_PREVIEW_LOCAL_RESPONSE_NORMALIZATION_GRAD_OPERATOR_DESC lrn_desc = {};
+    DML_LOCAL_RESPONSE_NORMALIZATION_GRAD_OPERATOR_DESC lrn_desc = {};
     lrn_desc.InputTensor = &inputs[0];
     lrn_desc.InputGradientTensor = &inputs[1];
     lrn_desc.OutputGradientTensor = &outputs[0];
@@ -219,8 +219,8 @@ class DmlLRNGradKernel : public DmlKernel {
     lrn_desc.Beta = init_helper->GetBeta();
     lrn_desc.Bias = init_helper->GetBias();
 
-    DML_OPERATOR_DESC op_desc = {
-        static_cast<DML_OPERATOR_TYPE>(DML_PREVIEW_OPERATOR_LOCAL_RESPONSE_NORMALIZATION_GRAD), &lrn_desc};
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_LOCAL_RESPONSE_NORMALIZATION_GRAD,
+                                 &lrn_desc};
     Initialize(ctx, std::move(tensors), op_desc);
   }
 };
