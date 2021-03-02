@@ -18,6 +18,8 @@ limitations under the License.
 #include "dml_command_queue.h"
 #include "dml_common.h"
 #include "dml_status.h"
+#include "dml_command_allocator_ring.h"
+#include "dml_descriptor_pool.h"
 
 namespace tensorflow {
 class DmlAllocator;
