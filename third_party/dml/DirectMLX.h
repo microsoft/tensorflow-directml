@@ -1074,6 +1074,27 @@ namespace dml
         return output;
     }
 
+    inline Expression ClipGrad(Expression input, Expression inputGradient, float min, float max)
+    {
+        detail::GraphBuilder* builder = input.Impl()->GetGraphBuilder();
+
+        TensorDesc inputTensor = input.Impl()->GetOutputDesc();
+        TensorDesc inputGradientTensor = inputGradient.Impl()->GetOutputDesc();
+        TensorDesc outputGradientTensor(inputGradientTensor.dataType, inputGradientTensor.sizes, builder->GetTensorPolicy());
+
+        DML_ELEMENT_WISE_CLIP_GRAD_OPERATOR_DESC desc = {};
+        desc.InputTensor = inputTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.OutputGradientTensor = outputGradientTensor.AsPtr<DML_TENSOR_DESC>();
+        desc.Min = min;
+        desc.Max = max;
+
+        detail::NodeOutput* const inputs[] = { input.Impl() };
+        detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_ELEMENT_WISE_CLIP_GRAD, &desc, inputs);
+        detail::NodeOutput* output = builder->CreateNodeOutput(node, 0, std::move(outputGradientTensor));
+
+        return output;
+    }
+
     inline Expression Cos(Expression input, const Optional<DML_SCALE_BIAS>& scaleBias = NullOpt)
     {
         return detail::ElementWiseUnary<DML_OPERATOR_ELEMENT_WISE_COS, DML_ELEMENT_WISE_COS_OPERATOR_DESC>(input, scaleBias);
@@ -1242,6 +1263,20 @@ namespace dml
     inline Expression Sqrt(Expression input, const Optional<DML_SCALE_BIAS>& scaleBias = NullOpt)
     {
         return detail::ElementWiseUnary<DML_OPERATOR_ELEMENT_WISE_SQRT, DML_ELEMENT_WISE_SQRT_OPERATOR_DESC>(input, scaleBias);
+    }
+
+struct DML_ELEMENT_WISE_SQUARE_DIFFERENCE_OPERATOR_DESC
+{
+    const DML_TENSOR_DESC* ATensor;
+    const DML_TENSOR_DESC* BTensor;
+    const DML_TENSOR_DESC* OutputTensor;
+};
+
+    inline Expression SquareDifference(Expression a, Expression b)
+    {
+        const uint32_t DML_OPERATOR_ELEMENT_WISE_SQUARE_DIFFERENCE = 142;
+
+        return detail::ElementWiseBinary<(DML_OPERATOR_TYPE)DML_OPERATOR_ELEMENT_WISE_SQUARE_DIFFERENCE, DML_ELEMENT_WISE_SQUARE_DIFFERENCE_OPERATOR_DESC>(a, b);
     }
 
     inline Expression Subtract(Expression a, Expression b)
@@ -2664,7 +2699,7 @@ namespace dml
         TensorDesc outputScaleTensor(meanTensor.dataType, meanTensor.sizes, builder->GetTensorPolicy());
         TensorDesc outputBiasTensor(meanTensor.dataType, meanTensor.sizes, builder->GetTensorPolicy());
 
-        DML_PREVIEW_BATCH_NORMALIZATION_GRAD_OPERATOR_DESC bng_desc = {};
+        DML_BATCH_NORMALIZATION_GRAD_OPERATOR_DESC bng_desc = {};
         bng_desc.InputTensor = inputXTensor.AsPtr<DML_TENSOR_DESC>();
         bng_desc.InputGradientTensor = inputYBackpropTensor.AsPtr<DML_TENSOR_DESC>();
         bng_desc.MeanTensor = meanTensor.AsPtr<DML_TENSOR_DESC>();
@@ -2677,7 +2712,7 @@ namespace dml
         bng_desc.OutputBiasGradientTensor = outputBiasTensor.AsPtr<DML_TENSOR_DESC>();
         
         dml::detail::NodeOutput* const inputs[] = { inputX.Impl(), inputYBackprop.Impl(), mean.Impl(), variance.Impl(), scale.Impl() };
-        dml::detail::NodeID node = builder->CreateOperatorNode((DML_OPERATOR_TYPE)DML_PREVIEW_OPERATOR_BATCH_NORMALIZATION_GRAD, &bng_desc, inputs);
+        dml::detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_BATCH_NORMALIZATION_GRAD, &bng_desc, inputs);
         
         dml::Expression x_backprop = builder->CreateNodeOutput(node, 0, *bng_desc.OutputGradientTensor);
         outputScaleGradient = builder->CreateNodeOutput(node, 1, *bng_desc.OutputScaleGradientTensor);

@@ -919,17 +919,18 @@ class DmlSquaredDifferenceKernel : public DmlKernel {
         CreateKernelTensors(ctx, input_shapes, output_shape);
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
+    const Tensor& min_tensor = ctx->GetConstantInputTensor(1);
+    const Tensor& max_tensor = ctx->GetConstantInputTensor(2);
 
-    auto scope = dml::Graph(ctx->GetDmlDevice());
-    auto x = dml::InputTensor(scope, 0, inputs[0]);
-    auto y = dml::InputTensor(scope, 1, inputs[1]);
-    auto diff = x - y;
-    auto result = diff * diff;
+    DML_ELEMENT_WISE_SQUARE_DIFFERENCE_OPERATOR_DESC square_difference_desc;
+    square_difference_desc.ATensor = &inputs[0];
+    square_difference_desc.BTensor = &inputs[1];
+    square_difference_desc.OutputTensor = &outputs[0];
 
-    ComPtr<IDMLCompiledOperator> compiled_op =
-        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+    DML_OPERATOR_DESC op_desc =
+        {DML_OPERATOR_ELEMENT_WISE_SQUARE_DIFFERENCE, &square_difference_desc};
 
-    Initialize(ctx, std::move(tensors), compiled_op.Get());
+    Initialize(ctx, std::move(tensors), op_desc);
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
