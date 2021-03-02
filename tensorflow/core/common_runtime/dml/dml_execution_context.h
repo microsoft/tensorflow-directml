@@ -16,7 +16,6 @@ limitations under the License.
 #pragma once
 
 #include "dml_command_queue.h"
-#include "dml_command_recorder.h"
 #include "dml_common.h"
 #include "dml_status.h"
 
