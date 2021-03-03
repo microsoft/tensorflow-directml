@@ -24,7 +24,7 @@ limitations under the License.
 namespace tensorflow {
 
 template <typename Tidx>
-class CumsumInitHelper : public InitializationHelper {
+class ScanInitHelper : public InitializationHelper {
  public:
   struct Attributes {
     explicit Attributes(OpKernelConstruction* ctx) {
@@ -36,7 +36,7 @@ class CumsumInitHelper : public InitializationHelper {
     bool exclusive;
   };
 
-  CumsumInitHelper(OpKernelContext* ctx, std::shared_ptr<const Attributes> attr)
+  ScanInitHelper(OpKernelContext* ctx, std::shared_ptr<const Attributes> attr)
       : attr_(attr) {
     const Tensor& input = ctx->input(0);
     const Tensor& tensor_axis = ctx->input(1);
@@ -66,7 +66,7 @@ class CumsumInitHelper : public InitializationHelper {
 template <typename Tidx, typename SCAN_OP_DESC, DML_OPERATOR_TYPE op_type>
 class DmlScanKernel : public DmlKernel {
  public:
-  using InitHelper = CumsumInitHelper<Tidx>;
+  using InitHelper = ScanInitHelper<Tidx>;
 
   explicit DmlScanKernel(DmlKernelConstruction* ctx,
                          const InitHelper* init_helper) {
@@ -116,7 +116,7 @@ class DmlScanKernel : public DmlKernel {
     // axis is always "2"
     constexpr uint32_t dml_axis = 2;
 
-    SCAN_OP_DESC cumsum_desc{
+    SCAN_OP_DESC scan_desc{
         &inputs[0],
         &outputs[0],
         dml_axis,
@@ -124,7 +124,7 @@ class DmlScanKernel : public DmlKernel {
         init_helper->IsExclusive(),
     };
 
-    DML_OPERATOR_DESC op_desc = {op_type, &cumsum_desc};
+    DML_OPERATOR_DESC op_desc = {op_type, &scan_desc};
     Initialize(ctx, std::move(tensors), op_desc);
   }
 
