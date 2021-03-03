@@ -15,11 +15,11 @@ limitations under the License.
 
 #pragma once
 
+#include "dml_command_allocator_ring.h"
 #include "dml_command_queue.h"
 #include "dml_common.h"
-#include "dml_status.h"
-#include "dml_command_allocator_ring.h"
 #include "dml_descriptor_pool.h"
+#include "dml_status.h"
 
 namespace tensorflow {
 class DmlAllocator;
@@ -60,6 +60,10 @@ class DmlExecutionContextImpl {
       IDMLOperatorInitializer* initializer,
       const DML_BINDING_DESC& persistent_resource_binding,
       const DML_BINDING_DESC& input_array_binding);
+
+  DmlGpuEvent InitializeOperator(IDMLOperatorInitializer* initializer,
+                                 IDMLBindingTable* binding_table,
+                                 ID3D12DescriptorHeap* descriptor_heap);
 
   DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
                               IDMLBindingTable* binding_table,
@@ -163,6 +167,14 @@ class DmlExecutionContext {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->InitializeOperator(initializer, persistent_resource_binding,
                                      input_array_binding);
+  }
+
+  DmlGpuEvent InitializeOperator(IDMLOperatorInitializer* initializer,
+                                 IDMLBindingTable* binding_table,
+                                 ID3D12DescriptorHeap* descriptor_heap) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return impl_->InitializeOperator(initializer, binding_table,
+                                     descriptor_heap);
   }
 
   DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,

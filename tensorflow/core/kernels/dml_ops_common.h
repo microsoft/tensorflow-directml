@@ -150,6 +150,9 @@ class DmlKernel {
   void Initialize(DmlKernelConstruction* ctx, DmlKernelTensors&& tensor_descs,
                   IDMLCompiledOperator* compiled_op);
 
+  void Initialize2(DmlKernelConstruction* ctx, DmlKernelTensors&& tensor_descs,
+                  IDMLCompiledOperator* compiled_op);
+
   // For ops that skip the DML graph (e.g. BlockLSTM in seq_len_max==0 case)
   void InitializeAsNoOp(DmlKernelConstruction* ctx) {
     init_helper_ = ctx->GetInitializationHelper();

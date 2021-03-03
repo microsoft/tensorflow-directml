@@ -70,6 +70,15 @@ class DmlKernelConstruction {
       _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
       absl::Span<const DML_BUFFER_BINDING> input_bindings);
 
+  // Initializes a given DML operator on the GPU. Note that this merely
+  // queues the initialization; the returned event will enter the signaled
+  // state when it completes.
+  DmlGpuEvent BindAndInitializeOperator(
+      IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
+      ID3D12DescriptorHeap* heap_for_binding_table,
+      _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
+      absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings);
+
   // Input tensors
   uint32_t GetInputCount() const { return op_ctx_->num_inputs(); }
   DataType GetInputDataType(uint32_t index) const;

@@ -253,6 +253,35 @@ DmlGpuEvent DmlExecutionContextImpl::InitializeOperator(
   return GetCurrentCompletionEvent();
 }
 
+DmlGpuEvent DmlExecutionContextImpl::InitializeOperator(
+    IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
+    ID3D12DescriptorHeap* descriptor_heap) {
+  assert(!closed_);
+  if (!status_.ok()) {
+    GetCurrentCompletionEvent();
+  }
+
+  // Record the initialization work.
+  SetDescriptorHeap(descriptor_heap);
+  recorder_->RecordDispatch(current_command_list_.Get(), initializer,
+                            binding_table);
+
+  // Barrier if there's an output (i.e. persistent resource), or if any temps
+  // are used.
+  DML_BINDING_PROPERTIES binding_props = initializer->GetBindingProperties();
+  if ((binding_props.PersistentResourceSize > 0) ||
+      (binding_props.TemporaryResourceSize > 0)) {
+    D3D12_RESOURCE_BARRIER barriers[] = {
+        CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
+        CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
+    current_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
+  }
+
+  OnCommandRecorded();
+
+  return GetCurrentCompletionEvent();
+}
+
 DmlGpuEvent DmlExecutionContextImpl::ExecuteOperator(
     IDMLCompiledOperator* op, IDMLBindingTable* binding_table,
     ID3D12DescriptorHeap* descriptor_heap) {

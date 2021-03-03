@@ -100,6 +100,14 @@ DmlGpuEvent DmlKernelConstruction::InitializeOperator(
       initializer, persistent_binding_desc, input_binding_desc);
 }
 
+DmlGpuEvent DmlKernelConstruction::BindAndInitializeOperator(
+    IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
+    ID3D12DescriptorHeap* heap_for_binding_table,
+    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
+    absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings) {
+  // TODO
+}
+
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {
   return op_ctx_->input_dtype(index);
 }
