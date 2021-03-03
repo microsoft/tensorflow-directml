@@ -103,8 +103,8 @@ DmlGpuEvent DmlKernelConstruction::InitializeOperator(
 DmlGpuEvent DmlKernelConstruction::BindAndInitializeOperator(
     IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
     ID3D12DescriptorHeap* heap_for_binding_table,
-    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
-    absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings) {
+    _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
+    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding) {
   // TODO
 }
 

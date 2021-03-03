@@ -298,9 +298,6 @@ void DmlKernel::Initialize2(DmlKernelConstruction* ctx,
   // Initialize the operator
   ComPtr<IDMLOperatorInitializer> initializer;
 
-  // We don't supply any input bindings, because we never set OWNED_BY_DML
-  absl::Span<const DML_BUFFER_BINDING> input_init_bindings = {};
-
   // Reset the initializer to reference the input operator.
   IDMLCompiledOperator* ops[] = {compiled_op_.Get()};
   DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateOperatorInitializer(
@@ -331,6 +328,7 @@ void DmlKernel::Initialize2(DmlKernelConstruction* ctx,
   // Create a temporary resource for initializing the op, if it's required.
   UINT64 temporary_resource_size = init_binding_props.TemporaryResourceSize;
   DmlBuffer temp_resource;
+  absl::optional<DML_BUFFER_BINDING> temp_resource_binding;
   if (temporary_resource_size > 0) {
     temp_resource = ctx->AllocateDefaultBuffer(temporary_resource_size);
 
@@ -338,10 +336,16 @@ void DmlKernel::Initialize2(DmlKernelConstruction* ctx,
                 errors::ResourceExhausted("OOM when allocating a buffer of ",
                                           temporary_resource_size,
                                           " bytes"));
+
+    temp_resource_binding = temp_resource.GetBufferBinding();
   }
 
-  auto init_gpu_event = ctx->InitializeOperator(
-      initializer.Get(), GetPersistentResourceBinding(), input_init_bindings);
+  auto init_gpu_event = ctx->BindAndInitializeOperator(
+      initializer.Get(), 
+      binding_table.Get(), 
+      descriptor_handles.heap,
+      temp_resource_binding ? &*temp_resource_binding : nullptr,
+      GetPersistentResourceBinding());
 
   // Enqueue an event to ensure that the relevant initialization state lives at
   // least until the operation completes execution on the GPU.
