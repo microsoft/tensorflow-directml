@@ -64,14 +64,6 @@ class DmlKernelConstruction {
 
   // Initializes a given DML operator on the GPU. Note that this merely
   // queues the initialization; the returned event will enter the signaled
-  // state when it completes.
-  DmlGpuEvent InitializeOperator(
-      IDMLOperatorInitializer* initializer,
-      _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
-      absl::Span<const DML_BUFFER_BINDING> input_bindings);
-
-  // Initializes a given DML operator on the GPU. Note that this merely
-  // queues the initialization; the returned event will enter the signaled
   // state when it completes. Note that we never supply any input bindings,
   // because we never set DML_TENSOR_FLAG_OWNED_BY_DML .
   DmlGpuEvent BindAndInitializeOperator(

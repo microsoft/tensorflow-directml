@@ -75,31 +75,6 @@ void DmlKernelConstruction::EnqueueCallbackForGpuEvent(
   device_->GetEventQueue()->Enqueue(std::move(gpu_event), std::move(callback));
 }
 
-DmlGpuEvent DmlKernelConstruction::InitializeOperator(
-    IDMLOperatorInitializer* initializer,
-    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
-    absl::Span<const DML_BUFFER_BINDING> input_bindings) {
-  // Set up the persistent resource binding
-  DML_BINDING_DESC persistent_binding_desc = {};
-  if (persistent_resource_binding) {
-    persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
-                               persistent_resource_binding};
-  }
-
-  // Set up the input array binding, if necessary. This is used if OWNED_BY_DML
-  // is specified.
-  DML_BUFFER_ARRAY_BINDING input_array_binding = {};
-  DML_BINDING_DESC input_binding_desc = {};
-  if (!input_bindings.empty()) {
-    input_array_binding.Bindings = input_bindings.data();
-    input_array_binding.BindingCount = static_cast<UINT>(input_bindings.size());
-    input_binding_desc = {DML_BINDING_TYPE_BUFFER_ARRAY, &input_array_binding};
-  }
-
-  return device_->GetExecutionContext()->InitializeOperator(
-      initializer, persistent_binding_desc, input_binding_desc);
-}
-
 DmlGpuEvent DmlKernelConstruction::BindAndInitializeOperator(
     IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
     ID3D12DescriptorHeap* heap_for_binding_table,

@@ -56,11 +56,6 @@ class DmlExecutionContextImpl {
       absl::Span<const uint8_t>
           value /* Data type agnostic value, treated as raw bits */);
 
-  DmlGpuEvent InitializeOperator(
-      IDMLOperatorInitializer* initializer,
-      const DML_BINDING_DESC& persistent_resource_binding,
-      const DML_BINDING_DESC& input_array_binding);
-
   DmlGpuEvent InitializeOperator(IDMLOperatorInitializer* initializer,
                                  IDMLBindingTable* binding_table,
                                  ID3D12DescriptorHeap* descriptor_heap);
@@ -158,15 +153,6 @@ class DmlExecutionContext {
     std::unique_lock<std::mutex> lock(mutex_);
     return impl_->FillBufferWithPattern(dst, dst_offset, dst_size_in_bytes,
                                         value);
-  }
-
-  DmlGpuEvent InitializeOperator(
-      IDMLOperatorInitializer* initializer,
-      const DML_BINDING_DESC& persistent_resource_binding,
-      const DML_BINDING_DESC& input_array_binding) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->InitializeOperator(initializer, persistent_resource_binding,
-                                     input_array_binding);
   }
 
   DmlGpuEvent InitializeOperator(IDMLOperatorInitializer* initializer,
