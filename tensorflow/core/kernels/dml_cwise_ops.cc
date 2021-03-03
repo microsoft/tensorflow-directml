@@ -405,7 +405,7 @@ class DmlUnaryScaleBiasKernel : public DmlKernel {
                                              dmlOpType, dmlOpDescType, ...) \
   using Dml##opName##Kernel =                                               \
       kernelClassName<dmlOpType, dmlOpDescType, ##__VA_ARGS__>;             \
-  REGISTER_OP_KERNEL(opName, Eigen::half);
+  REGISTER_OP_KERNEL(opName, float);
 
 #define REGISTER_DML_ALL_TYPES_OP_KERNEL(opName, kernelClassName, dmlOpType, \
                                          dmlOpDescType, ...)                 \
