@@ -401,6 +401,12 @@ class DmlUnaryScaleBiasKernel : public DmlKernel {
       kernelClassName<dmlOpType, dmlOpDescType, ##__VA_ARGS__>;          \
   TF_CALL_DML_OP_FLOAT_TYPES(opName, REGISTER_OP_KERNEL);
 
+#define REGISTER_DML_FLOAT_NO_HALF_OP_KERNEL(opName, kernelClassName,       \
+                                             dmlOpType, dmlOpDescType, ...) \
+  using Dml##opName##Kernel =                                               \
+      kernelClassName<dmlOpType, dmlOpDescType, ##__VA_ARGS__>;             \
+  REGISTER_OP_KERNEL(opName, float);
+
 #define REGISTER_DML_ALL_TYPES_OP_KERNEL(opName, kernelClassName, dmlOpType, \
                                          dmlOpDescType, ...)                 \
   using Dml##opName##Kernel =                                                \
@@ -670,6 +676,9 @@ REGISTER_DML_FLOAT_OP_KERNEL(Softmax, DmlMaxActivationKernel,
 REGISTER_DML_FLOAT_OP_KERNEL(LogSoftmax, DmlMaxActivationKernel,
                              DML_OPERATOR_ACTIVATION_LOG_SOFTMAX,
                              DML_ACTIVATION_LOG_SOFTMAX_OPERATOR_DESC)
+REGISTER_DML_FLOAT_NO_HALF_OP_KERNEL(Atan2, DmlBinaryKernel,
+                                     DML_OPERATOR_ELEMENT_WISE_ATAN_YX,
+                                     DML_ELEMENT_WISE_ATAN_YX_OPERATOR_DESC)
 
 REGISTER_DML_COMPOSITE_UNARY_FLOAT_KERNEL(Erfc, 1.0f - dml::Erf(x),
                                           kNchwDimensionCount)
