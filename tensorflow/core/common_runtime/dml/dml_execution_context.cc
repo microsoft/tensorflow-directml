@@ -348,9 +348,9 @@ void DmlExecutionContextImpl::SetDescriptorHeap(
       descriptor_heap != current_descriptor_heap_) {
     current_descriptor_heap_ = descriptor_heap;
 
-    ID3D12DescriptorHeap* descriptor_heaps_[] = {descriptor_heap};
-    current_command_list_->SetDescriptorHeaps(ABSL_ARRAYSIZE(descriptor_heaps_),
-                                              descriptor_heaps_);
+    ID3D12DescriptorHeap* descriptor_heaps[] = {descriptor_heap};
+    current_command_list_->SetDescriptorHeaps(ABSL_ARRAYSIZE(descriptor_heaps),
+                                              descriptor_heaps);
   }
 }
 

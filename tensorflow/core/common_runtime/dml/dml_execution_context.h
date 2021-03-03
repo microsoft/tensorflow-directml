@@ -98,7 +98,7 @@ class DmlExecutionContextImpl {
   DmlDescriptorPool descriptor_pool_;
   ID3D12DescriptorHeap* current_descriptor_heap_ = nullptr;
 
-  DmlAllocator* allocator_;
+  DmlAllocator* allocator_ = nullptr;
   DmlCommandAllocatorRing<2> command_allocator_ring_;
 
   // The command list currently being recorded into, and whether any command
