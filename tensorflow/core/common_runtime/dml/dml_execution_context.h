@@ -16,9 +16,10 @@ limitations under the License.
 #pragma once
 
 #include "dml_command_queue.h"
-#include "dml_command_recorder.h"
 #include "dml_common.h"
 #include "dml_status.h"
+#include "dml_command_allocator_ring.h"
+#include "dml_descriptor_pool.h"
 
 namespace tensorflow {
 class DmlAllocator;
@@ -72,7 +73,7 @@ class DmlExecutionContextImpl {
   // on the GPU.
   StatusOr<DmlGpuEvent> Flush();
 
-  Status GetCommandRecorderStatus() const;
+  Status GetCommandRecorderStatus() const { return status_; }
 
   // Returns an event which will become signaled when everything submitted to
   // the execution context thus far has completed execution on the GPU,
@@ -84,16 +85,45 @@ class DmlExecutionContextImpl {
  private:
   Microsoft::WRL::ComPtr<ID3D12Device> d3d_device_;
 
-  void SetCommandRecorder(DmlCommandRecorder* new_recorder);
-
   std::shared_ptr<DmlCommandQueue> queue_;
 
-  DmlCommandRecorder* current_recorder_ = nullptr;
-
-  // Up to one of these is active at a time
-  DmlCommandRecorder dml_recorder_;  // TODO: merge into this class
-
   bool closed_ = false;
+
+  Microsoft::WRL::ComPtr<IDMLDevice> dml_device_;
+  Microsoft::WRL::ComPtr<IDMLCommandRecorder> recorder_;
+
+  // Descriptors are allocated from a pool. The current heap pointer is only
+  // used to avoid redundantly setting the same heap; it does not have ownership
+  // of the heap object.
+  DmlDescriptorPool descriptor_pool_;
+  ID3D12DescriptorHeap* current_descriptor_heap_ = nullptr;
+
+  DmlAllocator* allocator_ = nullptr;
+  DmlCommandAllocatorRing<2> command_allocator_ring_;
+
+  // The command list currently being recorded into, and whether any command
+  // have been recorded yet.
+  Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> current_command_list_;
+  uint32_t operations_recorded_in_current_command_list_ = 0;
+
+  // A pool of cached command lists which may be re-used.
+  std::deque<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>>
+      cached_command_lists_;
+
+  // Status of the first error encountered when closing the command list.
+  // Operations that flush the command list or readback from the GPU should make
+  // sure that this status doesn't contain an error before doing so.
+  Status status_ = Status::OK();
+
+  void SetDescriptorHeap(ID3D12DescriptorHeap* descriptor_heap);
+
+  // Increments operations_recorded_in_current_command_list_. If the size of the
+  // current command list exceeds a certain value (based on heuristic), the
+  // command list is flushed.
+  void OnCommandRecorded();
+
+  void OpenCommandList();
+  void CloseCommandListAndExecute();
 };
 
 // A thread-safe wrapper over DmlExecutionContextImpl.
