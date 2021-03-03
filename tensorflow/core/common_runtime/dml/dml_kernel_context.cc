@@ -105,7 +105,22 @@ DmlGpuEvent DmlKernelConstruction::BindAndInitializeOperator(
     ID3D12DescriptorHeap* heap_for_binding_table,
     _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding) {
-  // TODO
+  // Bind the temporary resource
+  if (temporary_resource_binding) {
+    DML_BINDING_DESC temporary_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                                               temporary_resource_binding};
+    binding_table->BindTemporaryResource(&temporary_binding_desc);
+  }
+
+  // Bind the persistent resource
+  if (persistent_resource_binding) {
+    DML_BINDING_DESC persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                                                persistent_resource_binding};
+    binding_table->BindOutputs(1, &persistent_binding_desc);
+  }
+
+  return device_->GetExecutionContext()->InitializeOperator(
+      initializer, binding_table, heap_for_binding_table);
 }
 
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {
