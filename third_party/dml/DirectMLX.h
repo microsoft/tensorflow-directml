@@ -1265,18 +1265,9 @@ namespace dml
         return detail::ElementWiseUnary<DML_OPERATOR_ELEMENT_WISE_SQRT, DML_ELEMENT_WISE_SQRT_OPERATOR_DESC>(input, scaleBias);
     }
 
-struct DML_ELEMENT_WISE_SQUARE_DIFFERENCE_OPERATOR_DESC
-{
-    const DML_TENSOR_DESC* ATensor;
-    const DML_TENSOR_DESC* BTensor;
-    const DML_TENSOR_DESC* OutputTensor;
-};
-
-    inline Expression SquareDifference(Expression a, Expression b)
+    inline Expression DifferenceSquare(Expression a, Expression b)
     {
-        const uint32_t DML_OPERATOR_ELEMENT_WISE_SQUARE_DIFFERENCE = 142;
-
-        return detail::ElementWiseBinary<(DML_OPERATOR_TYPE)DML_OPERATOR_ELEMENT_WISE_SQUARE_DIFFERENCE, DML_ELEMENT_WISE_SQUARE_DIFFERENCE_OPERATOR_DESC>(a, b);
+        return detail::ElementWiseBinary<(DML_OPERATOR_TYPE)DML_OPERATOR_ELEMENT_WISE_DIFFERENCE_SQUARE, DML_ELEMENT_WISE_DIFFERENCE_SQUARE_OPERATOR_DESC>(a, b);
     }
 
     inline Expression Subtract(Expression a, Expression b)
