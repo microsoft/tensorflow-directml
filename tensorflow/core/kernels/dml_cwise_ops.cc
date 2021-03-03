@@ -919,13 +919,13 @@ class DmlSquaredDifferenceKernel : public DmlKernel {
     const Tensor& min_tensor = ctx->GetConstantInputTensor(1);
     const Tensor& max_tensor = ctx->GetConstantInputTensor(2);
 
-    DML_ELEMENT_WISE_SQUARE_DIFFERENCE_OPERATOR_DESC square_difference_desc;
-    square_difference_desc.ATensor = &inputs[0];
-    square_difference_desc.BTensor = &inputs[1];
-    square_difference_desc.OutputTensor = &outputs[0];
+    DML_ELEMENT_WISE_DIFFERENCE_SQUARE_OPERATOR_DESC difference_square_desc;
+    difference_square_desc.ATensor = &inputs[0];
+    difference_square_desc.BTensor = &inputs[1];
+    difference_square_desc.OutputTensor = &outputs[0];
 
     DML_OPERATOR_DESC op_desc =
-        {DML_OPERATOR_ELEMENT_WISE_SQUARE_DIFFERENCE, &square_difference_desc};
+        {DML_OPERATOR_ELEMENT_WISE_DIFFERENCE_SQUARE, &difference_square_desc};
 
     Initialize(ctx, std::move(tensors), op_desc);
   }

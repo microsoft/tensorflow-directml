@@ -599,29 +599,6 @@ class DmlBatchNormWithGlobalNormalizationKernel : public DmlKernel {
   }
 };
 
-enum DML_PREVIEW_OPERATOR_TYPE
-{
-    DML_PREVIEW_OPERATOR_FIRST = 0xC0000000,
-    DML_PREVIEW_OPERATOR_LOCAL_RESPONSE_NORMALIZATION_GRAD,
-    DML_PREVIEW_OPERATOR_BATCH_NORMALIZATION_GRAD,
-};
-
-// Op to support Tensorflow FusedBatchNormGrad
-struct DML_PREVIEW_BATCH_NORMALIZATION_GRAD_OPERATOR_DESC
-{
-    const DML_TENSOR_DESC* InputTensor;
-    const DML_TENSOR_DESC* InputGradientTensor;
-    const DML_TENSOR_DESC* MeanTensor;
-    const DML_TENSOR_DESC* VarianceTensor;
-    const DML_TENSOR_DESC* ScaleTensor;
-
-    const DML_TENSOR_DESC* OutputGradientTensor;
-    const DML_TENSOR_DESC* OutputScaleGradientTensor;
-    const DML_TENSOR_DESC* OutputBiasGradientTensor;
-
-    FLOAT Epsilon;
-};
-
 #define DML_REGISTER_KERNEL(type)                                 \
   REGISTER_KERNEL_BUILDER(                                        \
       Name("BatchNormWithGlobalNormalization")                    \
@@ -725,22 +702,26 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
     auto variance =
         dml::InputTensor(scope, kReserveSpace2, input_descs[kReserveSpace2]);
 
+    DML_TENSOR_DATA_TYPE input_type = y_backprop.GetOutputDesc().dataType;
+    auto input_sizes = y_backprop.GetOutputDesc().sizes;
+
+    // y_backprop, x, and x_backprop may be float16 or float32, but everything
+    // else is always float32. If the types don't match, we need to insert
+    // casts.
+    bool is_cast_required = (input_type != scale.GetOutputDesc().dataType);
+
+    if (is_cast_required) {
+      mean = dml::Cast(mean, input_type);
+      variance = dml::Cast(variance, input_type);
+      scale = dml::Cast(scale, input_type);
+    }
+    
+    dml::Expression scale_backprop;
+    dml::Expression offset_backprop;
+    dml::Expression x_backprop;
+    
     if (is_training)
     {
-      DML_TENSOR_DATA_TYPE input_type = y_backprop.GetOutputDesc().dataType;
-      auto input_sizes = y_backprop.GetOutputDesc().sizes;
-
-      // y_backprop, x, and x_backprop may be float16 or float32, but everything
-      // else is always float32. If the types don't match, we need to insert
-      // casts.
-      bool is_cast_required = (input_type != scale.GetOutputDesc().dataType);
-
-      if (is_cast_required) {
-        scale = dml::Cast(scale, input_type);
-        mean = dml::Cast(mean, input_type);
-        variance = dml::Cast(variance, input_type);
-      }
-
       // The strides we need to set to broadcast C across an entire tensor
       dml::TensorDesc::Dimensions broadcast_c_strides = {/*N*/ 0,
                                                          /*C*/ 1,
@@ -806,8 +787,7 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
       coef1_mean =
           dml::Reinterpret(coef1_mean, input_sizes, broadcast_c_strides);
 
-      dml::Expression x_backprop =
-          scaled_coef0_bcast *
+      x_backprop = scaled_coef0_bcast *
           (y_backprop_centered - x_centered * coef1_mean / variance_e_bcast);
 
       // scale_backprop = sum(y_backprop *
@@ -817,65 +797,33 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
       //     coef1 = y_backprop * (x - mean(x))
       //
       // => scale_backprop = sum(coef1 * coef0) = sum(coef1) * coef0
-      auto scale_backprop =
+      scale_backprop =
           dml::Reduce(coef1, DML_REDUCE_FUNCTION_SUM, {0, 2, 3}) * coef0;
 
       // offset_backprop = sum(y_backprop)
-      auto offset_backprop =
+      offset_backprop =
           dml::Reduce(y_backprop, DML_REDUCE_FUNCTION_SUM, {0, 2, 3});
-
-      // If necessary, cast outputs to their required types
-      if (is_cast_required) {
-        scale_backprop = dml::Cast(scale_backprop, DML_TENSOR_DATA_TYPE_FLOAT32);
-        offset_backprop =
-            dml::Cast(offset_backprop, DML_TENSOR_DATA_TYPE_FLOAT32);
-      }
-
-      auto outputs = {
-          x_backprop,
-          scale_backprop,
-          offset_backprop,
-      };
-
-      auto compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, outputs);
-      Initialize(ctx, std::move(tensors), compiled_op.Get());
     }
     else
     {
-      DML_TENSOR_DATA_TYPE input_type = y_backprop.GetOutputDesc().dataType;
-      auto input_sizes = y_backprop.GetOutputDesc().sizes;
-
-      // y_backprop, x, and x_backprop may be float16 or float32, but everything
-      // else is always float32. If the types don't match, we need to insert
-      // casts.
-      bool is_cast_required = (input_type != scale.GetOutputDesc().dataType);
-
-      if (is_cast_required) {
-        mean = dml::Cast(mean, input_type);
-        variance = dml::Cast(variance, input_type);
-        scale = dml::Cast(scale, input_type);
-      }
-      
-      dml::Expression scale_backprop;
-      dml::Expression offset_backprop;
-
-      dml::Expression x_backprop = 
+      x_backprop = 
           dml::BatchNormalizationGrad(x, y_backprop, mean, variance, scale, epsilon, scale_backprop, offset_backprop);
-
-      if (is_cast_required) {
-        scale_backprop = dml::Cast(scale_backprop, DML_TENSOR_DATA_TYPE_FLOAT32);
-        offset_backprop = dml::Cast(offset_backprop, DML_TENSOR_DATA_TYPE_FLOAT32);
-      }
-
-      auto outputs = {
-          x_backprop,
-          scale_backprop,
-          offset_backprop,
-      };
-      
-      auto compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, outputs);
-      Initialize(ctx, std::move(tensors), compiled_op.Get());
     }
+
+    // If necessary, cast outputs to their required types
+    if (is_cast_required) {
+      scale_backprop = dml::Cast(scale_backprop, DML_TENSOR_DATA_TYPE_FLOAT32);
+      offset_backprop = dml::Cast(offset_backprop, DML_TENSOR_DATA_TYPE_FLOAT32);
+    }
+
+    auto outputs = {
+        x_backprop,
+        scale_backprop,
+        offset_backprop,
+    };
+
+    auto compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, outputs);
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
