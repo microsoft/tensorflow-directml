@@ -187,25 +187,17 @@ class DmlRelu6GradKernel : public DmlLUGradKernel<DmlRelu6GradKernel<T>> {
             const DML_TENSOR_DESC& gradient_desc,
             const DML_TENSOR_DESC& feature_desc,
             const DML_TENSOR_DESC& output_desc) {
-    auto scope = dml::Graph(ctx->GetDmlDevice());
-    auto feature = dml::InputTensor(scope, 0, feature_desc);
-    auto gradient = dml::InputTensor(scope, 1, gradient_desc);
+    DML_ELEMENT_WISE_CLIP_GRAD_OPERATOR_DESC clip_grad_desc;
+    clip_grad_desc.InputTensor = &feature_desc;
+    clip_grad_desc.InputGradientTensor = &gradient_desc;
+    clip_grad_desc.OutputGradientTensor = &output_desc;
+    clip_grad_desc.Min = 0.0f;
+    clip_grad_desc.Max = 6.0f;
 
-    DML_TENSOR_DATA_TYPE feature_dtype = feature.GetOutputDesc().dataType;
-    const auto& feature_sizes = feature.GetOutputDesc().sizes;
+    DML_OPERATOR_DESC op_desc =
+        {DML_OPERATOR_ELEMENT_WISE_CLIP_GRAD, &clip_grad_desc};
 
-    auto zero = dml::ZeroTensor(scope, feature_dtype, feature_sizes);
-
-    auto six_val = TfTensorTypeTraits<T>::FromFloat(6.0f);
-    auto six = dml::ScalarTensor<T>(scope, six_val, feature_sizes);
-
-    auto in_relu6 = feature > zero && feature < six;
-    auto result = gradient * dml::Cast(in_relu6, feature_dtype);
-
-    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
-        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
-
-    DmlKernel::Initialize(ctx, std::move(tensors), compiled_op.Get());
+    Initialize(ctx, std::move(tensors), op_desc);
   }
 };
 
