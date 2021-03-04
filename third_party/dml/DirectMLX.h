@@ -1267,7 +1267,7 @@ namespace dml
 
     inline Expression DifferenceSquare(Expression a, Expression b)
     {
-        return detail::ElementWiseBinary<(DML_OPERATOR_TYPE)DML_OPERATOR_ELEMENT_WISE_DIFFERENCE_SQUARE, DML_ELEMENT_WISE_DIFFERENCE_SQUARE_OPERATOR_DESC>(a, b);
+        return detail::ElementWiseBinary<DML_OPERATOR_ELEMENT_WISE_DIFFERENCE_SQUARE, DML_ELEMENT_WISE_DIFFERENCE_SQUARE_OPERATOR_DESC>(a, b);
     }
 
     inline Expression Subtract(Expression a, Expression b)
