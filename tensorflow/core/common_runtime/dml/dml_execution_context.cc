@@ -29,6 +29,22 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
     : impl_(absl::make_unique<DmlExecutionContextImpl>(d3d_device, dml_device,
                                                        queue, allocator)) {
   shared_state_ = std::make_shared<SharedState>();
+
+  // Launch the thread, supplying it with a pointer to the shared state
+  thread_ = std::thread(ThreadProc, shared_state_);
+}
+
+DmlExecutionContext::~DmlExecutionContext() {
+  // Request exit of the background thread
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+  shared_state_->exit_requested = true;
+  shared_state_->new_function_enqueued.notify_all();  // wake the thread
+  lock.unlock();
+
+  // detach() rather than join(), because we don't want (or need) to wait for
+  // it to complete. This prevents blocking in a destructor, which would be
+  // bad.
+  thread_.detach();
 }
 
 DmlExecutionContextImpl::DmlExecutionContextImpl(ID3D12Device* d3d_device,
@@ -374,17 +390,40 @@ void DmlExecutionContextImpl::CloseCommandListAndExecute() {
   OpenCommandList();
 }
 
-void DmlExecutionContext::OnFunctionBatched() {
-  if (shared_state_->batched_functions.size() >= 1) {
-    InvokeBatchedFunctions();
-  }
-}
-
 void DmlExecutionContext::InvokeBatchedFunctions() {
   for (auto& f : shared_state_->batched_functions) {
     f();
   }
   shared_state_->batched_functions.clear();
+}
+
+/*static*/ void DmlExecutionContext::ThreadProc(
+    std::shared_ptr<SharedState> state) {
+  while (true) {
+    std::unique_lock<std::mutex> lock(state->mutex);
+    if (state->exit_requested) {
+      break;
+    }
+
+    if (state->batched_functions.empty()) {
+      // Wait for new functions
+      state->new_function_enqueued.wait(lock);
+
+      // No need for a loop around the wait() in case of spurious wakeup; just
+      // return to the top. This also handles the case where exit is
+      // requested.
+      continue;
+    }
+
+    DCHECK(!state->batched_functions.empty());
+
+    for (auto& f : state->batched_functions) {
+      f();
+    }
+    state->batched_functions.clear();
+
+    lock.unlock();
+  }
 }
 
 }  // namespace tensorflow

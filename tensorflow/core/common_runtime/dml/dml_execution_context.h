@@ -136,6 +136,8 @@ class DmlExecutionContext {
   DmlExecutionContext(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
                       ID3D12CommandQueue* queue, DmlAllocator* allocator);
 
+  ~DmlExecutionContext();
+
   void Close() {
     std::unique_lock<std::mutex> lock(shared_state_->mutex);
     impl_->Close();
@@ -176,7 +178,7 @@ class DmlExecutionContext {
           impl_->InitializeOperator(initializer, binding_table.Get(), descriptor_heap);
         });
 
-    OnFunctionBatched();
+    shared_state_->new_function_enqueued.notify_all();
 
     return impl_->GetCurrentCompletionEvent();
   }
@@ -197,7 +199,7 @@ class DmlExecutionContext {
           impl_->ExecuteOperator(op, binding_table.Get(), descriptor_heap);
         });
 
-    OnFunctionBatched();
+    shared_state_->new_function_enqueued.notify_all();
 
     return impl_->GetCurrentCompletionEvent();
   }
@@ -210,11 +212,11 @@ class DmlExecutionContext {
     // function call, so make a copy and transfer ownership to the lambda.
     absl::InlinedVector<D3D12_RESOURCE_BARRIER, 4> barriers_copy;
     shared_state_->batched_functions.emplace_back(
-        [this, barriers = std::move(barriers_copy)]() mutable {
+        [this, barriers = std::move(barriers_copy)]() {
           impl_->ResourceBarrier(barriers);
         });
 
-    OnFunctionBatched();
+    shared_state_->new_function_enqueued.notify_all();
 
     return impl_->GetCurrentCompletionEvent();
   }
@@ -252,9 +254,10 @@ class DmlExecutionContext {
   };
 
   std::shared_ptr<SharedState> shared_state_;
-  // std::thread thread_;
+  std::thread thread_;
 
-  void OnFunctionBatched();
+  static void ThreadProc(std::shared_ptr<SharedState> state);
+
   void InvokeBatchedFunctions();
 };
 
