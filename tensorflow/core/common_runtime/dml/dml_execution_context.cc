@@ -171,77 +171,23 @@ DmlGpuEvent DmlExecutionContextImpl::FillBufferWithPattern(
 }
 
 DmlGpuEvent DmlExecutionContextImpl::InitializeOperator(
-    IDMLOperatorInitializer* initializer,
-    const DML_BINDING_DESC& persistent_resource_binding,
-    const DML_BINDING_DESC& input_array_binding) {
+    IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
+    ID3D12DescriptorHeap* descriptor_heap) {
   assert(!closed_);
   if (!status_.ok()) {
     GetCurrentCompletionEvent();
   }
 
-  DML_BINDING_PROPERTIES init_binding_props =
-      initializer->GetBindingProperties();
-
-  const uint32_t num_descriptors = init_binding_props.RequiredDescriptorCount;
-  DmlDescriptorRange descriptor_range = descriptor_pool_.AllocDescriptors(
-      num_descriptors, queue_->GetNextCompletionEvent());
-
-  // Create a binding table for initialization.
-  DML_BINDING_TABLE_DESC binding_table_desc = {};
-  binding_table_desc.Dispatchable = initializer;
-  binding_table_desc.CPUDescriptorHandle = descriptor_range.cpu_handle;
-  binding_table_desc.GPUDescriptorHandle = descriptor_range.gpu_handle;
-  binding_table_desc.SizeInDescriptors = num_descriptors;
-
-  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table;
-  DML_CHECK_SUCCEEDED(dml_device_->CreateBindingTable(
-      &binding_table_desc, IID_PPV_ARGS(&binding_table)));
-
-  // Create a temporary resource for initializing the op, if it's required.
-  UINT64 temporary_resource_size = init_binding_props.TemporaryResourceSize;
-  DmlBuffer temp_resource;
-  if (temporary_resource_size > 0) {
-    // Allocate a temporary buffer and keep a use on it until the end of this
-    // method. The buffer resource will still be alive (managed by the pool);
-    // freeing allows the resource to be shared with other operators, but
-    // because the allocator is multi-threaded we need to at least keep a use on
-    // it until we're done with it locally to prevent the buffer being reused.
-    temp_resource = DmlBuffer(allocator_, temporary_resource_size);
-    if (!temp_resource) {
-      status_ = errors::ResourceExhausted("OOM when allocating a buffer of ",
-                                          temporary_resource_size, " bytes");
-      return GetCurrentCompletionEvent();
-    }
-
-    // Bind the temporary resource.
-    DML_BUFFER_BINDING buffer_binding = temp_resource.GetBufferBinding();
-    DML_BINDING_DESC binding_desc = {DML_BINDING_TYPE_BUFFER, &buffer_binding};
-    binding_table->BindTemporaryResource(&binding_desc);
-  }
-
-  // Bind inputs, if provided.
-  if (input_array_binding.Type != DML_BINDING_TYPE_NONE) {
-    // An operator with inputs to bind MUST use a BUFFER_ARRAY.
-    assert(input_array_binding.Type == DML_BINDING_TYPE_BUFFER_ARRAY);
-    binding_table->BindInputs(1, &input_array_binding);
-  }
-
-  // Bind the persistent resource, which is an output of initialization.
-  if (persistent_resource_binding.Type != DML_BINDING_TYPE_NONE) {
-    // Persistent resources MUST be bound as buffers.
-    assert(persistent_resource_binding.Type == DML_BINDING_TYPE_BUFFER);
-    binding_table->BindOutputs(1, &persistent_resource_binding);
-  }
-
   // Record the initialization work.
-  SetDescriptorHeap(descriptor_range.heap);
+  SetDescriptorHeap(descriptor_heap);
   recorder_->RecordDispatch(current_command_list_.Get(), initializer,
-                            binding_table.Get());
+                            binding_table);
 
   // Barrier if there's an output (i.e. persistent resource), or if any temps
   // are used.
-  if ((persistent_resource_binding.Type != DML_BINDING_TYPE_NONE) ||
-      (temporary_resource_size > 0)) {
+  DML_BINDING_PROPERTIES binding_props = initializer->GetBindingProperties();
+  if ((binding_props.PersistentResourceSize > 0) ||
+      (binding_props.TemporaryResourceSize > 0)) {
     D3D12_RESOURCE_BARRIER barriers[] = {
         CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
         CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};

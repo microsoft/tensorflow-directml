@@ -207,48 +207,84 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   output_refs_forwarding_ = std::move(tensor_descs.output_refs_forwarding);
   init_helper_ = ctx->GetInitializationHelper();
 
-  // Create the persistent resource, if necessary
+  DML_BINDING_PROPERTIES exec_binding_props =
+      compiled_op_->GetBindingProperties();
 
-  DML_BINDING_PROPERTIES binding_props = compiled_op_->GetBindingProperties();
-
-  if (binding_props.PersistentResourceSize != 0) {
+  if (exec_binding_props.PersistentResourceSize != 0) {
     VLOG(2) << "Allocating"
             << strings::HumanReadableNumBytes(
-                   binding_props.PersistentResourceSize)
+                   exec_binding_props.PersistentResourceSize)
             << " persistent resource for kernel "
             << ctx->GetOpKernelContext()->op_kernel().type_string();
 
     persistent_resource_ =
-        ctx->AllocateDefaultBuffer(binding_props.PersistentResourceSize);
+        ctx->AllocateDefaultBuffer(exec_binding_props.PersistentResourceSize);
 
     OP_REQUIRES(ctx->GetOpKernelContext(), persistent_resource_,
-                errors::ResourceExhausted("OOM when allocating a buffer of ",
-                                          binding_props.PersistentResourceSize,
-                                          " bytes"));
+                errors::ResourceExhausted(
+                    "OOM when allocating a buffer of ",
+                    exec_binding_props.PersistentResourceSize, " bytes"));
 
     persistent_resource_binding_ = persistent_resource_.GetBufferBinding();
   }
 
   // Initialize the operator
-
   ComPtr<IDMLOperatorInitializer> initializer;
-
-  // We don't supply any input bindings, because we never set OWNED_BY_DML
-  absl::Span<const DML_BUFFER_BINDING> input_init_bindings = {};
 
   // Reset the initializer to reference the input operator.
   IDMLCompiledOperator* ops[] = {compiled_op_.Get()};
   DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateOperatorInitializer(
       ABSL_ARRAYSIZE(ops), ops, IID_PPV_ARGS(&initializer)));
 
-  auto init_gpu_event = ctx->InitializeOperator(
-      initializer.Get(), GetPersistentResourceBinding(), input_init_bindings);
+  DML_BINDING_PROPERTIES init_binding_props =
+      initializer->GetBindingProperties();
+
+  // Unfortunately we have to use make_shared here to make it copyable, so it
+  // can be captured in the lambda below
+  auto descriptor_range = std::make_shared<DescriptorAllocation>(
+      ctx->AllocateDescriptors(init_binding_props.RequiredDescriptorCount));
+
+  D3D12DescriptorHandles descriptor_handles =
+      descriptor_range->GetDescriptorHandles();
+
+  // Create a binding table for initialization.
+  DML_BINDING_TABLE_DESC binding_table_desc = {};
+  binding_table_desc.Dispatchable = initializer.Get();
+  binding_table_desc.CPUDescriptorHandle = descriptor_handles.cpu;
+  binding_table_desc.GPUDescriptorHandle = descriptor_handles.gpu;
+  binding_table_desc.SizeInDescriptors =
+      init_binding_props.RequiredDescriptorCount;
+
+  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table;
+  DML_CHECK_SUCCEEDED(ctx->GetDmlDevice()->CreateBindingTable(
+      &binding_table_desc, IID_PPV_ARGS(&binding_table)));
+
+  // Create a temporary resource for initializing the op, if it's required.
+  UINT64 temporary_resource_size = init_binding_props.TemporaryResourceSize;
+  DmlBuffer temp_resource;
+  absl::optional<DML_BUFFER_BINDING> temp_resource_binding;
+  if (temporary_resource_size > 0) {
+    temp_resource = ctx->AllocateDefaultBuffer(temporary_resource_size);
+
+    OP_REQUIRES(ctx->GetOpKernelContext(), temp_resource,
+                errors::ResourceExhausted("OOM when allocating a buffer of ",
+                                          temporary_resource_size, " bytes"));
+
+    temp_resource_binding = temp_resource.GetBufferBinding();
+  }
+
+  auto init_gpu_event = ctx->BindAndInitializeOperator(
+      initializer.Get(), binding_table.Get(), descriptor_handles.heap,
+      temp_resource_binding ? &*temp_resource_binding : nullptr,
+      GetPersistentResourceBinding());
 
   // Enqueue an event to ensure that the relevant initialization state lives at
   // least until the operation completes execution on the GPU.
-  auto on_initialize_completed = [p = std::move(initializer)]() mutable {
+  auto on_initialize_completed = [p = std::move(initializer),
+                                  p2 = std::move(descriptor_range)]() mutable {
     // Free the initialization state
     p = nullptr;
+    p2->Reset();
   };
   ctx->EnqueueCallbackForGpuEvent(init_gpu_event, on_initialize_completed);
 }
