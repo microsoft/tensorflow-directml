@@ -924,8 +924,8 @@ class DmlSquaredDifferenceKernel : public DmlKernel {
     difference_square_desc.BTensor = &inputs[1];
     difference_square_desc.OutputTensor = &outputs[0];
 
-    DML_OPERATOR_DESC op_desc =
-        {DML_OPERATOR_ELEMENT_WISE_DIFFERENCE_SQUARE, &difference_square_desc};
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_DIFFERENCE_SQUARE,
+                                 &difference_square_desc};
 
     Initialize(ctx, std::move(tensors), op_desc);
   }

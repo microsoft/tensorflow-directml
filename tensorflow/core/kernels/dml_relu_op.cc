@@ -194,8 +194,8 @@ class DmlRelu6GradKernel : public DmlLUGradKernel<DmlRelu6GradKernel<T>> {
     clip_grad_desc.Min = 0.0f;
     clip_grad_desc.Max = 6.0f;
 
-    DML_OPERATOR_DESC op_desc =
-        {DML_OPERATOR_ELEMENT_WISE_CLIP_GRAD, &clip_grad_desc};
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_CLIP_GRAD,
+                                 &clip_grad_desc};
 
     Initialize(ctx, std::move(tensors), op_desc);
   }
