@@ -49,7 +49,6 @@ class DmlCommandQueue {
 
   Microsoft::WRL::ComPtr<ID3D12Fence> fence_;
   uint64_t last_fence_value_ = 0;
-  bool closing_ = false;
 };
 
 }  // namespace tensorflow
