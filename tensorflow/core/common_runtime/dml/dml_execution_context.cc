@@ -27,7 +27,9 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
                                          ID3D12CommandQueue* queue,
                                          DmlAllocator* allocator)
     : impl_(absl::make_unique<DmlExecutionContextImpl>(d3d_device, dml_device,
-                                                       queue, allocator)) {}
+                                                       queue, allocator)) {
+  shared_state_ = std::make_shared<SharedState>();
+}
 
 DmlExecutionContextImpl::DmlExecutionContextImpl(ID3D12Device* d3d_device,
                                                  IDMLDevice* dml_device,
@@ -370,6 +372,19 @@ void DmlExecutionContextImpl::CloseCommandListAndExecute() {
 
   // Always keep the command list in an opened state
   OpenCommandList();
+}
+
+void DmlExecutionContext::OnFunctionBatched() {
+  if (shared_state_->batched_functions.size() >= 1) {
+    InvokeBatchedFunctions();
+  }
+}
+
+void DmlExecutionContext::InvokeBatchedFunctions() {
+  for (auto& f : shared_state_->batched_functions) {
+    f();
+  }
+  shared_state_->batched_functions.clear();
 }
 
 }  // namespace tensorflow
