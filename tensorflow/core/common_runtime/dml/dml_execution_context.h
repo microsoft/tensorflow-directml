@@ -164,13 +164,13 @@ class DmlExecutionContext {
   // NOTE: the caller is responsible for keeping the initializer and
   // descriptor_heap alive until the returned GPU event has completed.
   DmlGpuEvent InitializeOperator(IDMLOperatorInitializer* initializer,
-                                 IDMLBindingTable* binding_table,
+                                 Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
                                  ID3D12DescriptorHeap* descriptor_heap);
 
   // NOTE: the caller is responsible for keeping the op and descriptor_heap
   // alive until the returned GPU event has completed.
   DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
-                              IDMLBindingTable* binding_table,
+                              Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
                               ID3D12DescriptorHeap* descriptor_heap);
 
   DmlGpuEvent ResourceBarrier(

@@ -76,7 +76,8 @@ void DmlKernelConstruction::EnqueueCallbackForGpuEvent(
 }
 
 DmlGpuEvent DmlKernelConstruction::BindAndInitializeOperator(
-    IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
+    IDMLOperatorInitializer* initializer,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
     ID3D12DescriptorHeap* heap_for_binding_table,
     _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding) {
@@ -95,7 +96,7 @@ DmlGpuEvent DmlKernelConstruction::BindAndInitializeOperator(
   }
 
   return device_->GetExecutionContext()->InitializeOperator(
-      initializer, binding_table, heap_for_binding_table);
+      initializer, std::move(binding_table), heap_for_binding_table);
 }
 
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {
@@ -201,7 +202,7 @@ void DmlKernelContext::EnqueueCallbackForGpuEvent(
 }
 
 DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
-    IDMLCompiledOperator* op, IDMLBindingTable* binding_table,
+    IDMLCompiledOperator* op, Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
     ID3D12DescriptorHeap* heap_for_binding_table,
     _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
@@ -250,7 +251,7 @@ DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
                              output_binding_descs.data());
 
   return device_->GetExecutionContext()->ExecuteOperator(
-      op, binding_table, heap_for_binding_table);
+      op, std::move(binding_table), heap_for_binding_table);
 }
 
 DmlGpuEvent DmlKernelContext::GetCurrentCompletionEvent() const {

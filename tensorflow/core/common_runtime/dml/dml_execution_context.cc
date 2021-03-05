@@ -454,18 +454,16 @@ DmlGpuEvent DmlExecutionContext::FillBufferWithPattern(
 }
 
 DmlGpuEvent DmlExecutionContext::InitializeOperator(
-    IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
+    IDMLOperatorInitializer* initializer,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
     ID3D12DescriptorHeap* descriptor_heap) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
 
   auto event = shared_state_->impl->GetCurrentCompletionEvent();
   ++event.fence_value;
 
-  // The caller may not keep the binding table alive for longer than this
-  // function call, so take a reference and transfer ownership to the lambda.
-  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_ref{binding_table};
   shared_state_->batched_functions.emplace_back(
-      [=, binding_table = std::move(binding_table_ref)]() {
+      [=, binding_table = std::move(binding_table)]() {
         shared_state_->impl->InitializeOperator(
             initializer, binding_table.Get(), descriptor_heap);
       });
@@ -476,19 +474,16 @@ DmlGpuEvent DmlExecutionContext::InitializeOperator(
 }
 
 DmlGpuEvent DmlExecutionContext::ExecuteOperator(
-    IDMLCompiledOperator* op, IDMLBindingTable* binding_table,
+    IDMLCompiledOperator* op,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
     ID3D12DescriptorHeap* descriptor_heap) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
 
   auto event = shared_state_->impl->GetCurrentCompletionEvent();
   ++event.fence_value;
 
-  // The caller may not keep the binding table alive for longer than this
-  // function call, so take a reference and transfer ownership to the lambda.
-  // TODO: consider r-value param to avoid unnecessary addref/release.
-  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_ref{binding_table};
   shared_state_->batched_functions.emplace_back(
-      [=, binding_table = std::move(binding_table_ref)]() {
+      [=, binding_table = std::move(binding_table)]() {
         shared_state_->impl->ExecuteOperator(op, binding_table.Get(),
                                              descriptor_heap);
       });
