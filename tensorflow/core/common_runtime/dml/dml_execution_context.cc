@@ -421,13 +421,19 @@ DmlGpuEvent DmlExecutionContext::FillBufferWithPattern(
     ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
     absl::Span<const uint8_t> value) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
-  auto invoke_batch = InvokeBatchedFunctionsAndExecute();
-  if (!invoke_batch.ok()) {
-    return GetCurrentCompletionEvent();
-  }
-  auto event = shared_state_->impl->FillBufferWithPattern(
-      dst, dst_offset, dst_size_in_bytes, value);
-  shared_state_->impl->Flush();
+
+  auto event = shared_state_->impl->GetCurrentCompletionEvent();
+  ++event.fence_value;
+
+  absl::InlinedVector<uint8_t, 16> value_copy(value.size());
+  std::copy(value.begin(), value.end(), value_copy.begin());
+
+  shared_state_->batched_functions.emplace_back(
+      [=, value_copy = std::move(value_copy)]() {
+        shared_state_->impl->FillBufferWithPattern(
+            dst, dst_offset, dst_size_in_bytes, value_copy);
+      });
+
   return event;
 }
 
