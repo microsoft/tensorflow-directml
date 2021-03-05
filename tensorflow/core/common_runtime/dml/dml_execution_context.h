@@ -140,169 +140,58 @@ class DmlExecutionContext {
 
   void Close() {
     std::unique_lock<std::mutex> lock(shared_state_->mutex);
-    VLOG(1) << "DML EC: Close";
     shared_state_->impl->Close();
   }
 
+  // NOTE: the caller is responsible for keeping the resources alive until the
+  // returned GPU event has completed.
   DmlGpuEvent CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
                                D3D12_RESOURCE_STATES dst_state,
                                ID3D12Resource* src_buffer, uint64_t src_offset,
                                D3D12_RESOURCE_STATES src_state,
-                               uint64_t byte_count) {
-    // std::unique_lock<std::mutex> lock(shared_state_->mutex);
-    // InvokeBatchedFunctions();
-    // shared_state_->impl->Flush();
-    // return shared_state_->impl->CopyBufferRegion(
-    //     dst_buffer, dst_offset, dst_state, src_buffer, src_offset, src_state,
-    //     byte_count);
+                               uint64_t byte_count);
 
-    std::unique_lock<std::mutex> lock(shared_state_->mutex);
-
-    auto event = shared_state_->impl->GetCurrentCompletionEvent();
-    ++event.fence_value;
-    VLOG(1) << "DML EC: CopyBufferRegion; completion fv = " << event.fence_value;
-
-    shared_state_->batched_functions.emplace_back(
-        [this, dst_buffer, dst_offset, dst_state, src_buffer, src_offset,
-         src_state, byte_count]() {
-           VLOG(1) << "DML EC BATCH: CopyBufferRegion";
-                    return shared_state_->impl->CopyBufferRegion(
-              dst_buffer, dst_offset, dst_state, src_buffer, src_offset,
-              src_state, byte_count);
-        });
-
-    shared_state_->new_function_enqueued.notify_all();
-
-    return event;
-  }
-
-  // TODO: this can be batched as well for small byte counts (typical). Larger
-  // copies should flush the batch and execute synchronously.
+  // NOTE: the caller is responsible for keeping the resources alive until the
+  // returned GPU event has completed.
   DmlGpuEvent FillBufferWithPattern(ID3D12Resource* dst, uint64_t dst_offset,
                                     uint64_t dst_size_in_bytes,
-                                    absl::Span<const uint8_t> value) {
-    std::unique_lock<std::mutex> lock(shared_state_->mutex);
-    VLOG(1) << "DML EC: Begin FillBufferWithPattern";
-    InvokeBatchedFunctions();
-    shared_state_->impl->Flush();
-    auto event = shared_state_->impl->FillBufferWithPattern(dst, dst_offset,
-                                                      dst_size_in_bytes, value);
-    VLOG(1) << "DML EC: End FillBufferWithPattern; completion fv = " << event.fence_value;
-    shared_state_->impl->Flush();
-    return event;
-  }
+                                    absl::Span<const uint8_t> value);
 
+  // NOTE: the caller is responsible for keeping the initializer and
+  // descriptor_heap alive until the returned GPU event has completed.
   DmlGpuEvent InitializeOperator(IDMLOperatorInitializer* initializer,
                                  IDMLBindingTable* binding_table,
-                                 ID3D12DescriptorHeap* descriptor_heap) {
-    std::unique_lock<std::mutex> lock(shared_state_->mutex);
-
-    auto event = shared_state_->impl->GetCurrentCompletionEvent();
-    ++event.fence_value;
-    VLOG(1) << "DML EC: InitializeOperator; completion fv = " << event.fence_value;
-
-    // The caller may not keep the binding table alive for longer than this
-    // function call, so take a reference and transfer ownership to the lambda.
-    Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_ref{binding_table};
-    shared_state_->batched_functions.emplace_back(
-        [this, initializer, binding_table = std::move(binding_table_ref),
-         descriptor_heap]() {
-           VLOG(1) << "DML EC BATCH: InitializeOperator";
-          shared_state_->impl->InitializeOperator(
-              initializer, binding_table.Get(), descriptor_heap);
-        });
-
-    shared_state_->new_function_enqueued.notify_all();
-
-    return event;
-  }
+                                 ID3D12DescriptorHeap* descriptor_heap);
 
   // NOTE: the caller is responsible for keeping the op and descriptor_heap
-  // alive until the returned GPU event has been signaled.
+  // alive until the returned GPU event has completed.
   DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
                               IDMLBindingTable* binding_table,
-                              ID3D12DescriptorHeap* descriptor_heap) {
-    std::unique_lock<std::mutex> lock(shared_state_->mutex);
-
-    auto event = shared_state_->impl->GetCurrentCompletionEvent();
-    ++event.fence_value;
-    VLOG(1) << "DML EC: ExecuteOperator; completion fv = " << event.fence_value;
-
-    // The caller may not keep the binding table alive for longer than this
-    // function call, so take a reference and transfer ownership to the lambda.
-    Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_ref{binding_table};
-    shared_state_->batched_functions.emplace_back(
-        [this, op, binding_table = std::move(binding_table_ref),
-         descriptor_heap]() {
-           VLOG(1) << "DML EC BATCH: ExecuteOperator";
-          shared_state_->impl->ExecuteOperator(op, binding_table.Get(),
-                                               descriptor_heap);
-        });
-
-    shared_state_->new_function_enqueued.notify_all();
-
-    return event;
-  }
+                              ID3D12DescriptorHeap* descriptor_heap);
 
   DmlGpuEvent ResourceBarrier(
-      absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
-    std::unique_lock<std::mutex> lock(shared_state_->mutex);
+      absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
-    auto event = shared_state_->impl->GetCurrentCompletionEvent();
-    ++event.fence_value;
-    VLOG(1) << "DML EC: ResourceBarrier; completion fv = " << event.fence_value;
-    // The caller may not keep the barriers span alive for longer than this
-    // function call, so make a copy and transfer ownership to the lambda.
-    absl::InlinedVector<D3D12_RESOURCE_BARRIER, 4> barriers_copy;
-    shared_state_->batched_functions.emplace_back(
-        [this, barriers = std::move(barriers_copy)]() {
-          VLOG(1) << "DML EC BATCH: ResourceBarrier";
-          shared_state_->impl->ResourceBarrier(barriers);
-        });
-
-    shared_state_->new_function_enqueued.notify_all();
-
-    return event;
-  }
-
-  StatusOr<DmlGpuEvent> Flush() {
-    std::unique_lock<std::mutex> lock(shared_state_->mutex);
-    VLOG(1) << "DML EC: Begin Flush; current fv = " << shared_state_->impl->GetCurrentCompletionEvent().fence_value;
-    InvokeBatchedFunctions();
-    auto event = shared_state_->impl->Flush();
-    VLOG(1) << "DML EC: End Flush; completion fv = " << event.ValueOrDie().fence_value;
-    return event;
-  }
+  StatusOr<DmlGpuEvent> Flush();
 
   Status GetCommandRecorderStatus() const {
     return shared_state_->impl->GetCommandRecorderStatus();
   }
 
-  DmlGpuEvent GetCurrentCompletionEvent() {
-    std::unique_lock<std::mutex> lock(shared_state_->mutex);
-    auto event = shared_state_->impl->GetCurrentCompletionEvent();
-    VLOG(1) << "DML EC: GetCurrentCompletionEvent; current fv = " << event.fence_value;
-
-    // If something has been batched but not submitted yet,
-    // it means that the *next* fence value is the one to signal completion.
-    if (!shared_state_->batched_functions.empty()) {
-      ++event.fence_value;
-      VLOG(1) << "DML EC: GetCurrentCompletionEvent; INCREMENT FV = " << event.fence_value;
-    }
-
-    return event;
-  }
+  DmlGpuEvent GetCurrentCompletionEvent();
 
   D3D12_COMMAND_LIST_TYPE GetCommandListTypeForQueue() const {
     return shared_state_->impl->GetCommandListTypeForQueue();
   }
 
  private:
+  static constexpr uint32_t batch_flush_size = 25;
+
   struct SharedState {
     std::mutex mutex;
     std::unique_ptr<DmlExecutionContextImpl> impl;
     std::condition_variable new_function_enqueued;
-    std::vector<std::function<void()>> batched_functions;
+    absl::InlinedVector<std::function<void()>, batch_flush_size> batched_functions;
     bool exit_requested = false;
   };
 
@@ -311,7 +200,7 @@ class DmlExecutionContext {
 
   static void ThreadProc(std::shared_ptr<SharedState> state);
 
-  void InvokeBatchedFunctions();
+  StatusOr<DmlGpuEvent> InvokeBatchedFunctionsAndExecute();
 };
 
 }  // namespace tensorflow

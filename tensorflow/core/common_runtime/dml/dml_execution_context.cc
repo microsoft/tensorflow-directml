@@ -257,7 +257,8 @@ DmlGpuEvent DmlExecutionContextImpl::ResourceBarrier(
 StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
   assert(!closed_);
   DmlTracing::Instance().LogExecutionContextFlush();
-  VLOG(1) << "DML EC IMPL: Begin Flush (" << operations_recorded_in_current_command_list_ << " cmds)";
+  VLOG(1) << "DML EC IMPL: Begin Flush ("
+          << operations_recorded_in_current_command_list_ << " cmds)";
 
   if (operations_recorded_in_current_command_list_ == 0) {
     // Nothing to flush
@@ -394,12 +395,132 @@ void DmlExecutionContextImpl::CloseCommandListAndExecute() {
   OpenCommandList();
 }
 
-void DmlExecutionContext::InvokeBatchedFunctions() {
-  VLOG(1) << "DML EC: InvokeBatchedFunctions (" << shared_state_->batched_functions.size() << "); current fv = " << shared_state_->impl->GetCurrentCompletionEvent().fence_value;
+DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
+    ID3D12Resource* dst_buffer, uint64_t dst_offset,
+    D3D12_RESOURCE_STATES dst_state, ID3D12Resource* src_buffer,
+    uint64_t src_offset, D3D12_RESOURCE_STATES src_state, uint64_t byte_count) {
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+
+  auto event = shared_state_->impl->GetCurrentCompletionEvent();
+  ++event.fence_value;
+
+  shared_state_->batched_functions.emplace_back([=]() {
+    return shared_state_->impl->CopyBufferRegion(
+        dst_buffer, dst_offset, dst_state, src_buffer, src_offset, src_state,
+        byte_count);
+  });
+
+  shared_state_->new_function_enqueued.notify_all();
+
+  return event;
+}
+
+// TODO: this can be batched as well for small byte counts (typical). Larger
+// copies should flush the batch and execute synchronously.
+DmlGpuEvent DmlExecutionContext::FillBufferWithPattern(
+    ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
+    absl::Span<const uint8_t> value) {
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+  auto invoke_batch = InvokeBatchedFunctionsAndExecute();
+  if (!invoke_batch.ok()) {
+    return GetCurrentCompletionEvent();
+  }
+  auto event = shared_state_->impl->FillBufferWithPattern(
+      dst, dst_offset, dst_size_in_bytes, value);
+  shared_state_->impl->Flush();
+  return event;
+}
+
+DmlGpuEvent DmlExecutionContext::InitializeOperator(
+    IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
+    ID3D12DescriptorHeap* descriptor_heap) {
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+
+  auto event = shared_state_->impl->GetCurrentCompletionEvent();
+  ++event.fence_value;
+
+  // The caller may not keep the binding table alive for longer than this
+  // function call, so take a reference and transfer ownership to the lambda.
+  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_ref{binding_table};
+  shared_state_->batched_functions.emplace_back(
+      [=, binding_table = std::move(binding_table_ref)]() {
+        shared_state_->impl->InitializeOperator(
+            initializer, binding_table.Get(), descriptor_heap);
+      });
+
+  shared_state_->new_function_enqueued.notify_all();
+
+  return event;
+}
+
+DmlGpuEvent DmlExecutionContext::ExecuteOperator(
+    IDMLCompiledOperator* op, IDMLBindingTable* binding_table,
+    ID3D12DescriptorHeap* descriptor_heap) {
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+
+  auto event = shared_state_->impl->GetCurrentCompletionEvent();
+  ++event.fence_value;
+
+  // The caller may not keep the binding table alive for longer than this
+  // function call, so take a reference and transfer ownership to the lambda.
+  // TODO: consider r-value param to avoid unnecessary addref/release.
+  Microsoft::WRL::ComPtr<IDMLBindingTable> binding_table_ref{binding_table};
+  shared_state_->batched_functions.emplace_back(
+      [=, binding_table = std::move(binding_table_ref)]() {
+        shared_state_->impl->ExecuteOperator(op, binding_table.Get(),
+                                             descriptor_heap);
+      });
+
+  shared_state_->new_function_enqueued.notify_all();
+
+  return event;
+}
+
+DmlGpuEvent DmlExecutionContext::ResourceBarrier(
+    absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+
+  auto event = shared_state_->impl->GetCurrentCompletionEvent();
+  ++event.fence_value;
+
+  // The caller may not keep the barriers referenced by the span alive for
+  // longer than this function call, so make a copy and transfer ownership to
+  // the lambda.
+  absl::InlinedVector<D3D12_RESOURCE_BARRIER, 4> barriers_copy;
+  shared_state_->batched_functions.emplace_back(
+      [=, barriers = std::move(barriers_copy)]() {
+        shared_state_->impl->ResourceBarrier(barriers);
+      });
+
+  shared_state_->new_function_enqueued.notify_all();
+
+  return event;
+}
+
+StatusOr<DmlGpuEvent> DmlExecutionContext::Flush() {
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+  return InvokeBatchedFunctionsAndExecute();
+}
+
+DmlGpuEvent DmlExecutionContext::GetCurrentCompletionEvent() {
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+  auto event = shared_state_->impl->GetCurrentCompletionEvent();
+
+  // If something has been batched but not submitted yet,
+  // it means that the *next* fence value is the one to signal completion.
+  if (!shared_state_->batched_functions.empty()) {
+    ++event.fence_value;
+  }
+
+  return event;
+}
+
+StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
   for (auto& f : shared_state_->batched_functions) {
     f();
   }
   shared_state_->batched_functions.clear();
+  return shared_state_->impl->Flush();
 }
 
 /*static*/ void DmlExecutionContext::ThreadProc(
@@ -410,13 +531,11 @@ void DmlExecutionContext::InvokeBatchedFunctions() {
       break;
     }
 
-    if (state->batched_functions.size() >= 25) {
-      VLOG(1) << "DML EC ThreadProc: InvokeBatchedFunctions (" << state->batched_functions.size() << "); current fv = " << state->impl->GetCurrentCompletionEvent().fence_value;
+    if (state->batched_functions.size() >= batch_flush_size) {
       for (auto& f : state->batched_functions) {
         f();
       }
       state->batched_functions.clear();
-
       state->impl->Flush();
     } else {
       // Wait for new functions
