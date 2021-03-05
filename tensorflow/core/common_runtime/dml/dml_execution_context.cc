@@ -32,7 +32,8 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
       d3d_device, dml_device, queue, allocator);
 
   int64 batch_flush_size = 0;
-  Status s = ReadInt64FromEnvVar("TF_DIRECTML_BATCH_FLUSH_SIZE", 0, &batch_flush_size);
+  Status s =
+      ReadInt64FromEnvVar("TF_DIRECTML_BATCH_FLUSH_SIZE", 0, &batch_flush_size);
   if (s.ok() && batch_flush_size != 0) {
     shared_state_->batch_flush_size_ = static_cast<uint32_t>(batch_flush_size);
   }
@@ -261,6 +262,19 @@ DmlGpuEvent DmlExecutionContextImpl::ResourceBarrier(
   return GetCurrentCompletionEvent();
 }
 
+DmlGpuEvent DmlExecutionContextImpl::UavBarrier() {
+  assert(!closed_);
+  if (!status_.ok()) {
+    GetCurrentCompletionEvent();
+  }
+
+  D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
+  current_command_list_->ResourceBarrier(1, &barrier);
+  OnCommandRecorded();
+
+  return GetCurrentCompletionEvent();
+}
+
 StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
   assert(!closed_);
   DmlTracing::Instance().LogExecutionContextFlush();
@@ -336,11 +350,6 @@ void DmlExecutionContextImpl::OnCommandRecorded() {
   DCHECK(status_.ok());
 
   ++operations_recorded_in_current_command_list_;
-
-  // if (operations_recorded_in_current_command_list_ >= 25) {
-  //   CloseCommandListAndExecute();
-  //   assert(operations_recorded_in_current_command_list_ == 0);
-  // }
 }
 
 void DmlExecutionContextImpl::OpenCommandList() {
@@ -510,6 +519,20 @@ DmlGpuEvent DmlExecutionContext::ResourceBarrier(
   return event;
 }
 
+DmlGpuEvent DmlExecutionContext::UavBarrier() {
+  std::unique_lock<std::mutex> lock(shared_state_->mutex);
+
+  auto event = shared_state_->impl->GetCurrentCompletionEvent();
+  ++event.fence_value;
+
+  shared_state_->batched_functions.emplace_back(
+      [=]() { shared_state_->impl->UavBarrier(); });
+
+  shared_state_->new_function_enqueued.notify_all();
+
+  return event;
+}
+
 StatusOr<DmlGpuEvent> DmlExecutionContext::Flush() {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
   return InvokeBatchedFunctionsAndExecute();
@@ -538,19 +561,20 @@ StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
 
 /*static*/ void DmlExecutionContext::ThreadProc(
     std::shared_ptr<SharedState> state) {
-
   auto last_flush = std::chrono::high_resolution_clock::now();
-  
+
   while (true) {
     std::unique_lock<std::mutex> lock(state->mutex);
     if (state->exit_requested) {
       break;
     }
 
-    std::chrono::duration<double> elapsed = std::chrono::high_resolution_clock::now() - last_flush;
+    std::chrono::duration<double> elapsed =
+        std::chrono::high_resolution_clock::now() - last_flush;
     auto elapsed_ms = elapsed.count() * 1e3;
 
-    if ((state->batched_functions.size() >= state->batch_flush_size_) || (!state->batched_functions.empty() && elapsed_ms >= 1)) {
+    if ((state->batched_functions.size() >= state->batch_flush_size_) ||
+        (!state->batched_functions.empty() && elapsed_ms >= 1)) {
       for (auto& f : state->batched_functions) {
         f();
       }

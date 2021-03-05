@@ -286,10 +286,7 @@ DmlGpuEvent DmlKernelContext::ZeroBuffer(const D3D12BufferRegion& dst) const {
 }
 
 DmlGpuEvent DmlKernelContext::InsertUavBarrier() const {
-  D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-
-  return device_->GetExecutionContext()->ResourceBarrier(
-      absl::Span<D3D12_RESOURCE_BARRIER>(&barrier, 1));
+  return device_->GetExecutionContext()->UavBarrier();
 }
 
 DmlGpuEvent DmlKernelContext::FillBufferWithPattern(

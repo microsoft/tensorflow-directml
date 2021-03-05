@@ -72,6 +72,8 @@ class DmlExecutionContextImpl {
   DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
+  DmlGpuEvent UavBarrier();
+
   // Forces all queued work to begin executing on the GPU. This method returns
   // immediately and does not wait for the submitted work to complete execution
   // on the GPU.
@@ -130,7 +132,9 @@ class DmlExecutionContextImpl {
   void CloseCommandListAndExecute();
 };
 
-// A thread-safe wrapper over DmlExecutionContextImpl.
+// A thread-safe wrapper over DmlExecutionContextImpl. Calls to this class are
+// batched to minimize work within the lock, and the batched calls are
+// periodically flushed by a background thread (or by explicitly calling Flush).
 class DmlExecutionContext {
  public:
   DmlExecutionContext(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
@@ -172,6 +176,10 @@ class DmlExecutionContext {
   DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
+  // A slightly more efficient version of ResourceBarrier when the barrier span
+  // only includes a UAV barrier (elides an extra copy).
+  DmlGpuEvent UavBarrier();
+
   StatusOr<DmlGpuEvent> Flush();
 
   Status GetCommandRecorderStatus() const {
@@ -192,7 +200,8 @@ class DmlExecutionContext {
     uint32_t batch_flush_size_ = default_batch_flush_size;
     std::unique_ptr<DmlExecutionContextImpl> impl;
     std::condition_variable new_function_enqueued;
-    absl::InlinedVector<std::function<void()>, default_batch_flush_size> batched_functions;
+    absl::InlinedVector<std::function<void()>, default_batch_flush_size>
+        batched_functions;
     bool exit_requested = false;
   };
 
