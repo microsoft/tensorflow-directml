@@ -203,6 +203,7 @@ class DmlExecutionContext {
     absl::InlinedVector<std::function<void()>, default_batch_flush_size>
         batched_functions;
     bool exit_requested = false;
+    std::chrono::high_resolution_clock::time_point last_flush_time;
   };
 
   std::shared_ptr<SharedState> shared_state_;

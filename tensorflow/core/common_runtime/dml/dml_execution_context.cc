@@ -546,12 +546,12 @@ StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
     f();
   }
   shared_state_->batched_functions.clear();
+  shared_state_->last_flush_time = std::chrono::high_resolution_clock::now();
   return shared_state_->impl->Flush();
 }
 
 /*static*/ void DmlExecutionContext::ThreadProc(
     std::shared_ptr<SharedState> state) {
-  auto last_flush = std::chrono::high_resolution_clock::now();
 
   while (true) {
     std::unique_lock<std::mutex> lock(state->mutex);
@@ -560,7 +560,7 @@ StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
     }
 
     std::chrono::duration<double> elapsed =
-        std::chrono::high_resolution_clock::now() - last_flush;
+        std::chrono::high_resolution_clock::now() - state->last_flush_time;
     auto elapsed_ms = elapsed.count() * 1e3;
 
     if ((state->batched_functions.size() >= state->batch_flush_size_) ||
@@ -570,7 +570,7 @@ StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
       }
       state->batched_functions.clear();
       state->impl->Flush();
-      last_flush = std::chrono::high_resolution_clock::now();
+      state->last_flush_time = std::chrono::high_resolution_clock::now();
     } else {
       // Wait for new functions
       state->new_function_enqueued.wait(lock);
