@@ -278,8 +278,6 @@ DmlGpuEvent DmlExecutionContextImpl::UavBarrier() {
 StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
   assert(!closed_);
   DmlTracing::Instance().LogExecutionContextFlush();
-  VLOG(1) << "DML EC IMPL: Begin Flush ("
-          << operations_recorded_in_current_command_list_ << " cmds)";
 
   if (operations_recorded_in_current_command_list_ == 0) {
     // Nothing to flush
@@ -296,10 +294,7 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
     return status_;
   }
 
-  auto event = GetCurrentCompletionEvent();
-  VLOG(1) << "DML EC IMPL: End Flush; completion fv = " << event.fence_value;
-
-  return event;
+  return GetCurrentCompletionEvent();
 }
 
 void DmlExecutionContextImpl::Close() {
