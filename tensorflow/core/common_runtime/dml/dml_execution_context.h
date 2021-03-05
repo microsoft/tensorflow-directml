@@ -163,15 +163,17 @@ class DmlExecutionContext {
 
   // NOTE: the caller is responsible for keeping the initializer and
   // descriptor_heap alive until the returned GPU event has completed.
-  DmlGpuEvent InitializeOperator(IDMLOperatorInitializer* initializer,
-                                 Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
-                                 ID3D12DescriptorHeap* descriptor_heap);
+  DmlGpuEvent InitializeOperator(
+      IDMLOperatorInitializer* initializer,
+      Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+      ID3D12DescriptorHeap* descriptor_heap);
 
   // NOTE: the caller is responsible for keeping the op and descriptor_heap
   // alive until the returned GPU event has completed.
-  DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
-                              Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
-                              ID3D12DescriptorHeap* descriptor_heap);
+  DmlGpuEvent ExecuteOperator(
+      IDMLCompiledOperator* op,
+      Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+      ID3D12DescriptorHeap* descriptor_heap);
 
   DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
@@ -194,10 +196,12 @@ class DmlExecutionContext {
 
  private:
   static constexpr uint32_t default_batch_flush_size = 100;
+  static constexpr uint32_t default_batch_flush_time_us = 1000;
 
   struct SharedState {
     std::mutex mutex;
-    uint32_t batch_flush_size_ = default_batch_flush_size;
+    uint32_t batch_flush_size = default_batch_flush_size;
+    uint32_t batch_flush_time_us = default_batch_flush_time_us;
     std::unique_ptr<DmlExecutionContextImpl> impl;
     std::condition_variable new_function_enqueued;
     absl::InlinedVector<std::function<void()>, default_batch_flush_size>

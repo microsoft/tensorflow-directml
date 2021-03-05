@@ -31,11 +31,23 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
   shared_state_->impl = absl::make_unique<DmlExecutionContextImpl>(
       d3d_device, dml_device, queue, allocator);
 
-  int64 batch_flush_size = 0;
-  Status s =
-      ReadInt64FromEnvVar("TF_DIRECTML_BATCH_FLUSH_SIZE", 0, &batch_flush_size);
-  if (s.ok() && batch_flush_size != 0) {
-    shared_state_->batch_flush_size_ = static_cast<uint32_t>(batch_flush_size);
+  {
+    int64 batch_flush_size = 0;
+    Status s = ReadInt64FromEnvVar("TF_DIRECTML_BATCH_FLUSH_SIZE", 0,
+                                   &batch_flush_size);
+    if (s.ok() && batch_flush_size != 0) {
+      shared_state_->batch_flush_size = static_cast<uint32_t>(batch_flush_size);
+    }
+  }
+
+  {
+    int64 batch_flush_time_us = 0;
+    Status s = ReadInt64FromEnvVar("TF_DIRECTML_BATCH_FLUSH_TIME", 0,
+                                   &batch_flush_time_us);
+    if (s.ok() && batch_flush_time_us != 0) {
+      shared_state_->batch_flush_time_us =
+          static_cast<uint32_t>(batch_flush_time_us);
+    }
   }
 
   // Launch the thread, supplying it with a pointer to the shared state
@@ -552,7 +564,6 @@ StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
 
 /*static*/ void DmlExecutionContext::ThreadProc(
     std::shared_ptr<SharedState> state) {
-
   while (true) {
     std::unique_lock<std::mutex> lock(state->mutex);
     if (state->exit_requested) {
@@ -561,10 +572,15 @@ StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
 
     std::chrono::duration<double> elapsed =
         std::chrono::high_resolution_clock::now() - state->last_flush_time;
-    auto elapsed_ms = elapsed.count() * 1e3;
+    auto elapsed_us = elapsed.count() * 1e6;
 
-    if ((state->batched_functions.size() >= state->batch_flush_size_) ||
-        (!state->batched_functions.empty() && elapsed_ms >= 1)) {
+    // The background thread will flush if either a minimum number of commands
+    // have been batched or a minimum duration has elapsed. The goal here is to
+    // balance feeding the GPU work while the CPU is processing more commands
+    // and avoiding many small packets.
+    if ((state->batched_functions.size() >= state->batch_flush_size) ||
+        (!state->batched_functions.empty() &&
+         elapsed_us >= state->batch_flush_time_us)) {
       for (auto& f : state->batched_functions) {
         f();
       }
