@@ -34,7 +34,8 @@ DmlTracing::DmlTracing() {
   TraceLoggingRegister(g_providerHandle);
 
   tensorflow::int64 trace_level = 0;
-  tensorflow::Status s = tensorflow::ReadInt64FromEnvVar("TF_DIRECTML_TRACE_LEVEL", 0, &trace_level);
+  tensorflow::Status s = tensorflow::ReadInt64FromEnvVar(
+      "TF_DIRECTML_TRACE_LEVEL", trace_level_, &trace_level);
   if (s.ok()) {
     trace_level_ = static_cast<TraceLevel>(trace_level);
   }
