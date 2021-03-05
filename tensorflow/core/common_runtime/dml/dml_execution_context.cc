@@ -438,8 +438,6 @@ DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
   return event;
 }
 
-// TODO: this can be batched as well for small byte counts (typical). Larger
-// copies should flush the batch and execute synchronously.
 DmlGpuEvent DmlExecutionContext::FillBufferWithPattern(
     ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
     absl::Span<const uint8_t> value) {
