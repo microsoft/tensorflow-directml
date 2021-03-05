@@ -185,13 +185,14 @@ class DmlExecutionContext {
   }
 
  private:
-  static constexpr uint32_t batch_flush_size = 25;
+  static constexpr uint32_t default_batch_flush_size = 100;
 
   struct SharedState {
     std::mutex mutex;
+    uint32_t batch_flush_size_ = default_batch_flush_size;
     std::unique_ptr<DmlExecutionContextImpl> impl;
     std::condition_variable new_function_enqueued;
-    absl::InlinedVector<std::function<void()>, batch_flush_size> batched_functions;
+    absl::InlinedVector<std::function<void()>, default_batch_flush_size> batched_functions;
     bool exit_requested = false;
   };
 

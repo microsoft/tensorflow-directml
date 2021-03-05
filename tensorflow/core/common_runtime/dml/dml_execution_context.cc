@@ -19,6 +19,7 @@ limitations under the License.
 #include "dml_buffer.h"
 #include "dml_tracing.h"
 #include "dml_util.h"
+#include "tensorflow/core/util/env_var.h"
 
 namespace tensorflow {
 
@@ -29,6 +30,12 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
   shared_state_ = std::make_shared<SharedState>();
   shared_state_->impl = absl::make_unique<DmlExecutionContextImpl>(
       d3d_device, dml_device, queue, allocator);
+
+  int64 batch_flush_size = 0;
+  Status s = ReadInt64FromEnvVar("TF_DIRECTML_BATCH_FLUSH_SIZE", 0, &batch_flush_size);
+  if (s.ok() && batch_flush_size != 0) {
+    shared_state_->batch_flush_size_ = static_cast<uint32_t>(batch_flush_size);
+  }
 
   // Launch the thread, supplying it with a pointer to the shared state
   thread_ = std::thread(ThreadProc, shared_state_);
@@ -537,7 +544,7 @@ StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
       break;
     }
 
-    if (state->batched_functions.size() >= batch_flush_size) {
+    if (state->batched_functions.size() >= state->batch_flush_size_) {
       for (auto& f : state->batched_functions) {
         f();
       }
