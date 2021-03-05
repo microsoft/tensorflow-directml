@@ -25,10 +25,10 @@ namespace tensorflow {
 DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
                                          IDMLDevice* dml_device,
                                          ID3D12CommandQueue* queue,
-                                         DmlAllocator* allocator)
-    : impl_(absl::make_unique<DmlExecutionContextImpl>(d3d_device, dml_device,
-                                                       queue, allocator)) {
+                                         DmlAllocator* allocator) {
   shared_state_ = std::make_shared<SharedState>();
+  shared_state_->impl = absl::make_unique<DmlExecutionContextImpl>(
+      d3d_device, dml_device, queue, allocator);
 
   // Launch the thread, supplying it with a pointer to the shared state
   thread_ = std::thread(ThreadProc, shared_state_);
@@ -325,10 +325,10 @@ void DmlExecutionContextImpl::OnCommandRecorded() {
 
   ++operations_recorded_in_current_command_list_;
 
-  if (operations_recorded_in_current_command_list_ >= 25) {
-    CloseCommandListAndExecute();
-    assert(operations_recorded_in_current_command_list_ == 0);
-  }
+  // if (operations_recorded_in_current_command_list_ >= 25) {
+  //   CloseCommandListAndExecute();
+  //   assert(operations_recorded_in_current_command_list_ == 0);
+  // }
 }
 
 void DmlExecutionContextImpl::OpenCommandList() {
@@ -405,7 +405,15 @@ void DmlExecutionContext::InvokeBatchedFunctions() {
       break;
     }
 
-    if (state->batched_functions.empty()) {
+    if (state->batched_functions.size() >= 25) {
+      VLOG(1) << "DML ThreadProc flush";
+      for (auto& f : state->batched_functions) {
+        f();
+      }
+      state->batched_functions.clear();
+
+      state->impl->Flush();
+    } else {
       // Wait for new functions
       state->new_function_enqueued.wait(lock);
 
@@ -414,13 +422,6 @@ void DmlExecutionContext::InvokeBatchedFunctions() {
       // requested.
       continue;
     }
-
-    DCHECK(!state->batched_functions.empty());
-
-    for (auto& f : state->batched_functions) {
-      f();
-    }
-    state->batched_functions.clear();
 
     lock.unlock();
   }
