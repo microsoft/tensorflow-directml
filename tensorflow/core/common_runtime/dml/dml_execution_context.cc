@@ -30,6 +30,9 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
   shared_state_ = std::make_shared<SharedState>();
   shared_state_->impl = absl::make_unique<DmlExecutionContextImpl>(
       d3d_device, dml_device, queue, allocator);
+  shared_state_->next_flush_event =
+      shared_state_->impl->GetCurrentCompletionEvent();
+  ++shared_state_->next_flush_event.fence_value;
 
   {
     int64 batch_flush_size = 0;
@@ -424,18 +427,15 @@ DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
     uint64_t src_offset, D3D12_RESOURCE_STATES src_state, uint64_t byte_count) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
 
-  auto event = shared_state_->impl->GetCurrentCompletionEvent();
-  ++event.fence_value;
-
-  shared_state_->batched_functions.emplace_back([=]() {
-    return shared_state_->impl->CopyBufferRegion(
-        dst_buffer, dst_offset, dst_state, src_buffer, src_offset, src_state,
-        byte_count);
+  shared_state_->WriteBatch().emplace_back([=]() {
+    shared_state_->impl->CopyBufferRegion(dst_buffer, dst_offset, dst_state,
+                                          src_buffer, src_offset, src_state,
+                                          byte_count);
   });
 
   shared_state_->new_function_enqueued.notify_all();
 
-  return event;
+  return shared_state_->next_flush_event;
 }
 
 DmlGpuEvent DmlExecutionContext::FillBufferWithPattern(
@@ -443,19 +443,16 @@ DmlGpuEvent DmlExecutionContext::FillBufferWithPattern(
     absl::Span<const uint8_t> value) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
 
-  auto event = shared_state_->impl->GetCurrentCompletionEvent();
-  ++event.fence_value;
-
   absl::InlinedVector<uint8_t, 16> value_copy(value.size());
   std::copy(value.begin(), value.end(), value_copy.begin());
 
-  shared_state_->batched_functions.emplace_back(
+  shared_state_->WriteBatch().emplace_back(
       [=, value_copy = std::move(value_copy)]() {
         shared_state_->impl->FillBufferWithPattern(
             dst, dst_offset, dst_size_in_bytes, value_copy);
       });
 
-  return event;
+  return shared_state_->next_flush_event;
 }
 
 DmlGpuEvent DmlExecutionContext::InitializeOperator(
@@ -464,10 +461,7 @@ DmlGpuEvent DmlExecutionContext::InitializeOperator(
     ID3D12DescriptorHeap* descriptor_heap) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
 
-  auto event = shared_state_->impl->GetCurrentCompletionEvent();
-  ++event.fence_value;
-
-  shared_state_->batched_functions.emplace_back(
+  shared_state_->WriteBatch().emplace_back(
       [=, binding_table = std::move(binding_table)]() {
         shared_state_->impl->InitializeOperator(
             initializer, binding_table.Get(), descriptor_heap);
@@ -475,7 +469,7 @@ DmlGpuEvent DmlExecutionContext::InitializeOperator(
 
   shared_state_->new_function_enqueued.notify_all();
 
-  return event;
+  return shared_state_->next_flush_event;
 }
 
 DmlGpuEvent DmlExecutionContext::ExecuteOperator(
@@ -484,10 +478,7 @@ DmlGpuEvent DmlExecutionContext::ExecuteOperator(
     ID3D12DescriptorHeap* descriptor_heap) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
 
-  auto event = shared_state_->impl->GetCurrentCompletionEvent();
-  ++event.fence_value;
-
-  shared_state_->batched_functions.emplace_back(
+  shared_state_->WriteBatch().emplace_back(
       [=, binding_table = std::move(binding_table)]() {
         shared_state_->impl->ExecuteOperator(op, binding_table.Get(),
                                              descriptor_heap);
@@ -495,107 +486,110 @@ DmlGpuEvent DmlExecutionContext::ExecuteOperator(
 
   shared_state_->new_function_enqueued.notify_all();
 
-  return event;
+  return shared_state_->next_flush_event;
 }
 
 DmlGpuEvent DmlExecutionContext::ResourceBarrier(
     absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
 
-  auto event = shared_state_->impl->GetCurrentCompletionEvent();
-  ++event.fence_value;
-
   // The caller may not keep the barriers referenced by the span alive for
   // longer than this function call, so make a copy and transfer ownership to
   // the lambda.
   absl::InlinedVector<D3D12_RESOURCE_BARRIER, 4> barriers_copy;
-  shared_state_->batched_functions.emplace_back(
+  shared_state_->WriteBatch().emplace_back(
       [=, barriers = std::move(barriers_copy)]() {
         shared_state_->impl->ResourceBarrier(barriers);
       });
 
   shared_state_->new_function_enqueued.notify_all();
 
-  return event;
+  return shared_state_->next_flush_event;
 }
 
 DmlGpuEvent DmlExecutionContext::UavBarrier() {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
 
-  auto event = shared_state_->impl->GetCurrentCompletionEvent();
-  ++event.fence_value;
-
-  shared_state_->batched_functions.emplace_back(
+  shared_state_->WriteBatch().emplace_back(
       [=]() { shared_state_->impl->UavBarrier(); });
 
   shared_state_->new_function_enqueued.notify_all();
 
-  return event;
+  return shared_state_->next_flush_event;
 }
 
 StatusOr<DmlGpuEvent> DmlExecutionContext::Flush() {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
-  return InvokeBatchedFunctionsAndExecute();
+
+  auto event = shared_state_->next_flush_event;
+  if (shared_state_->WriteBatch().empty()) {
+    --event.fence_value;
+  }
+
+  shared_state_->flush_requested = true;
+  shared_state_->new_function_enqueued.notify_all();
+  return event;
 }
 
 DmlGpuEvent DmlExecutionContext::GetCurrentCompletionEvent() {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
-  auto event = shared_state_->impl->GetCurrentCompletionEvent();
+  auto event = shared_state_->next_flush_event;
 
-  // If something has been batched but not submitted yet,
-  // it means that the *next* fence value is the one to signal completion.
-  if (!shared_state_->batched_functions.empty()) {
-    ++event.fence_value;
+  if (shared_state_->WriteBatch().empty()) {
+    --event.fence_value;
   }
 
   return event;
 }
 
-StatusOr<DmlGpuEvent> DmlExecutionContext::InvokeBatchedFunctionsAndExecute() {
-  for (auto& f : shared_state_->batched_functions) {
-    f();
-  }
-  shared_state_->batched_functions.clear();
-  shared_state_->last_flush_time = std::chrono::high_resolution_clock::now();
-  return shared_state_->impl->Flush();
-}
-
 /*static*/ void DmlExecutionContext::ThreadProc(
     std::shared_ptr<SharedState> state) {
+  auto last_flush_time = std::chrono::high_resolution_clock::now();
+
   while (true) {
+    std::chrono::duration<double> elapsed =
+        std::chrono::high_resolution_clock::now() - last_flush_time;
+    auto elapsed_us = elapsed.count() * 1e6;
+
     std::unique_lock<std::mutex> lock(state->mutex);
     if (state->exit_requested) {
       break;
     }
 
-    std::chrono::duration<double> elapsed =
-        std::chrono::high_resolution_clock::now() - state->last_flush_time;
-    auto elapsed_us = elapsed.count() * 1e6;
+    auto& batch = state->WriteBatch();
 
-    // The background thread will flush if either a minimum number of commands
-    // have been batched or a minimum duration has elapsed. The goal here is to
-    // balance feeding the GPU work while the CPU is processing more commands
-    // and avoiding many small packets.
-    if ((state->batched_functions.size() >= state->batch_flush_size) ||
-        (!state->batched_functions.empty() &&
-         elapsed_us >= state->batch_flush_time_us)) {
-      for (auto& f : state->batched_functions) {
-        f();
-      }
-      state->batched_functions.clear();
-      state->impl->Flush();
-      state->last_flush_time = std::chrono::high_resolution_clock::now();
-    } else {
-      // Wait for new functions
+    if (batch.empty()) {
+      // Wait for new work to be batched.
       state->new_function_enqueued.wait(lock);
-
-      // No need for a loop around the wait() in case of spurious wakeup; just
-      // return to the top. This also handles the case where exit is
-      // requested.
       continue;
     }
 
+    // Check if it's time to swap the write/execute batches and flush work to
+    // the GPU: this occurs if a flush is explicitly requested, the batch has
+    // reached a certain size, or enough time has elapsed since the last flush.
+    // The goal here is to balance feeding the GPU work while the CPU is
+    // processing more commands and avoiding many small packets.
+    bool flush = false;
+    if (state->flush_requested || batch.size() >= state->batch_flush_size ||
+        elapsed_us >= state->batch_flush_time_us) {
+      state->write_batch_index = (state->write_batch_index + 1) % 2;
+      flush = true;
+      ++state->next_flush_event.fence_value;
+    }
+    state->flush_requested = false;
+
+    // Unlock to allow kernels to resume writing to the new write batch.
     lock.unlock();
+
+    // Invoke the batched functions and submit the work to the GPU.
+    if (flush) {
+      for (auto& f : batch) {
+        f();
+      }
+      batch.clear();
+      state->impl->Flush();
+      last_flush_time = std::chrono::high_resolution_clock::now();
+    }
   }
 }
 

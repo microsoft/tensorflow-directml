@@ -200,22 +200,28 @@ class DmlExecutionContext {
 
   struct SharedState {
     std::mutex mutex;
+    DmlGpuEvent next_flush_event;
     uint32_t batch_flush_size = default_batch_flush_size;
     uint32_t batch_flush_time_us = default_batch_flush_time_us;
     std::unique_ptr<DmlExecutionContextImpl> impl;
     std::condition_variable new_function_enqueued;
-    absl::InlinedVector<std::function<void()>, default_batch_flush_size>
-        batched_functions;
+
+    // Functions are double buffered: callers extend the "write batch" while the
+    // background thread flushes the "execute batch".
+    using Batch =
+        absl::InlinedVector<std::function<void()>, default_batch_flush_size>;
+    Batch batches[2];
+    uint32_t write_batch_index = 0;
+    Batch& WriteBatch() { return batches[write_batch_index]; }
+
     bool exit_requested = false;
-    std::chrono::high_resolution_clock::time_point last_flush_time;
+    bool flush_requested = false;
   };
 
   std::shared_ptr<SharedState> shared_state_;
   std::thread thread_;
 
   static void ThreadProc(std::shared_ptr<SharedState> state);
-
-  StatusOr<DmlGpuEvent> InvokeBatchedFunctionsAndExecute();
 };
 
 }  // namespace tensorflow
