@@ -312,12 +312,6 @@ StatusOr<DmlGpuEvent> DmlExecutionContextImpl::Flush() {
   return GetCurrentCompletionEvent();
 }
 
-void DmlExecutionContextImpl::Close() {
-  assert(!closed_);
-  queue_->Close();
-  closed_ = true;
-}
-
 DmlGpuEvent DmlExecutionContextImpl::GetCurrentCompletionEvent() {
   assert(!closed_);
 
@@ -452,6 +446,8 @@ DmlGpuEvent DmlExecutionContext::FillBufferWithPattern(
             dst, dst_offset, dst_size_in_bytes, value_copy);
       });
 
+  shared_state_->new_function_enqueued.notify_all();
+
   return shared_state_->next_flush_event;
 }
 
@@ -544,11 +540,11 @@ DmlGpuEvent DmlExecutionContext::GetCurrentCompletionEvent() {
 
 /*static*/ void DmlExecutionContext::ThreadProc(
     std::shared_ptr<SharedState> state) {
-  auto last_flush_time = std::chrono::high_resolution_clock::now();
+  auto last_flush_time = std::chrono::steady_clock::now();
 
   while (true) {
     std::chrono::duration<double> elapsed =
-        std::chrono::high_resolution_clock::now() - last_flush_time;
+        std::chrono::steady_clock::now() - last_flush_time;
     auto elapsed_us = elapsed.count() * 1e6;
 
     std::unique_lock<std::mutex> lock(state->mutex);
@@ -561,6 +557,8 @@ DmlGpuEvent DmlExecutionContext::GetCurrentCompletionEvent() {
     if (batch.empty()) {
       // Wait for new work to be batched.
       state->new_function_enqueued.wait(lock);
+
+      // Return to the top in case of spurious wakeup.
       continue;
     }
 
@@ -588,7 +586,7 @@ DmlGpuEvent DmlExecutionContext::GetCurrentCompletionEvent() {
       }
       batch.clear();
       state->impl->Flush();
-      last_flush_time = std::chrono::high_resolution_clock::now();
+      last_flush_time = std::chrono::steady_clock::now();
     }
   }
 }

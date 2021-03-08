@@ -43,8 +43,6 @@ class DmlCommandQueue {
   // ExecuteCommandLists call.
   DmlGpuEvent GetNextCompletionEvent();
 
-  void Close();
-
  private:
   Microsoft::WRL::ComPtr<ID3D12CommandQueue> queue_;
   D3D12_COMMAND_LIST_TYPE type_;

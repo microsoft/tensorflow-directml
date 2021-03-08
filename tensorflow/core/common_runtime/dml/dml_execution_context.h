@@ -41,11 +41,6 @@ class DmlExecutionContextImpl {
   DmlExecutionContextImpl(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
                           ID3D12CommandQueue* queue, DmlAllocator* allocator);
 
-  // Waits for flushed work, discards unflushed work, and discards associated
-  // references to prevent circular references. Must be the last call on the
-  // object before destruction.
-  void Close();
-
   // Queues a CopyBufferRegion (see ID3D12GraphicsCommandList::CopyBufferRegion)
   // for execution. Transition barriers are automatically inserted to transition
   // the source and destination resources to COPY_SOURCE and COPY_DEST if
@@ -141,11 +136,6 @@ class DmlExecutionContext {
                       ID3D12CommandQueue* queue, DmlAllocator* allocator);
 
   ~DmlExecutionContext();
-
-  void Close() {
-    std::unique_lock<std::mutex> lock(shared_state_->mutex);
-    shared_state_->impl->Close();
-  }
 
   // NOTE: the caller is responsible for keeping the resources alive until the
   // returned GPU event has completed.
