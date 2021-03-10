@@ -15,6 +15,11 @@ limitations under the License.
 
 #pragma once
 
+#include <condition_variable>
+#include <functional>
+#include <thread>
+#include <vector>
+
 #include "dml_command_allocator_ring.h"
 #include "dml_command_queue.h"
 #include "dml_common.h"
@@ -35,11 +40,6 @@ class DmlExecutionContextImpl {
   // Constructs an DmlExecutionContext that executes on the supplied queue.
   DmlExecutionContextImpl(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
                           ID3D12CommandQueue* queue, DmlAllocator* allocator);
-
-  // Waits for flushed work, discards unflushed work, and discards associated
-  // references to prevent circular references. Must be the last call on the
-  // object before destruction.
-  void Close();
 
   // Queues a CopyBufferRegion (see ID3D12GraphicsCommandList::CopyBufferRegion)
   // for execution. Transition barriers are automatically inserted to transition
@@ -66,6 +66,8 @@ class DmlExecutionContextImpl {
 
   DmlGpuEvent ResourceBarrier(
       absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
+
+  DmlGpuEvent UavBarrier();
 
   // Forces all queued work to begin executing on the GPU. This method returns
   // immediately and does not wait for the submitted work to complete execution
@@ -125,78 +127,91 @@ class DmlExecutionContextImpl {
   void CloseCommandListAndExecute();
 };
 
-// A thread-safe wrapper over DmlExecutionContextImpl.
+// A thread-safe wrapper over DmlExecutionContextImpl. Calls to this class are
+// batched to minimize work within the lock, and the batched calls are
+// periodically flushed by a background thread (or by explicitly calling Flush).
 class DmlExecutionContext {
  public:
   DmlExecutionContext(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
                       ID3D12CommandQueue* queue, DmlAllocator* allocator);
 
-  void Close() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    impl_->Close();
-  }
+  ~DmlExecutionContext();
 
+  // NOTE: the caller is responsible for keeping the resources alive until the
+  // returned GPU event has completed.
   DmlGpuEvent CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
                                D3D12_RESOURCE_STATES dst_state,
                                ID3D12Resource* src_buffer, uint64_t src_offset,
                                D3D12_RESOURCE_STATES src_state,
-                               uint64_t byte_count) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->CopyBufferRegion(dst_buffer, dst_offset, dst_state,
-                                   src_buffer, src_offset, src_state,
-                                   byte_count);
-  }
+                               uint64_t byte_count);
 
+  // NOTE: the caller is responsible for keeping the resources alive until the
+  // returned GPU event has completed.
   DmlGpuEvent FillBufferWithPattern(ID3D12Resource* dst, uint64_t dst_offset,
                                     uint64_t dst_size_in_bytes,
-                                    absl::Span<const uint8_t> value) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->FillBufferWithPattern(dst, dst_offset, dst_size_in_bytes,
-                                        value);
-  }
+                                    absl::Span<const uint8_t> value);
 
-  DmlGpuEvent InitializeOperator(IDMLOperatorInitializer* initializer,
-                                 IDMLBindingTable* binding_table,
-                                 ID3D12DescriptorHeap* descriptor_heap) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->InitializeOperator(initializer, binding_table,
-                                     descriptor_heap);
-  }
+  // NOTE: the caller is responsible for keeping the initializer and
+  // descriptor_heap alive until the returned GPU event has completed.
+  DmlGpuEvent InitializeOperator(
+      IDMLOperatorInitializer* initializer,
+      Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+      ID3D12DescriptorHeap* descriptor_heap);
 
-  DmlGpuEvent ExecuteOperator(IDMLCompiledOperator* op,
-                              IDMLBindingTable* binding_table,
-                              ID3D12DescriptorHeap* descriptor_heap) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->ExecuteOperator(op, binding_table, descriptor_heap);
-  }
+  // NOTE: the caller is responsible for keeping the op and descriptor_heap
+  // alive until the returned GPU event has completed.
+  DmlGpuEvent ExecuteOperator(
+      IDMLCompiledOperator* op,
+      Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+      ID3D12DescriptorHeap* descriptor_heap);
 
   DmlGpuEvent ResourceBarrier(
-      absl::Span<const D3D12_RESOURCE_BARRIER> barriers) {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->ResourceBarrier(barriers);
-  }
+      absl::Span<const D3D12_RESOURCE_BARRIER> barriers);
 
-  StatusOr<DmlGpuEvent> Flush() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->Flush();
-  }
+  // A slightly more efficient version of ResourceBarrier when the barrier span
+  // only includes a UAV barrier (elides an extra copy).
+  DmlGpuEvent UavBarrier();
+
+  StatusOr<DmlGpuEvent> Flush();
 
   Status GetCommandRecorderStatus() const {
-    return impl_->GetCommandRecorderStatus();
+    return shared_state_->impl->GetCommandRecorderStatus();
   }
 
-  DmlGpuEvent GetCurrentCompletionEvent() {
-    std::unique_lock<std::mutex> lock(mutex_);
-    return impl_->GetCurrentCompletionEvent();
-  }
+  DmlGpuEvent GetCurrentCompletionEvent();
 
   D3D12_COMMAND_LIST_TYPE GetCommandListTypeForQueue() const {
-    return impl_->GetCommandListTypeForQueue();
+    return shared_state_->impl->GetCommandListTypeForQueue();
   }
 
  private:
-  std::mutex mutex_;
-  std::unique_ptr<DmlExecutionContextImpl> impl_;
+  static constexpr uint32_t default_batch_flush_size = 100;
+  static constexpr uint32_t default_batch_flush_time_us = 1000;
+
+  struct SharedState {
+    std::mutex mutex;
+    DmlGpuEvent next_flush_event;
+    uint32_t batch_flush_size = default_batch_flush_size;
+    uint32_t batch_flush_time_us = default_batch_flush_time_us;
+    std::unique_ptr<DmlExecutionContextImpl> impl;
+    std::condition_variable new_function_enqueued;
+
+    // Functions are double buffered: callers extend the "write batch" while the
+    // background thread flushes the "execute batch".
+    using Batch =
+        absl::InlinedVector<std::function<void()>, default_batch_flush_size>;
+    Batch batches[2];
+    uint32_t write_batch_index = 0;
+    Batch& WriteBatch() { return batches[write_batch_index]; }
+
+    bool exit_requested = false;
+    bool flush_requested = false;
+  };
+
+  std::shared_ptr<SharedState> shared_state_;
+  std::thread thread_;
+
+  static void ThreadProc(std::shared_ptr<SharedState> state);
 };
 
 }  // namespace tensorflow

@@ -19,6 +19,8 @@
 #endif
 
 #include "dml_tracing.h"
+#include "tensorflow/core/lib/core/status.h"
+#include "tensorflow/core/util/env_var.h"
 
 TRACELOGGING_DECLARE_PROVIDER(g_providerHandle);
 
@@ -28,7 +30,16 @@ TRACELOGGING_DEFINE_PROVIDER(
     (0xe57b9ae, 0x5ce1, 0x4bef, 0x86, 0xbc, 0x24, 0x15, 0x2f, 0x6a, 0x95,
      0x60));
 
-DmlTracing::DmlTracing() { TraceLoggingRegister(g_providerHandle); }
+DmlTracing::DmlTracing() {
+  TraceLoggingRegister(g_providerHandle);
+
+  tensorflow::int64 trace_level = 0;
+  tensorflow::Status s = tensorflow::ReadInt64FromEnvVar(
+      "TF_DIRECTML_TRACE_LEVEL", trace_level_, &trace_level);
+  if (s.ok()) {
+    trace_level_ = static_cast<TraceLevel>(trace_level);
+  }
+}
 
 DmlTracing::~DmlTracing() { TraceLoggingUnregister(g_providerHandle); }
 
@@ -38,30 +49,43 @@ DmlTracing::~DmlTracing() { TraceLoggingUnregister(g_providerHandle); }
 }
 
 void DmlTracing::LogSessionRunStart() {
-  TraceLoggingWrite(g_providerHandle, "SessionRun",
-                    TraceLoggingOpcode(EVENT_TRACE_TYPE_START));
+  if (trace_level_ >= LowFrequency) {
+    TraceLoggingWrite(g_providerHandle, "SessionRun",
+                      TraceLoggingOpcode(EVENT_TRACE_TYPE_START));
+  }
 }
 
 void DmlTracing::LogSessionRunEnd() {
-  TraceLoggingWrite(g_providerHandle, "SessionRun",
-                    TraceLoggingOpcode(EVENT_TRACE_TYPE_STOP));
+  if (trace_level_ >= LowFrequency) {
+    TraceLoggingWrite(g_providerHandle, "SessionRun",
+                      TraceLoggingOpcode(EVENT_TRACE_TYPE_STOP));
+  }
 }
 
 void DmlTracing::LogExecutionContextCopyBufferRegion() {
-  TraceLoggingWrite(g_providerHandle, "ExecutionContextCopyBufferRegion");
+  if (trace_level_ >= All) {
+    TraceLoggingWrite(g_providerHandle, "ExecutionContextCopyBufferRegion");
+  }
 }
 
 void DmlTracing::LogExecutionContextFillBufferWithPattern() {
-  TraceLoggingWrite(g_providerHandle, "ExecutionContextFillBufferWithPattern");
+  if (trace_level_ >= All) {
+    TraceLoggingWrite(g_providerHandle,
+                      "ExecutionContextFillBufferWithPattern");
+  }
 }
 
 void DmlTracing::LogExecutionContextFlush() {
-  TraceLoggingWrite(g_providerHandle, "ExecutionContextFlush");
+  if (trace_level_ >= All) {
+    TraceLoggingWrite(g_providerHandle, "ExecutionContextFlush");
+  }
 }
 
 void DmlTracing::LogKernelCompute(const std::string& op_type,
                                   const std::string& op_name) {
-  TraceLoggingWrite(g_providerHandle, "KernelCompute",
-                    TraceLoggingString(op_type.c_str(), "Type"),
-                    TraceLoggingString(op_name.c_str(), "Name"));
+  if (trace_level_ >= All) {
+    TraceLoggingWrite(g_providerHandle, "KernelCompute",
+                      TraceLoggingString(op_type.c_str(), "Type"),
+                      TraceLoggingString(op_name.c_str(), "Name"));
+  }
 }

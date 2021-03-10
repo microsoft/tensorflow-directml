@@ -9,6 +9,15 @@ class DmlTracing {
   DmlTracing();
   ~DmlTracing();
 
+  enum TraceLevel
+  {
+    None = 0,
+    LowFrequency = 1,
+    All = 10
+  };
+
+  TraceLevel trace_level_ = LowFrequency;
+
  public:
   static DmlTracing& Instance();
 

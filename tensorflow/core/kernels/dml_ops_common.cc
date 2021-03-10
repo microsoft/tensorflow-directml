@@ -274,7 +274,7 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   }
 
   auto init_gpu_event = ctx->BindAndInitializeOperator(
-      initializer.Get(), binding_table.Get(), descriptor_handles.heap,
+      initializer.Get(), std::move(binding_table), descriptor_handles.heap,
       temp_resource_binding ? &*temp_resource_binding : nullptr,
       GetPersistentResourceBinding());
 
@@ -347,7 +347,7 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
   }
 
   DmlGpuEvent gpu_event = ctx->BindAndExecuteOperator(
-      compiled_op_.Get(), binding_table.Get(), descriptor_handles.heap,
+      compiled_op_.Get(), std::move(binding_table), descriptor_handles.heap,
       temp_resource_binding ? &*temp_resource_binding : nullptr,
       GetPersistentResourceBinding(), input_bindings, output_bindings);
 

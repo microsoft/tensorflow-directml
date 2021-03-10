@@ -67,7 +67,8 @@ class DmlKernelConstruction {
   // state when it completes. Note that we never supply any input bindings,
   // because we never set DML_TENSOR_FLAG_OWNED_BY_DML .
   DmlGpuEvent BindAndInitializeOperator(
-      IDMLOperatorInitializer* initializer, IDMLBindingTable* binding_table,
+      IDMLOperatorInitializer* initializer,
+      Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
       ID3D12DescriptorHeap* heap_for_binding_table,
       _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
       _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding);
@@ -164,7 +165,8 @@ class DmlKernelContext {
   // Executes a DML operator. Note that this merely queues the execution; the
   // returned event will enter the signaled state when it completes.
   DmlGpuEvent BindAndExecuteOperator(
-      IDMLCompiledOperator* op, IDMLBindingTable* binding_table,
+      IDMLCompiledOperator* op,
+      Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
       ID3D12DescriptorHeap* heap_for_binding_table,
       _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
       _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
