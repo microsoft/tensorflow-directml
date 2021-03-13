@@ -66,6 +66,9 @@ function reorganize_includes() {
   # Select DML files are copied in the copy_dml_redist_files function; we should
   # never include the entire contents of the redistributable package.
   rm -rf external/dml_redist
+  if is_windows; then
+    rm -rf external/pix
+  fi
 
   popd
 }
@@ -112,6 +115,16 @@ function copy_dml_redist_files() {
   fi
   cp "${dml_redist_root}/LICENSE.txt" "${dml_redist_dir}/DirectML_LICENSE.txt"
   cp "${dml_redist_root}/ThirdPartyNotices.txt" "${dml_redist_dir}/DirectML_ThirdPartyNotices.txt"
+
+  # Copy PIX event runtime
+  if is_windows; then
+    pix_event_runtime_dll_path=$(awk '/^pix\/.*\/WinPixEventRuntime\.dll/ {print $2}' $runfiles_manifest_path)
+    pix_event_runtime_root=$(echo $pix_event_runtime_dll_path | sed 's/\/bin\/x64\/WinPixEventRuntime\.dll//')
+
+    cp "$pix_event_runtime_dll_path" "${dml_redist_dir}"
+    cp "$pix_event_runtime_root/license.txt" "${dml_redist_dir}/WinPixEventRuntime_LICENSE.txt"
+    cp "$pix_event_runtime_root/ThirdPartyNotices.txt" "${dml_redist_dir}/WinPixEventRuntime_ThirdPartyNotices.txt"
+  fi
 }
 
 function prepare_src() {

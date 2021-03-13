@@ -246,6 +246,7 @@ if os.name == 'nt':
   EXTENSION_NAME = 'python/_pywrap_tensorflow_internal.pyd'
   matches.extend(['../' + x for x in find_files("DirectML.*.dll", "tensorflow_core/python")])
   matches.extend(['../' + x for x in find_files("DirectML_*.txt", "tensorflow_core/python")])
+  matches.extend(['../' + x for x in find_files("WinPixEventRuntime*", "tensorflow_core/python")])
 else:
   EXTENSION_NAME = 'python/_pywrap_tensorflow_internal.so'
   matches.extend(['../' + x for x in find_files("libdirectml.*.so", "tensorflow_core")])

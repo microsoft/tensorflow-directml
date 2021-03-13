@@ -165,6 +165,8 @@ void DmlCommandList::InitializeOperator(IDMLOperatorInitializer* initializer,
 void DmlCommandList::ExecuteOperator(IDMLCompiledOperator* op,
                                      IDMLBindingTable* binding_table,
                                      ID3D12DescriptorHeap* descriptor_heap) {
+  DmlTracing::Instance().LogExecuteOperatorStart(op, d3d_command_list_.Get());
+
   // Record the execution work.
   SetDescriptorHeap(descriptor_heap);
   recorder_->RecordDispatch(d3d_command_list_.Get(), op, binding_table);
@@ -174,6 +176,8 @@ void DmlCommandList::ExecuteOperator(IDMLCompiledOperator* op,
       CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
       CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
   d3d_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
+
+  DmlTracing::Instance().LogExecuteOperatorEnd(d3d_command_list_.Get());
 }
 
 void DmlCommandList::ResourceBarrier(

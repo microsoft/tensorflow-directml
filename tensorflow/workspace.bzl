@@ -34,6 +34,7 @@ load("//third_party/kissfft:workspace.bzl", kissfft = "repo")
 load("//third_party/keras_applications_archive:workspace.bzl", keras_applications = "repo")
 load("//third_party/pasta:workspace.bzl", pasta = "repo")
 load("//third_party/dml/redist:workspace.bzl", "dml_repository")
+load("//third_party/pix:workspace.bzl", "pix_repository")
 
 def initialize_third_party():
     """ Load third party repositories.  See above load() statements. """
@@ -92,6 +93,14 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
         version = "1.5.0-dev20210301",
         source = "https://api.nuget.org/v3/index.json",
         build_file = "//third_party/dml/redist:BUILD.bazel",
+    )
+
+    pix_repository(
+        name = "pix",
+        package = "WinPixEventRuntime",
+        version = "1.0.210209001",
+        source = "https://api.nuget.org/v3/index.json",
+        build_file = "//third_party/pix:BUILD.bazel",
     )
 
     # Point //external/local_config_arm_compiler to //external/arm_compiler

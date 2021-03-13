@@ -1,0 +1,20 @@
+# Description:
+#   WinPixEventRuntime redistributable library
+
+package(default_visibility = ["//visibility:public"])
+
+licenses(["notice"])
+
+cc_library(
+    name = "headers",
+    hdrs = glob(["WinPixEventRuntime/include/WinPixEventRuntime/*.h"]),
+    includes = ["WinPixEventRuntime/include/WinPixEventRuntime"],
+)
+
+filegroup(
+    name = "pip_files",
+    srcs = glob([
+        "WinPixEventRuntime/bin/x64/WinPixEventRuntime.dll", 
+        "WinPixEventRuntime/*.txt"]),
+    visibility = ["//visibility:public"],
+)

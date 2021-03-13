@@ -225,6 +225,10 @@ port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
   return GetDirectMLLibraryHandle("directml.debug");
 }
 
+port::StatusOr<void*> GetPixDsoHandle() {
+  return GetDsoHandle("WinPixEventRuntime", "", GetModuleDirectory());
+}
+
 }  // namespace DsoLoader
 
 namespace CachedDsoLoader {
@@ -305,6 +309,11 @@ port::StatusOr<void*> GetDirectMLDsoHandle() {
 
 port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
   static auto result = new auto(DsoLoader::GetDirectMLDebugDsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetPixDsoHandle() {
+  static auto result = new auto(DsoLoader::GetPixDsoHandle());
   return *result;
 }
 
