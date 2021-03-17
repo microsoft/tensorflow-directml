@@ -77,14 +77,18 @@ dml::Expression UniformHalf(dml::Graph& scope, dml::Expression input_state,
   return dml::Reinterpret(result, DML_TENSOR_DATA_TYPE_FLOAT16) - 1.0f;
 }
 
-// Compute a + b where a is a signed type and b is unsigned.
+// Compute a + b where a is a signed type and b is unsigned. Requires the result
+// is representable in the range of a's data type. See SignedAdd from
+// random_distributions.h.
 dml::Expression SignedAdd(dml::Expression a, dml::Expression b) {
   auto b_div_2 = b / 2;
   return a + dml::Reinterpret(b_div_2, a.GetOutputDesc().dataType) +
          dml::Reinterpret(b - b_div_2, a.GetOutputDesc().dataType);
 }
 
-// Requires lo_value < hi_value.
+// Produces a uniform distribution of integers in the range [lo_value,
+// hi_value). See UniformDistribution<Generator, int32> from
+// random_distributions.h. Requires lo_value < hi_value.
 dml::Expression UniformInt(dml::Graph& graph, dml::Expression input_state,
                            int32_t lo_value, int32_t hi_value,
                            uint32_t element_count) {
