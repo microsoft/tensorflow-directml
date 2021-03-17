@@ -77,6 +77,32 @@ dml::Expression UniformHalf(dml::Graph& scope, dml::Expression input_state,
   return dml::Reinterpret(result, DML_TENSOR_DATA_TYPE_FLOAT16) - 1.0f;
 }
 
+// Compute a + b where a is a signed type and b is unsigned.
+dml::Expression SignedAdd(dml::Expression a, dml::Expression b) {
+  auto b_div_2 = b / 2;
+  return a + dml::Reinterpret(b_div_2, a.GetOutputDesc().dataType) +
+         dml::Reinterpret(b - b_div_2, a.GetOutputDesc().dataType);
+}
+
+// Requires lo_value < hi_value.
+dml::Expression UniformInt(dml::Graph& graph, dml::Expression input_state,
+                           int32_t lo_value, int32_t hi_value,
+                           uint32_t element_count) {
+  dml::TensorDimensions shape = {1, 1, 1, element_count};
+
+  auto generator = dml::RandomGenerator(input_state, shape, false);
+  auto random_bits = generator.values;
+
+  auto lo = dml::ScalarTensor(graph, lo_value, shape);
+
+  uint32_t hi_value_unsigned = static_cast<uint32_t>(hi_value);
+  uint32_t lo_value_unsigned = static_cast<uint32_t>(lo_value);
+  uint32_t range_value = hi_value_unsigned - lo_value_unsigned;
+  auto range = dml::ScalarTensor(graph, range_value, shape);
+
+  return SignedAdd(lo, random_bits % range);
+}
+
 class StatelessRandomUniformInitHelper : public InitializationHelper {
  public:
   using Attributes = EmptyAttributes;
@@ -203,7 +229,6 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     ctx->CopyHostToBuffer(input_state_buffer.Resource(),
                           input_state_buffer.Offset(), byte_span);
 
-    
     return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 };
