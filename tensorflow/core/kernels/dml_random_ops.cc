@@ -121,6 +121,28 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
     OP_REQUIRES_OK(ctx, GenerateKey(seed_t, &key_, &counter_));
 
     output_shape_ = std::move(shape);
+
+    // This init helper is shared for both "StatelessRandomUniform" (real types)
+    // and "StatelessRandomUniformInt" (integral types). The latter has two
+    // extra host-memory tensors for the min and max of the output range.
+    if (ctx->num_inputs() == 4) {
+      const Tensor& minval = ctx->input(2);
+      const Tensor& maxval = ctx->input(3);
+      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(minval.shape()),
+                  errors::InvalidArgument("minval must be 0-D, got shape ",
+                                          minval.shape().DebugString()));
+      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(maxval.shape()),
+                  errors::InvalidArgument("maxval must be 0-D, got shape ",
+                                          maxval.shape().DebugString()));
+
+      // Verify that minval < maxval. Note that we'll never reach this point
+      // for empty output.  Zero impossible things are fine.
+      const auto lo = minval.scalar<int32>()();
+      const auto hi = maxval.scalar<int32>()();
+      OP_REQUIRES(ctx, lo < hi,
+                  errors::InvalidArgument("Need minval < maxval, got ", lo,
+                                          " >= ", hi));
+    }
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
@@ -193,9 +215,13 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     dml::Expression result;
     if (ctx->GetOutputDataType(0) == DT_FLOAT) {
       result = UniformFloat(scope, input_state, num_elements);
-    } else {
-      DCHECK(ctx->GetOutputDataType(0) == DT_HALF);
+    } else if (ctx->GetOutputDataType(0) == DT_HALF) {
       result = UniformHalf(scope, input_state, num_elements);
+    } else {
+      DCHECK(ctx->GetOutputDataType(0) == DT_INT32);
+      int lo = ctx->GetConstantInputTensor(2).scalar<int32>()();
+      int hi = ctx->GetConstantInputTensor(3).scalar<int32>()();
+      result = UniformInt(scope, input_state, lo, hi, num_elements);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -245,6 +271,20 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
+#define DML_REGISTER_KERNEL(type)                       \
+  REGISTER_KERNEL_BUILDER(                              \
+      Name("StatelessRandomUniformInt")                 \
+          .Device(DEVICE_DML)                           \
+          .HostMemory("shape")                          \
+          .HostMemory("seed")                           \
+          .HostMemory("minval")                         \
+          .HostMemory("maxval")                         \
+          .TypeConstraint<type>("dtype"),               \
+      DmlKernelWrapper<DmlStatelessRandomUniformKernel, \
+                       StatelessRandomUniformShapeHelper>);
+TF_CALL_int32(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
 // ----------------------------------------------------------------------------
 
 template <typename TKernel, typename TShapeHelper,
@@ -276,6 +316,28 @@ class RandomUniformInitHelper : public InitializationHelper {
     TensorShape shape;
     OP_REQUIRES_OK(ctx, ctx->op_kernel().MakeShape(shape_t, &shape));
     output_shape_ = std::move(shape);
+
+    // This init helper is shared for both "RandomUniform" (real types) and
+    // "RandomUniformInt" (integral types). The latter has two extra host-memory
+    // tensors for the min and max of the output range.
+    if (ctx->num_inputs() == 4) {
+      const Tensor& minval = ctx->input(1);
+      const Tensor& maxval = ctx->input(2);
+      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(minval.shape()),
+                  errors::InvalidArgument("minval must be 0-D, got shape ",
+                                          minval.shape().DebugString()));
+      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(maxval.shape()),
+                  errors::InvalidArgument("maxval must be 0-D, got shape ",
+                                          maxval.shape().DebugString()));
+
+      // Verify that minval < maxval. Note that we'll never reach this point
+      // for empty output.  Zero impossible things are fine.
+      const auto lo = minval.scalar<int32>()();
+      const auto hi = maxval.scalar<int32>()();
+      OP_REQUIRES(ctx, lo < hi,
+                  errors::InvalidArgument("Need minval < maxval, got ", lo,
+                                          " >= ", hi));
+    }
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
