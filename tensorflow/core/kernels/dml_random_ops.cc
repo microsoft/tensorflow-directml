@@ -338,9 +338,13 @@ class DmlRandomUniformKernel : public DmlKernel {
     dml::Expression result;
     if (ctx->GetOutputDataType(0) == DT_FLOAT) {
       result = UniformFloat(scope, input_state, num_output_elements_);
-    } else {
-      DCHECK(ctx->GetOutputDataType(0) == DT_HALF);
+    } else if (ctx->GetOutputDataType(0) == DT_HALF) {
       result = UniformHalf(scope, input_state, num_output_elements_);
+    } else {
+      DCHECK(ctx->GetOutputDataType(0) == DT_INT32);
+      int lo = ctx->GetConstantInputTensor(1).scalar<int32>()();
+      int hi = ctx->GetConstantInputTensor(2).scalar<int32>()();
+      result = UniformInt(scope, input_state, lo, hi, num_output_elements_);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -392,6 +396,18 @@ class DmlRandomUniformKernel : public DmlKernel {
           .TypeConstraint<type>("dtype"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+#define DML_REGISTER_KERNEL(type)        \
+  REGISTER_KERNEL_BUILDER(               \
+      Name("RandomUniformInt")           \
+          .Device(DEVICE_DML)            \
+          .HostMemory("shape")           \
+          .HostMemory("minval")          \
+          .HostMemory("maxval")          \
+          .TypeConstraint<type>("Tout"), \
+      DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
+TF_CALL_int32(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 // ----------------------------------------------------------------------------
