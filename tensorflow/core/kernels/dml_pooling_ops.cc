@@ -486,7 +486,7 @@ class DmlMaxPoolGradKernel : public DmlKernel {
         ctx, init_helper, tensor_in_shape, 3);
 
     // TF doesn't use dilations, but DML needs default values of 1.
-    uint32_t dilations[] = {1, 1};
+    uint32_t dilations[] = {1, 1, 1};
 
     // Ignore the kernel size/stride tensors, because DML takes them as
     // attributes and not input tensors
@@ -568,13 +568,22 @@ using DmlMaxPoolKernel =
       Name("MaxPoolGrad").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlMaxPoolGradKernel,                            \
                        GetOutputShapeAsInputShapeHelper>);              \
-  REGISTER_KERNEL_BUILDER(Name("MaxPoolGradV2")                         \
-                              .Device(DEVICE_DML)                       \
-                              .TypeConstraint<type>("T")                \
-                              .HostMemory("ksize")                      \
-                              .HostMemory("strides"),                   \
-                          DmlKernelWrapper<DmlMaxPoolGradKernel,        \
-                                           GetOutputShapeAsInputShapeHelper>);
+  REGISTER_KERNEL_BUILDER(                                              \
+      Name("MaxPoolGradV2")                                             \
+          .Device(DEVICE_DML)                                           \
+          .TypeConstraint<type>("T")                                    \
+          .HostMemory("ksize")                                          \
+          .HostMemory("strides"),                                       \
+      DmlKernelWrapper<DmlMaxPoolGradKernel,                            \
+                       GetOutputShapeAsInputShapeHelper>);              \
+  REGISTER_KERNEL_BUILDER(                                              \
+      Name("MaxPool3DGrad")                                             \
+          .Device(DEVICE_DML)                                           \
+          .TypeConstraint<type>("T")                                    \
+          .TypeConstraint<type>("TInput"),                              \
+      DmlKernelWrapper<DmlMaxPoolGradKernel,                            \
+                       GetOutputShapeAsInputShapeHelper>);              \
+
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
