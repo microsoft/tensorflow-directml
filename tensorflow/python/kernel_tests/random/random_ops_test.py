@@ -336,6 +336,7 @@ class RandomUniformTest(RandomOpTestCommon):
       self.assertLess(error.max(), 5 * std)
 
   # Check that minval = maxval is fine iff we're producing no numbers
+  @test_util.skip_dml # DML doesn't run validation logic on no-op kernels
   def testUniformIntsDegenerate(self):
     for dt in dtypes.int32, dtypes.int64:
       def sample(n):
