@@ -86,22 +86,22 @@ dml::Expression SignedAdd(dml::Expression a, dml::Expression b) {
          dml::Reinterpret(b - b_div_2, a.GetOutputDesc().dataType);
 }
 
-// Produces a uniform distribution of integers in the range [lo_value,
-// hi_value). See UniformDistribution<Generator, int32> from
-// random_distributions.h. Requires lo_value < hi_value.
+// Produces a uniform distribution of integers in the range [min_value,
+// max_value). See UniformDistribution<Generator, int32> from
+// random_distributions.h. Requires min_value < max_value.
 dml::Expression UniformInt(dml::Graph& graph, dml::Expression input_state,
-                           int32_t lo_value, int32_t hi_value,
+                           int32_t min_value, int32_t max_value,
                            uint32_t element_count) {
   dml::TensorDimensions shape = {1, 1, 1, element_count};
 
   auto generator = dml::RandomGenerator(input_state, shape, false);
   auto random_bits = generator.values;
 
-  auto lo = dml::ScalarTensor(graph, lo_value, shape);
+  auto lo = dml::ScalarTensor(graph, min_value, shape);
 
-  uint32_t hi_value_unsigned = static_cast<uint32_t>(hi_value);
-  uint32_t lo_value_unsigned = static_cast<uint32_t>(lo_value);
-  uint32_t range_value = hi_value_unsigned - lo_value_unsigned;
+  uint32_t max_value_unsigned = static_cast<uint32_t>(max_value);
+  uint32_t min_value_unsigned = static_cast<uint32_t>(min_value);
+  uint32_t range_value = max_value_unsigned - min_value_unsigned;
   auto range = dml::ScalarTensor(graph, range_value, shape);
 
   return SignedAdd(lo, random_bits % range);
@@ -223,9 +223,10 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
       result = UniformHalf(scope, input_state, num_elements);
     } else {
       DCHECK(ctx->GetOutputDataType(0) == DT_INT32);
-      int lo = ctx->GetConstantInputTensor(2).scalar<int32>()();
-      int hi = ctx->GetConstantInputTensor(3).scalar<int32>()();
-      result = UniformInt(scope, input_state, lo, hi, num_elements);
+      int min_value = ctx->GetConstantInputTensor(2).scalar<int32>()();
+      int max_value = ctx->GetConstantInputTensor(3).scalar<int32>()();
+      result =
+          UniformInt(scope, input_state, min_value, max_value, num_elements);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -408,9 +409,10 @@ class DmlRandomUniformKernel : public DmlKernel {
       result = UniformHalf(scope, input_state, num_output_elements_);
     } else {
       DCHECK(ctx->GetOutputDataType(0) == DT_INT32);
-      int lo = ctx->GetConstantInputTensor(1).scalar<int32>()();
-      int hi = ctx->GetConstantInputTensor(2).scalar<int32>()();
-      result = UniformInt(scope, input_state, lo, hi, num_output_elements_);
+      int min_value = ctx->GetConstantInputTensor(1).scalar<int32>()();
+      int max_value = ctx->GetConstantInputTensor(2).scalar<int32>()();
+      result = UniformInt(scope, input_state, min_value, max_value,
+                          num_output_elements_);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
