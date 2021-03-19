@@ -916,8 +916,6 @@ class DmlSquaredDifferenceKernel : public DmlKernel {
         CreateKernelTensors(ctx, input_shapes, output_shape);
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
-    const Tensor& min_tensor = ctx->GetConstantInputTensor(1);
-    const Tensor& max_tensor = ctx->GetConstantInputTensor(2);
 
     DML_ELEMENT_WISE_DIFFERENCE_SQUARE_OPERATOR_DESC difference_square_desc;
     difference_square_desc.ATensor = &inputs[0];
@@ -928,7 +926,7 @@ class DmlSquaredDifferenceKernel : public DmlKernel {
                                  &difference_square_desc};
 
     Initialize(ctx, std::move(tensors), op_desc);
-  }
+  }  
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     // Currently, 64-bit integers in DML are emulated using 32-bit integers

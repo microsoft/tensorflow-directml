@@ -2673,9 +2673,9 @@ namespace dml
 
     struct BatchNormalizationGradOutputs
     {
-        Expression outputGradient;
-        Expression outputScaleGradient;
-        Expression outputBiasGradient;
+        Expression gradient;
+        Expression scaleGradient;
+        Expression biasGradient;
     };
 
     inline BatchNormalizationGradOutputs BatchNormalizationGrad(
@@ -2708,13 +2708,13 @@ namespace dml
         bng_desc.OutputScaleGradientTensor = outputScaleGradientTensor.AsPtr<DML_TENSOR_DESC>();
         bng_desc.OutputBiasGradientTensor = outputBiasGradientTensor.AsPtr<DML_TENSOR_DESC>();
         
-        dml::detail::NodeOutput* const inputs[] = { inputX.Impl(), inputYBackprop.Impl(), mean.Impl(), variance.Impl(), scale.Impl() };
+        dml::detail::NodeOutput* const inputs[] = { input.Impl(), inputGradient.Impl(), mean.Impl(), variance.Impl(), scale.Impl() };
         dml::detail::NodeID node = builder->CreateOperatorNode(DML_OPERATOR_BATCH_NORMALIZATION_GRAD, &bng_desc, inputs);
         
         BatchNormalizationGradOutputs outputValues;
-        outputValues.outputGradient = builder->CreateNodeOutput(node, 0, *bng_desc.OutputGradientTensor);
-        outputValues.outputScaleGradient = builder->CreateNodeOutput(node, 1, *bng_desc.OutputScaleGradientTensor);
-        outputValues.outputBiasGradient = builder->CreateNodeOutput(node, 2, *bng_desc.OutputBiasGradientTensor);
+        outputValues.gradient = builder->CreateNodeOutput(node, 0, *bng_desc.OutputGradientTensor);
+        outputValues.scaleGradient = builder->CreateNodeOutput(node, 1, *bng_desc.OutputScaleGradientTensor);
+        outputValues.biasGradient = builder->CreateNodeOutput(node, 2, *bng_desc.OutputBiasGradientTensor);
 
         return outputValues;
     }
