@@ -182,13 +182,15 @@ void DmlTracing::LogKernelCompute(const std::string& op_type,
 
 void DmlTracing::LogExecuteOperatorStart(
     IDMLCompiledOperator* op, ID3D12GraphicsCommandList* command_list) {
+#if _WIN32
   if (trace_level_ >= All) {
-    std::vector<char> chars(100);
-    UINT data_size = (UINT)(chars.size() * sizeof(char));
-    op->GetPrivateData(kPixEventNameId, &data_size, chars.data());
+    std::vector<char> eventName(100);
+    UINT data_size = (UINT)(eventName.size() * sizeof(char));
+    op->GetPrivateData(kPixEventNameId, &data_size, eventName.data());
     BeginEventOnCommandList(command_list, PIX_COLOR(128, 255, 128),
-                            chars.data());
+                            eventName.data());
   }
+#endif
 }
 
 void DmlTracing::LogExecuteOperatorEnd(
