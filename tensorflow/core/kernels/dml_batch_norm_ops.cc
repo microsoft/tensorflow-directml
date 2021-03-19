@@ -803,12 +803,11 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
       offset_backprop =
           dml::Reduce(y_backprop, DML_REDUCE_FUNCTION_SUM, {0, 2, 3});
     } else {
-      auto outputs =
-          dml::BatchNormalizationGrad(x, y_backprop, mean, variance, scale,
-                                      epsilon, scale_backprop, offset_backprop);
-      x_backprop = outputs.outputGradient;
-      scale_backprop = outputs.outputScaleGradient;
-      offset_backprop = outputs.outputBiasGradient;
+      auto outputs = dml::BatchNormalizationGrad(x, y_backprop, mean, variance,
+                                                 scale, epsilon);
+      x_backprop = outputs.gradient;
+      scale_backprop = outputs.scaleGradient;
+      offset_backprop = outputs.biasGradient;
     }
 
     // If necessary, cast outputs to their required types
