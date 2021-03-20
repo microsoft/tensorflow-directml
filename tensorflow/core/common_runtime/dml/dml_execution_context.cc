@@ -211,6 +211,10 @@ D3D12_COMMAND_LIST_TYPE DmlExecutionContext::GetCommandListTypeForQueue()
     std::shared_ptr<DmlCommandList> command_list,
     std::shared_ptr<DmlCommandQueue> command_queue, uint32_t batch_flush_size,
     uint32_t batch_flush_time_us) {
+#if _WIN32
+  SetThreadDescription(GetCurrentThread(), L"TFDML Execution Thread");
+#endif
+
   auto last_flush_time = std::chrono::steady_clock::now();
 
   while (true) {
@@ -252,6 +256,7 @@ D3D12_COMMAND_LIST_TYPE DmlExecutionContext::GetCommandListTypeForQueue()
     lock.unlock();
 
     if (flush) {
+      DmlTracing::Instance().LogExecutionContextFlush();
       // Record the commands into the command list.
       command_list->Open(batch_completion_event);
       for (auto& command : batch) {
@@ -268,7 +273,7 @@ D3D12_COMMAND_LIST_TYPE DmlExecutionContext::GetCommandListTypeForQueue()
 
       ID3D12CommandList* command_lists[] = {command_list->Get()};
       command_queue->ExecuteCommandLists(command_lists);
-      
+
       batch.clear();
       last_flush_time = std::chrono::steady_clock::now();
     }

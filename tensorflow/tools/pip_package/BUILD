@@ -242,7 +242,8 @@ sh_binary(
                    ":simple_console",
                ],
            }) + if_mkl_ml(["//third_party/mkl:intel_binary_blob"])
-           + if_dml(["@dml_redist//:pip_files"]),
+           + if_dml(["@dml_redist//:pip_files"])
+           + if_windows(["@pix//:pip_files"]),
 )
 
 # A genrule for generating a marker file for the pip package on Windows

@@ -29,6 +29,7 @@ limitations under the License.
 
 #if _WIN32
 #include <pathcch.h>
+
 #include "tensorflow/core/platform/windows/wide_char.h"
 #endif
 
@@ -225,6 +226,14 @@ port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
   return GetDirectMLLibraryHandle("directml.debug");
 }
 
+port::StatusOr<void*> GetPixDsoHandle() {
+#if _WIN32
+  return GetDsoHandle("WinPixEventRuntime", "", GetModuleDirectory());
+#else
+  return port::Status(port::error::UNIMPLEMENTED, "PIX events are not supported in WSL");
+#endif
+}
+
 }  // namespace DsoLoader
 
 namespace CachedDsoLoader {
@@ -305,6 +314,11 @@ port::StatusOr<void*> GetDirectMLDsoHandle() {
 
 port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
   static auto result = new auto(DsoLoader::GetDirectMLDebugDsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetPixDsoHandle() {
+  static auto result = new auto(DsoLoader::GetPixDsoHandle());
   return *result;
 }
 
