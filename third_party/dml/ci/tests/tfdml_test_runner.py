@@ -30,6 +30,11 @@ def _parse_args():
       required=True)
 
   parser.add_argument(
+      "--test_timeout",
+      default=600,
+      help="max duration allowed for a single test (in seconds)")
+
+  parser.add_argument(
       "--log_device_placement",
       action="store_true")
 
@@ -53,7 +58,8 @@ def _run_test(
     log_device_placement,
     shard_index,
     total_shard_count,
-    test_framework):
+    test_framework,
+    test_timeout):
   """Runs a test executable in its own process."""
 
   # Insert the shard index in the name of the xml file
@@ -96,6 +102,7 @@ def _run_test(
             stderr=stderr,
             env=env_copy,
             stdin=subprocess.DEVNULL,
+            timeout=test_timeout,
             check=True)
       except KeyboardInterrupt: # pylint: disable=try-except-raise
         raise
@@ -198,7 +205,8 @@ def main():
                   log_device_placement,
                   shard_index,
                   shard_count,
-                  args.test_framework))
+                  args.test_framework,
+                  args.test_timeout))
 
       for future in futures:
         future.result()
