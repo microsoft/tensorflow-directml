@@ -647,7 +647,12 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
 
     // FusedBatchNormGradV3 receives an additional (6th) input which we don't
     // use, so we explicitly only supply 5 indices here
-    params.kernel_input_indices = {0, 1, 2, 3, 4};
+    if (is_training) {
+      params.kernel_input_indices = {0, 1, 2, 3, 4};
+    } else {
+      params.kernel_input_indices = {kX, kYBackprop, kReserveSpace1,
+                                     kReserveSpace2, kScale};
+    }
 
     // Only the first 3 outputs are used, the remainder are placeholders
     params.kernel_output_indices = {0, 1, 2};
@@ -704,51 +709,55 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
     bool is_cast_required = (input_type != scale.GetOutputDesc().dataType);
 
     if (is_cast_required) {
-      scale = dml::Cast(scale, input_type);
       mean = dml::Cast(mean, input_type);
       variance = dml::Cast(variance, input_type);
+      scale = dml::Cast(scale, input_type);
     }
 
-    // The strides we need to set to broadcast C across an entire tensor
-    dml::TensorDesc::Dimensions broadcast_c_strides = {/*N*/ 0,
-                                                       /*C*/ 1,
-                                                       /*H*/ 0,
-                                                       /*W*/ 0};
-
-    //
-    // Formulae copied from tensorflow/core/kernels/fused_batch_norm_op.cc:
-    //
-    // x_backprop (training) = scale * rsqrt(variance + epsilon) *
-    //              [y_backprop - mean(y_backprop) - (x - mean(x)) *
-    //              mean(y_backprop * (x - mean(x))) / (variance + epsilon)]
-    //
-    // x_backprop (inference) = y_backprop * (scale * rsqrt(pop_var + epsilon))
-    //
-    // scale_backprop = sum(y_backprop *
-    //                  (x - mean(x)) * rsqrt(variance + epsilon))
-    // offset_backprop = sum(y_backprop)
-    //
-
-    auto variance_e = variance + epsilon;
-    auto sqrt_variance_e = dml::Sqrt(variance_e);
-    auto coef0 = 1.0f / sqrt_variance_e;  // rsqrt(variance + epsilon)
-    auto scaled_coef0 =
-        scale / sqrt_variance_e;  // scale * rsqrt(variance + epsilon)
-
-    auto scaled_coef0_bcast =
-        dml::Reinterpret(scaled_coef0, input_sizes, broadcast_c_strides);
-
-    // Unlike y_backprop we don't need to recompute the mean of x; it's provided
-    // to us as an input. We do, however, need to broadcast it to cover the
-    // entire tensor
-    auto x_mean = dml::Reinterpret(mean, input_sizes, broadcast_c_strides);
-
-    auto x_centered = x - x_mean;
-    auto coef1 = y_backprop * x_centered;  // y_backprop * (x - mean(x))
-
-    // Compute x_backprop:
+    dml::Expression scale_backprop;
+    dml::Expression offset_backprop;
     dml::Expression x_backprop;
+
     if (is_training) {
+      // The strides we need to set to broadcast C across an entire tensor
+      dml::TensorDesc::Dimensions broadcast_c_strides = {/*N*/ 0,
+                                                         /*C*/ 1,
+                                                         /*H*/ 0,
+                                                         /*W*/ 0};
+
+      //
+      // Formulae copied from tensorflow/core/kernels/fused_batch_norm_op.cc:
+      //
+      // x_backprop (training) = scale * rsqrt(variance + epsilon) *
+      //              [y_backprop - mean(y_backprop) - (x - mean(x)) *
+      //              mean(y_backprop * (x - mean(x))) / (variance + epsilon)]
+      //
+      // x_backprop (inference) = y_backprop * (scale * rsqrt(pop_var +
+      // epsilon))
+      //
+      // scale_backprop = sum(y_backprop *
+      //                  (x - mean(x)) * rsqrt(variance + epsilon))
+      // offset_backprop = sum(y_backprop)
+      //
+
+      auto variance_e = variance + epsilon;
+      auto sqrt_variance_e = dml::Sqrt(variance_e);
+      auto coef0 = 1.0f / sqrt_variance_e;  // rsqrt(variance + epsilon)
+      auto scaled_coef0 =
+          scale / sqrt_variance_e;  // scale * rsqrt(variance + epsilon)
+
+      auto scaled_coef0_bcast =
+          dml::Reinterpret(scaled_coef0, input_sizes, broadcast_c_strides);
+
+      // Unlike y_backprop we don't need to recompute the mean of x; it's
+      // provided to us as an input. We do, however, need to broadcast it to
+      // cover the entire tensor
+      auto x_mean = dml::Reinterpret(mean, input_sizes, broadcast_c_strides);
+
+      auto x_centered = x - x_mean;
+      auto coef1 = y_backprop * x_centered;  // y_backprop * (x - mean(x))
+
+      // Compute x_backprop:
       // x_backprop = scale * rsqrt(variance + epsilon) *
       //              [y_backprop - mean(y_backprop) - (x - mean(x)) *
       //              mean(y_backprop * (x - mean(x))) / (variance + epsilon)]
@@ -779,23 +788,27 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
       x_backprop =
           scaled_coef0_bcast *
           (y_backprop_centered - x_centered * coef1_mean / variance_e_bcast);
+
+      // scale_backprop = sum(y_backprop *
+      //                  (x - mean(x)) * rsqrt(variance + epsilon))
+      //
+      // let coef0 = rsqrt(variance + epsilon)
+      //     coef1 = y_backprop * (x - mean(x))
+      //
+      // => scale_backprop = sum(coef1 * coef0) = sum(coef1) * coef0
+      scale_backprop =
+          dml::Reduce(coef1, DML_REDUCE_FUNCTION_SUM, {0, 2, 3}) * coef0;
+
+      // offset_backprop = sum(y_backprop)
+      offset_backprop =
+          dml::Reduce(y_backprop, DML_REDUCE_FUNCTION_SUM, {0, 2, 3});
     } else {
-      x_backprop = scaled_coef0_bcast * y_backprop;
+      auto outputs = dml::BatchNormalizationGrad(x, y_backprop, mean, variance,
+                                                 scale, epsilon);
+      x_backprop = outputs.gradient;
+      scale_backprop = outputs.scaleGradient;
+      offset_backprop = outputs.biasGradient;
     }
-
-    // scale_backprop = sum(y_backprop *
-    //                  (x - mean(x)) * rsqrt(variance + epsilon))
-    //
-    // let coef0 = rsqrt(variance + epsilon)
-    //     coef1 = y_backprop * (x - mean(x))
-    //
-    // => scale_backprop = sum(coef1 * coef0) = sum(coef1) * coef0
-    auto scale_backprop =
-        dml::Reduce(coef1, DML_REDUCE_FUNCTION_SUM, {0, 2, 3}) * coef0;
-
-    // offset_backprop = sum(y_backprop)
-    auto offset_backprop =
-        dml::Reduce(y_backprop, DML_REDUCE_FUNCTION_SUM, {0, 2, 3});
 
     // If necessary, cast outputs to their required types
     if (is_cast_required) {
