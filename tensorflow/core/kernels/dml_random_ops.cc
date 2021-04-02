@@ -325,7 +325,7 @@ class RandomUniformInitHelper : public InitializationHelper {
     // This init helper is shared for both "RandomUniform" (real types) and
     // "RandomUniformInt" (integral types). The latter has two extra host-memory
     // tensors for the min and max of the output range.
-    if (ctx->num_inputs() == 4) {
+    if (ctx->num_inputs() == 3) {
       const Tensor& minval = ctx->input(1);
       const Tensor& maxval = ctx->input(2);
       OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(minval.shape()),
