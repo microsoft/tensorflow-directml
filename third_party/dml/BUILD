@@ -44,6 +44,6 @@ cc_library(
 
 cc_library(
     name = "dx_helpers",
-    hdrs = ["DirectMLX.h", "d3dx12.h"],
+    hdrs = ["DirectMLX.h"],
     visibility = ["//visibility:public"],
 )

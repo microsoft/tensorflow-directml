@@ -24,14 +24,14 @@ limitations under the License.
 #include "winadapter.h"
 #endif
 
-#include <d3d12.h>
+#include <directx/d3d12.h>
 #include <wrl/client.h>
 #include <wrl/implements.h>
 
 #if _WIN32
 #include <dxgi1_6.h>
 #else
-#include <dxcore.h>
+#include <directx/dxcore.h>
 #endif
 
 #include "absl/types/optional.h"
@@ -54,7 +54,7 @@ limitations under the License.
 #endif
 
 #include "third_party/dml/DirectMLX.h"
-#include "third_party/dml/d3dx12.h"
+#include "d3dx12.h"
 
 // When building for Windows, this include will statically assert that the declared IIDs
 // match those found in the Windows SDK.
