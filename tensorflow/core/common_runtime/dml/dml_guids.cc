@@ -25,7 +25,8 @@ limitations under the License.
 #include <directx/d3d12.h>
 #include <directx/dxcore.h>
 #include "DirectML.h"
-// #include "dml_guids.h"
+#include "dxguids.h"
+#include "dml_guids.h"
 #else
 #include <dxgi1_6.h>
 #include <directx/d3d12.h>
