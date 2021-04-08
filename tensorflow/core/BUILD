@@ -3791,8 +3791,8 @@ cc_library(
     deps = [
         ":lib",
         ":lib_internal",
-        "//third_party/dml:dx_helpers",
         "@dml_redist//:headers",
+        "@directml//:directmlx",
         "@directx_headers//:directx_headers",
         "@directx_headers//:directx_guids",
         "@directx_headers//:directx_winadapter",

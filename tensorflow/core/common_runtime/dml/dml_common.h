@@ -53,7 +53,7 @@ limitations under the License.
 #include "DirectML.h"
 #endif
 
-#include "third_party/dml/DirectMLX.h"
+#include "DirectMLX.h"
 #include "d3dx12.h"
 
 // When building for Windows, this include will statically assert that the declared IIDs

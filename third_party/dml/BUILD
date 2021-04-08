@@ -9,9 +9,3 @@ config_setting(
 )
 
 licenses(["notice"]) # MIT license
-
-cc_library(
-    name = "dx_helpers",
-    hdrs = ["DirectMLX.h"],
-    visibility = ["//visibility:public"],
-)
