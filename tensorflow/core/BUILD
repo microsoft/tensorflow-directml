@@ -3786,6 +3786,7 @@ cc_library(
         "common_runtime/dml/dml_adapter.h",
         "common_runtime/dml/dml_adapter_impl.h",
         "common_runtime/dml/dml_adapter_heuristics.h",
+        "common_runtime/dml/dml_guids.h",
     ],
     linkstatic = 1,
     deps = [

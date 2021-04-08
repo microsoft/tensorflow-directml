@@ -22,10 +22,11 @@ limitations under the License.
 
 #ifndef _WIN32
 #include "winadapter.h"
+#include <directx/d3d12.h>
 #include <directx/dxcore.h>
-#include "dml_guids.h"
+#include "DirectML.h"
+// #include "dml_guids.h"
 #else
 #include <dxgi1_6.h>
-#endif
-
 #include <directx/d3d12.h>
+#endif

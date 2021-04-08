@@ -28,7 +28,6 @@ cc_library(
 cc_library(
     name = "directx_guids",
     hdrs = ["include/dxguids/dxguids.h"],
-    srcs = ["src/dxguids.cpp"],
     includes = ["include/dxguids", "include"],
     linkstatic = 1,
 )
@@ -40,16 +39,9 @@ cc_library(
     hdrs = select({
         ":windows": [],
         "//conditions:default": [
-            "include/wsl/d3d12.h",
-            "include/wsl/d3d12sdklayers.h",
-            "include/wsl/d3dcommon.h",
-            "include/wsl/dxcore.h",
-            "include/wsl/dxcore_interface.h",
-            "include/wsl/dxgicommon.h",
-            "include/wsl/dxgiformat.h",
-            "include/wsl/winadapter.h",
+            "include/wsl/winadapter.h", 
             "include/wsl/wrladapter.h",
-        ]
+        ],
     }),
     includes = ["include/wsl"] + select({
         ":windows": [],
