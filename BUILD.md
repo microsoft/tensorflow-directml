@@ -34,26 +34,22 @@ Developer mode is, as the name indicates, only intended to be used for developme
 
 ## DirectX Development Files
 
-The development headers and libraries used to build DirectX-based applications are included in the Windows SDK; however, this SDK is not available when building for Linux. Additionally, this project may depend on a newer version of DirectML than what is available in Windows SDKs. For these reasons, the DirectX development files are integrated a little differently depending on Windows or Linux builds:
+The development headers and libraries used to build DirectX-based applications are included in the Windows SDK; however, this SDK is not available when building for Linux, and some of required APIs may not yet exist in public versions of the SDK. For these reasons, the DirectX development files are integrated a little differently in this project.
 
-- **Windows**
-  -  Direct3D/DXCore Headers: Windows SDK newer than 10.0.19645.0
-  -  Direct3D/DXCore Libraries: Windows SDK newer than 10.0.19645.0
+The header files for Direct3D, DXCore, and DirectML are downloaded automatically. This project does not use any DirectX headers included in the Windows 10 SDK *except* for dxgi1_6.h, which is part of Windows 10 SDK 10.0.17763.0 or newer. Windows builds also require import libraries for D3D12 and DXGI, which are included in Windows 10 SDK 10.0.17763.0 or newer.
 
-- **WSL**
-   -  Direct3D/DXCore Headers: `third_party/dml/winadapter`
-   -  Direct3D/DXCore Libraries: `/usr/lib/wsl/lib`
+Linux builds do not require the Windows 10 SDK at all (no such SDK exists for Linux), but your build machine must have WSL installed with the DirectX shared libraries available under `/usr/lib/wsl/lib`.
 
-For both Windows and WSL, the DirectML headers and libraries are pulled from a redistributable NuGet package. This package is downloaded automatically as a part of the build (see `third_party/dml/redist`). The use of the redistributable DirectML library is governed by a separate license that is found as part of the package (found in `tensorflow_core/python/DirectML_LICENSE.txt` when extracted).
+The use of the redistributable DirectML library is governed by a separate license that is found as part of the package (found in `tensorflow_core/python/DirectML_LICENSE.txt` when extracted).
 
 ## Build Environment
 
-Make sure to follow the official build setup instructions ([Windows](https://www.tensorflow.org/install/source_windows#:~:text=%20%20%20%20Version%20%20%20,%20Bazel%200.26.1%20%2016%20more%20rows%20), [Linux](https://www.tensorflow.org/install/source)) before proceeding. We've tested the following build environments, and we recommend using a Python environment manager like [Miniconda](https://docs.conda.io/en/latest/miniconda.html) to sandbox your builds.
+We've tested the following build environments, and we recommend using a Python environment manager like [Miniconda](https://docs.conda.io/en/latest/miniconda.html) to sandbox your builds.
 
 - **Windows**
   - Visual Studio 2017 (15.x)
-  - Windows SDK 10.0.19645.0 or later (requires Windows Insider Build)
-  - MSYS2 20190524
+  - Windows 10 SDK 10.0.17763.0 or newer
+  - MSYS2 20190524 or newer
   - Bazel 0.24.1
 
 - **WSL**
@@ -73,13 +69,11 @@ For example, to build the repository and produce a Python wheel use `build.py --
 
 These instructions use Miniconda to sandbox your build environment. This isn't strictly necessary, and there are other ways to do this (e.g. virtual machines, containers), but for the purpose of this walk-through you will use a Python virtual environment to build TFDML.
 
-## Install Windows Insider Build (Temporary)
-
-Register for the [Windows Insider Program](https://insider.windows.com/en-us/for-developers) and install the [preview SDK](https://www.microsoft.com/en-us/software-download/windowsinsiderpreviewSDK). This is necessary at the moment to get access to new DirectX APIs that are not available in the latest public SDK.
-
 ## Install Visual Studio 2017
 
 TensorFlow 1.15 only builds with VS2017. [Download](https://my.visualstudio.com/Downloads?q=visual%20studio%202017&wt.mc_id=o~msft~vscom~older-downloads) and install the community, professional, or enterprise edition.
+
+Make sure you install the Windows 10 SDK as well, which should be version 10.0.17763.0 or newer.
 
 ## Install MSYS2
 

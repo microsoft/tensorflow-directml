@@ -21,17 +21,18 @@ limitations under the License.
 #include <chrono>
 
 #ifndef _WIN32
+typedef uint64_t UINT64, ULONG_PTR; // TODO: move to dx headers repo
 #include "winadapter.h"
 #endif
 
-#include <d3d12.h>
+#include <directx/d3d12.h>
 #include <wrl/client.h>
 #include <wrl/implements.h>
 
 #if _WIN32
 #include <dxgi1_6.h>
 #else
-#include <dxcore.h>
+#include <directx/dxcore.h>
 #endif
 
 #include "absl/types/optional.h"
@@ -53,12 +54,13 @@ limitations under the License.
 #include "DirectML.h"
 #endif
 
-#include "third_party/dml/DirectMLX.h"
-#include "third_party/dml/d3dx12.h"
+#include "DirectMLX.h"
+#include "d3dx12.h"
 
 // When building for Windows, this include will statically assert that the declared IIDs
 // match those found in the Windows SDK.
 #include "dxguids.h"
+#include "dml_guids.h"
 
 // Drop-in C++11-compatible replacements for optional, variant, and small_vector
 // which are used by the external ApiHelpers.h header

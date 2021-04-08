@@ -961,6 +961,28 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
         ],
     )
 
+    tf_http_archive(
+        name = "directx_headers",
+        urls = [
+            "https://mirror.bazel.build/github.com/microsoft/DirectX-Headers/archive/v1.0.2.tar.gz",
+            "https://github.com/microsoft/DirectX-Headers/archive/v1.0.2.tar.gz",
+        ],
+        sha256 = "afeb932c1a92d7fa22f03565468256ce9cc46f0e7fc163cc34e2666313a7cd15",
+        strip_prefix = "DirectX-Headers-1.0.2",
+        build_file = clean_dep("//third_party:directx_headers.BUILD"),
+    )
+
+    tf_http_archive(
+        name = "directml",
+        urls = [
+            "https://mirror.bazel.build/github.com/microsoft/DirectML/archive/6498be13ab6da1d43ef6cb2179abd50050711d8a.tar.gz",
+            "https://github.com/microsoft/DirectML/archive/6498be13ab6da1d43ef6cb2179abd50050711d8a.tar.gz",
+        ],
+        sha256 = "bcc6c3b3d1196f879ab2543089ae1b9aa898118999e66c730a361737102191a0",
+        strip_prefix = "DirectML-6498be13ab6da1d43ef6cb2179abd50050711d8a",
+        build_file = clean_dep("//third_party:directml.BUILD"),
+    )
+
 def tf_bind():
     """Bind targets for some external repositories"""
     ##############################################################################
