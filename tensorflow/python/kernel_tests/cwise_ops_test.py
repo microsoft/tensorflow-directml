@@ -36,6 +36,9 @@ from tensorflow.python.ops import nn_grad  # pylint: disable=unused-import
 from tensorflow.python.ops import variables
 from tensorflow.python.platform import test
 
+import os
+input(os.getpid())
+
 _ADD = lambda x, y: x + y
 _SUB = lambda x, y: x - y
 _MUL = lambda x, y: x * y

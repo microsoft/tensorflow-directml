@@ -73,11 +73,11 @@ static bool IsUmaAdapter(const DmlAdapter& adapter) {
   DML_CHECK_SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
                                         IID_PPV_ARGS(&d3d12_device)));
 
-  D3D12_FEATURE_DATA_ARCHITECTURE1 feature_data = {};
-  DML_CHECK_SUCCEEDED(d3d12_device->CheckFeatureSupport(
-      D3D12_FEATURE_ARCHITECTURE1, &feature_data, sizeof(feature_data)));
+  D3D12_FEATURE_DATA_ARCHITECTURE feature_data = {};
+  HRESULT hr = d3d12_device->CheckFeatureSupport(
+      D3D12_FEATURE_ARCHITECTURE, &feature_data, sizeof(feature_data));
 
-  return feature_data.CacheCoherentUMA;
+  return SUCCEEDED(hr) && feature_data.CacheCoherentUMA;
 }
 
 class DmlDeviceFactory : public DeviceFactory {
