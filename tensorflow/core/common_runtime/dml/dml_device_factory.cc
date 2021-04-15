@@ -70,12 +70,20 @@ static bool IsUmaAdapter(const DmlAdapter& adapter) {
                                         : D3D_FEATURE_LEVEL_11_0;
 
   ComPtr<ID3D12Device> d3d12_device;
-  DML_CHECK_SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
-                                        IID_PPV_ARGS(&d3d12_device)));
+  HRESULT hr = D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
+                                 IID_PPV_ARGS(&d3d12_device));
 
-  D3D12_FEATURE_DATA_ARCHITECTURE1 feature_data = {};
-  DML_CHECK_SUCCEEDED(d3d12_device->CheckFeatureSupport(
-      D3D12_FEATURE_ARCHITECTURE1, &feature_data, sizeof(feature_data)));
+  if (FAILED(hr)) {
+    return false;
+  }
+
+  D3D12_FEATURE_DATA_ARCHITECTURE feature_data = {};
+  hr = d3d12_device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE,
+                                         &feature_data, sizeof(feature_data));
+
+  if (FAILED(hr)) {
+    return false;
+  }
 
   return feature_data.CacheCoherentUMA;
 }

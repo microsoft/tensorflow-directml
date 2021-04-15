@@ -30,27 +30,8 @@ namespace tensorflow {
 // different approach if the data shows that many people with old hardware
 // want to use our package.
 // TFDML #28244592
-static bool SupportsAllDataTypes(const DmlAdapter& adapter) {
-  D3D_FEATURE_LEVEL feature_level = adapter.IsComputeOnly()
-                                        ? D3D_FEATURE_LEVEL_1_0_CORE
-                                        : D3D_FEATURE_LEVEL_11_0;
-
-  ComPtr<ID3D12Device> d3d12_device;
-  if (!SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
-                                   IID_PPV_ARGS(&d3d12_device)))) {
-    LOG(WARNING) << "Could not create Direct3D device for adapter: "
-                 << adapter.Name();
-    return false;
-  }
-
-  ComPtr<IDMLDevice> dml_device =
-      TryCreateDmlDevice(d3d12_device.Get(), DML_CREATE_DEVICE_FLAG_NONE);
-  if (!dml_device) {
-    LOG(WARNING) << "Could not create DirectML device for adapter: "
-                 << adapter.Name();
-    return false;
-  }
-
+static bool SupportsAllDataTypes(const DmlAdapter& adapter,
+                                 IDMLDevice* dml_device) {
   std::array<DML_TENSOR_DATA_TYPE, 8> data_types = {
       DML_TENSOR_DATA_TYPE_FLOAT32, DML_TENSOR_DATA_TYPE_FLOAT16,
       DML_TENSOR_DATA_TYPE_UINT32,  DML_TENSOR_DATA_TYPE_UINT16,
@@ -77,6 +58,71 @@ static bool SupportsAllDataTypes(const DmlAdapter& adapter) {
       });
 }
 
+// Even though we successfully created a DML Device, some APIs required by
+// DirectML may still be missing. We compile a dummy identity operator to make
+// sure that we don't fail later on.
+static bool CanCompileOperator(IDMLDevice* dml_device) {
+  uint32_t sizes[4] = {1, 1, 1, 1};
+
+  DML_BUFFER_TENSOR_DESC buffer_tensor_desc;
+  buffer_tensor_desc.DataType = DML_TENSOR_DATA_TYPE_FLOAT32;
+  buffer_tensor_desc.Flags = DML_TENSOR_FLAG_NONE;
+  buffer_tensor_desc.DimensionCount = 4;
+  buffer_tensor_desc.Sizes = sizes;
+  buffer_tensor_desc.Strides = nullptr;
+  buffer_tensor_desc.TotalTensorSizeInBytes =
+      DMLCalcBufferTensorSize(DML_TENSOR_DATA_TYPE_FLOAT32, 4, sizes, nullptr);
+  buffer_tensor_desc.GuaranteedBaseOffsetAlignment = 0;
+
+  DML_TENSOR_DESC tensor_desc;
+  tensor_desc.Type = DML_TENSOR_TYPE_BUFFER;
+  tensor_desc.Desc = &buffer_tensor_desc;
+
+  DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc;
+  identity_desc.InputTensor = &tensor_desc;
+  identity_desc.OutputTensor = &tensor_desc;
+  identity_desc.ScaleBias = nullptr;
+
+  DML_OPERATOR_DESC op_desc;
+  op_desc.Type = DML_OPERATOR_ELEMENT_WISE_IDENTITY;
+  op_desc.Desc = &identity_desc;
+
+  ComPtr<IDMLOperator> dml_op;
+
+  if (FAILED(dml_device->CreateOperator(&op_desc, IID_PPV_ARGS(&dml_op)))) {
+    return false;
+  }
+
+  ComPtr<IDMLCompiledOperator> dml_compiled_op;
+  return SUCCEEDED(dml_device->CompileOperator(
+      dml_op.Get(), DML_EXECUTION_FLAG_NONE, IID_PPV_ARGS(&dml_compiled_op)));
+}
+
+static bool SupportsDmlDevice(const DmlAdapter& adapter) {
+  ComPtr<ID3D12Device> d3d12_device;
+  D3D_FEATURE_LEVEL feature_level = adapter.IsComputeOnly()
+                                        ? D3D_FEATURE_LEVEL_1_0_CORE
+                                        : D3D_FEATURE_LEVEL_11_0;
+
+  if (!SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
+                                   IID_PPV_ARGS(&d3d12_device)))) {
+    LOG(WARNING) << "Could not create Direct3D device for adapter: "
+                 << adapter.Name();
+    return false;
+  }
+
+  ComPtr<IDMLDevice> dml_device =
+      TryCreateDmlDevice(d3d12_device.Get(), DML_CREATE_DEVICE_FLAG_NONE);
+  if (!dml_device) {
+    LOG(WARNING) << "Could not create DirectML device for adapter: "
+                 << adapter.Name();
+    return false;
+  }
+
+  return SupportsAllDataTypes(adapter, dml_device.Get()) &&
+         CanCompileOperator(dml_device.Get());
+}
+
 static std::vector<DmlAdapter> FilterAdapters() {
   // Fail early if DirectML library cannot be located or loaded.
   auto dml_handle_or =
@@ -96,7 +142,7 @@ static std::vector<DmlAdapter> FilterAdapters() {
   std::vector<DmlAdapter> adapters = EnumerateAdapters();
   adapters.erase(std::remove_if(adapters.begin(), adapters.end(),
                                 [](const DmlAdapter& adapter) {
-                                  return !SupportsAllDataTypes(adapter);
+                                  return !SupportsDmlDevice(adapter);
                                 }),
                  adapters.end());
 
