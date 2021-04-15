@@ -120,20 +120,29 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
       event.done_callback();
     }
 
+    bool event_queue_empty = state->events_by_fence_value.empty();
+
     // We've finished processing the events, so we can unlock the mutex now.
     lock.unlock();
 
     events_to_process.clear();
 
-    // Now wait for the fence to become signaled again. Recall that the choice
-    // of next_fence_value ensures this wait will complete no matter what value
-    // is signaled.
-    DmlGpuEvent next_event{next_fence_value, state->fence};
-    next_event.WaitForSignal();
+    // If the queue isn't empty then there are still events waiting for a fence
+    // value that hasn't been reached. The WaitForSignal below is to avoid a
+    // busy wait, but it's not required for correctness. WaitForSignal should
+    // NOT be invoked if the queue is already empty since another signal may
+    // never come (i.e. no more events are enqueued).
+    if (!event_queue_empty) {
+      // Now wait for the fence to become signaled again. Recall that the choice
+      // of next_fence_value ensures this wait will complete no matter what
+      // value is signaled.
+      DmlGpuEvent next_event{next_fence_value, state->fence};
+      next_event.WaitForSignal();
 
-    // We require monotonically increasing fence values; time is not allowed to
-    // go backward!
-    CHECK(state->fence->GetCompletedValue() >= next_fence_value);
+      // We require monotonically increasing fence values; time is not allowed
+      // to go backward!
+      CHECK(state->fence->GetCompletedValue() >= next_fence_value);
+    }
   }
 }
 
