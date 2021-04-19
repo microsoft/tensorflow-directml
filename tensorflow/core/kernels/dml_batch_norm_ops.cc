@@ -647,12 +647,7 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
 
     // FusedBatchNormGradV3 receives an additional (6th) input which we don't
     // use, so we explicitly only supply 5 indices here
-    if (is_training) {
-      params.kernel_input_indices = {0, 1, 2, 3, 4};
-    } else {
-      params.kernel_input_indices = {kX, kYBackprop, kReserveSpace1,
-                                     kReserveSpace2, kScale};
-    }
+    params.kernel_input_indices = {0, 1, 2, 3, 4};
 
     // Only the first 3 outputs are used, the remainder are placeholders
     params.kernel_output_indices = {0, 1, 2};
