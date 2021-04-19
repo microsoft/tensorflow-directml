@@ -266,6 +266,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
     const TensorShape& in_out_shape = params_tensor.shape();
     const TensorShape& indices_shape = ctx->GetInputTensorShape(1);
     const TensorShape& updates_shape = ctx->GetInputTensorShape(2);
+    const TensorShape empty_scalar_shape = {1};
 
     DmlTensorInfo in_out_tensor;
     in_out_tensor.desc = DmlTensorDesc::Create(params_tensor.dtype(),
@@ -281,7 +282,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
 
     DmlTensorInfo empty_tensor;
     empty_tensor.desc = DmlTensorDesc::Create(params_tensor.dtype(),
-                                              in_out_shape, in_out_shape);
+                                              in_out_shape, empty_scalar_shape);
 
     DmlKernelTensors tensors;
     tensors.inputs = {in_out_tensor, indices_tensor, updates_tensor,
