@@ -503,6 +503,8 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
                            int64, std::minus<dml::Expression>>,                \
                        NoOutputShapeHelper, DmlKernelCachePolicy::Never>)
 
+TF_CALL_int32(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
 TF_CALL_float(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
