@@ -34,21 +34,6 @@ static Status ValidateRefScatter(const Tensor& params, const Tensor& indices,
   return Status::OK();
 }
 
-static Status ValidateResourceScatter(const Tensor& indices,
-                                      const Tensor& updates) {
-  int64 num_updates = updates.NumElements();
-  int64 num_indices = indices.NumElements();
-  if (num_indices > 0 && !TensorShapeUtils::IsScalar(updates.shape()) &&
-      num_updates % num_indices != 0) {
-    return errors::InvalidArgument(
-        "shape of indices (", indices.shape().DebugString(),
-        ") is not compatible with the shape of updates (",
-        updates.shape().DebugString(), ")");
-  }
-
-  return Status::OK();
-}
-
 static bool ValidEmptyOutputShape(int64 num_inputs, int64 num_indices,
                                   int64 num_updates) {
   if (num_indices == 0 && num_updates == 0) {
@@ -56,6 +41,42 @@ static bool ValidEmptyOutputShape(int64 num_inputs, int64 num_indices,
   }
   // now we want all 3 tensors to have values
   return (num_inputs != 0 && num_indices != 0 && num_updates != 0);
+}
+
+static Status ValidateUpdateShape(const TensorShape& params_shape,
+                                  const Tensor& indices,
+                                  const Tensor& updates) {
+  const int64 slice_dim =
+      (indices.dims() > 1) ? indices.dim_size(indices.dims() - 1) : 1;
+  const int64 batch_dim = (indices.dims() > 1) ? indices.dims() - 1 : 1;
+
+  auto shape_err = [&]() {
+    return errors::InvalidArgument(
+        "Must have updates.shape = indices.shape[:batch_dim] + ",
+        "params_shape[slice_dim:], got updates.shape: ",
+        updates.shape().DebugString(),
+        ", indices.shape: ", indices.shape().DebugString(),
+        ", params_shape: ", params_shape.DebugString(),
+        ", slice_dim: ", slice_dim, ", and batch_dim: ", batch_dim);
+  };
+
+  if (updates.dims() < batch_dim) return shape_err();
+  if (params_shape.dims() < slice_dim + (updates.dims() - batch_dim)) {
+    return shape_err();
+  }
+  if (updates.dims() != batch_dim + params_shape.dims() - slice_dim) {
+    return shape_err();
+  }
+  for (int d = 0; d < batch_dim; ++d) {
+    if (updates.dim_size(d) != indices.dim_size(d)) return shape_err();
+  }
+  for (int d = 0; d < updates.dims() - batch_dim; ++d) {
+    if (updates.dim_size(d + batch_dim) !=
+        params_shape.dim_size(d + slice_dim)) {
+      return shape_err();
+    }
+  }
+  return Status::OK();
 }
 
 template <typename Index>
@@ -79,6 +100,8 @@ static Status ValidateCommonScatter(const Tensor& params, const Tensor& indices,
         "must match. Got indices.shape ", indices.shape().DebugString(),
         ", updates.shape ", updates.shape().DebugString());
   }
+
+  TF_RETURN_IF_ERROR(ValidateUpdateShape(params.shape(), indices, updates));
 
   // Check that we have enough index space
   const int64 N_big = indices.NumElements();
@@ -129,10 +152,6 @@ class ResourceScatterNDInitHelper : public InitializationHelper {
     }
 
     OP_REQUIRES_OK(ctx, ValidateCommonScatter<Index>(params, indices, updates));
-
-    if (!ctx->input_is_ref(0) && ctx->input(0).dtype() == DT_RESOURCE) {
-      OP_REQUIRES_OK(ctx, ValidateResourceScatter(indices, updates));
-    }
   }
 
   Tensor GetParamsTensor(OpKernelContext* ctx) const {
