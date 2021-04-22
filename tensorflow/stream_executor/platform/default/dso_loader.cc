@@ -234,6 +234,14 @@ port::StatusOr<void*> GetPixDsoHandle() {
 #endif
 }
 
+port::StatusOr<void*> GetKernel32DsoHandle() {
+#if _WIN32
+  return GetDsoHandle("Kernel32", "");
+#else
+  return port::Status(port::error::UNIMPLEMENTED, "Kernel32.dll is only available on Windows");
+#endif
+}
+
 }  // namespace DsoLoader
 
 namespace CachedDsoLoader {
@@ -319,6 +327,11 @@ port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
 
 port::StatusOr<void*> GetPixDsoHandle() {
   static auto result = new auto(DsoLoader::GetPixDsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetKernel32DsoHandle() {
+  static auto result = new auto(DsoLoader::GetKernel32DsoHandle());
   return *result;
 }
 

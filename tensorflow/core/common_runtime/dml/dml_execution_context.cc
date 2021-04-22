@@ -20,6 +20,14 @@ limitations under the License.
 #include "dml_tracing.h"
 #include "dml_util.h"
 #include "tensorflow/core/util/env_var.h"
+#include "tensorflow/stream_executor/platform/default/dso_loader.h"
+
+#if _WIN32
+typedef HRESULT(WINAPI* SetThreadDescriptionFn)(HANDLE hThread,
+                                                PCWSTR lpThreadDescription);
+
+static SetThreadDescriptionFn g_setThreadDescription = nullptr;
+#endif
 
 namespace tensorflow {
 
@@ -27,6 +35,17 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
                                          IDMLDevice* dml_device,
                                          ID3D12CommandQueue* queue,
                                          DmlAllocator* allocator) {
+#if _WIN32
+  auto kernel32_handle_or =
+      stream_executor::internal::CachedDsoLoader::GetKernel32DsoHandle();
+
+  if (kernel32_handle_or.ok()) {
+    tensorflow::Env::Default()->GetSymbolFromLibrary(
+        kernel32_handle_or.ValueOrDie(), "SetThreadDescription",
+        reinterpret_cast<void**>(&g_setThreadDescription));
+  }
+#endif
+
   dml_command_queue_ = std::make_shared<DmlCommandQueue>(queue);
 
   batch_state_ = std::make_shared<BatchState>();
@@ -212,7 +231,9 @@ D3D12_COMMAND_LIST_TYPE DmlExecutionContext::GetCommandListTypeForQueue()
     std::shared_ptr<DmlCommandQueue> command_queue, uint32_t batch_flush_size,
     uint32_t batch_flush_time_us) {
 #if _WIN32
-  SetThreadDescription(GetCurrentThread(), L"TFDML Execution Thread");
+  if (g_setThreadDescription) {
+    g_setThreadDescription(GetCurrentThread(), L"TFDML Execution Thread");
+  }
 #endif
 
   auto last_flush_time = std::chrono::steady_clock::now();
