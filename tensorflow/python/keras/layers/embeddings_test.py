@@ -84,6 +84,8 @@ class EmbeddingTest(keras_parameterized.TestCase):
     outputs = model.predict(np.array([[0, 1, 0]], dtype='int32'))
     self.assertAllClose(outputs, [[[1, 1], [2, 2], [1, 1]]])
 
+  # DML doesn't implement ResourceSparseApplyAdagrad
+  @tf_test_util.skip_dml
   @tf_test_util.run_in_graph_and_eager_modes
   def test_eager_gpu_cpu(self):
     l = keras.layers.Embedding(output_dim=2, input_dim=2)
