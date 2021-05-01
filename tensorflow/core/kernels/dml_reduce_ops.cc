@@ -318,6 +318,7 @@ class DmlReduceKernel : public DmlKernel {
     // using striding to emulate a larger type. Because we can't guarantee
     // that our output tensor's memory is zero'd, we need to do so manually
     // prior to running the reduction.
+    // TFDML #24881131
     if (Is64BitIntegerType(ctx->GetOutputDataType(0))) {
       zero_outputs_ = true;
     }
@@ -333,11 +334,6 @@ class DmlReduceKernel : public DmlKernel {
     output.kernel_index = 0;
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), output_shape,
                                         output_shape);
-
-    // Coerce the output datatype to unsigned, for argmin/argmax
-    if (DataTypeIsInteger(output.desc.GetTfDataType())) {
-      output.desc.ForceUnsignedDataType();
-    }
 
     DmlKernelTensors tensors;
     tensors.inputs = {input};

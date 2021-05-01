@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#pragma optimize("", off)
+
 #include "tensorflow/core/common_runtime/dml/dml_operator_helper.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/framework/register_types.h"
@@ -66,11 +68,22 @@ class DmlAddNKernel : public DmlKernel {
                                    &identity_desc};
       Initialize(ctx, std::move(tensors), op_desc);
     } else {
-      auto scope = dml::Graph(ctx->GetDmlDevice());
+      // TFDML #24881131
+      const dml::TensorPolicy out_policy =
+          Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0))
+              ? GetEmulatedInt64TensorPolicy()
+              : dml::TensorPolicy::Default();
+
+      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
       auto result = dml::InputTensor(scope, 0, inputs[0]);
 
       for (uint32_t i = 1; i < inputs.size(); ++i) {
         result += dml::InputTensor(scope, i, inputs[i]);
+      }
+
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(scope, result);
       }
 
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -87,7 +100,8 @@ class DmlAddNKernel : public DmlKernel {
     // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
-    if (Is64BitIntegerType(output->dtype())) {
+    // TFDML #24881131
+    if (Is64BitUnsignedIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
 

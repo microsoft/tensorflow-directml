@@ -98,47 +98,17 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
 
     execution_context->ResourceBarrier(barriers);
 
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    int perm_stride = DataTypeSize(input.dtype()) * input_shape.dims();
-    bool is_64_bit_int = Is64BitIntegerType(output->dtype());
-    uint32_t permutation_size = is_64_bit_int ? perm_stride / 2 : perm_stride;
-
-    // For int64 data types, we copy only half the data since the other half is
-    // most likely garbage data
-    if (is_64_bit_int) {
-      const uint8_t pattern[] = {0};
-      execution_context->FillBufferWithPattern(
-          output_buffer.Resource(), output_buffer.Offset(),
-          output_buffer.SizeInBytes(), pattern);
-    }
+    const int perm_stride = DataTypeSize(input.dtype()) * input_shape.dims();
 
     for (uint32_t i = 0; i < permutations_.size(); ++i) {
       uint64_t dst_offset = output_buffer.Offset() + i * perm_stride;
       uint64_t src_offset =
           input_buffer.Offset() + permutations_[i] * perm_stride;
 
-      // For int64 data types, we need to do 2 to separate copies for 2D tensors
-      // in order to skip the garbage data between elements
-      if (is_64_bit_int && input.dims() == 2) {
-        execution_context->CopyBufferRegion(
-            output_buffer.Resource(), dst_offset,
-            D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, permutation_size / 2);
-
-        execution_context->CopyBufferRegion(
-            output_buffer.Resource(), dst_offset + permutation_size,
-            D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(),
-            src_offset + permutation_size, D3D12_RESOURCE_STATE_COPY_SOURCE,
-            permutation_size / 2);
-      } else {
-        execution_context->CopyBufferRegion(
-            output_buffer.Resource(), dst_offset,
-            D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, permutation_size);
-      }
+      execution_context->CopyBufferRegion(
+          output_buffer.Resource(), dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
+          input_buffer.Resource(), src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
+          perm_stride);
     }
 
     for (auto& barrier : barriers) {

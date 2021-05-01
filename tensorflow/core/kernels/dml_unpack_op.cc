@@ -151,6 +151,7 @@ class DmlUnpackKernel : public DmlKernel {
     for (uint32_t i = 0; i < ctx->GetOutputCount(); ++i) {
       Tensor* output = ctx->GetOutputTensor(i);
 
+      // TFDML #24881131
       if (Is64BitIntegerType(output->dtype())) {
         ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
       }

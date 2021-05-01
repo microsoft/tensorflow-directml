@@ -373,6 +373,7 @@ class DmlTernaryKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
+    // TFDML #24881131
     dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
     if (Is64BitIntegerType(ctx->GetOutputDataType(0))) {
       out_policy = GetEmulatedInt64TensorPolicy();
@@ -397,6 +398,7 @@ class DmlTernaryKernel : public DmlKernel {
     // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
+    // TFDML #24881131
     if (Is64BitIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }

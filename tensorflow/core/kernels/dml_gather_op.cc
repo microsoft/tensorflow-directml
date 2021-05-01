@@ -271,6 +271,7 @@ class DmlGatherKernel : public DmlKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
+    // TFDML #24881131
     // Create a custom tensor policy to correctly pad out strides for int64
     // emulation
     dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
@@ -281,16 +282,6 @@ class DmlGatherKernel : public DmlKernel {
     auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
     auto indices_tensor = dml::InputTensor(scope, 1, inputs[1]);
-
-    // DML's Gather only supports uint32 for the indices tensor, but TF models
-    // use either int64 or int32. int64 already gets converted to uint32 with
-    // the strides hack
-    // (TFDML #24881131), so we
-    // only need to reinterpret the int32 data to uint32 here.
-    if (indices_tensor.GetOutputDesc().dataType == DML_TENSOR_DATA_TYPE_INT32) {
-      indices_tensor =
-          dml::Reinterpret(indices_tensor, DML_TENSOR_DATA_TYPE_UINT32);
-    }
 
     auto result =
         dml::Gather(input_tensor, indices_tensor, simple_gather.gather_axis,
@@ -319,6 +310,7 @@ class DmlGatherKernel : public DmlKernel {
 
     D3D12BufferRegion output_buffers[] = {ctx->CreateBufferForTensor(*output)};
 
+    // TFDML #24881131
     if (Is64BitIntegerType(output->dtype())) {
       ctx->ZeroBuffer(output_buffers[0]);
     }

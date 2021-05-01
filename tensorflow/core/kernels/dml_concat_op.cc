@@ -33,10 +33,10 @@ class ConcatInitHelper : public InitializationHelper {
   ConcatInitHelper(OpKernelContext* ctx,
                    std::shared_ptr<const Attributes> attr) {
     const Tensor* concat_dim_tensor;
-    const char* axis_attribute_name =
-        AxisArgName == NAME_IS_AXIS
-            ? "axis"
-            : AxisArgName == NAME_IS_CONCAT_DIM ? "concat_dim" : "<invalid>";
+    const char* axis_attribute_name = AxisArgName == NAME_IS_AXIS ? "axis"
+                                      : AxisArgName == NAME_IS_CONCAT_DIM
+                                          ? "concat_dim"
+                                          : "<invalid>";
     OP_REQUIRES_OK(ctx, ctx->input(axis_attribute_name, &concat_dim_tensor));
 
     OpInputList values;
@@ -226,17 +226,33 @@ class DmlConcatKernel : public DmlKernel {
     // earlier
     CHECK(!tensors.inputs.empty());
 
+    // TFDML #24881131
+    const dml::TensorPolicy out_policy =
+        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0))
+            ? GetEmulatedInt64TensorPolicy()
+            : dml::TensorPolicy::Default();
+
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
 
-    DML_JOIN_OPERATOR_DESC op_specific_desc = {};
-    op_specific_desc.InputCount = inputs.size();
-    op_specific_desc.InputTensors = inputs.data();
-    op_specific_desc.OutputTensor = outputs.data();
-    op_specific_desc.Axis = kNchwDimensionCount - 2;
+    std::vector<dml::Expression> input_tensors;
+    input_tensors.reserve(inputs.size());
 
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_JOIN, &op_specific_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
+    for (int i = 0; i < inputs.size(); ++i) {
+      input_tensors.push_back(dml::InputTensor(scope, i, inputs[i]));
+    }
+
+    auto result = dml::Join(input_tensors, kNchwDimensionCount - 2);
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(scope, result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
@@ -246,7 +262,8 @@ class DmlConcatKernel : public DmlKernel {
     // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
-    if (Is64BitIntegerType(output->dtype())) {
+    // TFDML #24881131
+    if (Is64BitUnsignedIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
 

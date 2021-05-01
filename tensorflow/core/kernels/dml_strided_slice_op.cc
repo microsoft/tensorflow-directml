@@ -317,7 +317,8 @@ class DmlStridedSliceKernel : public DmlKernel {
 
     auto simple_slice = init_helper->GetSimplifiedSlice();
     auto dtype_tf = ctx->GetInputDataType(0);
-    DML_TENSOR_DATA_TYPE dtype_dml = DML_TENSOR_DATA_TYPE_UNKNOWN;
+    const DML_TENSOR_DATA_TYPE dtype_dml =
+        GetDmlDataTypeFromTfDataType(dtype_tf);
 
     // TODO #24881131: 64-bit data support should be revisited
     // TFDML #24881131
@@ -330,7 +331,6 @@ class DmlStridedSliceKernel : public DmlKernel {
       stride *= simple_slice->output_sizes[i];
     }
     if (Is64BitIntegerType(dtype_tf)) {
-      dtype_dml = DML_TENSOR_DATA_TYPE_UINT32;
       for (auto& stride : simple_slice->input_strides) {
         stride *= 2;
       }
@@ -338,8 +338,6 @@ class DmlStridedSliceKernel : public DmlKernel {
         output_strides[i] *= 2;
       }
       end_padding_in_bytes = sizeof(uint32_t);
-    } else {
-      dtype_dml = GetDmlDataTypeFromTfDataType(dtype_tf);
     }
 
     DmlTensorInfo input;
@@ -389,6 +387,7 @@ class DmlStridedSliceKernel : public DmlKernel {
     // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
+    // TFDML #24881131
     if (Is64BitIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
@@ -426,7 +425,8 @@ class DmlStridedSliceGradKernel : public DmlKernel {
 
     auto simple_slice = init_helper->GetSimplifiedSlice();
     auto dtype_tf = ctx->GetInputDataType(4);
-    DML_TENSOR_DATA_TYPE dtype_dml = DML_TENSOR_DATA_TYPE_UNKNOWN;
+    const DML_TENSOR_DATA_TYPE dtype_dml =
+        GetDmlDataTypeFromTfDataType(dtype_tf);
 
     // TODO #24881131: 64-bit data support should be revisited
     // TFDML #24881131
@@ -439,7 +439,6 @@ class DmlStridedSliceGradKernel : public DmlKernel {
       stride *= simple_slice->output_sizes[i];
     }
     if (Is64BitIntegerType(dtype_tf)) {
-      dtype_dml = DML_TENSOR_DATA_TYPE_UINT32;
       for (auto& stride : simple_slice->input_strides) {
         stride *= 2;
       }
@@ -447,8 +446,6 @@ class DmlStridedSliceGradKernel : public DmlKernel {
         output_strides[i] *= 2;
       }
       end_padding_in_bytes = sizeof(uint32_t);
-    } else {
-      dtype_dml = GetDmlDataTypeFromTfDataType(dtype_tf);
     }
 
     DmlTensorInfo input;
@@ -498,6 +495,7 @@ class DmlStridedSliceGradKernel : public DmlKernel {
     // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
+    // TFDML #24881131
     if (Is64BitIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }

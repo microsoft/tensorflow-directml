@@ -155,6 +155,7 @@ class DmlSliceKernel : public DmlKernel {
     // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
+    // TFDML #24881131
     if (Is64BitIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }

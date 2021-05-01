@@ -355,6 +355,10 @@ class DmlScatterUpdateKernel : public DmlKernel {
 
     const uint32_t scatter_axis =
         params.GetOutputDesc().sizes.size() - flat_params_shape.dims();
+
+    // TODO: Remove the Is64BitIntegerType hack when DML has a more solid
+    // solution for 64 bit datatypes
+    // TFDML #24881131
     auto result = ScatterOp()(scope, params, indices, updates, scatter_axis,
                               Is64BitIntegerType(ctx->GetInputDataType(1)),
                               scalar_updates);

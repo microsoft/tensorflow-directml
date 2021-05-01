@@ -102,16 +102,25 @@ class DmlBroadcastToKernel : public DmlKernel {
                                         output_shape);
     tensors.outputs = {output};
 
+    // TFDML #24881131
+    const dml::TensorPolicy out_policy =
+        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0))
+            ? GetEmulatedInt64TensorPolicy()
+            : dml::TensorPolicy::Default();
+
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto result = dml::Identity(dml::InputTensor(scope, 0, inputs[0]));
 
-    DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-    identity_desc.InputTensor = &inputs[0];
-    identity_desc.OutputTensor = &outputs[0];
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(scope, result);
+    }
 
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                 &identity_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
@@ -121,7 +130,8 @@ class DmlBroadcastToKernel : public DmlKernel {
     // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
-    if (Is64BitIntegerType(output->dtype())) {
+    // TFDML #24881131
+    if (Is64BitUnsignedIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
 

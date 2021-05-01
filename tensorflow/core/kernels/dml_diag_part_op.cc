@@ -76,8 +76,7 @@ class DmlDiagPartKernel : public DmlKernel {
     // TFDML #24881131
     auto dtype_tf = ctx->GetInputDataType(0);
     bool is_64_bit_type = Is64BitIntegerType(dtype_tf);
-    auto dtype_dml = is_64_bit_type ? DML_TENSOR_DATA_TYPE_UINT32
-                                    : GetDmlDataTypeFromTfDataType(dtype_tf);
+    auto dtype_dml = GetDmlDataTypeFromTfDataType(dtype_tf);
     uint64_t end_padding_in_bytes = is_64_bit_type ? sizeof(uint32_t) : 0;
     uint32_t stride_multiplier = is_64_bit_type ? 2 : 1;
 
@@ -124,6 +123,7 @@ class DmlDiagPartKernel : public DmlKernel {
     // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
+    // TFDML #24881131
     if (Is64BitIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }

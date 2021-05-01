@@ -421,6 +421,10 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
     auto indices = dml::InputTensor(graph, 1, inputs[1]);
     auto updates = dml::InputTensor(graph, 2, inputs[2]);
     auto strides = dml::InputTensor(graph, 3, inputs[3]);
+
+    // TODO: Remove the Is64BitIntegerType hack when DML has a more solid
+    // solution for 64 bit datatypes
+    // TFDML #24881131
     auto result = BinaryOp()(graph, input, indices, updates, strides,
                              Is64BitIntegerType(indices_dtype));
 

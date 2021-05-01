@@ -317,6 +317,7 @@ class DmlGatherNdKernel : public DmlKernel {
     // using striding to emulate a larger type. Because we can't guarantee that
     // our output tensor's memory is zero'd, we need to do so manually prior to
     // running running gather.
+    // TFDML #24881131
     if (Is64BitIntegerType(output->dtype())) {
       ctx->ZeroBuffer(output_buffer);
     }
