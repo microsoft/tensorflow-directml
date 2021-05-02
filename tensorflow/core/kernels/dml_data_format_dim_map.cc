@@ -88,18 +88,6 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto indices = dml::InputTensor(scope, 0, inputs[0]);
 
-    const bool is_64_bit_integer = Is64BitIntegerType(ctx->GetInputDataType(0));
-
-    // Reinterpreting to int32 is necessary for Gather to recognize the negative
-    // indices, since int64 is simply a stride hack with the uint32 datatype.
-    // Ones' complement will make sure that the sign bit is preserved since we
-    // don't need the highest 32 bits of int64 to represent values in the range
-    // [-4, 3].
-    if (is_64_bit_integer) {
-      indices = dml::Reinterpret(indices, DML_TENSOR_DATA_TYPE_INT32,
-                                 {1, 1, 1, 4}, indices.GetOutputDesc().strides);
-    }
-
     DML_SCALAR_UNION bits_scalar;
     bits_scalar.UInt32 = src_dst_mapping_packed;
 
@@ -114,10 +102,28 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
 
     // We need strides of 4 for int32 and strides of 8 for int64 since the
     // params are uint8
-    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
-    if (is_64_bit_integer) {
-      out_policy = GetEmulatedInt64TensorPolicy();
-    }
+    // TFDML #24881131
+    const uint32_t element_stride =
+        Is64BitIntegerType(ctx->GetOutputDataType(0)) ? 8 : 4;
+
+    const auto out_policy = dml::TensorPolicy(
+        [element_stride](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
+                         dml::Span<const uint32_t> sizes) {
+          uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
+
+          const uint32_t num_elements = std::accumulate(
+              sizes.begin(), sizes.end(), 1u, std::multiplies<uint32_t>());
+
+          dml::TensorDimensions strides(dimension_count);
+          strides.back() = element_stride;
+
+          dml::TensorProperties props = {};
+          props.guaranteedBaseOffsetAlignment = 0;
+          props.strides = std::move(strides);
+          props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+              dataType, dimension_count, sizes.data(), props.strides->data());
+          return props;
+        });
 
     scope.SetTensorPolicy(out_policy);
     auto result = dml::Gather(params, indices, gather_axis, index_dimensions);
