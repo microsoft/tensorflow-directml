@@ -59,48 +59,6 @@ class DiagShapeHelper : public ShapeHelper {
   }
 };
 
-static dml::TensorPolicy GetDiagDefaultTensorPolicy() {
-  return dml::TensorPolicy([](DML_TENSOR_DATA_TYPE dataType,
-                              DML_TENSOR_FLAGS flags,
-                              dml::Span<const uint32_t> sizes) {
-    uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
-
-    const uint32_t num_elements = std::accumulate(
-        sizes.begin(), sizes.end(), 1u, std::multiplies<uint32_t>());
-
-    dml::TensorDimensions strides(dimension_count);
-    strides.back() = num_elements + 1;
-
-    dml::TensorProperties props = {};
-    props.guaranteedBaseOffsetAlignment = 0;
-    props.strides = std::move(strides);
-    props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
-        dataType, dimension_count, sizes.data(), props.strides->data());
-    return props;
-  });
-}
-
-static dml::TensorPolicy GetDiagEmulatedInt64TensorPolicy() {
-  return dml::TensorPolicy([](DML_TENSOR_DATA_TYPE dataType,
-                              DML_TENSOR_FLAGS flags,
-                              dml::Span<const uint32_t> sizes) {
-    uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
-
-    const uint32_t num_elements = std::accumulate(
-        sizes.begin(), sizes.end(), 1u, std::multiplies<uint32_t>());
-
-    dml::TensorDimensions strides(dimension_count);
-    strides.back() = (num_elements + 1) * 2;
-
-    dml::TensorProperties props = {};
-    props.guaranteedBaseOffsetAlignment = 0;
-    props.strides = std::move(strides);
-    props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
-        dataType, dimension_count, sizes.data(), props.strides->data());
-    return props;
-  });
-}
-
 class DmlDiagKernel : public DmlKernel {
  public:
   using InitHelper = DiagInitHelper;
@@ -146,10 +104,28 @@ class DmlDiagKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
     // TFDML #24881131
-    const dml::TensorPolicy out_policy =
-        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0))
-            ? GetDiagEmulatedInt64TensorPolicy()
-            : GetDiagDefaultTensorPolicy();
+    const uint32_t tensor_policy_multiplier =
+        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0)) ? 2 : 1;
+
+    const auto out_policy = dml::TensorPolicy(
+        [tensor_policy_multiplier](DML_TENSOR_DATA_TYPE dataType,
+                                   DML_TENSOR_FLAGS flags,
+                                   dml::Span<const uint32_t> sizes) {
+          uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
+
+          const uint32_t num_elements = std::accumulate(
+              sizes.begin(), sizes.end(), 1u, std::multiplies<uint32_t>());
+
+          dml::TensorDimensions strides(dimension_count);
+          strides.back() = (num_elements + 1) * tensor_policy_multiplier;
+
+          dml::TensorProperties props = {};
+          props.guaranteedBaseOffsetAlignment = 0;
+          props.strides = std::move(strides);
+          props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+              dataType, dimension_count, sizes.data(), props.strides->data());
+          return props;
+        });
 
     auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
