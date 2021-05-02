@@ -233,24 +233,6 @@ class DmlSplitKernel : public DmlKernel {
     DML_OPERATOR_DESC op_desc = {DML_OPERATOR_SPLIT, &split_desc};
     Initialize(ctx, std::move(tensors), op_desc);
   }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    // TFDML #24881131
-    if (Is64BitIntegerType(ctx->GetOutputTensor(0)->dtype())) {
-      for (uint32_t i = 0; i < ctx->GetOutputCount(); ++i) {
-        if (ctx->GetOutputTensor(i)->NumElements() != 0) {
-          Tensor* output = ctx->GetOutputTensor(i);
-          ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
-        }
-      }
-    }
-
-    return DmlKernel::Compute(ctx);
-  }
 };
 
 #define REGISTER_KERNEL(type)                                                 \
@@ -274,7 +256,9 @@ class DmlSplitKernel : public DmlKernel {
                               .HostMemory("split_dim"),                       \
                           DmlKernelWrapper<DmlSplitKernel, SplitShapeHelper>)
 
-TF_CALL_DML_ALL_TYPES(REGISTER_KERNEL);
+// TODO(b/25387198): A special kernel exists for int32 (see split_v_op.cc).
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_half(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

@@ -173,21 +173,6 @@ class DmlReverseSequenceKernel : public DmlKernel {
                                  &reverse_desc};
     Initialize(ctx, std::move(tensors), op_desc);
   }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    // TFDML #24881131
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
-    }
-
-    return DmlKernel::Compute(ctx);
-  }
 };
 
 #define REGISTER_KERNELS(type)                                                \
@@ -204,7 +189,9 @@ class DmlReverseSequenceKernel : public DmlKernel {
                           DmlKernelWrapper<DmlReverseSequenceKernel,          \
                                            GetOutputShapeAsInputShapeHelper>)
 
-TF_CALL_DML_ALL_TYPES(REGISTER_KERNELS);
+TF_CALL_half(REGISTER_KERNELS);
+TF_CALL_float(REGISTER_KERNELS);
+TF_CALL_bool(REGISTER_KERNELS);
 #undef REGISTER_KERNELS
 
 }  // namespace tensorflow

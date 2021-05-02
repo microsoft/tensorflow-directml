@@ -226,14 +226,8 @@ class DmlConcatKernel : public DmlKernel {
     // earlier
     CHECK(!tensors.inputs.empty());
 
-    // TFDML #24881131
-    const dml::TensorPolicy out_policy =
-        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0))
-            ? GetEmulatedInt64TensorPolicy()
-            : dml::TensorPolicy::Default();
-
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
     std::vector<dml::Expression> input_tensors;
     input_tensors.reserve(inputs.size());
@@ -254,21 +248,6 @@ class DmlConcatKernel : public DmlKernel {
 
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    // TFDML #24881131
-    if (Is64BitUnsignedIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
-    }
-
-    return DmlKernel::Compute(ctx);
-  }
 };
 
 template <AxisArgumentName AxisArgName>
@@ -288,7 +267,11 @@ using DmlConcatWrapper = DmlKernelWrapper<DmlConcatKernel<AxisArgName>,
                           DmlConcatWrapper<NAME_IS_AXIS>)
 
 // TODO(b/25387198): A special kernel exists for int32 (see concat_op.cc).
-TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_uint8(REGISTER_KERNEL);
+TF_CALL_int64(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

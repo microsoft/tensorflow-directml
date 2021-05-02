@@ -237,6 +237,8 @@ class DmlGatherNdKernel : public DmlKernel {
     output_tensor.desc = DmlTensorDesc::Create(
         ctx->GetOutputDataType(0), flat_output_shape, flat_output_shape);
 
+    auto scope = dml::Graph(ctx->GetDmlDevice());
+
     // When the indices' last dimension is 0, we gather the entire tensor
     if (last_indices_dim == 0) {
       DmlKernelTensors tensors;
@@ -244,11 +246,14 @@ class DmlGatherNdKernel : public DmlKernel {
       tensors.outputs = {output_tensor};
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
-
-      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto params = dml::InputTensor(scope, 0, input_descs[0]);
       auto result = dml::Tile(
           params, {static_cast<uint32_t>(indices_leading_dims), 1, 1, 1});
+
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(scope, result);
+      }
 
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
@@ -265,17 +270,21 @@ class DmlGatherNdKernel : public DmlKernel {
       tensors.outputs = {output_tensor};
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto output_descs = GetDmlTensorDescs(tensors.outputs);
+      auto params = dml::InputTensor(scope, 0, input_descs[0]);
+      auto indices = dml::InputTensor(scope, 1, input_descs[1]);
 
-      DML_GATHER_ND_OPERATOR_DESC gather_nd_desc = {};
-      gather_nd_desc.InputTensor = &input_descs[0];
-      gather_nd_desc.IndicesTensor = &input_descs[1];
-      gather_nd_desc.OutputTensor = &output_descs[0];
-      gather_nd_desc.InputDimensionCount = flat_params_shape.dims();
-      gather_nd_desc.IndicesDimensionCount = flat_indices_shape.dims();
+      auto result = dml::GatherND(params, indices, flat_params_shape.dims(),
+                                  flat_indices_shape.dims(), 0);
 
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_GATHER_ND, &gather_nd_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(scope, result);
+      }
+
+      Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+          scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+      Initialize(ctx, std::move(tensors), compiled_op.Get());
     }
   }
 
@@ -313,15 +322,6 @@ class DmlGatherNdKernel : public DmlKernel {
 
     D3D12BufferRegion output_buffer = ctx->CreateBufferForTensor(*output);
 
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    // TFDML #24881131
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(output_buffer);
-    }
-
     output_bindings.push_back(output_buffer.GetBufferBinding());
 
     auto status_or_event =
@@ -347,9 +347,16 @@ using DmlGatherNdWrapper =
                           DmlGatherNdWrapper<int32>)              \
   REGISTER_KERNEL_BUILDER(Name("GatherNd")                        \
                               .Device(DEVICE_DML)                 \
-                              .TypeConstraint<type>("Tparams")    \
-                              .TypeConstraint<int64>("Tindices"), \
-                          DmlGatherNdWrapper<int64>)              \
+                              .TypeConstraint<type>("Tparams") \
+                              .TypeConstraint<int64>("Tindices"),
+
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
+TF_CALL_int32(DML_REGISTER_KERNELS);
+TF_CALL_int64(DML_REGISTER_KERNELS);
+#undef DML_REGISTER_KERNELS
+
+#define DML_REGISTER_KERNELS(type)                                \
   REGISTER_KERNEL_BUILDER(Name("ResourceGatherNd")                \
                               .Device(DEVICE_DML)                 \
                               .HostMemory("resource")             \
@@ -363,7 +370,8 @@ using DmlGatherNdWrapper =
                               .TypeConstraint<int64>("Tindices"), \
                           DmlGatherNdWrapper<int64>)
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNELS);
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 }  // namespace tensorflow

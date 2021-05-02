@@ -105,30 +105,19 @@ class DmlDiagPartKernel : public DmlKernel {
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
-
-    DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-    identity_desc.InputTensor = &inputs[0];
-    identity_desc.OutputTensor = &outputs[0];
-
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                 &identity_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
+    auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
+    auto result = dml::Identity(input_tensor);
 
     // TFDML #24881131
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(scope, result);
     }
 
-    return DmlKernel::Compute(ctx);
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
@@ -137,7 +126,6 @@ class DmlDiagPartKernel : public DmlKernel {
       Name("DiagPart").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlDiagPartKernel, DiagPartShapeHelper>)
 
-TF_CALL_half(REGISTER_KERNEL);
 TF_CALL_float(REGISTER_KERNEL);
 TF_CALL_int32(REGISTER_KERNEL);
 TF_CALL_int64(REGISTER_KERNEL);

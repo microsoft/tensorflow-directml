@@ -1,12 +1,9 @@
 /* Copyright 2020 The TensorFlow Authors. All Rights Reserved.
 Portions Copyright (c) Microsoft Corporation.
-
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
-
     http://www.apache.org/licenses/LICENSE-2.0
-
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -102,40 +99,16 @@ class DmlBroadcastToKernel : public DmlKernel {
                                         output_shape);
     tensors.outputs = {output};
 
-    // TFDML #24881131
-    const dml::TensorPolicy out_policy =
-        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0))
-            ? GetEmulatedInt64TensorPolicy()
-            : dml::TensorPolicy::Default();
-
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
-    auto result = dml::Identity(dml::InputTensor(scope, 0, inputs[0]));
+    auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(scope, result);
-    }
+    DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
+    identity_desc.InputTensor = &inputs[0];
+    identity_desc.OutputTensor = &outputs[0];
 
-    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
-        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
-
-    Initialize(ctx, std::move(tensors), compiled_op.Get());
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    // TFDML #24881131
-    if (Is64BitUnsignedIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
-    }
-
-    return DmlKernel::Compute(ctx);
+    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
+                                 &identity_desc};
+    Initialize(ctx, std::move(tensors), op_desc);
   }
 };
 
@@ -158,7 +131,9 @@ class DmlBroadcastToKernel : public DmlKernel {
                        GetOutputShapeFromDimsTensorHelper<int64, 1>>)
 
 // TODO(b/25387198): A special kernel exists for int32 (see broadcast_to_op.cc).
-TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

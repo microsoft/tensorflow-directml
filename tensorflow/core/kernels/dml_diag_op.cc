@@ -22,8 +22,6 @@ limitations under the License.
 
 namespace tensorflow {
 
-using Microsoft::WRL::ComPtr;
-
 class DiagInitHelper : public InitializationHelper {
  public:
   using Attributes = EmptyAttributes;
@@ -101,21 +99,16 @@ class DmlDiagKernel : public DmlKernel {
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
 
-    // TFDML #24881131
-    const uint32_t tensor_policy_multiplier =
-        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0)) ? 2 : 1;
-
     const auto out_policy = dml::TensorPolicy(
-        [tensor_policy_multiplier](DML_TENSOR_DATA_TYPE dataType,
-                                   DML_TENSOR_FLAGS flags,
-                                   dml::Span<const uint32_t> sizes) {
+        [](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
+           dml::Span<const uint32_t> sizes) {
           uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
 
           const uint32_t num_elements = std::accumulate(
               sizes.begin(), sizes.end(), 1u, std::multiplies<uint32_t>());
 
           dml::TensorDimensions strides(dimension_count);
-          strides.back() = (num_elements + 1) * tensor_policy_multiplier;
+          strides.back() = (num_elements + 1);
 
           dml::TensorProperties props = {};
           props.guaranteedBaseOffsetAlignment = 0;
@@ -134,7 +127,7 @@ class DmlDiagKernel : public DmlKernel {
       result = dml::ConvertInt32ToInt64(scope, result, num_elements + 1);
     }
 
-    ComPtr<IDMLCompiledOperator> compiled_op =
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
     Initialize(ctx, std::move(tensors), compiled_op.Get());
@@ -154,7 +147,6 @@ class DmlDiagKernel : public DmlKernel {
       Name("Diag").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlDiagKernel, DiagShapeHelper>)
 
-TF_CALL_half(REGISTER_KERNEL);
 TF_CALL_float(REGISTER_KERNEL);
 TF_CALL_int32(REGISTER_KERNEL);
 TF_CALL_int64(REGISTER_KERNEL);

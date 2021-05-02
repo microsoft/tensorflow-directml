@@ -1007,10 +1007,8 @@ class DmlBitCountKernel : public DmlKernel {
       Name("PopulationCount").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlBitCountKernel, GetOutputShapeAsInputShapeHelper>);
 TF_CALL_uint8(DML_REGISTER_KERNEL);
-TF_CALL_uint16(DML_REGISTER_KERNEL);
-TF_CALL_uint32(DML_REGISTER_KERNEL);
-TF_CALL_uint64(DML_REGISTER_KERNEL);
 TF_CALL_int8(DML_REGISTER_KERNEL);
+TF_CALL_uint16(DML_REGISTER_KERNEL);
 TF_CALL_int16(DML_REGISTER_KERNEL);
 TF_CALL_int32(DML_REGISTER_KERNEL);
 TF_CALL_int64(DML_REGISTER_KERNEL);
