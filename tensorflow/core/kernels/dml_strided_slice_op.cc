@@ -458,7 +458,7 @@ class DmlStridedSliceGradKernel : public DmlKernel {
       result = dml::Identity(result);
     } else {
       result = dml::SliceGrad(
-          result, simple_slice->output_sizes, simple_slice->window_offset,
+          result, simple_slice->input_sizes, simple_slice->window_offset,
           simple_slice->window_sizes, simple_slice->window_strides);
     }
 

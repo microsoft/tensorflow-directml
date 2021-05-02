@@ -52,8 +52,6 @@ class SliceTest(test.TestCase):
         slice_val = self.evaluate(slice_t)
       self.assertAllEqual(slice_val, inp[2, k:k])
 
-  # This test uses int64 Add operations which are not supported on DML
-  @test_util.skip_dml
   def testSlicingWithInt64Index(self):
     with self.cached_session(force_gpu=test.is_gpu_available()):
       a = constant_op.constant([0, 1, 2], dtype=dtypes.int32)
@@ -90,8 +88,6 @@ class SliceTest(test.TestCase):
       slice_val = self.evaluate(slice_t)
       self.assertAllEqual([1, 2], slice_val)
 
-  # This test uses int32 Add operations which are not supported on DML
-  @test_util.skip_dml
   def testSlicingInt64Tensor(self):
     with self.cached_session(force_gpu=test.is_gpu_available()):
       a = constant_op.constant([0, 1, 2], dtype=dtypes.int64)

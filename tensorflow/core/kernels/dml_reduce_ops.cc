@@ -241,16 +241,10 @@ class DmlReduceKernel : public DmlKernel {
       return;
     }
 
-    // ARGMIN and ARGMAX are special reduce functions that can never be replaced
-    // by identity
-    constexpr bool is_arg_function =
-        reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
-        reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
-
     // This logic copied from the CPU implementation:
     // tensorflow/core/kernels/reduction_ops_common.h(155)
     bool is_identity =
-        !is_arg_function &&
+        !is_arg_function_ &&
         (reduce_helper.ndims() == 0 ||
          (reduce_helper.ndims() == 1 && !reduce_helper.reduce_first_axis()));
 
@@ -358,8 +352,12 @@ class DmlReduceKernel : public DmlKernel {
       result = dml::Reduce(result, reduce_function, reduce_axes);
     }
 
+    // Arg functions never return negative indices, so even though TF only
+    // supports int64, we can safely use uint32 with strides instead of int32
+    // with strides
     // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+    if (!is_arg_function_ &&
+        Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
       result = dml::ConvertInt32ToInt64(scope, result);
     }
 
@@ -368,6 +366,28 @@ class DmlReduceKernel : public DmlKernel {
 
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
+
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
+    Tensor* output = ctx->GetOutputTensor(0);
+
+    // Only Arg functions need the output to be zero'ed since they're the only
+    // functions that output strided uint32. Other reduction functions either
+    // use non-strided types or use int64, which got its upper bits initialized
+    // in the constructor already.
+    // TFDML #24881131
+    if (is_arg_function_ && Is64BitIntegerType(output->dtype())) {
+      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    }
+
+    return DmlKernel::Compute(ctx);
+  }
+
+ private:
+  // ARGMIN and ARGMAX are special reduce functions that can never be replaced
+  // by identity
+  static constexpr bool is_arg_function_ =
+      reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
+      reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
 };
 
 template <DML_REDUCE_FUNCTION reduce_function, typename TAxis>

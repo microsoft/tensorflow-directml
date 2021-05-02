@@ -98,8 +98,7 @@ class ComparisonOpTest(test.TestCase):
   def testScalarCompareScalar(self):
     dtypes = [np.float16, np.float32, np.float64, np.int32, np.int64]
 
-    # DML doesn't support negative numbers for int64 yet
-    data = [0, 1, 2] if test_util.gpu_device_type() == "DML" else [-1, 0, 1]
+    data = [-1, 0, 1]
     for t in dtypes:
       for x in data:
         for y in data:
@@ -129,16 +128,10 @@ class ComparisonOpTest(test.TestCase):
     self.assertAllEqual(np_ans, tf_ans)
 
   def testTensorCompareTensor(self):
-    x2 = 15
+    x1 = -15
     y1 = 20
-
-    # DML doesn't support negative numbers for int64 yet
-    if test_util.gpu_device_type() == "DML":
-      x1 = 0
-      y2 = 0
-    else:
-      x1 = -15
-      y2 = -10
+    x2 = 15
+    y2 = -10
 
     x = np.linspace(x1, x2, 6).reshape(1, 3, 2)
     y = np.linspace(y1, y2, 6).reshape(1, 3, 2)
@@ -161,16 +154,10 @@ class ComparisonOpTest(test.TestCase):
       self._compare(xt, yt, np.not_equal, math_ops.not_equal)
 
   def _compareBCast(self, xs, ys, dtype, np_func, tf_func):
-    x2 = 15
+    x1 = -15
     y1 = 20
-
-    # DML doesn't support negative numbers for int64 yet
-    if test_util.gpu_device_type() == "DML" and dtype == np.int64:
-      x1 = 0
-      y2 = 0
-    else:
-      x1 = -15
-      y2 = -10
+    x2 = 15
+    y2 = -10
 
     x = np.linspace(x1, x2, np.prod(xs)).astype(dtype).reshape(xs)
     y = np.linspace(y1, y2, np.prod(ys)).astype(dtype).reshape(ys)
