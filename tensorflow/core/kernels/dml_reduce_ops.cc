@@ -272,7 +272,7 @@ class DmlReduceKernel : public DmlKernel {
       tensors.outputs = {in_out_tensor};
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto result = dml::Identity(dml::InputTensor(scope, 0, input_descs[0]));
 
       // TFDML #24881131
@@ -344,7 +344,7 @@ class DmlReduceKernel : public DmlKernel {
         GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto result = dml::InputTensor(scope, 0, input_descs[0]);
 
     // For logical operators like Any and All, we need to cast from uint8 to

@@ -347,8 +347,9 @@ using DmlGatherNdWrapper =
                           DmlGatherNdWrapper<int32>)              \
   REGISTER_KERNEL_BUILDER(Name("GatherNd")                        \
                               .Device(DEVICE_DML)                 \
-                              .TypeConstraint<type>("Tparams") \
-                              .TypeConstraint<int64>("Tindices"),
+                              .TypeConstraint<type>("Tparams")    \
+                              .TypeConstraint<int64>("Tindices"), \
+                          DmlGatherNdWrapper<int64>)
 
 TF_CALL_float(DML_REGISTER_KERNELS);
 TF_CALL_half(DML_REGISTER_KERNELS);

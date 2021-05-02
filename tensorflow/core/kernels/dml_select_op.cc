@@ -371,7 +371,7 @@ class DmlTernaryKernel : public DmlKernel {
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto cond_tensor = dml::InputTensor(scope, 0, inputs[0]);
     auto then_tensor = dml::InputTensor(scope, 1, inputs[1]);
     auto else_tensor = dml::InputTensor(scope, 2, inputs[2]);
