@@ -153,6 +153,7 @@ tf_cuda_cc_test(
         "guitar",
         "multi_gpu",
         "no_gpu",  # flaky, b/136267687
+        "no_dml",  # flaky, b/136267687
     ],
     deps = [
         ":c_api",

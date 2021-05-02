@@ -33,6 +33,11 @@ def _parse_args():
       "--log_device_placement",
       action="store_true")
 
+  parser.add_argument(
+      "--test_timeout",
+      default=300,
+      type=int)
+
   return parser.parse_args()
 
 def _get_tf_env(exe_path, test_framework):
@@ -53,7 +58,8 @@ def _run_test(
     log_device_placement,
     shard_index,
     total_shard_count,
-    test_framework):
+    test_framework,
+    test_timeout):
   """Runs a test executable in its own process."""
 
   # Insert the shard index in the name of the xml file
@@ -96,7 +102,9 @@ def _run_test(
             stderr=stderr,
             env=env_copy,
             stdin=subprocess.DEVNULL,
-            check=True)
+            check=True,
+            universal_newlines=True,
+            timeout=test_timeout)
       except KeyboardInterrupt: # pylint: disable=try-except-raise
         raise
       except Exception: # pylint: disable=broad-except
@@ -198,7 +206,8 @@ def main():
                   log_device_placement,
                   shard_index,
                   shard_count,
-                  args.test_framework))
+                  args.test_framework,
+                  args.test_timeout))
 
       for future in futures:
         future.result()
