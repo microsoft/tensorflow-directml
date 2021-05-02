@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#pragma optimize("", off)
-
 #include "tensorflow/core/common_runtime/dml/dml_operator_helper.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/framework/register_types.h"
