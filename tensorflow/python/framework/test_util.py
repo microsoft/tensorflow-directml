@@ -294,6 +294,8 @@ def IsGoogleCudaEnabled():
 def IsBuiltWithROCm():
   return pywrap_tensorflow.IsBuiltWithROCm()
 
+def IsBuiltWithDML():
+  return pywrap_tensorflow.IsBuiltWithDML()
 
 def GpuSupportsHalfMatMulAndConv():
   return pywrap_tensorflow.GpuSupportsHalfMatMulAndConv()
