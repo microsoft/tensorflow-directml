@@ -167,12 +167,10 @@ struct CumprodFunctor {
       DmlKernelWrapper<DmlScanKernel<int64, CumsumFunctor>, \
                        GetOutputShapeAsInputShapeHelper>)
 
-TF_CALL_float(REGISTER_KERNELS);
-TF_CALL_int64(REGISTER_KERNELS);
-TF_CALL_uint64(REGISTER_KERNELS);
-TF_CALL_int32(REGISTER_KERNELS);
-TF_CALL_uint32(REGISTER_KERNELS);
 TF_CALL_half(REGISTER_KERNELS);
+TF_CALL_float(REGISTER_KERNELS);
+TF_CALL_int32(REGISTER_KERNELS);
+TF_CALL_int64(REGISTER_KERNELS);
 #undef REGISTER_KERNELS
 
 #define REGISTER_KERNELS(type)                               \
