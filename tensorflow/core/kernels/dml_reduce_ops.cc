@@ -171,6 +171,19 @@ class DmlReduceKernel : public DmlKernel {
         reduce_function == DML_REDUCE_FUNCTION_MIN ||
         reduce_function == DML_REDUCE_FUNCTION_MAX;
 
+    // Arg functions in TF are defined with an int64 output, but the indices
+    // cannot be negative we output uint32 values with strides instead of int32
+    // with padding
+    const bool double_strides =
+        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0)) ||
+        (is_arg_function_ &&
+         Is64BitSignedIntegerType(ctx->GetOutputDataType(0)));
+
+    // TFDML #24881131
+    const dml::TensorPolicy out_policy = double_strides
+                                             ? GetEmulatedInt64TensorPolicy()
+                                             : dml::TensorPolicy::Default();
+
     // Special-case for Prod operator: when reducing an empty tensor, we
     // explicitly need to return a value of 1.0 (not zero, which is the
     // default for a no-op'd operator)
@@ -222,7 +235,7 @@ class DmlReduceKernel : public DmlKernel {
 
       const auto output_sizes = tensors.outputs[0]->desc.GetSizes();
 
-      auto scope = dml::Graph(ctx->GetDmlDevice());
+      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
       auto result = dml::FillValueConstant(
           scope,
           dml::TensorDimensions(output_sizes.begin(), output_sizes.end()),
@@ -266,7 +279,7 @@ class DmlReduceKernel : public DmlKernel {
       tensors.outputs = {in_out_tensor};
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto scope = dml::Graph(ctx->GetDmlDevice());
+      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
       auto result = dml::Identity(dml::InputTensor(scope, 0, input_descs[0]));
 
       // TFDML #24881131
@@ -338,7 +351,7 @@ class DmlReduceKernel : public DmlKernel {
         GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Graph(ctx->GetDmlDevice());
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
     auto result = dml::InputTensor(scope, 0, input_descs[0]);
 
     // For logical operators like Any and All, we need to cast from uint8 to
