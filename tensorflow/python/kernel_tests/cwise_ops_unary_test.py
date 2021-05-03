@@ -39,9 +39,6 @@ from tensorflow.python.platform import tf_logging
 _NEG = lambda x: -x
 _ABS = abs
 
-import os
-input(os.getpid())
-
 
 # TODO(zongheng): it'd be great to factor out this function and various random
 # SparseTensor gen funcs.
