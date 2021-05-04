@@ -114,10 +114,28 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
 
     // We need strides of 4 for int32 and strides of 8 for int64 since the
     // params are uint8
-    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
-    if (is_64_bit_integer) {
-      out_policy = GetEmulatedInt64TensorPolicy();
-    }
+    // TFDML #24881131
+    const uint32_t element_stride =
+        Is64BitIntegerType(ctx->GetOutputDataType(0)) ? 8 : 4;
+
+    const auto out_policy = dml::TensorPolicy(
+        [element_stride](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
+                         dml::Span<const uint32_t> sizes) {
+          uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
+
+          const uint32_t num_elements = std::accumulate(
+              sizes.begin(), sizes.end(), 1u, std::multiplies<uint32_t>());
+
+          dml::TensorDimensions strides(dimension_count);
+          strides.back() = element_stride;
+
+          dml::TensorProperties props = {};
+          props.guaranteedBaseOffsetAlignment = 0;
+          props.strides = std::move(strides);
+          props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+              dataType, dimension_count, sizes.data(), props.strides->data());
+          return props;
+        });
 
     scope.SetTensorPolicy(out_policy);
     auto result = dml::Gather(params, indices, gather_axis, index_dimensions);
