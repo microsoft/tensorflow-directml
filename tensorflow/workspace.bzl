@@ -975,11 +975,11 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     tf_http_archive(
         name = "directml",
         urls = [
-            "https://mirror.bazel.build/github.com/microsoft/DirectML/archive/a8711954378afafef836e16aed3ae5aade69c3a3.tar.gz",
-            "https://github.com/microsoft/DirectML/archive/a8711954378afafef836e16aed3ae5aade69c3a3.tar.gz",
+            "https://mirror.bazel.build/github.com/microsoft/DirectML/archive/2441f3768f5e4a6ef4f86cd838c27aaf8194e019.tar.gz",
+            "https://github.com/microsoft/DirectML/archive/2441f3768f5e4a6ef4f86cd838c27aaf8194e019.tar.gz",
         ],
-        sha256 = "163377ba9f98313434500393547788f8d0f67f08786a8d2516845213752fcb28",
-        strip_prefix = "DirectML-a8711954378afafef836e16aed3ae5aade69c3a3",
+        sha256 = "737b2e76ca9d8887c2efdf3833737a107d2a37122c12a9860b8137b0a45220aa",
+        strip_prefix = "DirectML-2441f3768f5e4a6ef4f86cd838c27aaf8194e019",
         build_file = clean_dep("//third_party:directml.BUILD"),
     )
 
