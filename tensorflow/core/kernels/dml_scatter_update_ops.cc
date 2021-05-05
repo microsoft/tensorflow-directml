@@ -515,4 +515,13 @@ TF_CALL_float(REGISTER_DML_KERNEL);
 #undef REGISTER_RESOURCE_SCATTER_KERNEL
 #undef REGISTER_RESOURCE_SCATTER_KERNEL_INDEX
 
+REGISTER_KERNEL_BUILDER(
+    Name("ResourceScatterUpdate")
+        .Device(DEVICE_DML)
+        .HostMemory("resource")
+        .TypeConstraint<bool>("dtype")
+        .TypeConstraint<int32>("Tindices"),
+    DmlKernelWrapper<DmlScatterUpdateKernel<int32, ScatterUpdateOperation>,
+                     NoOutputShapeHelper, DmlKernelCachePolicy::Never>)
+
 }  // namespace tensorflow

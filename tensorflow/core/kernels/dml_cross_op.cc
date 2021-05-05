@@ -85,6 +85,9 @@ class DmlCrossKernel : public DmlKernel {
     // Generate the indices [-2, -1, 0], which is the same as [1, 2, 0]
     auto indices = dml::Sequence<int32>(scope, -2, 1, {1, 1, 1, 3});
 
+    indices = dml::Reinterpret(indices, input1.GetOutputDesc().sizes,
+                               dml::TensorDimensions({0, 0, 0, 1}));
+
     // Generate the first vector:
     // [a, b, c] -> [b, c, a]
     constexpr uint32_t gather_axis = 3;
