@@ -150,13 +150,6 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
     }
   }
 
-  bool IsNoOpKernel(
-      OpKernelContext* ctx,
-      absl::Span<const TensorShape> output_shapes) const override {
-    DCHECK(!output_shapes.empty());
-    return output_shapes[0].num_elements() == 0;
-  }
-
   const TensorShape& GetOutputShape() const { return output_shape_; }
   const random::PhiloxRandom::Key GetKey() const { return key_; }
   const random::PhiloxRandom::ResultType GetCounter() const { return counter_; }
@@ -353,13 +346,6 @@ class RandomUniformInitHelper : public InitializationHelper {
                   errors::InvalidArgument("Need minval < maxval, got ", lo,
                                           " >= ", hi));
     }
-  }
-
-  bool IsNoOpKernel(
-      OpKernelContext* ctx,
-      absl::Span<const TensorShape> output_shapes) const override {
-    DCHECK(!output_shapes.empty());
-    return output_shapes[0].num_elements() == 0;
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
