@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
-#pragma optimize("", off)
-
 #include "tensorflow/core/kernels/dml_ops_common.h"
 
 #include "tensorflow/core/common_runtime/dml/dml_tracing.h"
