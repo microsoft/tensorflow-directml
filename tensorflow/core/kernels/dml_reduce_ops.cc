@@ -295,6 +295,19 @@ class DmlReduceKernel : public DmlKernel {
       return;
     }
 
+    // Unlike other reduction operators, the behavior for arg functions when
+    // there are no axes to reduce is to output 0's everywhere
+    is_no_op_ =
+        is_arg_function_ &&
+        (reduce_helper.ndims() == 0 ||
+         (reduce_helper.ndims() == 1 && !reduce_helper.reduce_first_axis()));
+
+    if (is_no_op_) {
+      zero_outputs_ = true;
+      InitializeAsNoOp(ctx);
+      return;
+    }
+
     // The input shape after adjacent reduction axes have been collapsed.
     const TensorShape& input_shape = reduce_helper.data_reshape();
 
@@ -331,6 +344,15 @@ class DmlReduceKernel : public DmlKernel {
       }
     }
 
+    // Only Arg functions need the output to be zero'ed since they're the only
+    // functions that output strided uint32. Other reduction functions either
+    // use non-strided types or use int64, which got its upper bits initialized
+    // in the constructor already.
+    // TFDML #24881131
+    if (is_arg_function_ && Is64BitIntegerType(ctx->GetOutputDataType(0))) {
+      zero_outputs_ = true;
+    }
+
     assert(input_shape.dims() == output_shape.dims());
 
     DmlTensorInfo input;
@@ -342,6 +364,12 @@ class DmlReduceKernel : public DmlKernel {
     output.kernel_index = 0;
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), output_shape,
                                         output_shape);
+
+    // Coerce the output datatype to unsigned, for argmin/argmax
+    if (is_arg_function_ && DataTypeIsInteger(output.desc.GetTfDataType())) {
+      output.desc.ForceUnsignedDataType();
+      zero_outputs_ = true;
+    }
 
     DmlKernelTensors tensors;
     tensors.inputs = {input};
@@ -381,21 +409,22 @@ class DmlReduceKernel : public DmlKernel {
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    // Only Arg functions need the output to be zero'ed since they're the only
-    // functions that output strided uint32. Other reduction functions either
-    // use non-strided types or use int64, which got its upper bits initialized
-    // in the constructor already.
-    // TFDML #24881131
-    if (is_arg_function_ && Is64BitIntegerType(output->dtype())) {
+    if (zero_outputs_) {
+      Tensor* output = ctx->GetOutputTensor(0);
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    }
+
+    if (is_no_op_) {
+      return ctx->GetCurrentCompletionEvent();
     }
 
     return DmlKernel::Compute(ctx);
   }
 
  private:
+  bool is_no_op_ = false;
+  bool zero_outputs_ = false;
+
   // ARGMIN and ARGMAX are special reduce functions that can never be replaced
   // by identity
   static constexpr bool is_arg_function_ =
