@@ -122,9 +122,10 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
                 errors::InvalidArgument("seed must have shape [2], not ",
                                         seed_t.shape().DebugString()));
 
-    OP_REQUIRES_OK(ctx, GenerateKey(seed_t, &key_, &counter_));
-
     output_shape_ = std::move(shape);
+    if (output_shape_.num_elements() == 0) return;
+
+    OP_REQUIRES_OK(ctx, GenerateKey(seed_t, &key_, &counter_));
 
     // This init helper is shared for both "StatelessRandomUniform" (real types)
     // and "StatelessRandomUniformInt" (integral types). The latter has two
@@ -147,6 +148,13 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
                   errors::InvalidArgument("Need minval < maxval, got ", lo,
                                           " >= ", hi));
     }
+  }
+
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    DCHECK(!output_shapes.empty());
+    return output_shapes[0].num_elements() == 0;
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
@@ -335,6 +343,8 @@ class RandomUniformInitHelper : public InitializationHelper {
                   errors::InvalidArgument("maxval must be 0-D, got shape ",
                                           maxval.shape().DebugString()));
 
+      if (output_shape_.num_elements() == 0) return;
+
       // Verify that minval < maxval. Note that we'll never reach this point
       // for empty output.  Zero impossible things are fine.
       const auto lo = minval.scalar<int32>()();
@@ -343,6 +353,13 @@ class RandomUniformInitHelper : public InitializationHelper {
                   errors::InvalidArgument("Need minval < maxval, got ", lo,
                                           " >= ", hi));
     }
+  }
+
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    DCHECK(!output_shapes.empty());
+    return output_shapes[0].num_elements() == 0;
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
