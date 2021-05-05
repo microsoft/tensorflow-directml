@@ -23,7 +23,7 @@ limitations under the License.
 
 namespace tensorflow {
 
-template <DML_OPERATOR_TYPE op_type, typename DML_OPERATOR_SPECIFIC_DESC>
+template <typename Expression>
 class DmlUpdateVariableOp : public DmlKernel {
  public:
   using InitHelper = NoOpInitializationHelper;
@@ -37,29 +37,33 @@ class DmlUpdateVariableOp : public DmlKernel {
     auto tensor_desc = DmlTensorDesc::Create(ctx->GetInputDataType(1),
                                              tensor_sizes, tensor_sizes);
 
-    // This kernel actually only has one (GPU) input: the right-hand side of the
-    // AssignAdd or AssignSub expression. The left-hand side is a resource
-    // handle residing in host memory, which we use during Compute to retrieve
-    // the actual GPU-backed tensor. This LHS tensor is treated as an inout
-    // tensor, which relies on DML's in-place execution.
+    DmlTensorInfo lhs_info = {};
+    lhs_info.kernel_index = 0;
+    lhs_info.desc = tensor_desc;
+
     DmlTensorInfo rhs_info = {};
     rhs_info.kernel_index = 1;
     rhs_info.desc = tensor_desc;
 
     DmlKernelTensors tensors = {};
-    tensors.inputs = {rhs_info};
-    tensors.outputs = {};
+    tensors.inputs = {lhs_info, rhs_info};
+    tensors.outputs = {lhs_info};
 
-    // All inputs/outputs have the same tensor desc
-    DML_TENSOR_DESC in_out_desc = tensor_desc.GetDmlDesc();
-    DML_OPERATOR_SPECIFIC_DESC op_specific_desc = {
-        &in_out_desc,  // ATensor
-        &in_out_desc,  // BTensor
-        &in_out_desc,  // OutputTensor
-    };
+    auto inputs = GetDmlTensorDescs(tensors.inputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
+    const auto a = dml::InputTensor(scope, 0, inputs[0]);
+    const auto b = dml::InputTensor(scope, 1, inputs[1]);
+    auto result = Expression()(a, b);
 
-    DML_OPERATOR_DESC op_desc = {op_type, &op_specific_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetInputDataType(1))) {
+      result = dml::ConvertInt32ToInt64(scope, result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
@@ -103,31 +107,23 @@ class DmlUpdateVariableOp : public DmlKernel {
 
     return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
-
- private:
-  Microsoft::WRL::ComPtr<IDMLCompiledOperator> op_;
 };
 
-using DmlAssignAddVariableOp =
-    DmlUpdateVariableOp<DML_OPERATOR_ELEMENT_WISE_ADD,
-                        DML_ELEMENT_WISE_ADD_OPERATOR_DESC>;
-using DmlAssignSubVariableOp =
-    DmlUpdateVariableOp<DML_OPERATOR_ELEMENT_WISE_SUBTRACT,
-                        DML_ELEMENT_WISE_SUBTRACT_OPERATOR_DESC>;
-
-#define REGISTER_DML_KERNEL(type)                                     \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("AssignAddVariableOp")                                     \
-          .Device(DEVICE_DML)                                         \
-          .HostMemory("resource")                                     \
-          .TypeConstraint<type>("dtype"),                             \
-      DmlKernelWrapper<DmlAssignAddVariableOp, NoOutputShapeHelper>); \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("AssignSubVariableOp")                                     \
-          .Device(DEVICE_DML)                                         \
-          .HostMemory("resource")                                     \
-          .TypeConstraint<type>("dtype"),                             \
-      DmlKernelWrapper<DmlAssignSubVariableOp, NoOutputShapeHelper>);
+#define REGISTER_DML_KERNEL(type)                                        \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("AssignAddVariableOp")                                        \
+          .Device(DEVICE_DML)                                            \
+          .HostMemory("resource")                                        \
+          .TypeConstraint<type>("dtype"),                                \
+      DmlKernelWrapper<DmlUpdateVariableOp<std::plus<dml::Expression>>,  \
+                       NoOutputShapeHelper>);                            \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("AssignSubVariableOp")                                        \
+          .Device(DEVICE_DML)                                            \
+          .HostMemory("resource")                                        \
+          .TypeConstraint<type>("dtype"),                                \
+      DmlKernelWrapper<DmlUpdateVariableOp<std::minus<dml::Expression>>, \
+                       NoOutputShapeHelper>);
 
 // This list of types is the intersection between what DML supports, and what
 // CUDA registers for these kernels. Notably (and deliberately) missing from
