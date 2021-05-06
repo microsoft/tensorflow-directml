@@ -214,6 +214,9 @@ class NdtrTest(test.TestCase):
         rtol=error_spec.rtol,
         atol=error_spec.atol)
 
+  # DML's implementation for erfc is 1.0 - erf(x), which isn't precise enough to
+  # represent large values of x
+  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def test_float32(self):
     self._test_grid(np.float32, self._grid32, self._error32)
