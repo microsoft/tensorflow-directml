@@ -68,7 +68,7 @@ enum class VendorID {
   kAmd = 0x1002,
   kNvidia = 0x10DE,
   kMicrosoft = 0x1414,
-  kQualcomm = 0x5143,
+  kQualcomm = 0x4D4F4351,
   kIntel = 0x8086,
 };
 
