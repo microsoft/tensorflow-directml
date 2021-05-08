@@ -88,18 +88,6 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto indices = dml::InputTensor(scope, 0, inputs[0]);
 
-    const bool is_64_bit_integer = Is64BitIntegerType(ctx->GetInputDataType(0));
-
-    // Reinterpreting to int32 is necessary for Gather to recognize the negative
-    // indices, since int64 is simply a stride hack with the uint32 datatype.
-    // Ones' complement will make sure that the sign bit is preserved since we
-    // don't need the highest 32 bits of int64 to represent values in the range
-    // [-4, 3].
-    if (is_64_bit_integer) {
-      indices = dml::Reinterpret(indices, DML_TENSOR_DATA_TYPE_INT32,
-                                 {1, 1, 1, 4}, indices.GetOutputDesc().strides);
-    }
-
     DML_SCALAR_UNION bits_scalar;
     bits_scalar.UInt32 = src_dst_mapping_packed;
 

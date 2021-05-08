@@ -289,6 +289,10 @@ Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
   return scalar;
 }
 
+// TFDML #24881131
+Expression ConvertInt32ToInt64(Graph& scope, Expression tensor,
+                               uint32_t element_stride = 1);
+
 template <typename T>
 Expression Sequence(Graph& scope, T start, T step,
                     TensorDesc::Dimensions sizes) {

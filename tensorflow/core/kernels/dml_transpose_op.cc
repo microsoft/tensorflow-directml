@@ -222,34 +222,64 @@ class DmlTransposeKernel : public DmlKernel {
         ctx->GetOutputDataType(0), simple_transpose.output_shape,
         simple_transpose.output_shape, output_layout);
 
+    const auto strides = output.desc.GetStrides();
+    const bool is_int64 = Is64BitSignedIntegerType(ctx->GetOutputDataType(0));
+
+    const auto out_policy =
+        dml::TensorPolicy([strides, is_int64](DML_TENSOR_DATA_TYPE dataType,
+                                              DML_TENSOR_FLAGS flags,
+                                              dml::Span<const uint32_t> sizes) {
+          uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
+
+          dml::TensorProperties props = {};
+          props.guaranteedBaseOffsetAlignment = 0;
+
+          if (strides.empty()) {
+            props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+                dataType, dimension_count, sizes.data(), nullptr);
+          } else {
+            if (is_int64) {
+              dml::TensorDimensions int32_strides;
+              int32_strides.reserve(strides.size());
+
+              // The final output's strides were doubled to be able to skip the
+              // upper int32 values. But since we're working with signed
+              // integers, we'll want to manually fill those with the sign bits
+              // instead of skipping them.
+              for (uint32_t stride : strides) {
+                int32_strides.push_back(stride / 2);
+              }
+
+              props.strides = std::move(int32_strides);
+            } else {
+              props.strides =
+                  dml::TensorDimensions(strides.begin(), strides.end());
+            }
+
+            props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+                dataType, dimension_count, sizes.data(), props.strides->data());
+          }
+
+          return props;
+        });
+
     DmlKernelTensors tensors;
     tensors.inputs = {input};
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto result = dml::Identity(dml::InputTensor(scope, 0, inputs[0]));
 
-    DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-    identity_desc.InputTensor = inputs.data();
-    identity_desc.OutputTensor = outputs.data();
-
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                 &identity_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    // TFDML #24881131
+    if (is_int64) {
+      result = dml::ConvertInt32ToInt64(scope, result);
     }
 
-    return DmlKernel::Compute(ctx);
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
@@ -261,7 +291,16 @@ class DmlTransposeKernel : public DmlKernel {
           .HostMemory("perm"),       \
       DmlKernelWrapper<DmlTransposeKernel, TransposeShapeHelper>);
 
-TF_CALL_DML_ALL_TYPES(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
+TF_CALL_int64(REGISTER_KERNEL);
+TF_CALL_int32(REGISTER_KERNEL);
+TF_CALL_uint16(REGISTER_KERNEL);
+TF_CALL_int16(REGISTER_KERNEL);
+TF_CALL_uint8(REGISTER_KERNEL);
+TF_CALL_int8(REGISTER_KERNEL);
+
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

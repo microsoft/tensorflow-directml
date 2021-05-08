@@ -190,12 +190,8 @@ static inline uint64_t ComputeEndPadding(DataType data_type) {
 
   uint64_t end_padding_in_bytes = ComputeEndPadding(data_type);
 
-  // TODO #24881131: 64-bit data support should be revisited once DML supports
-  // these types
-  // TFDML #24881131
-  DML_TENSOR_DATA_TYPE dml_data_type =
-      Is64BitIntegerType(data_type) ? DML_TENSOR_DATA_TYPE_UINT32
-                                    : GetDmlDataTypeFromTfDataType(data_type);
+  const DML_TENSOR_DATA_TYPE dml_data_type =
+      GetDmlDataTypeFromTfDataType(data_type);
 
   auto dml_desc = DmlTensorDesc(dml_data_type, dml_sizes, dml_strides,
                                 guaranteed_base_offset_alignment);
@@ -274,12 +270,8 @@ static inline uint64_t ComputeEndPadding(DataType data_type) {
 
   uint64_t end_padding_in_bytes = ComputeEndPadding(data_type);
 
-  // TODO #24881131: 64-bit data support should be revisited once DML supports
-  // these types
-  // TFDML #24881131
-  DML_TENSOR_DATA_TYPE dml_data_type =
-      Is64BitIntegerType(data_type) ? DML_TENSOR_DATA_TYPE_UINT32
-                                    : GetDmlDataTypeFromTfDataType(data_type);
+  const DML_TENSOR_DATA_TYPE dml_data_type =
+      GetDmlDataTypeFromTfDataType(data_type);
 
   auto dml_desc = DmlTensorDesc(dml_data_type, dml_sizes, dml_strides,
                                 guaranteed_base_offset_alignment);

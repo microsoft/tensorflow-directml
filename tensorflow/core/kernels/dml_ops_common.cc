@@ -481,4 +481,68 @@ DML_SCALAR_UNION ScalarUnion(double value, DML_TENSOR_DATA_TYPE data_type) {
 
   return scalar;
 }
+
+// TFDML #24881131
+Expression ConvertInt32ToInt64(Graph& scope, Expression int32_input,
+                               uint32_t element_stride) {
+  // Keep the previous tensor policy in memory to revert it at the end
+  auto previous_tensor_policy = scope.GetTensorPolicy();
+  scope.SetTensorPolicy(dml::TensorPolicy::Default());
+
+  const auto sizes = int32_input.GetOutputDesc().sizes;
+
+  const uint32_t num_elements = std::accumulate(sizes.begin(), sizes.end(), 1u,
+                                                std::multiplies<uint32_t>());
+
+  auto result =
+      dml::Reinterpret(int32_input, {1, 1, 1, num_elements},
+                       dml::TensorDesc::Dimensions({0, 0, 0, element_stride}));
+
+  // Shift the int32 values to the right by 31 to preserve only the sign bit
+  const auto shift =
+      dml::ScalarTensor<uint32_t>(scope, 31, {1, 1, 1, num_elements});
+  const auto sign_bits =
+      dml::Reinterpret(result, DML_TENSOR_DATA_TYPE_UINT32) >> shift;
+
+  // Negate the sign bit to fill all bits with 1's if the value was negative, or
+  // leave them to 0 if it was positive
+  auto complement = -dml::Reinterpret(sign_bits, DML_TENSOR_DATA_TYPE_INT32);
+
+  complement = dml::Reinterpret(complement, {1, 1, num_elements, 2},
+                                dml::TensorDesc::Dimensions({0, 0, 1, 0}));
+
+  const auto is_odd_start = dml::ScalarUnion(0, DML_TENSOR_DATA_TYPE_UINT8);
+  const auto is_odd_delta = dml::ScalarUnion(1, DML_TENSOR_DATA_TYPE_UINT8);
+  auto is_odd =
+      dml::FillValueSequence(scope, {1, 1, 1, 2}, DML_TENSOR_DATA_TYPE_UINT8,
+                             is_odd_start, is_odd_delta);
+
+  is_odd = dml::Reinterpret(is_odd, {1, 1, num_elements, 2},
+                            dml::TensorDesc::Dimensions({0, 0, 0, 1}));
+
+  auto sparse_result =
+      dml::Reinterpret(result, {1, 1, num_elements, 2},
+                       dml::TensorDesc::Dimensions({0, 0, element_stride, 0}));
+
+  auto new_tensor_policy = dml::TensorPolicy(
+      [element_stride](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
+                       dml::Span<const uint32_t> sizes) {
+        dml::TensorProperties props = {};
+        props.guaranteedBaseOffsetAlignment = 0;
+        props.strides = {0, 0, element_stride * 2, 1};
+        props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+            dataType, sizes.size(), sizes.data(), props.strides->data());
+        return props;
+      });
+
+  scope.SetTensorPolicy(new_tensor_policy);
+
+  // When elementIndex is odd, we write the complement; otherwise, we write the
+  // int32 value
+  result = dml::If(is_odd, complement, sparse_result);
+
+  scope.SetTensorPolicy(previous_tensor_policy);
+
+  return result;
+}
 }  // namespace dml

@@ -114,17 +114,12 @@ class DmlSliceKernel : public DmlKernel {
     params.kernel_input_indices = {0};
 
     DmlKernelTensors tensors = GetTensorInfos(ctx, params);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto result = dml::InputTensor(scope, 0, inputs[0]);
 
     if (is_identity) {
-      DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-      identity_desc.InputTensor = inputs.data();
-      identity_desc.OutputTensor = outputs.data();
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                   &identity_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      result = dml::Identity(result);
     } else {
       // Pad the sizes and offsets to match DML's 4D minimum requirement
       if (sizes.size() < kNchwDimensionCount) {
@@ -133,33 +128,19 @@ class DmlSliceKernel : public DmlKernel {
         offsets.insert(offsets.begin(), pad_amount, 0);
       }
 
-      absl::InlinedVector<uint32_t, 5> strides(sizes.size(), 1);
-
-      DML_SLICE_OPERATOR_DESC slice_desc = {};
-      slice_desc.InputTensor = inputs.data();
-      slice_desc.OutputTensor = outputs.data();
-      slice_desc.Sizes = sizes.data();
-      slice_desc.Strides = strides.data();
-      slice_desc.Offsets = offsets.data();
-      slice_desc.DimensionCount = sizes.size();
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_SLICE, &slice_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
-    }
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      absl::InlinedVector<int32_t, 5> strides(sizes.size(), 1);
+      result = dml::Slice(result, offsets, sizes, strides);
     }
 
-    return DmlKernel::Compute(ctx);
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(scope, result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
@@ -179,7 +160,11 @@ class DmlSliceKernel : public DmlKernel {
                               .HostMemory("size"),                            \
                           DmlKernelWrapper<DmlSliceKernel, SliceShapeHelper>)
 // TODO(b/25387198): A special kernel exists for int32 (see slice_op.cc).
-TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(REGISTER_KERNELS);
+TF_CALL_half(REGISTER_KERNELS);
+TF_CALL_float(REGISTER_KERNELS);
+TF_CALL_bool(REGISTER_KERNELS);
+TF_CALL_int8(REGISTER_KERNELS);
+TF_CALL_int64(REGISTER_KERNELS);
 #undef REGISTER_KERNELS
 
 }  // namespace tensorflow

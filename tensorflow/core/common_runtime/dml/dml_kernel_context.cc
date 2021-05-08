@@ -202,7 +202,8 @@ void DmlKernelContext::EnqueueCallbackForGpuEvent(
 }
 
 DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
-    IDMLCompiledOperator* op, Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+    IDMLCompiledOperator* op,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
     ID3D12DescriptorHeap* heap_for_binding_table,
     _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,

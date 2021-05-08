@@ -182,20 +182,6 @@ class DmlSpaceDepthKernel : public DmlKernel {
     DML_OPERATOR_DESC op_desc = {operator_type, &specific_op_desc};
     Initialize(ctx, std::move(tensors), op_desc);
   }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
-    }
-
-    return DmlKernel::Compute(ctx);
-  }
 };
 
 template <typename OP_DESC, DML_OPERATOR_TYPE operator_type>
@@ -203,17 +189,25 @@ using DmlSpaceDepthKernelWrapper =
     DmlKernelWrapper<DmlSpaceDepthKernel<OP_DESC, operator_type>,
                      SpaceDepthShapeHelper<operator_type>>;
 
-#define DML_REGISTER_KERNELS(type)                                       \
+#define DML_REGISTER_KERNEL(type)                                        \
   REGISTER_KERNEL_BUILDER(                                               \
       Name("SpaceToDepth").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlSpaceDepthKernelWrapper<DML_SPACE_TO_DEPTH_OPERATOR_DESC,       \
-                                 DML_OPERATOR_SPACE_TO_DEPTH>)           \
+                                 DML_OPERATOR_SPACE_TO_DEPTH>)
+
+TF_CALL_float(DML_REGISTER_KERNEL);
+TF_CALL_half(DML_REGISTER_KERNEL);
+TF_CALL_uint8(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+#define DML_REGISTER_KERNEL(type)                                        \
   REGISTER_KERNEL_BUILDER(                                               \
       Name("DepthToSpace").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlSpaceDepthKernelWrapper<DML_DEPTH_TO_SPACE_OPERATOR_DESC,       \
                                  DML_OPERATOR_DEPTH_TO_SPACE>)
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNELS);
-#undef DML_REGISTER_KERNELS
+TF_CALL_float(DML_REGISTER_KERNEL);
+TF_CALL_half(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow

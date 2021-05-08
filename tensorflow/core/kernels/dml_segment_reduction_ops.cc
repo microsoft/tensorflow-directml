@@ -194,6 +194,10 @@ class DmlSegmentReductionKernel : public DmlKernel {
     auto scope = dml::Graph(ctx->GetDmlDevice());
     auto data = dml::InputTensor(scope, 0, inputs[0]);
     auto segment_ids = dml::InputTensor(scope, 1, inputs[1]);
+
+    // TODO: Remove the Is64BitIntegerType hack when DML has a more solid
+    // solution for 64 bit datatypes
+    // TFDML #24881131
     auto result =
         SegmentReductionOp()(scope, data, segment_ids, output_shape.dim_size(0),
                              Is64BitIntegerType(ctx->GetInputDataType(1)));

@@ -48,12 +48,6 @@ class StackOpTest(test.TestCase):
     with self.session(use_gpu=True):
       for shape in (2,), (3,), (2, 3), (3, 2), (4, 3, 2):
         for dtype in [np.bool, np.float32, np.int32, np.int64]:
-          # DML doesn't support negative numbers for int64 yet, but
-          # np.random.randn generates negative numbers
-          # TFDML #24881131
-          if dtype == np.int64 and test_util.gpu_device_type() == "DML":
-            continue
-
           data = np.random.randn(*shape).astype(dtype)
           # Convert [data[0], data[1], ...] separately to tensorflow
           # TODO(irving): Remove list() once we handle maps correctly
