@@ -387,7 +387,7 @@ REGISTER_DML_COMPOSITE_BINARY_UINT8_UINT16_INT16_INT64_KERNEL(TruncateDiv,
                                                               x / y, 8)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_mul1.cc).
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_INT32_INT64_TYPES_EXCEPT_INT32_OP_KERNEL(
-    Mul, x* y, 8)
+    Mul, (x * y), 8)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_sub.cc).
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_INT32_INT64_TYPES_EXCEPT_INT32_OP_KERNEL(
     Sub, x - y, 8)
@@ -496,13 +496,13 @@ REGISTER_DML_COMPOSITE_BINARY_ALL_TYPES_EXCEPT_INT32_KERNEL(GreaterEqual,
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_floor_div.cc).
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(FloorDiv, dml::Floor(x / y), 8)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SigmoidGrad, y* x*(1 - x), 8)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(TanhGrad, y*(1 - x * x), 8)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SqrtGrad, y * 0.5f / x, 8)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad, y*(-0.5f * x) * (x * x),
-                                           8)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(ReciprocalGrad, -y* x* x, 8)
-REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(InvGrad, -y* x* x, 8)
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SigmoidGrad, (y * x * (1 - x)), 8)
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(TanhGrad, (y * (1 - x * x)), 8)
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SqrtGrad, (y * 0.5f / x), 8)
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(RsqrtGrad,
+                                           (y * (-0.5f * x) * (x * x)), 8)
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(ReciprocalGrad, (-y * x * x), 8)
+REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(InvGrad, (-y * x * x), 8)
 REGISTER_DML_COMPOSITE_BINARY_FLOAT_KERNEL(SoftplusGrad, x / (dml::Exp(-y) + 1),
                                            8)
 // softsigngrad(gradients, features) = gradients / (1 + abs(features)) ** 2

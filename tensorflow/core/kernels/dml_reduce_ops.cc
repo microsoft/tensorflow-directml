@@ -171,9 +171,9 @@ class DmlReduceKernel : public DmlKernel {
         reduce_function == DML_REDUCE_FUNCTION_MIN ||
         reduce_function == DML_REDUCE_FUNCTION_MAX;
 
-    // Arg functions in TF are defined with an int64 output, but the indices
-    // cannot be negative we output uint32 values with strides instead of int32
-    // with padding
+    // Arg functions in TF are defined with an int64 output, but since the
+    // indices cannot be negative we output uint32 values with strides instead
+    // of int32 with padding
     const bool double_strides =
         Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0)) ||
         (is_arg_function_ &&

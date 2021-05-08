@@ -229,7 +229,7 @@ class DmlConcatKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto scope = dml::Graph(ctx->GetDmlDevice());
 
-    std::vector<dml::Expression> input_tensors;
+    absl::InlinedVector<dml::Expression, 5> input_tensors;
     input_tensors.reserve(inputs.size());
 
     for (int i = 0; i < inputs.size(); ++i) {
