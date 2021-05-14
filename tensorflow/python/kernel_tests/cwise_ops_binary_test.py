@@ -685,22 +685,18 @@ class BinaryOpTest(test.TestCase):
   def testBCast_11D(self):
     self._testBCastD([1, 3, 2], [1, 3, 2])
 
-  @test_util.skip_dml # DML only supports up to 5D
   @test_util.run_deprecated_v1
   def testBCast_12A(self):
     self._testBCastA([1, 1, 1, 1, 3, 2], [1, 3, 2])
 
-  @test_util.skip_dml # DML only supports up to 5D
   @test_util.run_deprecated_v1
   def testBCast_12B(self):
     self._testBCastB([1, 1, 1, 1, 3, 2], [1, 3, 2])
 
-  @test_util.skip_dml # DML only supports up to 5D
   @test_util.run_deprecated_v1
   def testBCast_12C(self):
     self._testBCastC([1, 1, 1, 1, 3, 2], [1, 3, 2])
 
-  @test_util.skip_dml # DML only supports up to 5D
   @test_util.run_deprecated_v1
   def testBCast_12D(self):
     self._testBCastD([1, 1, 1, 1, 3, 2], [1, 3, 2])
@@ -709,7 +705,6 @@ class BinaryOpTest(test.TestCase):
   def testBCast_13A(self):
     self._testBCastA([1, 3, 2, 1, 1], [1])
 
-  @test_util.skip_dml # DML subtract only supports up to 4D
   @test_util.run_deprecated_v1
   def testBCast_13B(self):
     self._testBCastB([1, 3, 2, 1, 1], [1])
@@ -718,7 +713,6 @@ class BinaryOpTest(test.TestCase):
   def testBCast_13C(self):
     self._testBCastC([1, 3, 2, 1, 1], [1])
 
-  @test_util.skip_dml # DML divide only supports up to 4D
   @test_util.run_deprecated_v1
   def testBCast_13D(self):
     self._testBCastD([1, 3, 2, 1, 1], [1])
@@ -727,7 +721,6 @@ class BinaryOpTest(test.TestCase):
   def testBCast_14A(self):
     self._testBCastA([2, 3, 1, 1, 5], [1])
 
-  @test_util.skip_dml # DML subtract only supports up to 4D
   @test_util.run_deprecated_v1
   def testBCast_14B(self):
     self._testBCastB([2, 3, 1, 1, 5], [1])
@@ -736,7 +729,6 @@ class BinaryOpTest(test.TestCase):
   def testBCast_14C(self):
     self._testBCastC([2, 3, 1, 1, 5], [1])
 
-  @test_util.skip_dml # DML divide only supports up to 4D
   @test_util.run_deprecated_v1
   def testBCast_14D(self):
     self._testBCastD([2, 3, 1, 1, 5], [1])
