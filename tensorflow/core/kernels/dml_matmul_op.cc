@@ -133,11 +133,11 @@ class BaseBatchMatMulInitHelper : public InitializationHelper {
                     "collapsing dimensions together, but the output has ",
                     collapsed_output_shape_.dims(), " dimensions."));
 
-    OP_REQUIRES(ctx, d1 == d2,
+    OP_REQUIRES(ctx, in0_cols == in1_rows,
                 errors::InvalidArgument(
-                    "In[0] mismatch In[1] shape: ", d1, " vs. ", d2, ": ",
-                    in0_shape.DebugString(), " ", in1_shape.DebugString(), " ",
-                    attr->adj_x, " ", attr->adj_y));
+                    "In[0] mismatch In[1] shape: ", in0_cols, " vs. ", in1_rows,
+                    ": ", in0_shape.DebugString(), " ", in1_shape.DebugString(),
+                    " ", attr->adj_x, " ", attr->adj_y));
   }
 
   const TensorShape& GetCollapsedIn0Shape() const {
