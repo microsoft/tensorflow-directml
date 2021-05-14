@@ -107,25 +107,25 @@ class BaseBatchMatMulInitHelper : public InitializationHelper {
                     "In[0] and In[1] must have compatible batch dimensions: ",
                     in0_shape.DebugString(), " vs. ", in1_shape.DebugString()));
 
-    auto d0 = in0_shape.dim_size(in0_shape.dims() - 2);
-    auto d1 = in0_shape.dim_size(in0_shape.dims() - 1);
-    auto d2 = in1_shape.dim_size(in1_shape.dims() - 2);
-    auto d3 = in1_shape.dim_size(in1_shape.dims() - 1);
+    auto in0_rows = in0_shape.dim_size(in0_shape.dims() - 2);
+    auto in0_cols = in0_shape.dim_size(in0_shape.dims() - 1);
+    auto in1_rows = in1_shape.dim_size(in1_shape.dims() - 2);
+    auto in1_cols = in1_shape.dim_size(in1_shape.dims() - 1);
 
     collapsed_in0_shape_ = BCast::ToShape(batches_bcast.x_reshape());
-    collapsed_in0_shape_.AddDim(d0);
-    collapsed_in0_shape_.AddDim(d1);
+    collapsed_in0_shape_.AddDim(in0_rows);
+    collapsed_in0_shape_.AddDim(in0_cols);
 
     collapsed_in1_shape_ = BCast::ToShape(batches_bcast.y_reshape());
-    collapsed_in1_shape_.AddDim(d2);
-    collapsed_in1_shape_.AddDim(d3);
+    collapsed_in1_shape_.AddDim(in1_rows);
+    collapsed_in1_shape_.AddDim(in1_cols);
 
-    if (attr->adj_x) std::swap(d0, d1);
-    if (attr->adj_y) std::swap(d2, d3);
+    if (attr->adj_x) std::swap(in0_rows, in0_cols);
+    if (attr->adj_y) std::swap(in1_rows, in1_cols);
 
     collapsed_output_shape_ = BCast::ToShape(batches_bcast.output_shape());
-    collapsed_output_shape_.AddDim(d0);
-    collapsed_output_shape_.AddDim(d3);
+    collapsed_output_shape_.AddDim(in0_rows);
+    collapsed_output_shape_.AddDim(in1_cols);
 
     OP_REQUIRES(ctx, collapsed_output_shape_.dims() <= 8,
                 errors::InvalidArgument(
