@@ -137,8 +137,6 @@ class BiasAddTest(test.TestCase):
           np.random.rand(4, 4, 4, 2048).astype(t),
           np.random.rand(2048).astype(t))
           
-  # DML doesn't support 5D for this operator
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def test5DFloatTypes(self):
     for t in [np.float16, np.float32, np.float64]:
@@ -241,8 +239,6 @@ class BiasAddTest(test.TestCase):
                            np.random.rand(64).astype(dtype.as_numpy_dtype),
                            dtype, data_format, use_gpu)
                            
-  # DML doesn't support 5D for this operator
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testGradientTensor5D(self):
     for (data_format, use_gpu) in [("NHWC", False), ("NHWC", True),

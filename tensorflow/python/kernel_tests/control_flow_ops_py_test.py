@@ -4475,10 +4475,7 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
 
   @test_util.run_v1_only("b/120545219")
   def testQIntSwitchMerge(self):
-    # DML doesn't support quantized data types
-    force_gpu = test.is_gpu_available() and test_util.gpu_device_type() != "DML"
-
-    with self.cached_session(force_gpu=force_gpu) as sess:
+    with self.cached_session(force_gpu=test.is_gpu_available()) as sess:
       constant_qint = constant_op.constant(np.array([42]), dtypes.qint8)
       cond = constant_op.constant(True, dtypes.bool)
       v_f, v_t = control_flow_ops.switch(constant_qint, cond)
@@ -4523,10 +4520,7 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
     def func(x):
       return x
       
-    # DML doesn't support quantized data types
-    force_gpu = test.is_gpu_available() and test_util.gpu_device_type() != "DML"
-
-    with self.cached_session(force_gpu=force_gpu) as sess:
+    with self.cached_session(force_gpu=test.is_gpu_available()) as sess:
       qint = constant_op.constant(np.array([42]), dtypes.qint8)
       result = func(qint)
       self.evaluate(result)
