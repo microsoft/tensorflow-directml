@@ -57,7 +57,7 @@ struct SimpleTile {
 template <typename Tmultiples>
 absl::optional<SimpleTile> SimplifyTile(const TensorShape& input_shape,
                                         const Tensor& multiples_tensor,
-                                        uint32_t output_size = 4) {
+                                        uint32_t output_size = 8) {
   SimpleTile desc = {};
   desc.input_shape.resize(output_size, 1);
   desc.output_shape.resize(output_size, 1);
@@ -156,14 +156,13 @@ class TileInitializationHelper : public InitializationHelper {
     const TensorShape& input_shape = ctx->input(0).shape();
     const Tensor& multiples = ctx->input(1);
 
-    // DML only supports tiling 4D tensors. Attempt to simplify into 4D.
-    simple_tile_ =
-        SimplifyTile<Tmultiples>(input_shape, multiples, kNchwDimensionCount);
+    // DML only supports tiling 8D tensors. Attempt to simplify into 8D.
+    simple_tile_ = SimplifyTile<Tmultiples>(input_shape, multiples, 8);
     OP_REQUIRES(ctx, simple_tile_,
                 errors::InvalidArgument(
-                    "DML doesn't support more than 4 dimensions for Tile after "
+                    "DML doesn't support more than 8 dimensions for Tile after "
                     "collapsing non-repeatable dimensions together, but could "
-                    "not simplify the given shape to 4D."));
+                    "not simplify the given shape to 8D."));
   }
 
   const absl::optional<SimpleTile>& GetSimpleTile() const {
