@@ -31,9 +31,6 @@ from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import gradient_checker
 from tensorflow.python.platform import test
 
-import os
-input(os.getpid())
-
 class TransposeTest(test.TestCase):
 
   def _np_transpose(self, x, perm):
