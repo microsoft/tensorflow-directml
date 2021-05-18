@@ -167,7 +167,10 @@ class DmlZerosLikeKernelVariant : public OpKernel {
       DmlZerosLikeKernel);
 
 // TODO(b/25387198): A special kernel exists for int32 (see constant_op.cc).
-TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(REGISTER_DML_KERNEL)
+TF_CALL_bool(REGISTER_DML_KERNEL)
+TF_CALL_half(REGISTER_DML_KERNEL)
+TF_CALL_float(REGISTER_DML_KERNEL)
+TF_CALL_int64(REGISTER_DML_KERNEL)
 #undef REGISTER_DML_KERNEL
 
 REGISTER_KERNEL_BUILDER(

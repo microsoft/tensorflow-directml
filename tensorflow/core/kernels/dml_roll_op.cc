@@ -183,6 +183,11 @@ class DmlRollKernel : public DmlKernel {
       result = dml::Gather(result, indices, dml_axis, index_dimensions);
     }
 
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(scope, result);
+    }
+
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
@@ -229,6 +234,7 @@ class DmlRollKernel : public DmlKernel {
                                            GetOutputShapeAsInputShapeHelper>)
 
 TF_CALL_int32(REGISTER_DML_KERNEL);
+TF_CALL_int64(REGISTER_DML_KERNEL);
 TF_CALL_float(REGISTER_DML_KERNEL);
 TF_CALL_half(REGISTER_DML_KERNEL);
 

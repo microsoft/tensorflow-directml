@@ -263,6 +263,7 @@ TF_CALL_int64(REGISTER_GPU_KERNELS);
                           IsVariableInitializedOp);
 
 TF_CALL_DML_FLOAT_TYPES(REGISTER_DML_KERNELS);
+TF_CALL_int64(REGISTER_DML_KERNELS);
 #undef REGISTER_DML_KERNELS
 #endif  // TENSORFLOW_USE_DIRECTML
 }  // namespace tensorflow

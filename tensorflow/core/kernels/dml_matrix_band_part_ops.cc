@@ -159,24 +159,30 @@ class DmlMatrixBandPartKernel : public DmlKernel {
   }
 };
 
-#define REGISTER_DML_KERNEL(type)                                              \
-  REGISTER_KERNEL_BUILDER(Name("MatrixBandPart")                               \
-                              .Device(DEVICE_DML)                              \
-                              .TypeConstraint<type>("T")                       \
-                              .HostMemory("num_lower")                         \
-                              .HostMemory("num_upper"),                        \
-                          DmlKernelWrapper<DmlMatrixBandPartKernel,            \
-                                           GetOutputShapeAsInputShapeHelper>); \
-  REGISTER_KERNEL_BUILDER(Name("BatchMatrixBandPart")                          \
-                              .Device(DEVICE_DML)                              \
-                              .TypeConstraint<type>("T")                       \
-                              .HostMemory("num_lower")                         \
-                              .HostMemory("num_upper"),                        \
-                          DmlKernelWrapper<DmlMatrixBandPartKernel,            \
+#define REGISTER_DML_KERNEL(type)                                   \
+  REGISTER_KERNEL_BUILDER(Name("MatrixBandPart")                    \
+                              .Device(DEVICE_DML)                   \
+                              .TypeConstraint<type>("T")            \
+                              .HostMemory("num_lower")              \
+                              .HostMemory("num_upper"),             \
+                          DmlKernelWrapper<DmlMatrixBandPartKernel, \
                                            GetOutputShapeAsInputShapeHelper>);
 
 TF_CALL_float(REGISTER_DML_KERNEL);
 TF_CALL_half(REGISTER_DML_KERNEL);
 TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+#define REGISTER_DML_KERNEL(type)                                   \
+  REGISTER_KERNEL_BUILDER(Name("BatchMatrixBandPart")               \
+                              .Device(DEVICE_DML)                   \
+                              .TypeConstraint<type>("T")            \
+                              .HostMemory("num_lower")              \
+                              .HostMemory("num_upper"),             \
+                          DmlKernelWrapper<DmlMatrixBandPartKernel, \
+                                           GetOutputShapeAsInputShapeHelper>);
+
+TF_CALL_float(REGISTER_DML_KERNEL);
+TF_CALL_half(REGISTER_DML_KERNEL);
 #undef REGISTER_DML_KERNEL
 }  // namespace tensorflow

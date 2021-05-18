@@ -310,14 +310,8 @@ class CopyToDeviceTest(test_base.DatasetTestBase):
 
     device_name = "/%s:0" % test_util.gpu_device_type()
 
-    # DML doesn't support int32 for square
-    if test_util.gpu_device_type() == "DML":
-      output_types = (dtypes.float32, dtypes.float32, dtypes.string)
-    else:
-      output_types = (dtypes.int32, dtypes.float32, dtypes.string)
-
     host_dataset = dataset_ops.Dataset.from_generator(
-        generator, output_types=output_types)
+        generator, output_types=(dtypes.int32, dtypes.float32, dtypes.string))
     device_dataset = host_dataset.apply(
         prefetching_ops.copy_to_device(device_name))
 

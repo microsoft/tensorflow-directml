@@ -81,18 +81,6 @@ class GetResizeShapeHelper : public ShapeHelper {
   }
 };
 
-static bool CastInputToFloat(DML_INTERPOLATION_MODE mode, DataType data_type,
-                             bool is_identity) {
-  switch (mode) {
-    case DML_INTERPOLATION_MODE_LINEAR:
-      return data_type != DT_FLOAT;
-    case DML_INTERPOLATION_MODE_NEAREST_NEIGHBOR:
-      return !is_identity && data_type != DT_FLOAT && data_type != DT_HALF;
-    default:
-      return false;
-  }
-}
-
 template <DML_INTERPOLATION_MODE interpolation_mode>
 class DmlResizeKernel : public DmlKernel {
  public:
@@ -127,23 +115,9 @@ class DmlResizeKernel : public DmlKernel {
     DataType tf_input_data_type = ctx->GetInputDataType(0);
     DML_TENSOR_DATA_TYPE dml_input_data_type = result.GetOutputDesc().dataType;
 
-    bool is_identity = input_tensor_shape == output_tensor_shape;
-
-    // ResizeBilinear only supports DT_FLOAT as an output type, and DML doesn't
-    // support mixed data types for Resample. Therefore, we need to cast all
-    // non-float input types to DML_TENSOR_DATA_TYPE_FLOAT32.
-    bool cast_to_float =
-        CastInputToFloat(interpolation_mode, tf_input_data_type, is_identity);
-
-    if (cast_to_float) {
-      result = dml::Cast(result, DML_TENSOR_DATA_TYPE_FLOAT32);
-    } else if (is_identity) {
+    if (input_tensor_shape == output_tensor_shape) {
       result = dml::Identity(result);
-    }
-
-    // If the input and output shapes are identical, we don't need to do
-    // anything here
-    if (!is_identity) {
+    } else {
       bool align_corners = init_helper->AlignCorners();
       bool half_pixel_centers = init_helper->HalfPixelCenters();
       float input_offset = 0.5f;
@@ -175,11 +149,6 @@ class DmlResizeKernel : public DmlKernel {
           dml::TensorDesc::Dimensions(output_sizes.begin(), output_sizes.end()),
           interpolation_mode, scales, input_pixel_offsets,
           output_pixel_offsets);
-
-      if (interpolation_mode == DML_INTERPOLATION_MODE_NEAREST_NEIGHBOR &&
-          dml_input_data_type != result.GetOutputDesc().dataType) {
-        result = dml::Cast(result, dml_input_data_type);
-      }
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -198,15 +167,7 @@ class DmlResizeKernel : public DmlKernel {
       DmlKernelWrapper<DmlResizeKernel<DML_INTERPOLATION_MODE_LINEAR>, \
                        GetResizeShapeHelper>);
 
-// Although DML's resample only supports floats and halfs, models sometimes use
-// other types as well for the input type
-TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
-TF_CALL_uint8(DML_REGISTER_KERNEL);
-TF_CALL_int8(DML_REGISTER_KERNEL);
-TF_CALL_uint16(DML_REGISTER_KERNEL);
-TF_CALL_int16(DML_REGISTER_KERNEL);
-TF_CALL_int32(DML_REGISTER_KERNEL);
-TF_CALL_int64(DML_REGISTER_KERNEL);
+TF_CALL_float(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 #define DML_REGISTER_KERNEL(type)                                   \
@@ -220,11 +181,6 @@ TF_CALL_int64(DML_REGISTER_KERNEL);
           GetResizeShapeHelper>);
 
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
-TF_CALL_uint8(DML_REGISTER_KERNEL);
-TF_CALL_int8(DML_REGISTER_KERNEL);
-TF_CALL_uint16(DML_REGISTER_KERNEL);
-TF_CALL_int16(DML_REGISTER_KERNEL);
-TF_CALL_int32(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow

@@ -248,7 +248,7 @@ struct DmlRGBToHSVFunctor {
       Name("RGBToHSV").Device(DEVICE_DML).TypeConstraint<type>("T"),       \
       DmlKernelWrapper<DmlColorConversionKernel<DmlRGBToHSVFunctor<type>>, \
                        GetOutputShapeAsInputShapeHelper>)
-TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL)
+TF_CALL_float(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 struct DmlHSVToRGBFunctor {
@@ -263,7 +263,7 @@ struct DmlHSVToRGBFunctor {
       Name("HSVToRGB").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlColorConversionKernel<DmlHSVToRGBFunctor>, \
                        GetOutputShapeAsInputShapeHelper>)
-TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL)
+TF_CALL_float(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 template <typename Functor>
@@ -440,6 +440,12 @@ struct DmlAdjustContrastFunctor {
                              dml::Expression contrast_factor,
                              dml::Expression min_value,
                              dml::Expression max_value) {
+    // AdjustContrast can take inputs of different types, but only supports
+    // float32 for its output
+    if (input.GetOutputDesc().dataType != DML_TENSOR_DATA_TYPE_FLOAT32) {
+      input = dml::Cast(input, DML_TENSOR_DATA_TYPE_FLOAT32);
+    }
+
     contrast_factor =
         dml::Reinterpret(contrast_factor, input.GetOutputDesc().sizes,
                          dml::TensorDesc::Dimensions{0, 0, 0, 0});
@@ -475,6 +481,10 @@ struct DmlAdjustContrastFunctorV2 {
       Name("AdjustContrast").Device(DEVICE_DML).TypeConstraint<type>("T"),    \
       DmlKernelWrapper<DmlAdjustImageClampedKernel<DmlAdjustContrastFunctor>, \
                        GetOutputShapeAsInputShapeHelper>)
+TF_CALL_uint8(DML_REGISTER_KERNEL);
+TF_CALL_int8(DML_REGISTER_KERNEL);
+TF_CALL_int16(DML_REGISTER_KERNEL);
+TF_CALL_int32(DML_REGISTER_KERNEL);
 TF_CALL_float(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
