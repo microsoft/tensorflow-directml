@@ -152,6 +152,13 @@ class DmlOneHotKernel : public DmlKernel {
     indices_info.desc = DmlTensorDesc::Create(indices_type, indices_shape_dml,
                                               indices_shape_dml);
 
+    // Although DML's OneHot supports int32, the way it handles negative indices
+    // is different from TensorFlow. In negative indices in DML are relative to
+    // the end, but in TensorFlow they are always out of bounds. By forcing the
+    // indices to be unsigned we make sure that they are always out of bounds if
+    // their signed representation is negative.
+    indices_info.desc.ForceUnsignedDataType();
+
     DmlTensorInfo on_value_info = {};
     on_value_info.kernel_index = 2;
     on_value_info.desc = DmlTensorDesc{value_type, {1, 1, 1, 1}};
