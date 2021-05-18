@@ -264,8 +264,6 @@ class SliceTest(test.TestCase):
       slice_t = a[:, x, y:z, :]
       self.assertAllEqual(slice_t.eval(), inp[:, x, y:z, :])
 
-  # DML doesn't support more than 5D for slice after collapsing dimensions
-  @test_util.skip_dml
   def testRandom(self):
     # Random dims of rank 6
     input_shape = np.random.randint(0, 20, size=6)
