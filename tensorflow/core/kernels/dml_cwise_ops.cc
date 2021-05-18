@@ -295,16 +295,16 @@ class DmlCompositeUnaryKernel : public DmlKernel {
 #define CONCAT_NAMESPACE_NAME(opName, uniqueId) \
   CONCAT_NAMESPACE_NAME_HELPER(opName, uniqueId)
 
-#define REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)  \
+#define REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)            \
   struct Dml##opName##Functor {                                            \
     dml::Expression operator()(dml::Expression x) { return (expression); } \
   };                                                                       \
   using Dml##opName##Kernel = DmlCompositeUnaryKernel<Dml##opName##Functor>;
 
-#define REGISTER_DML_COMPOSITE_UNARY_BOOL_KERNEL(opName, expression)     \
-  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                 \
-    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression) \
-    REGISTER_BOOL_OP_KERNEL(opName);                                     \
+#define REGISTER_DML_COMPOSITE_UNARY_BOOL_KERNEL(opName, expression) \
+  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {             \
+    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)          \
+    REGISTER_BOOL_OP_KERNEL(opName);                                 \
   }
 
 #define REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression,       \
@@ -427,6 +427,42 @@ class DmlCompositeUnaryKernel : public DmlKernel {
     REGISTER_OP_KERNEL(opName, T8);                                         \
   }
 
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
+    Mul,
+    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) *
+                  dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
+              DML_TENSOR_DATA_TYPE_UINT8),
+    8, uint8)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
+    Mul,
+    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_INT32) *
+                  dml::Cast(y, DML_TENSOR_DATA_TYPE_INT32),
+              DML_TENSOR_DATA_TYPE_INT8),
+    8, int8)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
+    Mul,
+    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) *
+                  dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
+              DML_TENSOR_DATA_TYPE_UINT16),
+    8, uint16)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
+    Mul,
+    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_INT32) *
+                  dml::Cast(y, DML_TENSOR_DATA_TYPE_INT32),
+              DML_TENSOR_DATA_TYPE_INT16),
+    8, int16)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
+    Add,
+    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) +
+                  dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
+              DML_TENSOR_DATA_TYPE_UINT8),
+    8, uint8)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
+    AddV2,
+    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) +
+                  dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
+              DML_TENSOR_DATA_TYPE_UINT8),
+    8, uint8)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(Atan2, dml::ATanYX(x, y), 8, float)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(RealDiv, x / y, 8, Eigen::half, float)
 // TODO: Register this operator for all types (except int32) when FloorDiv is
@@ -468,16 +504,16 @@ REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Maximum, dml::Max(x, y), 8, Eigen::half,
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(SquaredDifference,
                                        dml::DifferenceSquare(x, y), 8,
                                        Eigen::half, float, int64)
+// TODO(b/25387198): A special kernel exists for int32 (see cwise_op_mul1.cc).
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Mul, (x * y), 8, Eigen::half, float,
                                        int64)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Pow, dml::Pow(x, y), 8, Eigen::half,
                                        float, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_add1.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_4(Add, x + y, 8, Eigen::half, float, uint8,
-                                       int64)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Add, x + y, 8, Eigen::half, float, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_add1.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_4(AddV2, x + y, 8, Eigen::half, float,
-                                       uint8, int64)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(AddV2, x + y, 8, Eigen::half, float,
+                                       int64)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_4(TruncateDiv, x / y, 8, uint8, uint16,
                                        int16, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_div.cc).
@@ -505,31 +541,6 @@ REGISTER_DML_COMPOSITE_BINARY_KERNEL_7(Equal, x == y, 8, Eigen::half, float,
 // cwise_op_not_equal_to_1.cc).
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_7(NotEqual, x != y, 8, Eigen::half, float,
                                        uint8, int8, int16, int64, bool)
-// TODO(b/25387198): A special kernel exists for int32 (see cwise_op_mul1.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
-    Mul,
-    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) *
-                  dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
-              DML_TENSOR_DATA_TYPE_UINT8),
-    8, uint8)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
-    Mul,
-    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_INT32) *
-                  dml::Cast(y, DML_TENSOR_DATA_TYPE_INT32),
-              DML_TENSOR_DATA_TYPE_INT8),
-    8, int8)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
-    Mul,
-    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) *
-                  dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
-              DML_TENSOR_DATA_TYPE_UINT16),
-    8, uint16)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
-    Mul,
-    dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_INT32) *
-                  dml::Cast(y, DML_TENSOR_DATA_TYPE_INT32),
-              DML_TENSOR_DATA_TYPE_INT16),
-    8, int16)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_less.cc).
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Acos, dml::ACos(x), float)
@@ -994,49 +1005,24 @@ class DmlBinaryBitwiseKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 2);
     CHECK(ctx->GetOutputCount() == 1);
 
-    auto num_elements =
-        static_cast<uint32_t>(ctx->GetInputTensorShape(0).num_elements());
-
-    // DML doesn't support 64-bit integer types, but we can reinterpret
-    // the tensor as twice as many 32-bit elements. Sign doesn't matter.
-    // TFDML #24881131
-    DataType dtype = ctx->GetInputDataType(0);
-    DCHECK(dtype == ctx->GetOutputDataType(0));
-    if (Is64BitIntegerType(dtype)) {
-      num_elements *= 2;
-    }
-
-    std::array<uint32_t, 4> sizes = {1, 1, 1, num_elements};
-
-    DmlTensorInfo in1;
-    in1.kernel_index = 0;
-    in1.desc = DmlTensorDesc::Create(dtype, sizes, sizes);
-    in1.desc.ForceUnsignedDataType();
-    auto in1_desc = in1.desc.GetDmlDesc();
-
-    DmlTensorInfo in2;
-    in2.kernel_index = 1;
-    in2.desc = DmlTensorDesc::Create(dtype, sizes, sizes);
-    in2.desc.ForceUnsignedDataType();
-    auto in2_desc = in2.desc.GetDmlDesc();
-
-    DmlTensorInfo out;
-    out.kernel_index = 0;
-    out.desc = DmlTensorDesc::Create(dtype, sizes, sizes);
-    out.desc.ForceUnsignedDataType();
-    auto out_desc = out.desc.GetDmlDesc();
-
-    DmlKernelTensors tensors;
-    tensors.inputs = {in1, in2};
-    tensors.outputs = {out};
-
     auto input_shapes = init_helper->GetCollapsedInputShapes();
     const TensorShape& output_shape = init_helper->GetCollapsedOutputShape();
 
+    DmlKernelTensors tensors =
+        CreateKernelTensors(ctx, input_shapes, output_shape);
+
+    // DML only supports unsigned types, but sign doesn't matter for bitwise.
+    tensors.inputs[0]->desc.ForceUnsignedDataType();
+    tensors.inputs[1]->desc.ForceUnsignedDataType();
+    tensors.outputs[0]->desc.ForceUnsignedDataType();
+
+    auto inputs = GetDmlTensorDescs(tensors.inputs);
+    auto outputs = GetDmlTensorDescs(tensors.outputs);
+
     DML_OPERATOR_SPECIFIC_DESC desc = {
-        &in1_desc,
-        &in2_desc,
-        &out_desc,
+        &inputs[0],
+        &inputs[1],
+        outputs.data(),
     };
 
     DML_OPERATOR_DESC op_desc = {op_type, &desc};
@@ -1145,14 +1131,12 @@ TF_CALL_int64(DML_REGISTER_KERNEL);
           DmlBinaryBitwiseKernel<DML_OPERATOR_ELEMENT_WISE_BIT_AND,       \
                                  DML_ELEMENT_WISE_BIT_AND_OPERATOR_DESC>, \
           GetBroadcastedOutputShapeHelper>);
-TF_CALL_int8(DML_REGISTER_KERNEL);
-TF_CALL_int16(DML_REGISTER_KERNEL);
-TF_CALL_int32(DML_REGISTER_KERNEL);
-TF_CALL_int64(DML_REGISTER_KERNEL);
 TF_CALL_uint8(DML_REGISTER_KERNEL);
 TF_CALL_uint16(DML_REGISTER_KERNEL);
 TF_CALL_uint32(DML_REGISTER_KERNEL);
-TF_CALL_uint64(DML_REGISTER_KERNEL);
+TF_CALL_int8(DML_REGISTER_KERNEL);
+TF_CALL_int16(DML_REGISTER_KERNEL);
+TF_CALL_int32(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 #define DML_REGISTER_KERNEL(type)                                        \
@@ -1162,14 +1146,12 @@ TF_CALL_uint64(DML_REGISTER_KERNEL);
           DmlBinaryBitwiseKernel<DML_OPERATOR_ELEMENT_WISE_BIT_OR,       \
                                  DML_ELEMENT_WISE_BIT_OR_OPERATOR_DESC>, \
           GetBroadcastedOutputShapeHelper>);
-TF_CALL_int8(DML_REGISTER_KERNEL);
-TF_CALL_int16(DML_REGISTER_KERNEL);
-TF_CALL_int32(DML_REGISTER_KERNEL);
-TF_CALL_int64(DML_REGISTER_KERNEL);
 TF_CALL_uint8(DML_REGISTER_KERNEL);
 TF_CALL_uint16(DML_REGISTER_KERNEL);
 TF_CALL_uint32(DML_REGISTER_KERNEL);
-TF_CALL_uint64(DML_REGISTER_KERNEL);
+TF_CALL_int8(DML_REGISTER_KERNEL);
+TF_CALL_int16(DML_REGISTER_KERNEL);
+TF_CALL_int32(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 #define DML_REGISTER_KERNEL(type)                                         \
@@ -1179,14 +1161,12 @@ TF_CALL_uint64(DML_REGISTER_KERNEL);
           DmlBinaryBitwiseKernel<DML_OPERATOR_ELEMENT_WISE_BIT_XOR,       \
                                  DML_ELEMENT_WISE_BIT_XOR_OPERATOR_DESC>, \
           GetBroadcastedOutputShapeHelper>);
-TF_CALL_int8(DML_REGISTER_KERNEL);
-TF_CALL_int16(DML_REGISTER_KERNEL);
-TF_CALL_int32(DML_REGISTER_KERNEL);
-TF_CALL_int64(DML_REGISTER_KERNEL);
 TF_CALL_uint8(DML_REGISTER_KERNEL);
 TF_CALL_uint16(DML_REGISTER_KERNEL);
 TF_CALL_uint32(DML_REGISTER_KERNEL);
-TF_CALL_uint64(DML_REGISTER_KERNEL);
+TF_CALL_int8(DML_REGISTER_KERNEL);
+TF_CALL_int16(DML_REGISTER_KERNEL);
+TF_CALL_int32(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 #define DML_REGISTER_KERNEL(type)                                           \
