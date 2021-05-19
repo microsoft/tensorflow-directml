@@ -5739,6 +5739,9 @@ cuda_py_test(
         "//tensorflow/python/data/ops:dataset_ops",
     ],
     xla_enable_strict_auto_jit = True,
+    # Sporadic permissions issues on Windows related to moving/deleting temp dirs.
+    # This test is unrelated to DML usage.
+    tags = ["no_dml"],
 )
 
 tf_py_test(
