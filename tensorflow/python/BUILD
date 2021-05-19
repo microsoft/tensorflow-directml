@@ -5740,8 +5740,7 @@ cuda_py_test(
     ],
     xla_enable_strict_auto_jit = True,
     # Sporadic permissions issues on Windows related to moving/deleting temp dirs.
-    # This test is unrelated to DML usage.
-    tags = ["no_dml"],
+    tags = ["no_windows"],
 )
 
 tf_py_test(
