@@ -51,7 +51,7 @@ static absl::optional<SimplifiedSlice> SimplifySlice(
     const gtl::InlinedVector<int64, 4>& canonical_begins,
     const gtl::InlinedVector<int64, 4>& canonical_ends,
     const gtl::InlinedVector<int64, 4>& strides, uint32_t min_output_size = 4,
-    uint32_t max_output_size = 5) {
+    uint32_t max_output_size = 8) {
   assert(input_shape.dims() == begins.size());
   assert(input_shape.dims() == ends.size());
   assert(input_shape.dims() == strides.size());
@@ -275,7 +275,7 @@ class StridedSliceInitHelper : public InitializationHelper {
     if (!simple_slice_) {
       OP_REQUIRES(
           ctx, simple_slice_,
-          errors::InvalidArgument("DML only support slicing up to 5D inputs, "
+          errors::InvalidArgument("DML only support slicing up to 8D inputs, "
                                   "but received ",
                                   input_shape.dims()));
     }

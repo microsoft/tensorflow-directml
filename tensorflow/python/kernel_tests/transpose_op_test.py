@@ -71,9 +71,6 @@ class TransposeTest(test.TestCase):
       return tf_ans, jacob_t
 
   def _compareGpu(self, x, p, conjugate=False):
-    if test_util.gpu_device_type() == "DML" and x.ndim > 5:
-      return
-
     if p is None:
       rank = x.ndim
       perm = (rank - 1) - np.arange(rank)
@@ -123,9 +120,6 @@ class TransposeTest(test.TestCase):
         self._compareGpu(x, None, conjugate=c)
 
   def _compare_cpu_gpu(self, x):
-    if test_util.gpu_device_type() == "DML" and x.ndim > 5:
-      return
-
     n = np.ndim(x)
     # generate all permutation of [0, 1, ... n-1] in random order,
     # choose the first two.
