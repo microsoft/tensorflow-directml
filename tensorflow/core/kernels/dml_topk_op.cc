@@ -97,38 +97,45 @@ class DmlTopKKernel : public DmlKernel {
     const TensorShape& tensor_shape = ctx->GetInputTensorShape(0);
     const TensorShape& output_shape = ctx->GetOutputTensorShape(0);
 
-    DmlKernelTensors tensors;
     DmlTensorInfo input;
     input.kernel_index = 0;
     input.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0), tensor_shape,
                                        tensor_shape);
 
+    DmlTensorInfo values_output;
+    values_output.kernel_index = 0;
+    values_output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0),
+                                               output_shape, output_shape);
+
+    DmlTensorInfo indices_output;
+    indices_output.kernel_index = 1;
+    indices_output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(1),
+                                                output_shape, output_shape);
+    indices_output.desc.ForceUnsignedDataType();
+
+    DmlKernelTensors tensors;
     tensors.inputs = {input};
-    for (uint32_t i = 0; i < ctx->GetOutputCount(); ++i) {
-      DmlTensorInfo output;
-      output.kernel_index = i;
-      output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(i),
-                                          output_shape, output_shape);
-      if (i == 1) {
-        output.desc.ForceUnsignedDataType();
-      }
-      tensors.outputs.push_back(std::move(output));
-    }
+    tensors.outputs = {values_output, indices_output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
+    auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
 
     uint32_t k = init_helper->GetK();
     uint32_t axis = input.desc.GetDimensionCount() - 1;
-    DML_TOP_K_OPERATOR_DESC topk_desc = {};
-    topk_desc.InputTensor = &inputs[0];
-    topk_desc.OutputValueTensor = &outputs[0];
-    topk_desc.OutputIndexTensor = &outputs[1];
-    topk_desc.Axis = axis;
-    topk_desc.K = k;
 
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_TOP_K, &topk_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
+    dml::TopKOutputs result =
+        dml::TopK(input_tensor, axis, k, DML_AXIS_DIRECTION_DECREASING);
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result.value = dml::ConvertInt32ToInt64(scope, result.value);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result.value, result.index});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
@@ -142,5 +149,11 @@ class DmlTopKKernel : public DmlKernel {
                               .HostMemory("k"),                  \
                           DmlKernelWrapper<DmlTopKKernel, TopKShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+TF_CALL_int64(DML_REGISTER_KERNEL);
+TF_CALL_int32(DML_REGISTER_KERNEL);
+TF_CALL_uint16(DML_REGISTER_KERNEL);
+TF_CALL_int16(DML_REGISTER_KERNEL);
+TF_CALL_uint8(DML_REGISTER_KERNEL);
+TF_CALL_int8(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 }  // namespace tensorflow

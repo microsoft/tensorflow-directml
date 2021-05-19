@@ -44,7 +44,16 @@ class DmlSnapshotOp : public OpKernel {
       Name("Snapshot").Device(DEVICE_DML).TypeConstraint<TYPE>("T"), \
       DmlSnapshotOp);
 
-TF_CALL_DML_ALL_TYPES(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_int64(REGISTER_KERNEL);
+TF_CALL_int32(REGISTER_KERNEL);
+TF_CALL_uint16(REGISTER_KERNEL);
+TF_CALL_int16(REGISTER_KERNEL);
+TF_CALL_uint8(REGISTER_KERNEL);
+TF_CALL_int8(REGISTER_KERNEL);
+
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

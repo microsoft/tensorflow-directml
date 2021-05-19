@@ -130,7 +130,6 @@ class DmlUpdateVariableOp : public DmlKernel {
 // this list is int32, even though it's supported by DML.
 TF_CALL_DML_FLOAT_TYPES(REGISTER_DML_KERNEL);
 TF_CALL_int64(REGISTER_DML_KERNEL);
-TF_CALL_bool(REGISTER_DML_KERNEL);
 
 #undef REGISTER_DML_KERNEL
 

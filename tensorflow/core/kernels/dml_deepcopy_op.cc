@@ -72,7 +72,9 @@ class DmlDeepCopyKernel : public OpKernel {
       Name("DeepCopy").Device(DEVICE_DML).TypeConstraint<TYPE>("T"), \
       DmlDeepCopyKernel);
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNEL);
+TF_CALL_half(DML_REGISTER_KERNEL);
+TF_CALL_float(DML_REGISTER_KERNEL);
+TF_CALL_int64(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow

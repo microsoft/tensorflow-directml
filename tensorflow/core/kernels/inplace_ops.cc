@@ -571,5 +571,39 @@ REGISTER_EMPTY(int32, GPU);
 
 #endif  // GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 
+#ifdef TENSORFLOW_USE_DIRECTML
+REGISTER_KERNEL_BUILDER(Name("InplaceUpdate")
+                            .Device(DEVICE_DML)
+                            .HostMemory("x")
+                            .HostMemory("i")
+                            .HostMemory("v")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        InplaceOp<CPUDevice, functor::I_UPDATE>);
+REGISTER_KERNEL_BUILDER(Name("InplaceAdd")
+                            .Device(DEVICE_DML)
+                            .HostMemory("x")
+                            .HostMemory("i")
+                            .HostMemory("v")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        InplaceOp<CPUDevice, functor::I_ADD>);
+REGISTER_KERNEL_BUILDER(Name("InplaceSub")
+                            .Device(DEVICE_DML)
+                            .HostMemory("x")
+                            .HostMemory("i")
+                            .HostMemory("v")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        InplaceOp<CPUDevice, functor::I_SUB>);
+
+REGISTER_KERNEL_BUILDER(Name("DeepCopy")
+                            .Device(DEVICE_DML)
+                            .HostMemory("x")
+                            .HostMemory("y")
+                            .TypeConstraint<int32>("T"),
+                        CopyOp<CPUDevice>);
+#endif  // TENSORFLOW_USE_DIRECTML
+
 }  // end namespace
 }  // end namespace tensorflow

@@ -207,25 +207,31 @@ class DmlMatrixSetDiagKernel : public DmlKernel {
   }
 };
 
-#define REGISTER_DML_KERNEL(T)                                                 \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name("MatrixSetDiag").Device(DEVICE_DML).TypeConstraint<T>("T"),         \
-      DmlKernelWrapper<DmlMatrixSetDiagKernel<T>,                              \
-                       GetOutputShapeAsInputShapeHelper>);                     \
-  REGISTER_KERNEL_BUILDER(Name("MatrixSetDiagV2")                              \
-                              .Device(DEVICE_DML)                              \
-                              .TypeConstraint<T>("T")                          \
-                              .HostMemory("k"),                                \
-                          DmlKernelWrapper<DmlMatrixSetDiagKernel<T>,          \
-                                           GetOutputShapeAsInputShapeHelper>); \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name("BatchMatrixSetDiag").Device(DEVICE_DML).TypeConstraint<T>("T"),    \
-      DmlKernelWrapper<DmlMatrixSetDiagKernel<T>,                              \
-                       GetOutputShapeAsInputShapeHelper>);
+#define REGISTER_DML_KERNEL(T)                                         \
+  REGISTER_KERNEL_BUILDER(                                             \
+      Name("MatrixSetDiag").Device(DEVICE_DML).TypeConstraint<T>("T"), \
+      DmlKernelWrapper<DmlMatrixSetDiagKernel<T>,                      \
+                       GetOutputShapeAsInputShapeHelper>);             \
+  REGISTER_KERNEL_BUILDER(Name("MatrixSetDiagV2")                      \
+                              .Device(DEVICE_DML)                      \
+                              .TypeConstraint<T>("T")                  \
+                              .HostMemory("k"),                        \
+                          DmlKernelWrapper<DmlMatrixSetDiagKernel<T>,  \
+                                           GetOutputShapeAsInputShapeHelper>);
 
 TF_CALL_half(REGISTER_DML_KERNEL);
 TF_CALL_float(REGISTER_DML_KERNEL);
 TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+#define REGISTER_DML_KERNEL(T)                                              \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("BatchMatrixSetDiag").Device(DEVICE_DML).TypeConstraint<T>("T"), \
+      DmlKernelWrapper<DmlMatrixSetDiagKernel<T>,                           \
+                       GetOutputShapeAsInputShapeHelper>);
+
+TF_CALL_half(REGISTER_DML_KERNEL);
+TF_CALL_float(REGISTER_DML_KERNEL);
 #undef REGISTER_DML_KERNEL
 
 }  // namespace tensorflow
