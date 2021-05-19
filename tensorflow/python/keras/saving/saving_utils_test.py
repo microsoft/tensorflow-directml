@@ -228,6 +228,11 @@ class TraceModelCallTest(keras_parameterized.TestCase):
     x = np.random.random((8, 5))
     y = np.random.random((8, 3))
 
+    # Numpy allocates float64 by default, which isn't supported by DML
+    if test.is_built_with_dml():
+      x = x.astype(np.float32)
+      y = y.astype(np.float32)
+
     train_step(x, y)
 
     fn = saving_utils.trace_model_call(model)
