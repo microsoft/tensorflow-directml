@@ -53,9 +53,6 @@ class DmlDeepCopyKernel : public OpKernel {
 
     execution_context->ResourceBarrier(barriers);
 
-    constexpr uint64_t dst_offset = 0;
-    constexpr uint64_t src_offset = 0;
-
     execution_context->CopyBufferRegion(
         output_buffer.Resource(), output_buffer.Offset(),
         D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(),
