@@ -56,6 +56,11 @@ _rewrites.min_graph_nodes = -1
 _graph_options = config_pb2.GraphOptions(rewrite_options=_rewrites)
 _config = config_pb2.ConfigProto(graph_options=_graph_options)
 
+# DML doesn't implement every operator that used in these tests (e.g.
+# 'Qr'), so we need fallback to CPU kernels for unsupported ops to pass 
+# the _v1_session test case.
+if test_util.IsBuiltWithDML():
+  _config = None
 
 @keras_parameterized.run_all_keras_modes(config=_config)
 class LSTMV2Test(keras_parameterized.TestCase):
@@ -535,23 +540,30 @@ class LSTMV2Test(keras_parameterized.TestCase):
       weights = cpu_model.get_weights()
     y_1 = cpu_model.predict(x_train)
 
-    with test_util.device(use_gpu=True):
+    def run_y2y3():
       layer = rnn.LSTM(rnn_state_size)
       output = layer(inputs)
       gpu_model = keras.models.Model(inputs, output)
       gpu_model.set_weights(weights)
-    y_2 = gpu_model.predict(x_train)
-
-    # Note that CuDNN uses 'sigmoid' as activation, so the LSTM V2 uses
-    # 'sigmoid' as default. Construct the canonical LSTM with sigmoid to achieve
-    # the same output.
-    with test_util.device(use_gpu=True):
+      y_2 = gpu_model.predict(x_train)
+      # Note that CuDNN uses 'sigmoid' as activation, so the LSTM V2 uses
+      # 'sigmoid' as default. Construct the canonical LSTM with sigmoid to achieve
+      # the same output.
       layer = rnn_v1.LSTM(rnn_state_size, recurrent_activation='sigmoid')
       output = layer(inputs)
       canonical_model = keras.models.Model(inputs, output)
       # Remove the extra cudnn bias since canonical lstm will not use it.
       canonical_model.set_weights(weights[:3])
-    y_3 = canonical_model.predict(x_train)
+      y_3 = canonical_model.predict(x_train)
+      return y_2, y_3
+
+    # DML doesn't implement 'Qr', so allow default device placement (i.e.
+    # prefer DML but fallback to CPU when necessary).
+    if test_util.gpu_device_type() == "DML":
+      y_2, y_3 = run_y2y3()
+    else:
+      with test_util.device(use_gpu=True):
+        y_2, y_3 = run_y2y3()
 
     self.assertAllClose(y_1, y_2)
     self.assertAllClose(y_2, y_3)
@@ -682,6 +694,11 @@ class LSTMV2Test(keras_parameterized.TestCase):
     self.assertAllClose(out8, out7, atol=1e-5)
 
   def test_stateful_LSTM_training(self):
+    # DML doesn't implement 'UnsortedSegmentSum', which will trigger colocation issues when
+    # running this test in an eager context.
+    if context.executing_eagerly() and test_util.gpu_device_type() == "DML":
+      self.skipTest('Test skipped on DML because UnsortedSegmentSum kernel is not implemented')
+
     # See b/123587692 for more context.
     vocab_size = 20
     embedding_dim = 10
@@ -719,6 +736,11 @@ class LSTMV2Test(keras_parameterized.TestCase):
         input_shape=(num_samples, timesteps, embedding_dim))
 
   def test_bidirectional(self):
+    # DML doesn't implement 'UnsortedSegmentSum', which will trigger colocation issues when
+    # running this test in an eager context.
+    if context.executing_eagerly() and test_util.gpu_device_type() == "DML":
+      self.skipTest('Test skipped on DML because UnsortedSegmentSum kernel is not implemented')
+
     batch = 128
     timestep = 20
     vocab_size = 1000
