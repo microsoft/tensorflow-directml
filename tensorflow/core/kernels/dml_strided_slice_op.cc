@@ -211,10 +211,18 @@ class StridedSliceInitHelper : public InitializationHelper {
     int32 ellipsis_mask, new_axis_mask, shrink_axis_mask;
   };
 
-  // StridedSlice is only a no-op if the first input or its output is empty
   bool IsNoOpKernel(
       OpKernelContext* ctx,
       absl::Span<const TensorShape> output_shapes) const override {
+    const bool is_grad_op = ctx->num_inputs() == 5;
+
+    if (is_grad_op) {
+      // For StridedSliceGrad, the last input is the input gradient
+      return ctx->input(4).NumElements() == 0 ||
+             output_shapes[0].num_elements() == 0;
+    }
+
+    // StridedSlice is only a no-op if the first input or its output is empty
     return ctx->input(0).NumElements() == 0 ||
            output_shapes[0].num_elements() == 0;
   }
@@ -379,7 +387,7 @@ class DmlStridedSliceKernel : public DmlKernel {
   }
 };
 
-#define REGISTER_KERNEL(type)       \
+#define REGISTER_KERNEL(type)        \
   REGISTER_KERNEL_BUILDER(           \
       Name("StridedSlice")           \
           .Device(DEVICE_DML)        \
@@ -474,7 +482,7 @@ class DmlStridedSliceGradKernel : public DmlKernel {
   }
 };
 
-#define REGISTER_KERNEL(type)       \
+#define REGISTER_KERNEL(type)        \
   REGISTER_KERNEL_BUILDER(           \
       Name("StridedSliceGrad")       \
           .Device(DEVICE_DML)        \
