@@ -43,7 +43,7 @@ class SimpleRNNLayerTest(keras_parameterized.TestCase):
         input_shape=(num_samples, timesteps, embedding_dim))
 
   def test_float64_SimpleRNN(self):
-    if test.is_built_with_rocm:
+    if test.is_built_with_dml():
       self.skipTest("Double type is yet not supported in DML")
     num_samples = 2
     timesteps = 3
