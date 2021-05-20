@@ -56,6 +56,11 @@ _rewrites.min_graph_nodes = -1
 _graph_options = config_pb2.GraphOptions(rewrite_options=_rewrites)
 _config = config_pb2.ConfigProto(graph_options=_graph_options)
 
+# DML doesn't implement every operator that used in these tests (e.g.
+# 'Qr'), so we need fallback to CPU kernels for unsupported ops to pass 
+# the _v1_session test case.
+if test_util.IsBuiltWithDML():
+  _config = None
 
 @keras_parameterized.run_all_keras_modes(config=_config)
 class LSTMV2Test(keras_parameterized.TestCase):
