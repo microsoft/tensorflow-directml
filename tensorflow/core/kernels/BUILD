@@ -8152,6 +8152,7 @@ tf_kernel_library(
         "dml_compare_and_bitpack_op.cc",
         "dml_parallel_concat_ops.cc",
         "dml_cross_op.cc",
+        "dml_inplace_ops.cc",
     ],
     hdrs = [
         "dml_kernel_wrapper.h",

@@ -307,7 +307,6 @@ class CTCLossTest(test.TestCase):
 
 class CTCLossTestV2(test.TestCase):
 
-  @test_util.skip_dml # DML doesn't implement InplaceUpdate
   @test_util.run_in_graph_and_eager_modes
   def testCtcLossV2(self):
     random_seed.set_random_seed(5)
@@ -357,7 +356,6 @@ class CTCLossTestV2(test.TestCase):
             logit_length=logit_length,
             blank_index=0))
 
-  @test_util.skip_dml # DML doesn't implement InplaceUpdate
   @test_util.run_v1_only("b/120545219")
   def testCtcLossDenseIsSameAsCtcLoss(self):
     with ops.device(test_util.gpu_device_name() or "/CPU:0"):
@@ -412,7 +410,6 @@ class CTCLossTestV2(test.TestCase):
               rtol=2e-06,
               atol=2e-06)
 
-  @test_util.skip_dml # DML doesn't implement InplaceUpdate
   @test_util.run_v1_only("b/120545219")
   def testCtcLossDenseUniqueFastPathIsSameAsCtcLoss(self):
     random_seed.set_random_seed(5)
@@ -467,7 +464,6 @@ class CTCLossTestV2(test.TestCase):
             rtol=2e-06,
             atol=2e-06)
 
-  @test_util.skip_dml # DML doesn't implement InplaceUpdate
   @test_util.run_v1_only("b/120545219")
   def testCtcLossDenseWithBlankIndexIsSameAsCtcLoss(self):
     random_seed.set_random_seed(5)
@@ -526,7 +522,6 @@ class CTCLossTestV2(test.TestCase):
             rtol=2e-06,
             atol=2e-06)
 
-  @test_util.skip_dml # DML doesn't implement InplaceUpdate
   @test_util.run_v1_only("b/120545219")
   def testCtcLossDenseWithNegativeBlankIndexIsSameAsCtcLoss(self):
     with ops.device(test_util.gpu_device_name() or "/CPU:0"):
@@ -774,7 +769,6 @@ class CTCLossTestV2(test.TestCase):
          [22.0 + 23.0 + 24.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]],
     ])
 
-  @test_util.skip_dml # DML doesn't implement InplaceUpdate
   @test_util.run_deprecated_v1
   def testScan(self):
     with ops.device(test_util.gpu_device_name() or "/CPU:0"):
@@ -818,7 +812,6 @@ class CTCLossTestV2(test.TestCase):
           [23.0 + x * 0.0, 23.0 + x * 1.0, 23.0 + x * 3.0], out
       ]))
 
-  @test_util.skip_dml # DML doesn't implement InplaceUpdate
   @test_util.run_deprecated_v1
   def testScanMultipleAccumulators(self):
     with ops.device(test_util.gpu_device_name() or "/CPU:0"):
@@ -832,7 +825,6 @@ class CTCLossTestV2(test.TestCase):
       self.assertAllEqual([24.0, 26.0, 29.0], a)
       self.assertAllEqual([[1.0, 2.0], [2.0, 4.0], [6.0, 12.0]], b)
 
-  @test_util.skip_dml # DML doesn't implement InplaceUpdate
   @test_util.run_deprecated_v1
   def testScanMultipleElements(self):
     with ops.device(test_util.gpu_device_name() or "/CPU:0"):
