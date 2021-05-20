@@ -694,6 +694,11 @@ class LSTMV2Test(keras_parameterized.TestCase):
     self.assertAllClose(out8, out7, atol=1e-5)
 
   def test_stateful_LSTM_training(self):
+    # DML doesn't implement 'UnsortedSegmentSum', which will trigger colocation issues when
+    # running this test in an eager context.
+    if context.executing_eagerly() and test_util.gpu_device_type() == "DML":
+      self.skipTest('Test skipped on DML because UnsortedSegmentSum kernel is not implemented')
+
     # See b/123587692 for more context.
     vocab_size = 20
     embedding_dim = 10
