@@ -348,6 +348,7 @@ class GRUV2Test(keras_parameterized.TestCase):
                 'return_sequences': True},
         input_shape=(num_samples, timesteps, embedding_dim))
 
+  @test_util.skip_dml # DML doesn't support float64 for most of the ops used in this test
   def test_float64_GRU(self):
     num_samples = 2
     timesteps = 3
