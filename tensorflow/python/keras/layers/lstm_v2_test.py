@@ -540,26 +540,24 @@ class LSTMV2Test(keras_parameterized.TestCase):
       weights = cpu_model.get_weights()
     y_1 = cpu_model.predict(x_train)
 
-    # Note that CuDNN uses 'sigmoid' as activation, so the LSTM V2 uses
-    # 'sigmoid' as default. Construct the canonical LSTM with sigmoid to achieve
-    # the same output.
     def run_y2y3():
       layer = rnn.LSTM(rnn_state_size)
       output = layer(inputs)
       gpu_model = keras.models.Model(inputs, output)
       gpu_model.set_weights(weights)
       y_2 = gpu_model.predict(x_train)
-
+      # Note that CuDNN uses 'sigmoid' as activation, so the LSTM V2 uses
+      # 'sigmoid' as default. Construct the canonical LSTM with sigmoid to achieve
+      # the same output.
       layer = rnn_v1.LSTM(rnn_state_size, recurrent_activation='sigmoid')
       output = layer(inputs)
       canonical_model = keras.models.Model(inputs, output)
       # Remove the extra cudnn bias since canonical lstm will not use it.
       canonical_model.set_weights(weights[:3])
       y_3 = canonical_model.predict(x_train)
-
       return y_2, y_3
 
-    # DML doesn't implement UnsortedSegmentSum, so allow default device placement (i.e.
+    # DML doesn't implement 'Qr', so allow default device placement (i.e.
     # prefer DML but fallback to CPU when necessary).
     if test_util.gpu_device_type() == "DML":
       y_2, y_3 = run_y2y3()

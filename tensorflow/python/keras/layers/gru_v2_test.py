@@ -54,12 +54,6 @@ _rewrites.min_graph_nodes = -1
 _graph_options = config_pb2.GraphOptions(rewrite_options=_rewrites)
 _config = config_pb2.ConfigProto(graph_options=_graph_options)
 
-# DML doesn't implement every operator that used in these tests (e.g.
-# 'Qr'), so we need fallback to CPU kernels for unsupported ops to pass 
-# the _v1_session test case.
-if test_util.IsBuiltWithDML():
-  _config = None
-
 @keras_parameterized.run_all_keras_modes(config=_config)
 class GRUV2Test(keras_parameterized.TestCase):
 
@@ -245,24 +239,31 @@ class GRUV2Test(keras_parameterized.TestCase):
       weights = cpu_model.get_weights()
       y_1 = cpu_model.predict(x_train)
 
-    with test_util.device(use_gpu=True):
-      layer = rnn.GRU(rnn_state_size)
-      output = layer(inputs)
-      gpu_model = keras.models.Model(inputs, output)
-      gpu_model.set_weights(weights)
-      y_2 = gpu_model.predict(x_train)
+    def run_y2y3():
+        layer = rnn.GRU(rnn_state_size)
+        output = layer(inputs)
+        gpu_model = keras.models.Model(inputs, output)
+        gpu_model.set_weights(weights)
+        y_2 = gpu_model.predict(x_train)
+        # Note that CuDNN uses 'sigmoid' as activation, so the GRU V2 uses
+        # 'sigmoid' as default. Construct the canonical GRU with sigmoid to achieve
+        # the same output.
+        layer = rnn_v1.GRU(rnn_state_size,
+                          recurrent_activation='sigmoid',
+                          reset_after=True)
+        output = layer(inputs)
+        canonical_model = keras.models.Model(inputs, output)
+        canonical_model.set_weights(weights)
+        y_3 = canonical_model.predict(x_train)
+        return y_2, y_3
 
-    # Note that CuDNN uses 'sigmoid' as activation, so the GRU V2 uses
-    # 'sigmoid' as default. Construct the canonical GRU with sigmoid to achieve
-    # the same output.
-    with test_util.device(use_gpu=True):
-      layer = rnn_v1.GRU(rnn_state_size,
-                         recurrent_activation='sigmoid',
-                         reset_after=True)
-      output = layer(inputs)
-      canonical_model = keras.models.Model(inputs, output)
-      canonical_model.set_weights(weights)
-      y_3 = canonical_model.predict(x_train)
+    # DML doesn't implement 'Qr', so allow default device placement (i.e.
+    # prefer DML but fallback to CPU when necessary).
+    if test_util.gpu_device_type() == "DML":
+      y_2, y_3 = run_y2y3()
+    else:
+      with test_util.device(use_gpu=True):
+        y_2, y_3 = run_y2y3()
 
     self.assertAllClose(y_1, y_2, rtol=1e-5, atol=1e-5)
     self.assertAllClose(y_2, y_3, rtol=1e-5, atol=1e-5)
