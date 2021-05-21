@@ -37,6 +37,10 @@ class OptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testBasic(self):
     for i, dtype in enumerate([dtypes.half, dtypes.float32, dtypes.float64]):
+      # DML doesn't support double
+      if test_util.IsBuiltWithDML() and dtype == dtypes.float64:
+        continue
+
       # Note that we name the variables uniquely here since the variables don't
       # seem to be getting deleted at the end of the loop.
       var0 = resource_variable_ops.ResourceVariable([1.0, 2.0], dtype=dtype,
@@ -180,6 +184,10 @@ class OptimizerTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def testGradientsAsVariables(self):
     for i, dtype in enumerate([dtypes.half, dtypes.float32, dtypes.float64]):
+      # DML doesn't support double
+      if test_util.IsBuiltWithDML() and dtype == dtypes.float64:
+        continue
+
       # Note that we name the variables uniquely here since the variables don't
       # seem to be getting deleted at the end of the loop.
       var0 = resource_variable_ops.ResourceVariable([1.0, 2.0], dtype=dtype,
