@@ -30,8 +30,7 @@ class DmlCommandList {
  public:
   // Constructs a command list.
   DmlCommandList(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                 D3D12_COMMAND_LIST_TYPE command_list_type,
-                 DmlAllocator* allocator);
+                 D3D12_COMMAND_LIST_TYPE command_list_type);
 
   // Records a CopyBufferRegion (see
   // ID3D12GraphicsCommandList::CopyBufferRegion) for execution. Transition
@@ -95,7 +94,6 @@ class DmlCommandList {
   ID3D12DescriptorHeap* current_descriptor_heap_ = nullptr;
   DmlGpuEvent current_completion_event_;
 
-  DmlAllocator* allocator_ = nullptr;
   DmlCommandAllocatorRing<2> command_allocator_ring_;
 
   void SetDescriptorHeap(ID3D12DescriptorHeap* descriptor_heap);

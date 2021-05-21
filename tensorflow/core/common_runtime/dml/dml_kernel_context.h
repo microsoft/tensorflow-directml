@@ -34,7 +34,6 @@ class DmlKernelConstruction {
  public:
   DmlKernelConstruction(
       const DmlDevice* device, OpKernelContext* op_ctx, const NodeDef* def,
-      const ShapeHelper* shape_helper,
       absl::Span<const TensorShape> output_shapes,
       std::shared_ptr<const InitializationHelper> init_helper);
 
@@ -120,7 +119,6 @@ class DmlKernelConstruction {
   const DmlDevice* device_;
   OpKernelContext* op_ctx_;
   const NodeDef* def_;
-  const ShapeHelper* shape_helper_;
   absl::Span<const TensorShape> output_shapes_;
   std::shared_ptr<const InitializationHelper> init_helper_;
 };

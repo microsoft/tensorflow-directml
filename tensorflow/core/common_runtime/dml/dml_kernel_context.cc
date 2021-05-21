@@ -29,13 +29,11 @@ namespace tensorflow {
 
 DmlKernelConstruction::DmlKernelConstruction(
     const DmlDevice* device, OpKernelContext* op_ctx, const NodeDef* def,
-    const ShapeHelper* shape_helper,
     absl::Span<const TensorShape> output_shapes,
     std::shared_ptr<const InitializationHelper> init_helper)
     : device_(device),
       op_ctx_(op_ctx),
       def_(def),
-      shape_helper_(shape_helper),
       output_shapes_(output_shapes),
       init_helper_(init_helper) {}
 

@@ -104,8 +104,7 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
     }
 
     DmlKernelConstruction dml_construction(dml_device, ctx, node_def_.get(),
-                                           shape_helper, output_shapes,
-                                           shared_helper);
+                                           output_shapes, shared_helper);
 
     if (cache_policy_ == DmlKernelCachePolicy::Never) {
       // This kernel has requested to never be cached; create a new one

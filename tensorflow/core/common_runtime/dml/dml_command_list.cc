@@ -23,13 +23,11 @@ limitations under the License.
 namespace tensorflow {
 
 DmlCommandList::DmlCommandList(ID3D12Device* d3d_device, IDMLDevice* dml_device,
-                               D3D12_COMMAND_LIST_TYPE command_list_type,
-                               DmlAllocator* allocator)
+                               D3D12_COMMAND_LIST_TYPE command_list_type)
     : d3d_device_(d3d_device),
       dml_device_(dml_device),
       command_list_type_(command_list_type),
       descriptor_pool_(d3d_device, 2048),
-      allocator_(allocator),
       command_allocator_ring_(d3d_device, command_list_type) {
   DML_CHECK_SUCCEEDED(
       dml_device->CreateCommandRecorder(IID_PPV_ARGS(&recorder_)));

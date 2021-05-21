@@ -42,7 +42,7 @@ class DmlCommandQueue;
 class DmlExecutionContext {
  public:
   DmlExecutionContext(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                      ID3D12CommandQueue* queue, DmlAllocator* allocator);
+                      ID3D12CommandQueue* queue);
 
   ~DmlExecutionContext();
 
@@ -130,11 +130,11 @@ class DmlExecutionContext {
   std::shared_ptr<DmlCommandList> dml_command_list_;
   std::thread execution_thread_;
 
-  static void ExecutionThreadProc(std::shared_ptr<BatchState> batch_state,
-                                  std::shared_ptr<DmlCommandList> command_list,
-                                  std::shared_ptr<DmlCommandQueue> command_queue,
-                                  uint32_t batch_flush_size,
-                                  uint32_t batch_flush_time_us);
+  static void ExecutionThreadProc(
+      std::shared_ptr<BatchState> batch_state,
+      std::shared_ptr<DmlCommandList> command_list,
+      std::shared_ptr<DmlCommandQueue> command_queue, uint32_t batch_flush_size,
+      uint32_t batch_flush_time_us);
 };
 
 }  // namespace tensorflow
