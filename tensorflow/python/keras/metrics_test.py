@@ -1378,8 +1378,8 @@ class MeanTensorTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_unweighted(self):
-    # DML doesn't support double
-    if test_util.IsBuiltWithDML():
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
       dtype = dtypes.float32
     else:
       dtype = dtypes.float64
@@ -1404,8 +1404,8 @@ class MeanTensorTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_weighted(self):
-    # DML doesn't support double
-    if test_util.IsBuiltWithDML():
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
       dtype = dtypes.float32
     else:
       dtype = dtypes.float64
@@ -1461,7 +1461,14 @@ class MeanTensorTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def test_build_in_tf_function(self):
     """Ensure that variables are created correctly in a tf function."""
-    m = metrics.MeanTensor(dtype=dtypes.float64)
+
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+
+    m = metrics.MeanTensor(dtype=dtype)
 
     @eager_function.defun
     def call_metric(x):
