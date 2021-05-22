@@ -33,8 +33,7 @@ namespace tensorflow {
 
 DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
                                          IDMLDevice* dml_device,
-                                         ID3D12CommandQueue* queue,
-                                         DmlAllocator* allocator) {
+                                         ID3D12CommandQueue* queue) {
 #if _WIN32
   auto kernel32_handle_or =
       stream_executor::internal::CachedDsoLoader::GetKernel32DsoHandle();
@@ -74,7 +73,7 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
   }
 
   dml_command_list_ = std::make_shared<DmlCommandList>(
-      d3d_device, dml_device, dml_command_queue_->GetType(), allocator);
+      d3d_device, dml_device, dml_command_queue_->GetType());
 
   execution_thread_ =
       std::thread(ExecutionThreadProc, batch_state_, dml_command_list_,
