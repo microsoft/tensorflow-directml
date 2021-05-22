@@ -75,8 +75,14 @@ class KerasSumTest(test.TestCase):
     self.assertEqual(self.evaluate(m.total), 0)
 
   def test_sum_with_sample_weight(self):
-    m = metrics.Sum(dtype=dtypes.float64)
-    self.assertEqual(m.dtype, dtypes.float64)
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+
+    m = metrics.Sum(dtype=dtype)
+    self.assertEqual(m.dtype, dtype)
     self.evaluate(variables.variables_initializer(m.variables))
 
     # check scalar weight
@@ -1378,7 +1384,12 @@ class MeanTensorTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_unweighted(self):
-    m = metrics.MeanTensor(dtype=dtypes.float64)
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+    m = metrics.MeanTensor(dtype=dtype)
 
     # check __call__()
     self.assertAllClose(self.evaluate(m([100, 40])), [100, 40])
@@ -1399,8 +1410,13 @@ class MeanTensorTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_weighted(self):
-    m = metrics.MeanTensor(dtype=dtypes.float64)
-    self.assertEqual(m.dtype, dtypes.float64)
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+    m = metrics.MeanTensor(dtype=dtype)
+    self.assertEqual(m.dtype, dtype)
 
     # check scalar weight
     result_t = m([100, 30], sample_weight=0.5)
@@ -1428,7 +1444,7 @@ class MeanTensorTest(test.TestCase):
     self.assertAllClose(self.evaluate(m.count), [3, 1.4])
 
     # check weights expand
-    m = metrics.MeanTensor(dtype=dtypes.float64)
+    m = metrics.MeanTensor(dtype=dtype)
     self.evaluate(variables.variables_initializer(m.variables))
     result_t = m([[1], [5]], sample_weight=[1, 0.2])
     self.assertAllClose(self.evaluate(result_t), [[1], [5]])
@@ -1451,7 +1467,14 @@ class MeanTensorTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def test_build_in_tf_function(self):
     """Ensure that variables are created correctly in a tf function."""
-    m = metrics.MeanTensor(dtype=dtypes.float64)
+
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+
+    m = metrics.MeanTensor(dtype=dtype)
 
     @eager_function.defun
     def call_metric(x):

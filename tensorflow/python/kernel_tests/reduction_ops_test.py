@@ -694,6 +694,7 @@ class MinReductionTest(test.TestCase):
         tf_v = self.evaluate(v)
       self.assertAllEqual(tf_v, 0)
 
+  @test_util.skip_dml # Re-enable after DML is upgraded to 1.7 #33412454
   @test_util.run_deprecated_v1
   def testInfinity(self):
     for dtype in [np.float32, np.float64]:
@@ -813,6 +814,7 @@ class MaxReductionTest(test.TestCase):
         tf_v = self.evaluate(v)
       self.assertAllEqual(tf_v, 0)
 
+  @test_util.skip_dml # Re-enable after DML is upgraded to 1.7 #33412454
   @test_util.run_deprecated_v1
   def testInfinity(self):
     for dtype in [np.float32, np.float64]:
