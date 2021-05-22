@@ -75,8 +75,14 @@ class KerasSumTest(test.TestCase):
     self.assertEqual(self.evaluate(m.total), 0)
 
   def test_sum_with_sample_weight(self):
-    m = metrics.Sum(dtype=dtypes.float64)
-    self.assertEqual(m.dtype, dtypes.float64)
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+
+    m = metrics.Sum(dtype=dtype)
+    self.assertEqual(m.dtype, dtype)
     self.evaluate(variables.variables_initializer(m.variables))
 
     # check scalar weight
