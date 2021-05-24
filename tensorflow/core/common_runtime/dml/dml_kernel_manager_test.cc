@@ -32,7 +32,7 @@ namespace tensorflow {
 class DmlKernelManagerTest : public ::testing::Test {
  public:
   DmlKernelManagerTest()
-      : ctx_(nullptr, nullptr, nullptr, nullptr, {}, nullptr),
+      : ctx_(nullptr, nullptr, nullptr, {}, nullptr),
         init_helper_(nullptr, nullptr),
         kernel_manager_() {}
 
