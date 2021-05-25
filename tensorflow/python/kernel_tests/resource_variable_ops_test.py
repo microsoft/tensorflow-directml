@@ -1337,6 +1337,10 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
   ])
   @test_util.run_in_graph_and_eager_modes
   def testGatherWithBatchDims(self, params, indices, batch_dims, expected):
+    # This test doesn't run on Windows in eager mode
+    if os.name == "nt" and context.executing_eagerly():
+      return
+
     var = resource_variable_ops.ResourceVariable(params, name="var0")
     with ops.control_dependencies([var.initializer]):
       result = resource_variable_ops.resource_gather(
@@ -1384,6 +1388,11 @@ class ResourceVariableOpsTest(test_util.TensorFlowTestCase,
   def testGatherWithBatchDimsMatchesTensor(self, params_shape, indices_shape,
                                            batch_dims, output_shape):
     """Checks that gather with batch_dims returns the correct shape."""
+
+    # This test doesn't run on Windows in eager mode
+    if os.name == "nt" and context.executing_eagerly():
+      return
+
     # Generate a `params` tensor with the indicated shape.
     params_size = np.prod(params_shape)
     params = np.reshape(np.arange(params_size, dtype=np.int32), params_shape)
