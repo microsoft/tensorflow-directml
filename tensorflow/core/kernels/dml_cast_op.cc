@@ -73,6 +73,10 @@ class DmlCastKernel : public DmlKernel {
 
     auto result = dml::Cast(input_tensor, dml_out_dtype);
 
+    if (output_dtype == DT_BOOL) {
+      result = dml::Clip(result, 0.0, 1.0);
+    }
+
     // TFDML #24881131
     if (Is64BitSignedIntegerType(output_dtype)) {
       result = dml::ConvertInt32ToInt64(scope, result);
