@@ -1287,6 +1287,9 @@ class MeanIoUTest(test.TestCase):
     self.assertEqual(m_obj2.name, 'mean_iou')
     self.assertEqual(m_obj2.num_classes, 2)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_unweighted(self):
     y_pred = [0, 1, 0, 1]
     y_true = [0, 0, 1, 1]
@@ -1303,6 +1306,9 @@ class MeanIoUTest(test.TestCase):
     expected_result = (1 / (2 + 2 - 1) + 1 / (2 + 2 - 1)) / 2
     self.assertAllClose(self.evaluate(result), expected_result, atol=1e-3)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_weighted(self):
     y_pred = constant_op.constant([0, 1, 0, 1], dtype=dtypes.float32)
     y_true = constant_op.constant([0, 0, 1, 1])
@@ -1320,6 +1326,9 @@ class MeanIoUTest(test.TestCase):
     expected_result = (0.2 / (0.6 + 0.5 - 0.2) + 0.1 / (0.4 + 0.5 - 0.1)) / 2
     self.assertAllClose(self.evaluate(result), expected_result, atol=1e-3)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_multi_dim_input(self):
     y_pred = constant_op.constant([[0, 1], [0, 1]], dtype=dtypes.float32)
     y_true = constant_op.constant([[0, 0], [1, 1]])
@@ -1342,6 +1351,9 @@ class MeanIoUTest(test.TestCase):
     self.evaluate(variables.variables_initializer(m_obj.variables))
     self.assertAllClose(self.evaluate(m_obj.result()), 0, atol=1e-3)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_zero_and_non_zero_entries(self):
     y_pred = constant_op.constant([1], dtype=dtypes.float32)
     y_true = constant_op.constant([1])
