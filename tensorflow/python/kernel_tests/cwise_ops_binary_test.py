@@ -783,6 +783,8 @@ class BinaryOpTest(test.TestCase):
           error = gradient_checker.compute_gradient_error(y, [], z, [])
           self.assertLess(error, 2e-4)
 
+  # Atan2 in DML is undefined for most of those special values
+  @test_util.skip_dml
   def testAtan2SpecialValues(self):
     x1l, x2l = zip((+0.0, +0.0), (+0.0, -0.0), (-0.0, +0.0), (-0.0, -0.0),
                    (1.2345, float("inf")), (1.2345, -float("inf")),
