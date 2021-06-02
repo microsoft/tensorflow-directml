@@ -183,7 +183,7 @@ class BinaryOpTest(test.TestCase):
     if test_util.gpu_device_type() == "DML" and x.dtype == np.float16:
       self.assertAllClose(np_ans, tf_gpu, rtol=2e-3)
     else:
-      self.assertAllClose(np_ans, tf_gpu)
+      self.assertAllClose(np_ans, tf_gpu, atol=1e-4)
     self.assertShapeEqual(np_ans, out)
     # TODO(zhifengc/ke): make gradient checker work on GPU.
 
