@@ -464,6 +464,7 @@ class DmlRandomUniformKernel : public DmlKernel {
       Name("RandomUniform")               \
           .Device(DEVICE_DML)             \
           .HostMemory("shape")            \
+          .TypeConstraint<int32>("T")     \
           .TypeConstraint<type>("dtype"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
@@ -476,6 +477,7 @@ TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
           .HostMemory("shape")           \
           .HostMemory("minval")          \
           .HostMemory("maxval")          \
+          .TypeConstraint<int32>("T")    \
           .TypeConstraint<type>("Tout"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
 TF_CALL_int32(DML_REGISTER_KERNEL);
