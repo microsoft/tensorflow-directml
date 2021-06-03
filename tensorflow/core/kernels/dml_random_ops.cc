@@ -350,6 +350,17 @@ class RandomUniformInitHelper : public InitializationHelper {
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
 
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    for (size_t i = 0; i < output_shapes.size(); ++i) {
+      if (output_shapes[i].num_elements() != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
  private:
   TensorShape output_shape_;
 };
