@@ -284,13 +284,15 @@ class AutoLambdaTest(keras_parameterized.TestCase):
       grads = t.gradient(z, x)
       return grads
 
-    self.assertAllEqual(f(constant_op.constant(10.0, shape=(1, 1))),
-                        constant_op.constant(40.0, shape=(1, 1)))
+    assertFn = self.assertAllClose if test.is_built_with_dml() else self.assertAllEqual
+
+    assertFn(f(constant_op.constant(10.0, shape=(1, 1))),
+             constant_op.constant(40.0, shape=(1, 1)))
 
     f = def_function.function(f)
 
-    self.assertAllEqual(f(constant_op.constant(10.0, shape=(1, 1))),
-                        constant_op.constant(40.0, shape=(1, 1)))
+    assertFn(f(constant_op.constant(10.0, shape=(1, 1))),
+             constant_op.constant(40.0, shape=(1, 1)))
 
   def test_no_tracking(self):
     x = keras.backend.placeholder((10, 10))
