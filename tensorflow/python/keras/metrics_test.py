@@ -292,7 +292,11 @@ class KerasMeanTest(keras_parameterized.TestCase):
     # restore to the same checkpoint mean object
     checkpoint.restore(save_path).assert_consumed().run_restore_ops()
     self.evaluate(m(300.))
-    self.assertEqual(200., self.evaluate(m.result()))
+
+    if test.is_built_with_dml():
+      self.assertAlmostEqual(200., self.evaluate(m.result()), delta=2e-5)
+    else:
+      self.assertEqual(200., self.evaluate(m.result()))
 
     # restore to a different checkpoint mean object
     restore_mean = metrics.Mean()
@@ -301,7 +305,11 @@ class KerasMeanTest(keras_parameterized.TestCase):
     restore_update = restore_mean(300.)
     status.assert_consumed().run_restore_ops()
     self.evaluate(restore_update)
-    self.assertEqual(200., self.evaluate(restore_mean.result()))
+
+    if test.is_built_with_dml():
+      self.assertAlmostEqual(200., self.evaluate(restore_mean.result()), delta=2e-5)
+    else:
+      self.assertEqual(200., self.evaluate(restore_mean.result()))
     self.assertEqual(3, self.evaluate(restore_mean.count))
 
   def test_multiple_instances(self):
@@ -494,7 +502,10 @@ class KerasAccuracyTest(test.TestCase):
     update_op = acc_obj.update_state(rt1, rt2)
     self.evaluate(update_op)
     result = self.evaluate(acc_obj.result())
-    self.assertEqual(result, 1)  # 2/2
+    if test.is_built_with_dml():
+      self.assertAlmostEqual(result, 1, places=6)  # 2/2
+    else:
+      self.assertEqual(result, 1)  # 2/2
 
     # check with sample_weight
     rt1 = ragged_factory_ops.constant([[0, 0, 1], [0, 1, 0]])
