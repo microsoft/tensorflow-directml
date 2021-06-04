@@ -137,7 +137,8 @@ class MultipleInputTest(keras_parameterized.TestCase):
 
     model = self._get_multiple_input_model(subclassed)
     loss = model.evaluate(x, y, batch_size=3)
-    self.assertAlmostEqual(loss, 2.)
+    places = 6 if test.is_built_with_dml() else None
+    self.assertAlmostEqual(loss, 2., places=places)
 
   @parameterized.named_parameters(('subclassed', True), ('functional', False))
   def test_multiple_input_predict(self, subclassed):
