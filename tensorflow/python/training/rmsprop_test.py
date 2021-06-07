@@ -169,7 +169,7 @@ class RMSPropOptimizerTest(test.TestCase):
           self.assertAllCloseAccordingToType(
                 var0_np, self.evaluate(var0), half_atol=2e-3)
           self.assertAllCloseAccordingToType(
-                var1_np, self.evaluate(var1), half_atol=2e-3)
+                var1_np, self.evaluate(var1), half_rtol=2e-3)
 
   @test_util.run_deprecated_v1
   def testMinimizeSparseResourceVariable(self):
