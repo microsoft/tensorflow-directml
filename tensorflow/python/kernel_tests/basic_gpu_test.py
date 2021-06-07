@@ -91,13 +91,13 @@ class GPUBinaryOpsTest(test.TestCase):
 
 class MathBuiltinUnaryTest(test.TestCase):
 
-  def _compare(self, x, np_func, tf_func, use_gpu):
+  def _compare(self, x, np_func, tf_func, use_gpu, atol=1e-6):
     np_out = np_func(x)
     with self.cached_session(use_gpu=use_gpu) as sess:
       inx = ops.convert_to_tensor(x)
       ofunc = tf_func(inx)
       tf_out = self.evaluate(ofunc)
-    self.assertAllClose(np_out, tf_out, rtol=1e-4)
+    self.assertAllClose(np_out, tf_out, atol=atol, rtol=1e-4)
 
   def _inv(self, x):
     return 1.0 / x
@@ -110,7 +110,7 @@ class MathBuiltinUnaryTest(test.TestCase):
     data_gt_1 = data + 2 # for x > 1
     self._compare(data, np.abs, math_ops.abs, use_gpu)
     self._compare(data, np.arccos, math_ops.acos, use_gpu)
-    self._compare(data, np.arcsin, math_ops.asin, use_gpu)
+    self._compare(data, np.arcsin, math_ops.asin, use_gpu, atol=1e-4)
     self._compare(data, np.arcsinh, math_ops.asinh, use_gpu)
     self._compare(data_gt_1, np.arccosh, math_ops.acosh, use_gpu)
     self._compare(data, np.arctan, math_ops.atan, use_gpu)

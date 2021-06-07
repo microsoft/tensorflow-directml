@@ -93,7 +93,7 @@ class BatchNormalizationTest(test.TestCase):
     # An atol value of 1e-3 is too small for float16's, because some adjacent
     # float16 values that y_val can take are greater than 1e-3 apart, e.g.
     # 2.16602 and 2.16797.
-    atol = 4e-3 if x_dtype == np.float16 else 1e-3
+    atol = 5e-3 if x_dtype == np.float16 else 1e-3
     self.assertAllClose(y_ref, y_val, atol=atol)
 
   def _training_ref(self, x, scale, offset, epsilon, data_format):
@@ -138,7 +138,7 @@ class BatchNormalizationTest(test.TestCase):
       y_val, mean_val, var_val = self.evaluate([y, mean, var])
       y_ref, mean_ref, var_ref = self._training_ref(x, scale, offset, epsilon,
                                                     data_format)
-    y_atol = 4e-3 if x_dtype == np.float16 else 1e-3
+    y_atol = 5e-3 if x_dtype == np.float16 else 1e-3
     self.assertAllClose(y_ref, y_val, atol=y_atol)
     self.assertAllClose(mean_ref, mean_val, atol=1e-3)
     # This is for Bessel's correction. tf.nn.moments uses n, instead of n-1, as
@@ -630,7 +630,7 @@ class BatchNormalizationTest(test.TestCase):
   def testBatchNormGradGradConfig3(self):
     config = {
         'shape': [2, 3, 4, 5],
-        'err_tolerance': 2e-2,
+        'err_tolerance': 3e-2,
         'dtype': np.float16,
     }
     self._testBatchNormGradGrad(config)
@@ -639,7 +639,7 @@ class BatchNormalizationTest(test.TestCase):
   def testBatchNormGradGradConfig4(self):
     config = {
         'shape': [2, 3, 2, 2],
-        'err_tolerance': 1e-2,
+        'err_tolerance': 2e-2,
         'dtype': np.float16,
     }
     self._testBatchNormGradGrad(config)
