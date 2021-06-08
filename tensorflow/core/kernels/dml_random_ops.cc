@@ -294,7 +294,7 @@ TF_CALL_int32(DML_REGISTER_KERNEL);
 // ----------------------------------------------------------------------------
 
 template <typename TKernel, typename TShapeHelper,
-          DmlKernelCachePolicy cache_policy = DmlKernelCachePolicy::Default>
+          DmlKernelCachePolicy cache_policy = DmlKernelCachePolicy::Never>
 class DmlPhiloxWrapper
     : public DmlKernelWrapper<TKernel, TShapeHelper, cache_policy> {
  public:
