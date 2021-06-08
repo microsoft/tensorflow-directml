@@ -154,6 +154,17 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
   const random::PhiloxRandom::Key GetKey() const { return key_; }
   const random::PhiloxRandom::ResultType GetCounter() const { return counter_; }
 
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    for (size_t i = 0; i < output_shapes.size(); ++i) {
+      if (output_shapes[i].num_elements() != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
  private:
   TensorShape output_shape_;
   random::PhiloxRandom::Key key_;
