@@ -376,7 +376,7 @@ class LinearOperatorScaledIdentityTest(
           num_rows=2, multiplier=multiplier)
       x = rng.randn(2, 3).astype(np.float16)
       y = operator.matmul(x)
-      self.assertAllClose(multiplier[..., None, None] * x, self.evaluate(y))
+      self.assertAllCloseAccordingToType(multiplier[..., None, None] * x, self.evaluate(y))
 
   def test_non_scalar_num_rows_raises_static(self):
     # Many "test_...num_rows" tests are performed in LinearOperatorIdentity.

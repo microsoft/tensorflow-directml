@@ -593,7 +593,7 @@ class UnaryOpTest(test.TestCase):
 
     err = gradient_checker_v2.max_error(
         *gradient_checker_v2.compute_gradient(g, [ops.convert_to_tensor(2.0)]))
-    self.assertLess(err, 1e-3)
+    self.assertLess(err, 2e-2)
 
 
 if __name__ == "__main__":
