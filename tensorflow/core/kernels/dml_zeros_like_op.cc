@@ -131,7 +131,8 @@ class DmlZerosLikeKernel : public OpKernel {
 
   void Compute(OpKernelContext* ctx) override {
     Tensor* output_tensor = nullptr;
-    OP_REQUIRES_OK(ctx, ctx->forward_input_or_allocate_output({0}, 0, ctx->input(0).shape(), &output_tensor));
+    OP_REQUIRES_OK(ctx, ctx->forward_input_or_allocate_output(
+                            {0}, 0, ctx->input(0).shape(), &output_tensor));
     if (output_tensor->NumElements() > 0) {
       SetTensorToZero(ctx, *output_tensor);
     }
