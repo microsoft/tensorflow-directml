@@ -131,10 +131,10 @@ class DmlZerosLikeKernel : public OpKernel {
 
   void Compute(OpKernelContext* ctx) override {
     Tensor* output_tensor = nullptr;
-    OP_REQUIRES_OK(
-        ctx, ctx->allocate_output(0, ctx->input(0).shape(), &output_tensor));
-
-    SetTensorToZero(ctx, *output_tensor);
+    OP_REQUIRES_OK(ctx, ctx->forward_input_or_allocate_output({0}, 0, ctx->input(0).shape(), &output_tensor));
+    if (output_tensor->NumElements() > 0) {
+      SetTensorToZero(ctx, *output_tensor);
+    }
   }
 };
 
@@ -167,15 +167,13 @@ class DmlZerosLikeKernelVariant : public OpKernel {
       DmlZerosLikeKernel);
 
 // TODO(b/25387198): A special kernel exists for int32 (see constant_op.cc).
-TF_CALL_bool(REGISTER_DML_KERNEL)
-TF_CALL_half(REGISTER_DML_KERNEL)
-TF_CALL_float(REGISTER_DML_KERNEL)
-TF_CALL_int64(REGISTER_DML_KERNEL)
+TF_CALL_bool(REGISTER_DML_KERNEL) TF_CALL_half(REGISTER_DML_KERNEL)
+    TF_CALL_float(REGISTER_DML_KERNEL) TF_CALL_int64(REGISTER_DML_KERNEL)
 #undef REGISTER_DML_KERNEL
 
-REGISTER_KERNEL_BUILDER(
-    Name("ZerosLike").Device(DEVICE_DML).TypeConstraint<Variant>("T"),
-    DmlZerosLikeKernelVariant);
+        REGISTER_KERNEL_BUILDER(
+            Name("ZerosLike").Device(DEVICE_DML).TypeConstraint<Variant>("T"),
+            DmlZerosLikeKernelVariant);
 
 #define REGISTER_VARIANT_DML_KERNEL(TYPE)                               \
   REGISTER_UNARY_VARIANT_UNARY_OP_FUNCTION(ZEROS_LIKE_VARIANT_UNARY_OP, \
