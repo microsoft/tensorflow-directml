@@ -99,6 +99,17 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
     // means that the wait we perform below will return immediately, and the
     // loop will continue.
     uint64_t next_fence_value = state->fence->GetCompletedValue() + 1;
+
+    // Device removal will result in all fences reporting a completed value of
+    // UINT64_MAX; GetCompletedValue()+1 will overflow to 0. The intention
+    // here is to ensure all outstanding events are signaled, but this queue uses
+    // the *next* value (0) to flush events in a batch. If the device is removed
+    // we explicitly set the next_fence_value to UINT64_MAX so that all events
+    // are flushed then exit this thread.
+    bool device_removed = next_fence_value == 0;
+    if (device_removed) {
+      next_fence_value = std::numeric_limits<uint64_t>::max();
+    }
     state->current_awaited_fence_value = next_fence_value;
 
     // Find all the events that have fence values < next_fence_values. These
@@ -118,6 +129,10 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
     // Process the events by invoking their done callback
     for (const auto& event : events_to_process) {
       event.done_callback();
+    }
+
+    if (device_removed) {
+      break;
     }
 
     bool event_queue_empty = state->events_by_fence_value.empty();
