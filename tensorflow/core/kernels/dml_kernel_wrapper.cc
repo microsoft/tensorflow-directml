@@ -103,6 +103,22 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
       return;
     }
 
+    int inputIndexToForward = -1;
+    if (shared_helper->IsInputForwardable(ctx, output_shapes,
+                                          inputIndexToForward)) {
+      // This should be set if true was returned
+      CHECK(inputIndexToForward != -1);
+      // We assume we are forwarding one input to one output for now.
+      CHECK(ctx->num_outputs() == 1);
+      constexpr int outputIndex = 0;
+      Tensor* output;
+      CHECK(ctx->forward_input_to_output_with_shape(
+          inputIndexToForward, outputIndex, output_shapes[outputIndex],
+          &output));
+
+      return;
+    }
+
     DmlKernelConstruction dml_construction(dml_device, ctx, node_def_.get(),
                                            output_shapes, shared_helper);
 

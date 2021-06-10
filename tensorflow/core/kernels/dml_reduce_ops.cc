@@ -66,6 +66,21 @@ class ReduceInitializationHelper : public InitializationHelper {
     return false;
   }
 
+  bool IsInputForwardable(OpKernelContext* ctx,
+                          absl::Span<const TensorShape> output_shapes,
+                          int& inputIndex) const override {
+    bool is_identity =
+        !is_arg_function_ && (reduction_helper_.ndims() == 0 ||
+                              (reduction_helper_.ndims() == 1 &&
+                               !reduction_helper_.reduce_first_axis()));
+
+    bool requiresConversion =
+        Is64BitSignedIntegerType(ctx->expected_output_dtype(0));
+    // for identity reduce we want to forward the input at index 0
+    inputIndex = 0;
+    return (is_identity && !requiresConversion);
+  }
+
   ReduceInitializationHelper(OpKernelContext* ctx,
                              std::shared_ptr<const Attributes> attr) {
     // We delegate most of the work to TF's existing ReductionHelper
@@ -87,6 +102,9 @@ class ReduceInitializationHelper : public InitializationHelper {
 
  private:
   ReductionHelper reduction_helper_;
+  static constexpr bool is_arg_function_ =
+      reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
+      reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
 };
 
 template <DML_REDUCE_FUNCTION reduce_function>
@@ -261,7 +279,8 @@ class DmlReduceKernel : public DmlKernel {
         (reduce_helper.ndims() == 0 ||
          (reduce_helper.ndims() == 1 && !reduce_helper.reduce_first_axis()));
 
-    if (is_identity) {
+    // TFDML #24881131
+    if (is_identity && Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
       // Since the reduce helper may have removed dimensions of size 1, we can't
       // just take its shape as-is. We know that this is an identity scenario,
       // so we can just collapse all dimensions into one and use the same tensor
@@ -282,10 +301,7 @@ class DmlReduceKernel : public DmlKernel {
       auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
       auto result = dml::Identity(dml::InputTensor(scope, 0, input_descs[0]));
 
-      // TFDML #24881131
-      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-        result = dml::ConvertInt32ToInt64(scope, result);
-      }
+      result = dml::ConvertInt32ToInt64(scope, result);
 
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
