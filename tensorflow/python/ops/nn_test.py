@@ -43,8 +43,6 @@ import tensorflow.python.ops.nn_grad  # pylint: disable=unused-import
 from tensorflow.python.ops.nn_impl import _compute_sampled_logits
 from tensorflow.python.platform import test as test_lib
 
-import os
-input(os.getpid())
 
 class ZeroFractionTest(test_lib.TestCase):
 
