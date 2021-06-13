@@ -23,21 +23,58 @@ limitations under the License.
 
 namespace tensorflow {
 
+// Ensure that `src` and `dst` define a valid permutation.
+// Ops defined in this file assume that user specifies a permutation via two
+// string attributes. This check validates that these attributes properly define
+// it to prevent security vulnerabilities.
+static bool IsValidPermutation(const std::string& src, const std::string& dst) {
+  if (src.size() != dst.size()) {
+    return false;
+  }
+
+  std::map<char, bool> characters;
+
+  // Every character in `src` must be present only once
+  for (const auto c : src) {
+    if (characters[c]) {
+      return false;
+    }
+    characters[c] = true;
+  }
+
+  // Every character in `dst` must show up in `src` exactly once
+  for (const auto c : dst) {
+    if (!characters[c]) {
+      return false;
+    }
+    characters[c] = false;
+  }
+
+  // At this point, characters[] has been switched to true and false exactly
+  // once for all character in `src` (and `dst`) so we have a valid permutation
+  return true;
+}
+
 class DataFormatDimMapInitHelper : public InitializationHelper {
  public:
   struct Attributes {
     explicit Attributes(OpKernelConstruction* ctx) {
       OP_REQUIRES_OK(ctx, ctx->GetAttr("src_format", &src_format));
       OP_REQUIRES_OK(ctx, ctx->GetAttr("dst_format", &dst_format));
-      OP_REQUIRES(ctx, src_format.size() == 4,
+      OP_REQUIRES(ctx, src_format.size() == 4 || src_format.size() == 5,
                   errors::InvalidArgument(strings::StrCat(
-                      "Source format must of length 4, received src_format = ",
+                      "Source format must be of length 4 or 5, received "
+                      "src_format = ",
                       src_format)));
-      OP_REQUIRES(
-          ctx, dst_format.size() == 4,
-          errors::InvalidArgument(strings::StrCat(
-              "Destination format must of length 4, received dst_format = ",
-              dst_format)));
+      OP_REQUIRES(ctx, dst_format.size() == 4 || dst_format.size() == 5,
+                  errors::InvalidArgument(
+                      strings::StrCat("Destination format must be of length "
+                                      "4 or 5, received dst_format = ",
+                                      dst_format)));
+      OP_REQUIRES(ctx, IsValidPermutation(src_format, dst_format),
+                  errors::InvalidArgument("Destination and source format must "
+                                          "determine a permutation, got ",
+                                          src_format, " and ", dst_format));
     }
 
     std::string src_format;
@@ -55,6 +92,7 @@ class DataFormatDimMapInitHelper : public InitializationHelper {
   const std::shared_ptr<const Attributes> attr_;
 };
 
+template <typename T>
 class DmlDataFormaDimMapKernel : public DmlKernel {
  public:
   using InitHelper = DataFormatDimMapInitHelper;
@@ -71,34 +109,52 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     // gather operation.
     uint32_t src_dst_mapping_packed = 0;
     uint32_t left_shift = 0;
+    uint8_t additional_src_dst_mapping = 0;
 
     for (uint8_t i = 0; i < src_format.size(); ++i) {
       for (uint8_t j = 0; j < dst_format.size(); ++j) {
         if (dst_format[j] == src_format[i]) {
-          src_dst_mapping_packed |= j << left_shift;
-          left_shift += 8;
+          if (left_shift == 32) {
+            // If we are dealing with a 5D format, we need an additional uint8_t
+            // to store the last mapping
+            additional_src_dst_mapping = j;
+          } else {
+            src_dst_mapping_packed |= j << left_shift;
+            left_shift += 8;
+          }
           break;
         }
       }
     }
 
-    auto scope = dml::Graph(ctx->GetDmlDevice());
+    TensorShape collapsed_shape({ctx->GetInputTensorShape(0).num_elements()});
 
-    DmlKernelTensors tensors = GetTensorInfos(ctx, {});
+    DmlTensorInfo in_out;
+    in_out.kernel_index = 0;
+    in_out.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0),
+                                        collapsed_shape, collapsed_shape);
+
+    DmlKernelTensors tensors;
+    tensors.inputs = {in_out};
+    tensors.outputs = {in_out};
+
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto indices = dml::InputTensor(scope, 0, inputs[0]);
-
-    DML_SCALAR_UNION bits_scalar;
-    bits_scalar.UInt32 = src_dst_mapping_packed;
-
-    auto params = dml::FillValueConstant(
-        scope, {1, 1, 1, 1}, DML_TENSOR_DATA_TYPE_UINT32, bits_scalar);
+    auto params = dml::ScalarTensor<uint32_t>(scope, src_dst_mapping_packed,
+                                              {1, 1, 1, 1});
 
     params =
         dml::Reinterpret(params, DML_TENSOR_DATA_TYPE_UINT8, {1, 1, 1, 4}, {});
 
     constexpr uint32_t gather_axis = 3;
-    constexpr uint32_t index_dimensions = 1;
+
+    if (src_format.size() == 5) {
+      auto additional_params = dml::ScalarTensor<uint8_t>(
+          scope, additional_src_dst_mapping, {1, 1, 1, 1});
+
+      params = dml::Join({params, additional_params}, gather_axis);
+    }
 
     // We need strides of 4 for int32 and strides of 8 for int64 since the
     // params are uint8
@@ -126,6 +182,8 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
         });
 
     scope.SetTensorPolicy(out_policy);
+
+    constexpr uint32_t index_dimensions = 1;
     auto result = dml::Gather(params, indices, gather_axis, index_dimensions);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -146,7 +204,7 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
 #define REGISTER_KERNEL(T)                                                \
   REGISTER_KERNEL_BUILDER(                                                \
       Name("DataFormatDimMap").Device(DEVICE_DML).TypeConstraint<T>("T"), \
-      DmlKernelWrapper<DmlDataFormaDimMapKernel,                          \
+      DmlKernelWrapper<DmlDataFormaDimMapKernel<T>,                       \
                        GetOutputShapeAsInputShapeHelper>);
 
 TF_CALL_int32(REGISTER_KERNEL);
