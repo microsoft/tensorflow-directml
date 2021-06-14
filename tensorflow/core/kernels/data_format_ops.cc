@@ -176,7 +176,7 @@ class DataFormatVecPermuteOp : public OpKernel {
     OP_REQUIRES_OK(context,
                    context->allocate_output(0, input.shape(), &output));
     // Support 1D and 2D cases.
-    Eigen::DSizes<Eigen::DenseIndex, 8> dst_idx;
+    Eigen::DSizes<Eigen::DenseIndex, 10> dst_idx;
     string src_format_str = src_format_;
     string dst_format_str = dst_format_;
     if (input.dim_size(0) == spatial_dim_count) {
@@ -220,7 +220,7 @@ class DataFormatVecPermuteOp : public OpKernel {
   // Example: HWNC --> NHWC
   // 1D: dst = [1, 2, 0, 3],
   // 2D: dst = [2, 3, 4, 5, 0, 1, 6, 7]
-  void ComputeDstIndex(int num_dim, Eigen::DSizes<Eigen::DenseIndex, 8>* dst) {
+  void ComputeDstIndex(int num_dim, Eigen::DSizes<Eigen::DenseIndex, 10>* dst) {
     for (int i = 0; i < src_format_.size(); ++i) {
       for (int j = 0; j < dst_format_.size(); ++j) {
         if (dst_format_[j] != src_format_[i]) continue;
@@ -286,12 +286,12 @@ TF_CALL_int32(DECLARE_GPU_SPECS);
 TF_CALL_int64(DECLARE_GPU_SPECS);
 #undef DECLARE_GPU_SPEC
 
-#define DECLARE_GPU_SPEC(T)                                \
-  template <>                                              \
-  void DataFormatVecPermute<GPUDevice, T>::operator()(     \
-      const GPUDevice& d, typename TTypes<T>::ConstFlat x, \
-      typename TTypes<T>::Vec y,                           \
-      const Eigen::DSizes<Eigen::DenseIndex, 8>& dst_idx); \
+#define DECLARE_GPU_SPEC(T)                                 \
+  template <>                                               \
+  void DataFormatVecPermute<GPUDevice, T>::operator()(      \
+      const GPUDevice& d, typename TTypes<T>::ConstFlat x,  \
+      typename TTypes<T>::Vec y,                            \
+      const Eigen::DSizes<Eigen::DenseIndex, 10>& dst_idx); \
   extern template struct DataFormatVecPermute<GPUDevice, T>;
 #define DECLARE_GPU_SPECS(T) DECLARE_GPU_SPEC(T);
 TF_CALL_int32(DECLARE_GPU_SPECS);
