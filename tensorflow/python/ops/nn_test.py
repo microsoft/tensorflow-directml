@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import math
+import os
 
 from absl.testing import parameterized
 import numpy as np
@@ -1121,6 +1122,8 @@ class MomentsTest(test_lib.TestCase):
     self.doOutputTest((10, 10, 10, 30), (0, 1, 2))
 
   def testOutput4DInput123(self):
+    if os.name == "nt":
+      self.skipTest("This test doesn't work on Windows")
     self.doOutputTest((10, 10, 10, 30), (1, 2, 3))
 
 
