@@ -348,7 +348,7 @@ class CosineDecayTest(test_util.TensorFlowTestCase):
       decayed_lr = learning_rate_decay.cosine_decay(initial_lr, step,
                                                     num_training_steps)
       expected = self.np_cosine_decay(step, num_training_steps)
-      self.assertAllClose(self.evaluate(decayed_lr), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr), expected, atol=2e-6)
 
   @test_util.run_in_graph_and_eager_modes
   def testAlpha(self):
@@ -359,7 +359,7 @@ class CosineDecayTest(test_util.TensorFlowTestCase):
       decayed_lr = learning_rate_decay.cosine_decay(initial_lr, step,
                                                     num_training_steps, alpha)
       expected = self.np_cosine_decay(step, num_training_steps, alpha)
-      self.assertAllClose(self.evaluate(decayed_lr), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr), expected, atol=2e-6)
 
 
 class CosineDecayRestartsTest(test_util.TensorFlowTestCase):
@@ -384,7 +384,7 @@ class CosineDecayRestartsTest(test_util.TensorFlowTestCase):
       decayed_lr = learning_rate_decay.cosine_decay_restarts(
           initial_lr, step, num_training_steps)
       expected = self.np_cosine_decay_restarts(step, num_training_steps)
-      self.assertAllClose(self.evaluate(decayed_lr), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr), expected, atol=5e-6)
 
   @test_util.run_in_graph_and_eager_modes
   def testAlpha(self):
@@ -396,7 +396,7 @@ class CosineDecayRestartsTest(test_util.TensorFlowTestCase):
           initial_lr, step, num_training_steps, alpha=alpha)
       expected = self.np_cosine_decay_restarts(
           step, num_training_steps, alpha=alpha)
-      self.assertAllClose(self.evaluate(decayed_lr), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr), expected, atol=5e-6)
 
   @test_util.run_in_graph_and_eager_modes
   def testMMul(self):
@@ -408,7 +408,7 @@ class CosineDecayRestartsTest(test_util.TensorFlowTestCase):
           initial_lr, step, num_training_steps, m_mul=m_mul)
       expected = self.np_cosine_decay_restarts(
           step, num_training_steps, m_mul=m_mul)
-      self.assertAllClose(self.evaluate(decayed_lr), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr), expected, atol=5e-6)
 
   @test_util.run_in_graph_and_eager_modes
   def testTMul(self):
@@ -420,7 +420,7 @@ class CosineDecayRestartsTest(test_util.TensorFlowTestCase):
           initial_lr, step, num_training_steps, t_mul=t_mul)
       expected = self.np_cosine_decay_restarts(
           step, num_training_steps, t_mul=t_mul)
-      self.assertAllClose(self.evaluate(decayed_lr), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr), expected, atol=2e-6)
 
 
 class LinearCosineDecayTest(test_util.TensorFlowTestCase):

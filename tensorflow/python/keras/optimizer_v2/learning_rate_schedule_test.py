@@ -362,7 +362,7 @@ class CosineDecayTestV2(test_util.TensorFlowTestCase, parameterized.TestCase):
                                                       num_training_steps)
       decayed_lr = _maybe_serialized(decayed_lr, serialize)
       expected = self.np_cosine_decay(step, num_training_steps)
-      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, 1e-5)
 
   @test_util.run_in_graph_and_eager_modes
   def testAlpha(self, serialize):
@@ -375,7 +375,7 @@ class CosineDecayTestV2(test_util.TensorFlowTestCase, parameterized.TestCase):
                                                       alpha)
       decayed_lr = _maybe_serialized(decayed_lr, serialize)
       expected = self.np_cosine_decay(step, num_training_steps, alpha)
-      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, 1e-5)
 
 
 @parameterized.named_parameters(
@@ -405,7 +405,7 @@ class CosineDecayRestartsTestV2(test_util.TensorFlowTestCase,
           initial_lr, num_training_steps)
       decayed_lr = _maybe_serialized(decayed_lr, serialize)
       expected = self.np_cosine_decay_restarts(step, num_training_steps)
-      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, atol=5e-6)
 
   @test_util.run_in_graph_and_eager_modes
   def testAlpha(self, serialize):
@@ -418,7 +418,7 @@ class CosineDecayRestartsTestV2(test_util.TensorFlowTestCase,
       decayed_lr = _maybe_serialized(decayed_lr, serialize)
       expected = self.np_cosine_decay_restarts(
           step, num_training_steps, alpha=alpha)
-      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, atol=5e-6)
 
   @test_util.run_in_graph_and_eager_modes
   def testMMul(self, serialize):
@@ -431,7 +431,7 @@ class CosineDecayRestartsTestV2(test_util.TensorFlowTestCase,
       decayed_lr = _maybe_serialized(decayed_lr, serialize)
       expected = self.np_cosine_decay_restarts(
           step, num_training_steps, m_mul=m_mul)
-      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, atol=5e-6)
 
   @test_util.run_in_graph_and_eager_modes
   def testTMul(self, serialize):
@@ -444,7 +444,7 @@ class CosineDecayRestartsTestV2(test_util.TensorFlowTestCase,
       decayed_lr = _maybe_serialized(decayed_lr, serialize)
       expected = self.np_cosine_decay_restarts(
           step, num_training_steps, t_mul=t_mul)
-      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, 1e-6)
+      self.assertAllClose(self.evaluate(decayed_lr(step)), expected, atol=2e-6)
 
 
 @parameterized.named_parameters(

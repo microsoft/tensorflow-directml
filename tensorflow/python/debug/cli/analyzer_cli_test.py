@@ -595,8 +595,8 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
 
     cls._sess = session.Session(config=no_rewrite_session_config())
     with cls._sess as sess:
-      u_init_val = np.array([[5.0, 3.0], [-1.0, 0.0]])
-      v_init_val = np.array([[2.0], [-1.0]])
+      u_init_val = np.array([[5.0, 3.0], [-1.0, 0.0]], dtype=np.float32)
+      v_init_val = np.array([[2.0], [-1.0]], dtype=np.float32)
 
       u_name = "simple_mul_add/u"
       v_name = "simple_mul_add/v"
@@ -929,7 +929,7 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
 
     test_attr_key_val_pairs = [("transpose_a", "b: false"),
                                ("transpose_b", "b: false"),
-                               ("T", "type: DT_DOUBLE")]
+                               ("T", "type: DT_FLOAT")]
     if test_util.IsMklEnabled():
       test_attr_key_val_pairs.append(("_kernel", 's: "MklNameChangeOp"'))
 
@@ -1057,11 +1057,11 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
 
     self.assertEqual([
         "Tensor \"%s:DebugIdentity\":" % tensor_name,
-        "  dtype: float64",
+        "  dtype: float32",
         "  shape: (2, 1)",
         "",
         "array([[ 7.],",
-        "       [-2.]])",
+        "       [-2.]], dtype=float32)",
     ], out.lines)
 
     self.assertIn("tensor_metadata", out.annotations)
@@ -1085,7 +1085,7 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
 
     self.assertEqual([
         "Tensor \"%s:DebugIdentity\":" % tensor_name,
-        "  dtype: float64",
+        "  dtype: float32",
         "  shape: (2, 1)",
         "",
     ], out.lines[:4])
@@ -1103,11 +1103,11 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
     self.assertEqual([
         "Tensor \"%s:DebugIdentity\": " % tensor_name +
         "Highlighted([-inf, 0.0]): 1 of 2 element(s) (50.00%)",
-        "  dtype: float64",
+        "  dtype: float32",
         "  shape: (2, 1)",
         "",
         "array([[ 7.],",
-        "       [-2.]])",
+        "       [-2.]], dtype=float32)",
     ], out.lines)
 
     self.assertIn("tensor_metadata", out.annotations)
@@ -1123,11 +1123,11 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
         "Tensor \"%s:DebugIdentity\": " % tensor_name +
         "Highlighted([[-inf, -5.5], [5.5, inf]]): "
         "1 of 2 element(s) (50.00%)",
-        "  dtype: float64",
+        "  dtype: float32",
         "  shape: (2, 1)",
         "",
         "array([[ 7.],",
-        "       [-2.]])",
+        "       [-2.]], dtype=float32)",
     ], out.lines)
 
     self.assertIn("tensor_metadata", out.annotations)
@@ -1153,7 +1153,7 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
     self.assertEqual([
         "Tensor \"%s:DebugIdentity\": " % tensor_name +
         "Highlighted([-inf, 0.0]): 1 of 2 element(s) (50.00%)",
-        "  dtype: float64",
+        "  dtype: float32",
         "  shape: (2, 1)",
         "",
         "Numeric summary:",
@@ -1163,7 +1163,7 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
         "| -2.0  7.0  2.5  4.5 |",
         "",
         "array([[ 7.],",
-        "       [-2.]])",
+        "       [-2.]], dtype=float32)",
     ], out.lines)
 
     self.assertIn("tensor_metadata", out.annotations)
@@ -1178,8 +1178,8 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
         "print_tensor", [tensor_name + "[1, :]"], screen_info={"cols": 80})
 
     self.assertEqual([
-        "Tensor \"%s:DebugIdentity[1, :]\":" % tensor_name, "  dtype: float64",
-        "  shape: (1,)", "", "array([-2.])"
+        "Tensor \"%s:DebugIdentity[1, :]\":" % tensor_name, "  dtype: float32",
+        "  shape: (1,)", "", "array([-2.], dtype=float32)"
     ], out.lines)
 
     self.assertIn("tensor_metadata", out.annotations)
@@ -1211,11 +1211,11 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
 
     self.assertEqual([
         "Tensor \"%s:DebugIdentity\":" % tensor_name,
-        "  dtype: float64",
+        "  dtype: float32",
         "  shape: (2, 1)",
         "",
         "array([[ 7.],",
-        "       [-2.]])",
+        "       [-2.]], dtype=float32)",
     ], out.lines)
 
     self.assertIn("tensor_metadata", out.annotations)
@@ -1255,8 +1255,8 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
     out = self._registry.dispatch_command("print_tensor", [node_name])
 
     self.assertEqual([
-        "Tensor \"%s:0:DebugIdentity\":" % node_name, "  dtype: float64",
-        "  shape: (2, 1)", "", "array([[ 7.],", "       [-2.]])"
+        "Tensor \"%s:0:DebugIdentity\":" % node_name, "  dtype: float32",
+        "  shape: (2, 1)", "", "array([[ 7.],", "       [-2.]], dtype=float32)"
     ], out.lines)
     check_main_menu(
         self,
@@ -1288,7 +1288,7 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
         ["Tensor \"from eval of expression "
          "'np.matmul(`simple_mul_add/matmul:0`, "
          "`simple_mul_add/matmul:0`.T)'\":",
-         "  dtype: float64",
+         "  dtype: float32",
          "  shape: (2, 2)",
          "",
          "Numeric summary:",
@@ -1299,7 +1299,9 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
     cli_test_utils.assert_array_lines_close(
         self, [-14.0, 49.0, 6.25, 25.7524270701], out.lines[8:9])
     cli_test_utils.assert_array_lines_close(
-        self, [[49.0, -14.0], [-14.0, 4.0]], out.lines[10:])
+        self,
+        [[49.0, -14.0], [-14.0, 4.0]],
+        [x.replace('dtype=float32', '') for x in out.lines[10:]])
 
   def testEvalExpressionAndWriteToNpyFile(self):
     node_name = "simple_mul_add/matmul"
@@ -1314,7 +1316,7 @@ class AnalyzerCLISimpleMulAddTest(test_util.TensorFlowTestCase):
         "Tensor \"from eval of expression "
         "'np.matmul(`simple_mul_add/matmul:0`, "
         "`simple_mul_add/matmul:0`.T)'\":",
-        "  dtype: float64",
+        "  dtype: float32",
         "  shape: (2, 2)",
         ""], out.lines[:4])
 
@@ -1712,7 +1714,7 @@ class AnalyzerCLIControlDepTest(test_util.TensorFlowTestCase):
       cls._main_device = "/job:localhost/replica:0/task:0/device:CPU:0"
 
     with session.Session(config=no_rewrite_session_config()) as sess:
-      x_init_val = np.array([5.0, 3.0])
+      x_init_val = np.array([5.0, 3.0], dtype=np.float32)
       x_init = constant_op.constant(x_init_val, shape=[2])
       x = variables.VariableV1(x_init, name="control_deps/x")
 
