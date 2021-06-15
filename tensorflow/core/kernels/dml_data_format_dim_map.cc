@@ -32,22 +32,24 @@ static bool IsValidPermutation(const std::string& src, const std::string& dst) {
     return false;
   }
 
-  std::map<char, bool> characters;
+  std::array<bool, 256> characters{};
 
   // Every character in `src` must be present only once
-  for (const auto c : src) {
-    if (characters[c]) {
+  for (const char c : src) {
+    const uint8_t char_index = static_cast<uint8_t>(c);
+    if (characters[char_index]) {
       return false;
     }
-    characters[c] = true;
+    characters[char_index] = true;
   }
 
   // Every character in `dst` must show up in `src` exactly once
-  for (const auto c : dst) {
-    if (!characters[c]) {
+  for (const char c : dst) {
+    const uint8_t char_index = static_cast<uint8_t>(c);
+    if (!characters[char_index]) {
       return false;
     }
-    characters[c] = false;
+    characters[char_index] = false;
   }
 
   // At this point, characters[] has been switched to true and false exactly
@@ -107,21 +109,14 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     // has been validated earlier, we can represent them as 4 uint8 values. We
     // can then reinterpret them as a tensor of 4 uint8 values before doing the
     // gather operation.
-    uint32_t src_dst_mapping_packed = 0;
-    uint32_t left_shift = 0;
-    uint8_t additional_src_dst_mapping = 0;
+    uint64_t src_dst_mapping_packed = 0;
+    uint64_t left_shift = 0;
 
-    for (uint8_t i = 0; i < src_format.size(); ++i) {
-      for (uint8_t j = 0; j < dst_format.size(); ++j) {
+    for (uint64_t i = 0; i < src_format.size(); ++i) {
+      for (uint64_t j = 0; j < dst_format.size(); ++j) {
         if (dst_format[j] == src_format[i]) {
-          if (left_shift == 32) {
-            // If we are dealing with a 5D format, we need an additional uint8_t
-            // to store the last mapping
-            additional_src_dst_mapping = j;
-          } else {
-            src_dst_mapping_packed |= j << left_shift;
-            left_shift += 8;
-          }
+          src_dst_mapping_packed |= j << left_shift;
+          left_shift += 8;
           break;
         }
       }
@@ -141,8 +136,12 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     auto scope = dml::Graph(ctx->GetDmlDevice());
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto indices = dml::InputTensor(scope, 0, inputs[0]);
-    auto params = dml::ScalarTensor<uint32_t>(scope, src_dst_mapping_packed,
-                                              {1, 1, 1, 1});
+
+    const uint32_t src_dst_mapping_right =
+        static_cast<uint32_t>(src_dst_mapping_packed);
+
+    auto params =
+        dml::ScalarTensor<uint32_t>(scope, src_dst_mapping_right, {1, 1, 1, 1});
 
     params =
         dml::Reinterpret(params, DML_TENSOR_DATA_TYPE_UINT8, {1, 1, 1, 4}, {});
@@ -150,8 +149,11 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
     constexpr uint32_t gather_axis = 3;
 
     if (src_format.size() == 5) {
-      auto additional_params = dml::ScalarTensor<uint8_t>(
-          scope, additional_src_dst_mapping, {1, 1, 1, 1});
+      const uint8_t src_dst_mapping_left =
+          static_cast<uint8_t>(src_dst_mapping_packed >> 32);
+
+      auto additional_params =
+          dml::ScalarTensor<uint8_t>(scope, src_dst_mapping_left, {1, 1, 1, 1});
 
       params = dml::Join({params, additional_params}, gather_axis);
     }

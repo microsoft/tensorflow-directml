@@ -31,22 +31,24 @@ static bool IsValidPermutation(const std::string& src, const std::string& dst) {
     return false;
   }
 
-  std::map<char, bool> characters;
+  std::array<bool, 256> characters{};
 
   // Every character in `src` must be present only once
   for (const auto c : src) {
-    if (characters[c]) {
+    const uint8_t char_index = static_cast<uint8_t>(c);
+    if (characters[char_index]) {
       return false;
     }
-    characters[c] = true;
+    characters[char_index] = true;
   }
 
   // Every character in `dst` must show up in `src` exactly once
   for (const auto c : dst) {
-    if (!characters[c]) {
+    const uint8_t char_index = static_cast<uint8_t>(c);
+    if (!characters[char_index]) {
       return false;
     }
-    characters[c] = false;
+    characters[char_index] = false;
   }
 
   // At this point, characters[] has been switched to true and false exactly
