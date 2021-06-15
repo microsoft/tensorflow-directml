@@ -103,18 +103,34 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
       return;
     }
 
-    int inputIndexToForward = -1;
-    if (shared_helper->IsInputForwardable(ctx, output_shapes,
-                                          inputIndexToForward)) {
-      // This should be set if true was returned
-      CHECK(inputIndexToForward != -1);
-      // We assume we are forwarding one input to one output for now.
-      CHECK(ctx->num_outputs() == 1);
-      constexpr int outputIndex = 0;
-      Tensor* output;
-      CHECK(ctx->forward_input_to_output_with_shape(
-          inputIndexToForward, outputIndex, output_shapes[outputIndex],
-          &output));
+    std::vector<std::pair<int, int>> forwardIndices;
+    forwardIndices.reserve(ctx->num_outputs());
+
+    for (int i = 0; i < ctx->num_outputs(); ++i) {
+      int inputIndexToForward = -1;
+      // If the input is considered forwardable for the op, and the shapes match
+      if (shared_helper->IsOutputForwardable(ctx, output_shapes, i, inputIndexToForward)) {
+        // This should be set if true was returned
+        CHECK(inputIndexToForward != -1);
+        forwardIndices.emplace_back(std::make_pair(inputIndexToForward, i));
+      } else {
+        // If not all outputs are forwardable, we will forward nothing and
+        // proceed with the kernel normally.
+        forwardIndices.clear();
+        break;
+      }
+    }
+
+    // If we are forwarding (if this vector is not empty)
+    if (!forwardIndices.empty()) {
+      for (size_t i = 0U; i < forwardIndices.size(); ++i) {
+        int inputIndex = forwardIndices[i].first;
+        int outputIndex = forwardIndices[i].second;
+        const Tensor& input = ctx->input_is_ref(inputIndex)
+                                  ? ctx->mutable_input(inputIndex, false)
+                                  : ctx->input(inputIndex);
+        ctx->set_output(outputIndex, input);
+      }
 
       return;
     }
