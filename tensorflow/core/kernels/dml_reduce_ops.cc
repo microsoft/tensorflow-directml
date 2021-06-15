@@ -282,6 +282,47 @@ class DmlReduceKernel : public DmlKernel {
       return;
     }
 
+    // This logic copied from the CPU implementation:
+    // tensorflow/core/kernels/reduction_ops_common.h(155)
+    bool is_identity =
+        !is_arg_function_ &&
+        (reduce_helper.ndims() == 0 ||
+         (reduce_helper.ndims() == 1 && !reduce_helper.reduce_first_axis()));
+
+    if (is_identity) {
+      // Since the reduce helper may have removed dimensions of size 1, we can't
+      // just take its shape as-is. We know that this is an identity scenario,
+      // so we can just collapse all dimensions into one and use the same tensor
+      // desc for both the input and the output.
+      TensorShape in_out_shape(
+          {1, 1, 1, ctx->GetInputTensorShape(0).num_elements()});
+
+      DmlTensorInfo in_out_tensor;
+      in_out_tensor.kernel_index = 0;
+      in_out_tensor.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0),
+                                                 in_out_shape, in_out_shape);
+
+      DmlKernelTensors tensors;
+      tensors.inputs = {in_out_tensor};
+      tensors.outputs = {in_out_tensor};
+
+      auto input_descs = GetDmlTensorDescs(tensors.inputs);
+      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+      auto result = dml::Identity(dml::InputTensor(scope, 0, input_descs[0]));
+
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(scope, result);
+      }
+
+      Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+          scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+      Initialize(ctx, std::move(tensors), compiled_op.Get());
+
+      return;
+    }
+
     // Unlike other reduction operators, the behavior for arg functions when
     // there are no axes to reduce is to output 0's everywhere
     is_no_op_ =
