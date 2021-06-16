@@ -66,21 +66,19 @@ class ReduceInitializationHelper : public InitializationHelper {
     return false;
   }
 
-  bool IsOutputForwardable(OpKernelContext* ctx,
-                           absl::Span<const TensorShape> output_shapes,
-                           int outputIndex, int& inputIndex) const override {
+  absl::optional<int> GetForwardableInputIndex(
+      OpKernelContext* ctx, absl::Span<const TensorShape> output_shapes,
+      int outputIndex) const override {
     // For reduce, we can only forward input 0 to output 0
     if (outputIndex != 0) {
-      return false;
+      return {};
     }
 
-    inputIndex = 0;
-    const Tensor& input = ctx->input_is_ref(inputIndex)
-                              ? ctx->mutable_input(inputIndex, false)
-                              : ctx->input(inputIndex);
+    const Tensor& input =
+        ctx->input_is_ref(0) ? ctx->mutable_input(0, false) : ctx->input(0);
     // Make sure the shapes match so we can forward
     if (input.shape() != output_shapes[outputIndex]) {
-      return false;
+      return {};
     }
 
     bool is_identity =
@@ -88,7 +86,13 @@ class ReduceInitializationHelper : public InitializationHelper {
                               (reduction_helper_.ndims() == 1 &&
                                !reduction_helper_.reduce_first_axis()));
 
-    return is_identity;
+    absl::optional<int> return_val;
+    if (is_identity)
+    {
+      return_val = 0;
+    }
+
+    return return_val;
   }
 
   ReduceInitializationHelper(OpKernelContext* ctx,

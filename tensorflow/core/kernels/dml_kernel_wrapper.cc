@@ -107,12 +107,12 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
     forwardIndices.reserve(ctx->num_outputs());
 
     for (int i = 0; i < ctx->num_outputs(); ++i) {
-      int inputIndexToForward = -1;
+      absl::optional<int> inputIndexToForward =
+          shared_helper->GetForwardableInputIndex(ctx, output_shapes, i);
       // If the input is considered forwardable for the op, and the shapes match
-      if (shared_helper->IsOutputForwardable(ctx, output_shapes, i, inputIndexToForward)) {
-        // This should be set if true was returned
-        CHECK(inputIndexToForward != -1);
-        forwardIndices.emplace_back(std::make_pair(inputIndexToForward, i));
+      if (inputIndexToForward) {
+        forwardIndices.emplace_back(
+            std::make_pair(inputIndexToForward.value(), i));
       } else {
         // If not all outputs are forwardable, we will forward nothing and
         // proceed with the kernel normally.
