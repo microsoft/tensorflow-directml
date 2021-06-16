@@ -76,6 +76,9 @@ def _run_test(
   if log_device_placement:
     env_copy["TF_CPP_LOG_DEVICE_PLACEMENT"] = "1"
 
+  if os.name != "nt":
+    env_copy["TEST_SRCDIR"] = exe_path + ".runfiles"
+
   if test_framework == "abseil":
     env_copy["TEST_TOTAL_SHARDS"] = str(total_shard_count)
     env_copy["TEST_SHARD_INDEX"] = str(shard_index)
