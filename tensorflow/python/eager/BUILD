@@ -695,6 +695,8 @@ cuda_py_test(
     tags = [
         "no_mac",
         "no_windows",
+        # XLA support is not enabled in DML builds
+        "no_dml",
     ],
     xla_enabled = True,
 )
