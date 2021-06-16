@@ -73,8 +73,14 @@ class BitwiseOpTest(test_util.TensorFlowTestCase):
 
   @test_util.run_deprecated_v1
   def testInvertOp(self):
-    dtype_list = [dtypes.int8, dtypes.int16, dtypes.int32, dtypes.int64,
-                  dtypes.uint8, dtypes.uint16, dtypes.uint32, dtypes.uint64]
+    dtype_list = [dtypes.int8, dtypes.int16, dtypes.int32, dtypes.uint8,
+                  dtypes.uint16, dtypes.uint32]
+
+    # DML doesn't support very large numbers for int64 and uint64
+    # TFDML #24881131
+    if test_util.gpu_device_type() != 'DML':
+      dtype_list.extend([dtypes.int64, dtypes.uint64])
+
     inputs = [0, 5, 3, 14]
     with self.session(use_gpu=True) as sess:
       for dtype in dtype_list:
