@@ -66,6 +66,35 @@ class ReduceInitializationHelper : public InitializationHelper {
     return false;
   }
 
+  absl::optional<int> GetForwardableInputIndex(
+      OpKernelContext* ctx, absl::Span<const TensorShape> output_shapes,
+      int outputIndex) const override {
+    // For reduce, we can only forward input 0 to output 0
+    if (outputIndex != 0) {
+      return {};
+    }
+
+    const Tensor& input =
+        ctx->input_is_ref(0) ? ctx->mutable_input(0, false) : ctx->input(0);
+    // Make sure the shapes match so we can forward
+    if (input.shape() != output_shapes[outputIndex]) {
+      return {};
+    }
+
+    bool is_identity =
+        !is_arg_function_ && (reduction_helper_.ndims() == 0 ||
+                              (reduction_helper_.ndims() == 1 &&
+                               !reduction_helper_.reduce_first_axis()));
+
+    absl::optional<int> return_val;
+    if (is_identity)
+    {
+      return_val = 0;
+    }
+
+    return return_val;
+  }
+
   ReduceInitializationHelper(OpKernelContext* ctx,
                              std::shared_ptr<const Attributes> attr) {
     // We delegate most of the work to TF's existing ReductionHelper
@@ -87,6 +116,9 @@ class ReduceInitializationHelper : public InitializationHelper {
 
  private:
   ReductionHelper reduction_helper_;
+  static constexpr bool is_arg_function_ =
+      reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
+      reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
 };
 
 template <DML_REDUCE_FUNCTION reduce_function>
