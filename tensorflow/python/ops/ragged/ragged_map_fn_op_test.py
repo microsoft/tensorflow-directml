@@ -167,7 +167,7 @@ class RaggedMapOpTest(test_util.TensorFlowTestCase,
 
     expected_rt = ragged_factory_ops.constant(
         expected_output, ragged_rank=expected_ragged_rank)
-    self.assertAllEqual(expected_rt, output)
+    self.assertAllClose(expected_rt, output)
 
   def testRaggedMapOnStructure(self):
     batman = ragged_factory_ops.constant([[1, 2, 3], [4], [5, 6, 7]])
