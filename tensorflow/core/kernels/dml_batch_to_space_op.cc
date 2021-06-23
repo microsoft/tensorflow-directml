@@ -191,6 +191,29 @@ class BaseBatchToSpaceInitHelper : public InitializationHelper {
     return false;
   }
 
+  absl::optional<int> GetForwardableInputIndex(
+      OpKernelContext* ctx, absl::Span<const TensorShape> output_shapes,
+      int outputIndex) const override {
+    // For batchtospace, we can only forward input 0 to output 0
+    if (outputIndex != 0) {
+      return {};
+    }
+
+    const Tensor& input =
+        ctx->input_is_ref(0) ? ctx->mutable_input(0, false) : ctx->input(0);
+    // Make sure the shapes match so we can forward
+    if (input.shape() != output_shapes[outputIndex]) {
+      return {};
+    }
+
+    absl::optional<int> return_val;
+    if (internal_block_dims_ == 0) {
+      return_val = 0;
+    }
+
+    return return_val;
+  }
+
  private:
   TensorShape internal_input_shape_;
   TensorShape internal_output_shape_;
@@ -316,79 +339,120 @@ class DmlBatchToSpaceKernel : public DmlKernel {
     absl::Span<const int64> internal_block_sizes =
         init_helper->GetInternalBlockSizes();
 
-    uint32_t batch_size = internal_input_shape.dim_size(0);
-    uint32_t block_shape_product = std::accumulate(internal_block_sizes.begin(),
-                                                   internal_block_sizes.end(),
-                                                   1, std::multiplies<int64>());
-
-    // Reshape the input into [block_shape[0], ..., block_shape[M-1], batch /
-    // prod(block_shape), input_shape[1], ..., input_shape[N-1]]
-    dml::TensorDesc::Dimensions reshaped_sizes;
-    for (int i = 0; i < internal_block_sizes.size(); ++i) {
-      reshaped_sizes.push_back(internal_block_sizes[i]);
-    }
-
-    reshaped_sizes.push_back(internal_input_shape.dim_size(0) /
-                             block_shape_product);
-
-    for (int i = 1; i < internal_input_shape.dims(); ++i) {
-      reshaped_sizes.push_back(internal_input_shape.dim_size(i));
-    }
-
-    // Permute the reshaped input into [batch / prod(block_shape),
-    // input_shape[1], block_shape[0], ..., input_shape[M], block_shape[M-1],
-    // input_shape[M+1], ..., input_shape[N-1]]
-    uint32_t stride = 1;
-    dml::TensorDesc::Dimensions reshaped_strides(reshaped_sizes.size());
-    for (int i = reshaped_sizes.size() - 1; i >= 0; --i) {
-      reshaped_strides[i] = stride;
-      stride *= reshaped_sizes[i];
-    }
-
-    dml::TensorDesc::Dimensions perm_strides;
-    perm_strides.reserve(reshaped_strides.size());
-
-    dml::TensorDesc::Dimensions perm_sizes;
-    perm_sizes.reserve(reshaped_strides.size());
-
-    perm_strides.push_back(reshaped_strides[internal_block_dims]);
-    perm_sizes.push_back(reshaped_sizes[internal_block_dims]);
-
-    for (int i = 0; i < internal_block_dims; ++i) {
-      int reshaped_index = internal_block_dims + i + 1;
-      perm_strides.push_back(reshaped_strides[reshaped_index]);
-      perm_sizes.push_back(reshaped_sizes[reshaped_index]);
-
-      perm_strides.push_back(reshaped_strides[i]);
-      perm_sizes.push_back(reshaped_sizes[i]);
-    }
-
-    for (int i = internal_block_dims * 2 + 1; i < reshaped_sizes.size(); ++i) {
-      perm_strides.push_back(reshaped_strides[i]);
-      perm_sizes.push_back(reshaped_sizes[i]);
-    }
-
-    auto permuted = dml::Reinterpret(input, perm_sizes, perm_strides);
-    permuted = dml::Identity(permuted);
-
-    // Reshape permuted into [batch / prod(block_shape), input_shape[1] *
-    // block_shape[0], ..., input_shape[M] * block_shape[M-1], input_shape[M+1],
-    // ..., input_shape[N-1]]
+    dml::Expression output_before_slice;
     dml::TensorDesc::Dimensions perm_reshaped_sizes;
-    perm_reshaped_sizes.reserve(perm_sizes.size() - internal_block_dims / 2);
-    perm_reshaped_sizes.push_back(perm_sizes.front());
 
-    for (int i = 1; i <= internal_block_dims * 2; i += 2) {
-      uint32_t new_size = perm_sizes[i] * perm_sizes[i + 1];
-      perm_reshaped_sizes.push_back(new_size);
+    // For 4d cases we can use the DML Depth to Space operator
+    if (internal_input_shape.dims() == 4 &&
+        !Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      auto input_sizes = input_desc.desc.GetSizes();
+      auto input_strides = input_desc.desc.GetStrides();
+      dml::TensorDimensions input_tensor_sizes = {input_sizes[3], input_sizes[0],
+                                             input_sizes[1], input_sizes[2]};
+      dml::TensorStrides input_tensor_strides = {input_strides[3], input_strides[0],
+                                            input_strides[1], input_strides[2]};
+      input = dml::Reinterpret(input, input_tensor_sizes, input_tensor_strides);
+
+      output_before_slice =
+          dml::DepthToSpace(input, internal_block_sizes[0],
+                            DML_DEPTH_SPACE_ORDER_COLUMN_ROW_DEPTH);
+
+      const dml::TensorDesc& outputDesc = output_before_slice.GetOutputDesc();
+      dml::TensorDimensions output_tensor_sizes = {
+          outputDesc.sizes[1], outputDesc.sizes[2], outputDesc.sizes[3],
+          outputDesc.sizes[0]};
+
+      uint32_t stride = 1;
+      uint32_t output_strides[4];
+      for (int i = 3; i >= 0; --i)
+      {
+        output_strides[i] = stride;
+        stride *= outputDesc.sizes[i];
+      }
+
+      dml::TensorStrides output_tensor_strides = {
+          output_strides[1], output_strides[2], output_strides[3],
+          output_strides[0]};
+      output_before_slice = dml::Reinterpret(
+          output_before_slice, output_tensor_sizes, output_tensor_strides);
+
+      perm_reshaped_sizes = {output_tensor_sizes[0], output_tensor_sizes[1], output_tensor_sizes[2], output_tensor_sizes[3]};
+    } else {
+      uint32_t batch_size = internal_input_shape.dim_size(0);
+      uint32_t block_shape_product = std::accumulate(
+          internal_block_sizes.begin(), internal_block_sizes.end(), 1,
+          std::multiplies<int64>());
+
+      // Reshape the input into [block_shape[0], ..., block_shape[M-1], batch /
+      // prod(block_shape), input_shape[1], ..., input_shape[N-1]]
+      dml::TensorDesc::Dimensions reshaped_sizes;
+      for (int i = 0; i < internal_block_sizes.size(); ++i) {
+        reshaped_sizes.push_back(internal_block_sizes[i]);
+      }
+
+      reshaped_sizes.push_back(internal_input_shape.dim_size(0) /
+                               block_shape_product);
+
+      for (int i = 1; i < internal_input_shape.dims(); ++i) {
+        reshaped_sizes.push_back(internal_input_shape.dim_size(i));
+      }
+
+      // Permute the reshaped input into [batch / prod(block_shape),
+      // input_shape[1], block_shape[0], ..., input_shape[M], block_shape[M-1],
+      // input_shape[M+1], ..., input_shape[N-1]]
+      uint32_t stride = 1;
+      dml::TensorDesc::Dimensions reshaped_strides(reshaped_sizes.size());
+      for (int i = reshaped_sizes.size() - 1; i >= 0; --i) {
+        reshaped_strides[i] = stride;
+        stride *= reshaped_sizes[i];
+      }
+
+      dml::TensorDesc::Dimensions perm_strides;
+      perm_strides.reserve(reshaped_strides.size());
+
+      dml::TensorDesc::Dimensions perm_sizes;
+      perm_sizes.reserve(reshaped_strides.size());
+
+      perm_strides.push_back(reshaped_strides[internal_block_dims]);
+      perm_sizes.push_back(reshaped_sizes[internal_block_dims]);
+
+      for (int i = 0; i < internal_block_dims; ++i) {
+        int reshaped_index = internal_block_dims + i + 1;
+        perm_strides.push_back(reshaped_strides[reshaped_index]);
+        perm_sizes.push_back(reshaped_sizes[reshaped_index]);
+
+        perm_strides.push_back(reshaped_strides[i]);
+        perm_sizes.push_back(reshaped_sizes[i]);
+      }
+
+      for (int i = internal_block_dims * 2 + 1; i < reshaped_sizes.size();
+           ++i) {
+        perm_strides.push_back(reshaped_strides[i]);
+        perm_sizes.push_back(reshaped_sizes[i]);
+      }
+
+      auto permuted = dml::Reinterpret(input, perm_sizes, perm_strides);
+      permuted = dml::Identity(permuted);
+
+      // Reshape permuted into [batch / prod(block_shape), input_shape[1] *
+      // block_shape[0], ..., input_shape[M] * block_shape[M-1],
+      // input_shape[M+1],
+      // ..., input_shape[N-1]]
+      dml::TensorDesc::Dimensions perm_reshaped_sizes;
+      perm_reshaped_sizes.reserve(perm_sizes.size() - internal_block_dims / 2);
+      perm_reshaped_sizes.push_back(perm_sizes.front());
+
+      for (int i = 1; i <= internal_block_dims * 2; i += 2) {
+        uint32_t new_size = perm_sizes[i] * perm_sizes[i + 1];
+        perm_reshaped_sizes.push_back(new_size);
+      }
+
+      for (int i = internal_block_dims * 2 + 1; i < perm_sizes.size(); ++i) {
+        perm_reshaped_sizes.push_back(perm_sizes[i]);
+      }
+
+      output_before_slice = dml::Reinterpret(permuted, perm_reshaped_sizes, {});
     }
-
-    for (int i = internal_block_dims * 2 + 1; i < perm_sizes.size(); ++i) {
-      perm_reshaped_sizes.push_back(perm_sizes[i]);
-    }
-
-    auto permuted_reshaped =
-        dml::Reinterpret(permuted, perm_reshaped_sizes, {});
 
     // Finally, slice the appropriate dimensions
     dml::TensorDesc::Dimensions slice_offsets(perm_reshaped_sizes.size());
@@ -397,15 +461,27 @@ class DmlBatchToSpaceKernel : public DmlKernel {
 
     absl::Span<const int64> internal_crops = init_helper->GetInternalCrops();
 
+    bool do_slice = false;
     for (int i = 0; i < internal_block_dims; ++i) {
       int64 start_crop = internal_crops[i * 2];
       int64 end_crop = internal_crops[i * 2 + 1];
       slice_offsets[i + 1] = start_crop;
       slice_sizes[i + 1] = perm_reshaped_sizes[i + 1] - start_crop - end_crop;
+
+      // only do the slice 
+      if (start_crop != 0 || end_crop != 0) {
+        do_slice = true;
+      }
     }
 
-    auto result = dml::Slice(permuted_reshaped, slice_offsets, slice_sizes,
-                             slice_strides);
+    dml::Expression result;
+    if (do_slice) {
+      result = dml::Slice(output_before_slice, slice_offsets, slice_sizes,
+                          slice_strides);
+    } 
+    else {
+      result = output_before_slice;
+    }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
