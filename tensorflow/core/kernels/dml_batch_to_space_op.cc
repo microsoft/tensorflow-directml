@@ -354,31 +354,32 @@ class DmlBatchToSpaceKernel : public DmlKernel {
       input = dml::Reinterpret(input, input_tensor_sizes, input_tensor_strides);
 
       output_before_slice =
-          dml::DepthToSpace(input, internal_block_sizes[0],
-                            DML_DEPTH_SPACE_ORDER_DEPTH_COLUMN_ROW);
+          dml::DepthToSpace(input, internal_block_sizes[0]);
 
-      const dml::TensorDesc& outputDesc = output_before_slice.GetOutputDesc();
-      dml::TensorDimensions output_tensor_sizes = {
-          outputDesc.sizes[1], outputDesc.sizes[2], outputDesc.sizes[3],
-          outputDesc.sizes[0]};
-
+      auto outputSizes = output_before_slice.Impl()->GetOutputDesc().sizes;
       uint32_t stride = 1;
       uint32_t output_strides[4];
       for (int i = 3; i >= 0; --i)
       {
-        output_strides[i] = stride;
-        stride *= outputDesc.sizes[i];
+          output_strides[i] = stride;
+          stride *= outputSizes[i];
       }
+
+      dml::TensorDimensions output_tensor_sizes = {
+          outputSizes[1], outputSizes[2], outputSizes[3],
+          outputSizes[0]};
 
       dml::TensorStrides output_tensor_strides = {
           output_strides[1], output_strides[2], output_strides[3],
           output_strides[0]};
-      output_before_slice = dml::Reinterpret(
-          output_before_slice, output_tensor_sizes, output_tensor_strides);
 
+      output_before_slice = dml::Reinterpret(output_before_slice, output_tensor_sizes, output_tensor_strides);
       output_before_slice = dml::Identity(output_before_slice);
+      auto outputPreSliceTensor = output_before_slice.Impl()->GetOutputDesc();
 
-      perm_reshaped_sizes = {output_tensor_sizes[0], output_tensor_sizes[1], output_tensor_sizes[2], output_tensor_sizes[3]};
+      perm_reshaped_sizes = {outputPreSliceTensor.sizes[0], outputPreSliceTensor.sizes[1], outputPreSliceTensor.sizes[2], outputPreSliceTensor.sizes[3]};
+
+      
     } else {
       uint32_t batch_size = internal_input_shape.dim_size(0);
       uint32_t block_shape_product = std::accumulate(
