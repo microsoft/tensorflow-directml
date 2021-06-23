@@ -355,7 +355,7 @@ class DmlBatchToSpaceKernel : public DmlKernel {
 
       output_before_slice =
           dml::DepthToSpace(input, internal_block_sizes[0],
-                            DML_DEPTH_SPACE_ORDER_COLUMN_ROW_DEPTH);
+                            DML_DEPTH_SPACE_ORDER_DEPTH_COLUMN_ROW);
 
       const dml::TensorDesc& outputDesc = output_before_slice.GetOutputDesc();
       dml::TensorDimensions output_tensor_sizes = {
@@ -375,6 +375,8 @@ class DmlBatchToSpaceKernel : public DmlKernel {
           output_strides[0]};
       output_before_slice = dml::Reinterpret(
           output_before_slice, output_tensor_sizes, output_tensor_strides);
+
+      output_before_slice = dml::Identity(output_before_slice);
 
       perm_reshaped_sizes = {output_tensor_sizes[0], output_tensor_sizes[1], output_tensor_sizes[2], output_tensor_sizes[3]};
     } else {
