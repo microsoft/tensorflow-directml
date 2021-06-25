@@ -522,10 +522,22 @@ class StridedSliceAssignInitHelper : public InitializationHelper {
   bool IsNoOpKernel(
       OpKernelContext* ctx,
       absl::Span<const TensorShape> output_shapes) const override {
-    // StridedSliceAssign is only a no-op if the first input or its output is
-    // empty
-    return ctx->input(0).NumElements() == 0 ||
-           (!output_shapes.empty() && output_shapes[0].num_elements() == 0);
+    if (!output_shapes.empty() && output_shapes[0].num_elements() == 0) {
+      return true;
+    }
+
+    if (ctx->input(4).NumElements() == 0) {
+      return true;
+    }
+
+    auto lock_cleanup = gtl::MakeCleanup([this] { Unlock(); });
+    const Tensor input_tensor = GetInputTensor(ctx);
+
+    if (input_tensor.NumElements() == 0) {
+      return true;
+    }
+
+    return false;
   }
 
   StridedSliceAssignInitHelper(OpKernelContext* ctx,
@@ -550,14 +562,13 @@ class StridedSliceAssignInitHelper : public InitializationHelper {
 
     TensorShape input_shape = input.shape();
     TensorShape final_shape;
-    bool is_identity;
 
     OP_REQUIRES_OK(
         ctx, ValidateStridedSliceOp(
                  &ctx->input(1), &ctx->input(2), ctx->input(3), input_shape,
                  attr->begin_mask, attr->end_mask, attr->ellipsis_mask,
                  attr->new_axis_mask, attr->shrink_axis_mask, &processing_shape,
-                 &final_shape, &is_identity, &is_simple_slice, &slice_dim0,
+                 &final_shape, &is_identity_, &is_simple_slice, &slice_dim0,
                  &begin, &end, &strides));
 
     if (processing_shape.num_elements()) {
@@ -599,10 +610,13 @@ class StridedSliceAssignInitHelper : public InitializationHelper {
     return simple_slice_;
   }
 
+  const bool IsIdentity() const { return is_identity_; }
+
  private:
   absl::optional<SimplifiedSlice> simple_slice_;
   core::RefCountPtr<Var> input_resource_;
   mutable bool locked_ = false;
+  bool is_identity_;
 };
 
 class DmlStridedSliceAssignKernel : public DmlKernel {
@@ -613,30 +627,47 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
                                        const InitHelper* init_helper) {
     const Tensor input = init_helper->GetInputTensor(ctx->GetOpKernelContext());
     const TensorShape& input_shape = input.shape();
+    const TensorShape& updates_shape = ctx->GetInputTensorShape(4);
 
     auto simple_slice = init_helper->GetSimplifiedSlice();
     auto dtype_tf = ctx->GetInputDataType(4);
 
-    uint32_t num_elements = input.NumElements();
-    dml::TensorDimensions collapsed_sizes = {1, 1, 1, num_elements};
+    dml::TensorDimensions collapsed_input_sizes = {
+        1,
+        1,
+        1,
+        static_cast<uint32_t>(input_shape.num_elements()),
+    };
 
-    DmlTensorInfo original_input;
-    original_input.kernel_index = 0;
-    original_input.desc =
-        DmlTensorDesc::Create(dtype_tf, collapsed_sizes, collapsed_sizes);
+    dml::TensorDimensions collapsed_updates_sizes = {
+        1,
+        1,
+        1,
+        static_cast<uint32_t>(updates_shape.num_elements()),
+    };
 
     DmlTensorInfo updates;
     updates.kernel_index = 4;
-    updates.desc = DmlTensorDesc::Create(dtype_tf, simple_slice->output_sizes,
-                                         simple_slice->output_sizes);
+    updates.desc = DmlTensorDesc::Create(dtype_tf, collapsed_updates_sizes,
+                                         collapsed_updates_sizes);
 
     DmlTensorInfo output;
     output.kernel_index = 0;
-    output.desc = DmlTensorDesc::Create(dtype_tf, simple_slice->input_sizes,
-                                        simple_slice->input_sizes);
+    output.desc = DmlTensorDesc::Create(dtype_tf, collapsed_input_sizes,
+                                        collapsed_input_sizes);
 
     DmlKernelTensors tensors;
-    tensors.inputs = {original_input, updates};
+    tensors.inputs = {updates};
+
+    if (!init_helper->IsIdentity()) {
+      DmlTensorInfo original_input;
+      original_input.kernel_index = 0;
+      original_input.desc = DmlTensorDesc::Create(
+          dtype_tf, collapsed_input_sizes, collapsed_input_sizes);
+
+      tensors.inputs.push_back(original_input);
+    }
+
     tensors.outputs = {output};
 
     if (input.dtype() != DT_RESOURCE) {
@@ -646,28 +677,32 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
 
     auto scope = dml::Graph(ctx->GetDmlDevice());
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto original_input_tensor = dml::InputTensor(scope, 0, inputs[0]);
-    auto updates_tensor = dml::InputTensor(scope, 1, inputs[1]);
+    auto updates_tensor = dml::InputTensor(scope, 0, inputs[0]);
 
-    auto scattered_updates = dml::SliceGrad(
-        updates_tensor, simple_slice->input_sizes, simple_slice->window_offset,
-        simple_slice->window_sizes, simple_slice->window_strides);
+    dml::Expression result;
 
-    scattered_updates =
-        dml::Reinterpret(scattered_updates, collapsed_sizes, {});
+    if (init_helper->IsIdentity()) {
+      result = dml::Identity(updates_tensor);
+    } else {
+      auto original_input_tensor = dml::InputTensor(scope, 1, inputs[1]);
 
-    const DML_TENSOR_DATA_TYPE dtype_dml =
-        GetDmlDataTypeFromTfDataType(dtype_tf);
+      auto indices_start = dml::ScalarUnion(0, DML_TENSOR_DATA_TYPE_UINT32);
+      auto indices_delta = dml::ScalarUnion(1, DML_TENSOR_DATA_TYPE_UINT32);
 
-    auto indices_start = dml::ScalarUnion(0, dtype_dml);
-    auto indices_delta = dml::ScalarUnion(1, dtype_dml);
+      auto indices = dml::FillValueSequence(scope, simple_slice->input_sizes,
+                                            DML_TENSOR_DATA_TYPE_UINT32,
+                                            indices_start, indices_delta);
 
-    auto indices = dml::FillValueSequence(scope, collapsed_sizes,
-                                          DML_TENSOR_DATA_TYPE_UINT32,
-                                          indices_start, indices_delta);
+      auto sliced_indices =
+          dml::Slice(indices, simple_slice->window_offset,
+                     simple_slice->window_sizes, simple_slice->window_strides);
 
-    auto result = dml::ScatterElements(original_input_tensor, indices,
-                                       scattered_updates, 3);
+      sliced_indices =
+          dml::Reinterpret(sliced_indices, collapsed_updates_sizes, {});
+
+      result = dml::ScatterElements(original_input_tensor, sliced_indices,
+                                    updates_tensor, 3);
+    }
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(ctx->GetInputDataType(4))) {
@@ -689,10 +724,29 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
     const Tensor input_tensor =
         init_helper->GetInputTensor(ctx->GetOpKernelContext());
 
+    // Identity can be done in-place
+    if (init_helper->IsIdentity()) {
+      D3D12BufferRegion input_buffer =
+          ctx->CreateBufferForTensor(ctx->GetInputTensor(4));
+
+      D3D12BufferRegion output_buffer =
+          ctx->CreateBufferForTensor(input_tensor);
+
+      absl::optional<DML_BUFFER_BINDING> input_bindings[] = {
+          input_buffer.GetBufferBinding(),
+      };
+
+      absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
+          output_buffer.GetBufferBinding(),
+      };
+
+      return DmlKernel::Compute(ctx, input_bindings, output_bindings);
+    }
+
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
-        ctx->CreateBufferForTensor(input_tensor),
         ctx->CreateBufferForTensor(ctx->GetInputTensor(4)),
+        ctx->CreateBufferForTensor(input_tensor),
     };
 
     // Create input bindings
@@ -702,7 +756,7 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
     };
 
     DmlBuffer output_buffer =
-        ctx->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
+        ctx->AllocateDefaultBuffer(input_buffers[1].SizeInBytes());
 
     absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
         output_buffer.GetBufferBinding(),
@@ -714,8 +768,8 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
       return status_or_event;
     }
 
-    ctx->CopyBufferToBuffer(input_buffers[0].Resource(),
-                            input_buffers[0].Offset(), output_buffer.Resource(),
+    ctx->CopyBufferToBuffer(input_buffers[1].Resource(),
+                            input_buffers[1].Offset(), output_buffer.Resource(),
                             output_buffer.Offset(),
                             output_buffer.SizeInBytes());
 

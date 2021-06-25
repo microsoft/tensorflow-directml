@@ -154,6 +154,17 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
   const random::PhiloxRandom::Key GetKey() const { return key_; }
   const random::PhiloxRandom::ResultType GetCounter() const { return counter_; }
 
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    for (size_t i = 0; i < output_shapes.size(); ++i) {
+      if (output_shapes[i].num_elements() != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
  private:
   TensorShape output_shape_;
   random::PhiloxRandom::Key key_;
@@ -294,7 +305,7 @@ TF_CALL_int32(DML_REGISTER_KERNEL);
 // ----------------------------------------------------------------------------
 
 template <typename TKernel, typename TShapeHelper,
-          DmlKernelCachePolicy cache_policy = DmlKernelCachePolicy::Default>
+          DmlKernelCachePolicy cache_policy = DmlKernelCachePolicy::Never>
 class DmlPhiloxWrapper
     : public DmlKernelWrapper<TKernel, TShapeHelper, cache_policy> {
  public:
@@ -349,6 +360,17 @@ class RandomUniformInitHelper : public InitializationHelper {
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
+
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    for (size_t i = 0; i < output_shapes.size(); ++i) {
+      if (output_shapes[i].num_elements() != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
 
  private:
   TensorShape output_shape_;
@@ -464,6 +486,7 @@ class DmlRandomUniformKernel : public DmlKernel {
       Name("RandomUniform")               \
           .Device(DEVICE_DML)             \
           .HostMemory("shape")            \
+          .TypeConstraint<int32>("T")     \
           .TypeConstraint<type>("dtype"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
@@ -476,6 +499,7 @@ TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
           .HostMemory("shape")           \
           .HostMemory("minval")          \
           .HostMemory("maxval")          \
+          .TypeConstraint<int32>("T")    \
           .TypeConstraint<type>("Tout"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
 TF_CALL_int32(DML_REGISTER_KERNEL);

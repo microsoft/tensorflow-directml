@@ -584,9 +584,10 @@ class BackpropTest(test.TestCase, parameterized.TestCase):
   @test_util.assert_no_new_tensors
   def testGPU(self):
     def fn(x):
-      with context.device('/gpu:0'):
+      with context.device(test_util.gpu_device_type()):
         b = constant_op.constant(2.0)
-        c = math_ops.add(x.gpu(), b)
+        c = math_ops.add(
+            x.dml() if test_util.gpu_device_type() == 'DML' else x.gpu(), b)
         # TODO(apassos): remove cpu below by making TensorVSPace aware
         # of devices.
         return math_ops.add(c, constant_op.constant(3.0)).cpu()
@@ -597,12 +598,12 @@ class BackpropTest(test.TestCase, parameterized.TestCase):
   @test_util.run_gpu_only
   @test_util.assert_no_new_tensors
   def testGPUImplicitGrad(self):
-    with context.device('gpu:0'):
+    with context.device(test_util.gpu_device_type()):
       v = resource_variable_ops.ResourceVariable(
           constant_op.constant(1.0), name='v')
 
     def f():
-      with context.device('gpu:0'):
+      with context.device(test_util.gpu_device_type()):
         return v.read_value()
 
     self.assertEqual(
@@ -625,7 +626,7 @@ class BackpropTest(test.TestCase, parameterized.TestCase):
     def f(a, b):
       return a.cpu() + b.cpu()
 
-    with context.device('/gpu:0'):
+    with context.device(test_util.gpu_device_type()):
       a = constant_op.constant(1.0)
       b = constant_op.constant(2.0)
 
@@ -822,7 +823,7 @@ class BackpropTest(test.TestCase, parameterized.TestCase):
       d2y_dx2 = g.gradient(dy_dx, x)  # d2y/dx2 := 6x
     d3y_dx3 = g.gradient(d2y_dx2, x)  # d3y/dx3 := 6
     x = 3
-    self.assertEqual(self.evaluate(y), x ** 3)
+    self.assertAllClose(self.evaluate(y), x ** 3)
     self.assertEqual(self.evaluate(dy_dx), 3 * x ** 2)
     self.assertEqual(self.evaluate(d2y_dx2), 6 * x)
     self.assertEqual(self.evaluate(d3y_dx3), 6)
@@ -971,8 +972,11 @@ class BackpropTest(test.TestCase, parameterized.TestCase):
     # forward: a (cpu->gpu) -> add (gpu) -> c (gpu->cpu) -> add (cpu) -> e (cpu)
     # back: e (cpu) -> add (cpu) -> c (cpu->gpu) -> add (gpu) -> grad (gpu->cpu)
     def f(a, b):
-      with context.device('/gpu:0'):
-        c = math_ops.add(a.gpu(0), b.gpu(0))
+      with context.device(test_util.gpu_device_type()):
+        if test_util.gpu_device_type() == 'DML':
+          c = math_ops.add(a.dml(0), b.dml(0))
+        else:
+          c = math_ops.add(a.gpu(0), b.gpu(0))
       return math_ops.add(c.cpu(), constant_op.constant(3.0))
 
     with context.device('/cpu:0'):

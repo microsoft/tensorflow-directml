@@ -950,7 +950,7 @@ class FunctionGradientsTest(test.TestCase, parameterized.TestCase):
     g, _ = reduce_fn(constant_op.constant([7.0]))
 
     self.evaluate(variables.global_variables_initializer())
-    self.assertAllEqual(nest.flatten(self.evaluate(g)), [-6.0])
+    self.assertAllCloseAccordingToType(nest.flatten(self.evaluate(g)), [-6.0])
 
 
 if __name__ == '__main__':

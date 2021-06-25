@@ -943,7 +943,10 @@ class AutographControlFlowTest(keras_parameterized.TestCase):
     train_loss = model.train_on_batch(np.ones((2, 3)), np.ones((2, 3)))
     self.assertEqual(train_loss, 0.)
     test_loss = model.test_on_batch(np.ones((2, 3)), np.ones((2, 3)))
-    self.assertEqual(test_loss, 1.)
+    if test.is_built_with_dml():
+      self.assertAlmostEqual(test_loss, 1., places=6)
+    else:
+      self.assertEqual(test_loss, 1.)
 
   def test_if_training_pattern_loss(self):
 

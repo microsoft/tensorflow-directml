@@ -154,7 +154,11 @@ class DynamicLossScaleTest(test.TestCase, parameterized.TestCase):
       else:
         self.evaluate(update_op)
       actual_outputs.append(self.evaluate(loss_scale()))
-    self.assertEqual(actual_outputs, expected_outputs)
+    if test.is_built_with_dml():
+      for i in range(len(inputs)):
+        self.assertAlmostEqual(actual_outputs[i], expected_outputs[i], delta=1e-6)
+    else:
+      self.assertEqual(actual_outputs, expected_outputs)
 
   @parameterized.named_parameters(*TESTCASES)
   @test_util.run_in_graph_and_eager_modes

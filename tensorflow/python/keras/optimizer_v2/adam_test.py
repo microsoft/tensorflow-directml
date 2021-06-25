@@ -254,8 +254,8 @@ class AdamOptimizerTest(test.TestCase):
           var1_np, m1, v1 = adam_update_numpy(var1_np, grads1_np, t, m1, v1)
 
           # Validate updated params
-          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
-          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
+          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0), half_rtol=2e-3)
+          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1), half_rtol=2e-3)
 
   @test_util.run_in_graph_and_eager_modes(reset_test=True)
   def testResourceBasic(self):
@@ -308,8 +308,8 @@ class AdamOptimizerTest(test.TestCase):
               var1_np, grads1_np, t, m1, v1, v1hat)
 
           # Validate updated params
-          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
-          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
+          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0), half_rtol=2e-3)
+          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1), half_rtol=2e-3)
 
   @test_util.run_in_graph_and_eager_modes
   def testSparseWithAmsgrad(self):

@@ -21,11 +21,11 @@ limitations under the License.
 
 #include <map>
 
-#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/framework/tensor.h"
 #include "tensorflow/core/lib/core/errors.h"
+#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
 namespace tensorflow {
 
@@ -144,17 +144,27 @@ class DataFormatVecPermuteOp : public OpKernel {
                 errors::InvalidArgument(
                     "input must be a vector or 2D tensor, but got shape ",
                     input.shape().DebugString()));
+
+    const int full_dim_count = src_format_.size();
+    const int spatial_dim_count = full_dim_count - 2;
+
     if (input.dims() == 1) {
-      OP_REQUIRES(
-          context, input.NumElements() == 4,
-          errors::InvalidArgument("1D input must be of size 4, but got shape ",
-                                  input.shape().DebugString()));
+      OP_REQUIRES(context,
+                  input.NumElements() == spatial_dim_count ||
+                      input.NumElements() == full_dim_count,
+                  errors::InvalidArgument("1D input must be of size ",
+                                          spatial_dim_count, " or ",
+                                          full_dim_count, ", but got shape ",
+                                          input.shape().DebugString()));
     } else if (input.dims() == 2) {
-      OP_REQUIRES(
-          context, input.dim_size(0) == 4,
-          errors::InvalidArgument(
-              "First dimension of 2D input must be of size 4, but got shape ",
-              input.shape().DebugString()));
+      OP_REQUIRES(context,
+                  input.dim_size(0) == spatial_dim_count ||
+                      input.dim_size(0) == full_dim_count,
+                  errors::InvalidArgument("First dimension of 2D input must be "
+                                          "of size ",
+                                          spatial_dim_count, " or ",
+                                          full_dim_count, ", but got shape ",
+                                          input.shape().DebugString()));
       OP_REQUIRES(
           context, input.dim_size(1) == 2,
           errors::InvalidArgument(
@@ -166,24 +176,37 @@ class DataFormatVecPermuteOp : public OpKernel {
     OP_REQUIRES_OK(context,
                    context->allocate_output(0, input.shape(), &output));
     // Support 1D and 2D cases.
-    Eigen::DSizes<Eigen::DenseIndex, 8> dst_idx;
+    Eigen::DSizes<Eigen::DenseIndex, 10> dst_idx;
     string src_format_str = src_format_;
     string dst_format_str = dst_format_;
-    if (input.dim_size(0) == 2) {
+    if (input.dim_size(0) == spatial_dim_count) {
       // If the input is a vector of size 2, treat the two elements as spatial
       // dimensions.
-      auto keep_only_spatial_dimensions = [](string* format_str) -> void {
-        auto new_end = std::remove_if(
-            format_str->begin(), format_str->end(),
-            [](const char dim) { return dim != 'H' && dim != 'W'; });
+      auto keep_only_spatial_dimensions =
+          [spatial_dim_count](string* format_str) -> void {
+        auto new_end =
+            std::remove_if(format_str->begin(), format_str->end(),
+                           [spatial_dim_count](const char dim) {
+                             return dim != 'H' && dim != 'W' &&
+                                    (spatial_dim_count == 2 || dim != 'D');
+                           });
         format_str->erase(new_end, format_str->end());
       };
       keep_only_spatial_dimensions(&src_format_str);
       keep_only_spatial_dimensions(&dst_format_str);
-      OP_REQUIRES(context,
-                  src_format_str.size() == 2 && dst_format_str.size() == 2,
-                  errors::InvalidArgument(
-                      "Format specifier must contain H and W for 2D case"));
+
+      if (spatial_dim_count == 3) {
+        OP_REQUIRES(
+            context, src_format_str.size() == 3 && dst_format_str.size() == 3,
+            errors::InvalidArgument(
+                "Format specifier must contain D, H and W for 2D case"));
+      } else {
+        DCHECK(spatial_dim_count == 2);
+        OP_REQUIRES(context,
+                    src_format_str.size() == 2 && dst_format_str.size() == 2,
+                    errors::InvalidArgument(
+                        "Format specifier must contain H and W for 2D case"));
+      }
     }
     ComputeDstIndex(input.dims(), &dst_idx);
 
@@ -197,7 +220,7 @@ class DataFormatVecPermuteOp : public OpKernel {
   // Example: HWNC --> NHWC
   // 1D: dst = [1, 2, 0, 3],
   // 2D: dst = [2, 3, 4, 5, 0, 1, 6, 7]
-  void ComputeDstIndex(int num_dim, Eigen::DSizes<Eigen::DenseIndex, 8>* dst) {
+  void ComputeDstIndex(int num_dim, Eigen::DSizes<Eigen::DenseIndex, 10>* dst) {
     for (int i = 0; i < src_format_.size(); ++i) {
       for (int j = 0; j < dst_format_.size(); ++j) {
         if (dst_format_[j] != src_format_[i]) continue;
@@ -263,12 +286,12 @@ TF_CALL_int32(DECLARE_GPU_SPECS);
 TF_CALL_int64(DECLARE_GPU_SPECS);
 #undef DECLARE_GPU_SPEC
 
-#define DECLARE_GPU_SPEC(T)                                \
-  template <>                                              \
-  void DataFormatVecPermute<GPUDevice, T>::operator()(     \
-      const GPUDevice& d, typename TTypes<T>::ConstFlat x, \
-      typename TTypes<T>::Vec y,                           \
-      const Eigen::DSizes<Eigen::DenseIndex, 8>& dst_idx); \
+#define DECLARE_GPU_SPEC(T)                                 \
+  template <>                                               \
+  void DataFormatVecPermute<GPUDevice, T>::operator()(      \
+      const GPUDevice& d, typename TTypes<T>::ConstFlat x,  \
+      typename TTypes<T>::Vec y,                            \
+      const Eigen::DSizes<Eigen::DenseIndex, 10>& dst_idx); \
   extern template struct DataFormatVecPermute<GPUDevice, T>;
 #define DECLARE_GPU_SPECS(T) DECLARE_GPU_SPEC(T);
 TF_CALL_int32(DECLARE_GPU_SPECS);

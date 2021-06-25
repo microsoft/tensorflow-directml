@@ -264,8 +264,8 @@ class MeanTest(test.TestCase):
       variables.local_variables_initializer().run()
       for mean_result in mean_results:
         mean, update_op = mean_result
-        self.assertAlmostEqual(expected, update_op.eval())
-        self.assertAlmostEqual(expected, mean.eval())
+        self.assertAlmostEqual(expected, update_op.eval(), delta=1e-6)
+        self.assertAlmostEqual(expected, mean.eval(), delta=1e-6)
 
   def _test_3d_weighted(self, values, weights):
     expected = (
@@ -1504,8 +1504,8 @@ class SpecificityAtSensitivityTest(test.TestCase):
 
     with self.cached_session():
       self.evaluate(variables.local_variables_initializer())
-      self.assertEqual(1, self.evaluate(update_op))
-      self.assertEqual(1, specificity.eval())
+      self.assertAllClose(1, self.evaluate(update_op))
+      self.assertAllClose(1, specificity.eval())
 
   @test_util.run_deprecated_v1
   def testSomeCorrectHighSensitivity(self):
@@ -3183,8 +3183,8 @@ class MeanSquaredErrorTest(test.TestCase):
 
     with self.cached_session():
       self.evaluate(variables.local_variables_initializer())
-      self.assertEqual(6, self.evaluate(update_op))
-      self.assertEqual(6, error.eval())
+      self.assertAllClose(6, self.evaluate(update_op))
+      self.assertAllClose(6, error.eval())
 
   @test_util.run_deprecated_v1
   def testSingleUpdateWithErrorAndWeights(self):
@@ -3465,8 +3465,8 @@ class MeanCosineDistanceTest(test.TestCase):
 
     with self.cached_session():
       self.evaluate(variables.local_variables_initializer())
-      self.assertEqual(0, self.evaluate(update_op))
-      self.assertEqual(0, error.eval())
+      self.assertAllClose(0, self.evaluate(update_op))
+      self.assertAllClose(0, error.eval())
 
   @test_util.run_deprecated_v1
   def testSingleUpdateWithError1(self):

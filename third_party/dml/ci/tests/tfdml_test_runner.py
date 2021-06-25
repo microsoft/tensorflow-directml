@@ -76,6 +76,9 @@ def _run_test(
   if log_device_placement:
     env_copy["TF_CPP_LOG_DEVICE_PLACEMENT"] = "1"
 
+  if os.name != "nt":
+    env_copy["TEST_SRCDIR"] = exe_path + ".runfiles"
+
   if test_framework == "abseil":
     env_copy["TEST_TOTAL_SHARDS"] = str(total_shard_count)
     env_copy["TEST_SHARD_INDEX"] = str(shard_index)
@@ -152,8 +155,9 @@ def _run_test(
 def main():
   args = _parse_args()
   absolute_binaries_path = os.path.join(sys.path[0], args.test_binaries_path)
+  processes_count = min(8, os.cpu_count())
 
-  with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as executor:
+  with concurrent.futures.ThreadPoolExecutor(processes_count) as executor:
     futures = []
 
     try:

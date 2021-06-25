@@ -61,7 +61,7 @@ class WindowOpsTest(test.TestCase):
   def setUp(self):
     self._window_lengths = [1, 2, 3, 4, 5, 31, 64, 128]
     self._dtypes = [(dtypes.float16, 1e-2),
-                    (dtypes.float32, 1e-6),
+                    (dtypes.float32, 3e-5),
                     (dtypes.float64, 1e-9)]
 
   def _compare_window_fns(self, np_window_fn, tf_window_fn):

@@ -774,7 +774,7 @@ class SensitivityAtSpecificityTest(test.TestCase, parameterized.TestCase):
     y_true = constant_op.constant(inputs)
     self.evaluate(variables.variables_initializer(s_obj.variables))
     result = s_obj(y_true, y_pred)
-    self.assertAlmostEqual(1, self.evaluate(result))
+    self.assertAlmostEqual(1, self.evaluate(result), places=6)
 
   def test_unweighted_high_specificity(self):
     s_obj = metrics.SensitivityAtSpecificity(0.8)
