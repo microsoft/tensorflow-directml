@@ -174,7 +174,7 @@ class DmlCropAndResizeKernel : public DmlKernel {
         dml::ScalarTensor<uint32_t>(scope, 2, {1, roi_sizes[2], 2, 1});
     roi = dml::ReverseSubsequences(roi, seq_lengths, 3);
 
-    // NHWC stides for sizes [1, 1, roiCount, 4]
+    // NHWC strides for sizes [1, 1, roiCount, 4]
     dml::TensorDimensions roiStrides{
         roi_sizes[2] * 4,
         roi_sizes[2] * 4,
