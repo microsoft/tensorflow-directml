@@ -219,7 +219,7 @@ TEST(DmlKernelTests, Relu) {
 
 TEST(DmlKernelTests, RealDiv) {
   TensorShape shape({2, 2});
-  auto a_data = {2.0f, 7.0f, 9.0f, 50.0f};
+  auto a_data = {2.0f, 7.0f, 6.0f, 12.0f};
   auto b_data = {1.0f, 2.0f, 3.0f, 4.0f};
 
   {
