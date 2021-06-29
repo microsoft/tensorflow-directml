@@ -492,17 +492,30 @@ Status WindowsFileSystem::GetFileSize(const string& fname, uint64* size) {
 }
 
 Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
-  Status result;
   // rename() is not capable of replacing the existing file as on Linux
   // so use OS API directly
   std::wstring ws_translated_src = Utf8ToWideChar(TranslateName(src));
   std::wstring ws_translated_target = Utf8ToWideChar(TranslateName(target));
+
+  WIN32_FIND_DATAW find_file_data;
+  HANDLE find_file_handle = ::FindFirstFileW(ws_translated_target.c_str(), &find_file_data);
+  if (find_file_handle != INVALID_HANDLE_VALUE) {
+    if (!::DeleteFileW(ws_translated_target.c_str())) {
+      ::FindClose(find_file_handle);
+      string context(strings::StrCat("Failed to rename: ", src, " to: ", target));
+      return IOErrorFromWindowsError(context, ::GetLastError());
+    }
+
+    ::FindClose(find_file_handle);
+  }
+
   if (!::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
                      MOVEFILE_REPLACE_EXISTING)) {
     string context(strings::StrCat("Failed to rename: ", src, " to: ", target));
-    result = IOErrorFromWindowsError(context, ::GetLastError());
+    return IOErrorFromWindowsError(context, ::GetLastError());
   }
-  return result;
+
+  return Status::OK();
 }
 
 Status WindowsFileSystem::GetMatchingPaths(const string& pattern,
