@@ -502,7 +502,7 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
   if (find_file_handle != INVALID_HANDLE_VALUE) {
     if (!::DeleteFileW(ws_translated_target.c_str())) {
       ::FindClose(find_file_handle);
-      string context(strings::StrCat("Failed to rename: ", src, " to: ", target));
+      string context(strings::StrCat("Failed to delete: ", target));
       return IOErrorFromWindowsError(context, ::GetLastError());
     }
 
