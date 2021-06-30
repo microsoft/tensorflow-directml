@@ -347,39 +347,53 @@ class DmlBatchToSpaceKernel : public DmlKernel {
         !Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
       auto input_sizes = input_desc.desc.GetSizes();
       auto input_strides = input_desc.desc.GetStrides();
-      dml::TensorDimensions input_tensor_sizes = {input_sizes[3], input_sizes[0],
-                                             input_sizes[1], input_sizes[2]};
-      dml::TensorStrides input_tensor_strides = {input_strides[3], input_strides[0],
-                                            input_strides[1], input_strides[2]};
+
+      // Permute input NCHW->WNCH
+      dml::TensorDimensions input_tensor_sizes = {
+          input_sizes[3], input_sizes[0], input_sizes[1], input_sizes[2]};
+      dml::TensorStrides input_tensor_strides = {
+          input_strides[3], input_strides[0], input_strides[1],
+          input_strides[2]};
       input = dml::Reinterpret(input, input_tensor_sizes, input_tensor_strides);
 
-      output_before_slice =
-          dml::DepthToSpace(input, internal_block_sizes[0]);
+      const auto old_policy = scope.GetTensorPolicy();
+      const auto out_policy = dml::TensorPolicy(
+          [](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
+             dml::Span<const uint32_t> sizes) {
+            uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
+            // Permute output sizes WNCH->NCHW in order to calculate strides.
+            dml::TensorDimensions output_tensor_sizes = {sizes[1], sizes[2],
+                                                         sizes[3], sizes[0]};
 
-      auto outputSizes = output_before_slice.Impl()->GetOutputDesc().sizes;
-      uint32_t stride = 1;
-      uint32_t output_strides[4];
-      for (int i = 3; i >= 0; --i)
-      {
-          output_strides[i] = stride;
-          stride *= outputSizes[i];
-      }
+            // Calculate strides with the permuted sizes
+            dml::TensorStrides strides(dimension_count);
+            uint32_t stride = 1;
+            for (int i = 3; i >= 0; --i) {
+              strides[i] = stride;
+              stride *= output_tensor_sizes[i];
+            }
 
-      dml::TensorDimensions output_tensor_sizes = {
-          outputSizes[1], outputSizes[2], outputSizes[3],
-          outputSizes[0]};
+            // Permute output strides NCHW->WNCH
+            dml::TensorStrides output_tensor_strides = {strides[3], strides[0],
+                                                        strides[1], strides[2]};
 
-      dml::TensorStrides output_tensor_strides = {
-          output_strides[1], output_strides[2], output_strides[3],
-          output_strides[0]};
+            dml::TensorProperties props = {};
+            props.guaranteedBaseOffsetAlignment = 0;
+            props.strides = std::move(output_tensor_strides);
+            props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+                dataType, dimension_count, sizes.data(), props.strides->data());
+            return props;
+          });
 
-      output_before_slice = dml::Reinterpret(output_before_slice, output_tensor_sizes, output_tensor_strides);
-      output_before_slice = dml::Identity(output_before_slice);
+      // We want to have special output striding for this one operator so it can
+      // mimic BatchToSpace
+      scope.SetTensorPolicy(out_policy);
+      output_before_slice = dml::DepthToSpace(input, internal_block_sizes[0]);
+      scope.SetTensorPolicy(old_policy);
+
       auto outputPreSliceTensor = output_before_slice.Impl()->GetOutputDesc();
 
       perm_reshaped_sizes = {outputPreSliceTensor.sizes[0], outputPreSliceTensor.sizes[1], outputPreSliceTensor.sizes[2], outputPreSliceTensor.sizes[3]};
-
-      
     } else {
       uint32_t batch_size = internal_input_shape.dim_size(0);
       uint32_t block_shape_product = std::accumulate(
