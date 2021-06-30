@@ -509,18 +509,31 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
   HANDLE find_file_handle =
       ::FindFirstFileW(ws_translated_target.c_str(), &find_file_data);
   if (find_file_handle != INVALID_HANDLE_VALUE) {
+    printf(
+        "************************PAVIGNOL: FindFirstFileW FOUND EXISTING "
+        "FILE!\n");
+
     if (!::DeleteFileW(ws_translated_target.c_str())) {
-      printf("************************PAVIGNOL: DeleteFileW FAILED!\n");
+      printf(
+          "************************PAVIGNOL: DeleteFileW FAILED (first "
+          "time)!\n");
 
       ::FindClose(find_file_handle);
       string context(strings::StrCat("Failed to delete target: ", target));
       return IOErrorFromWindowsError(context, ::GetLastError());
     }
 
+    printf(
+        "************************PAVIGNOL: DeleteFileW SUCCEEDED (first "
+        "time)!\n");
+
     ::FindClose(find_file_handle);
 
     if (::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
                       MOVEFILE_REPLACE_EXISTING)) {
+      printf(
+          "************************PAVIGNOL: MoveFileExW FINALLY SUCCEEDED!\n");
+
       return Status::OK();
     }
 
@@ -536,13 +549,21 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
     return IOErrorFromWindowsError(context, ::GetLastError());
   }
 
+  printf("************************PAVIGNOL: CopyFileExW SUCCEEDED!\n");
+
   if (!::DeleteFileW(ws_translated_src.c_str())) {
-    printf("************************PAVIGNOL: DeleteFileW FAILED!\n");
+    printf(
+        "************************PAVIGNOL: DeleteFileW FAILED (second "
+        "time)!\n");
 
     string context(strings::StrCat("Failed to delete: ", src,
                                    " after copying it to ", target));
     return IOErrorFromWindowsError(context, ::GetLastError());
   }
+
+  printf(
+      "************************PAVIGNOL: DeleteFileW SUCCEEDED (second "
+      "time)!\n");
 
   return Status::OK();
 }
