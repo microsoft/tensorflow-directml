@@ -497,37 +497,51 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
   std::wstring ws_translated_src = Utf8ToWideChar(TranslateName(src));
   std::wstring ws_translated_target = Utf8ToWideChar(TranslateName(target));
 
+  // Try to move the file first
+  if (::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
+                    MOVEFILE_REPLACE_EXISTING)) {
+    return Status::OK();
+  }
+
+  printf("************************PAVIGNOL: MoveFileExW FAILED!\n");
+
   WIN32_FIND_DATAW find_file_data;
   HANDLE find_file_handle =
       ::FindFirstFileW(ws_translated_target.c_str(), &find_file_data);
   if (find_file_handle != INVALID_HANDLE_VALUE) {
     if (!::DeleteFileW(ws_translated_target.c_str())) {
+      printf("************************PAVIGNOL: DeleteFileW FAILED!\n");
+
       ::FindClose(find_file_handle);
       string context(strings::StrCat("Failed to delete target: ", target));
       return IOErrorFromWindowsError(context, ::GetLastError());
     }
 
     ::FindClose(find_file_handle);
-  }
 
-  // Try to move the file first
-  if (!::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
-                     MOVEFILE_REPLACE_EXISTING)) {
-    // If the move failed, try to copy and delete instead
-    if (!::CopyFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
-                       nullptr, nullptr, nullptr, 0)) {
-      string context(strings::StrCat("Failed to copy: ", src, " to: ", target));
-      return IOErrorFromWindowsError(context, ::GetLastError());
-
-      if (!::DeleteFileW(ws_translated_src.c_str())) {
-        ::FindClose(find_file_handle);
-        string context(strings::StrCat("Failed to delete: ", src,
-                                       " after copying it to ", target));
-        return IOErrorFromWindowsError(context, ::GetLastError());
-      }
+    if (::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
+                      MOVEFILE_REPLACE_EXISTING)) {
+      return Status::OK();
     }
 
-    string context(strings::StrCat("Failed to rename: ", src, " to: ", target));
+    printf("************************PAVIGNOL: MoveFileExW FAILED AGAIN!\n");
+  }
+
+  // If the move failed, try to copy and delete instead
+  if (!::CopyFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
+                     nullptr, nullptr, nullptr, 0)) {
+    printf("************************PAVIGNOL: CopyFileExW FAILED!\n");
+
+    string context(strings::StrCat("Failed to copy: ", src, " to: ", target));
+    return IOErrorFromWindowsError(context, ::GetLastError());
+  }
+
+  if (!::DeleteFileW(ws_translated_src.c_str())) {
+    printf("************************PAVIGNOL: DeleteFileW FAILED!\n");
+
+    ::FindClose(find_file_handle);
+    string context(strings::StrCat("Failed to delete: ", src,
+                                   " after copying it to ", target));
     return IOErrorFromWindowsError(context, ::GetLastError());
   }
 
