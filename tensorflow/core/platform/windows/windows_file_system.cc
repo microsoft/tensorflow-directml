@@ -539,7 +539,6 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
   if (!::DeleteFileW(ws_translated_src.c_str())) {
     printf("************************PAVIGNOL: DeleteFileW FAILED!\n");
 
-    ::FindClose(find_file_handle);
     string context(strings::StrCat("Failed to delete: ", src,
                                    " after copying it to ", target));
     return IOErrorFromWindowsError(context, ::GetLastError());
