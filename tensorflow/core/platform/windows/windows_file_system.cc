@@ -26,6 +26,7 @@ limitations under the License.
 #include <time.h>
 
 #include "tensorflow/core/lib/core/error_codes.pb.h"
+#include "tensorflow/core/lib/gtl/cleanup.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system_helper.h"
@@ -503,69 +504,27 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
     return Status::OK();
   }
 
-  printf("************************PAVIGNOL: MoveFileExW FAILED!\n");
-
+  // If moving the file fails even with the MOVEFILE_REPLACE_EXISTING flag, then
+  // it's possible that another process is still using the target file. In that
+  // scenario, deleting the target file before moving the source file will work
+  // because it allows the process to keep using the old handle while creating a
+  // new handle for the new file.
   WIN32_FIND_DATAW find_file_data;
-  HANDLE find_file_handle =
+  HANDLE target_file_handle =
       ::FindFirstFileW(ws_translated_target.c_str(), &find_file_data);
-  if (find_file_handle != INVALID_HANDLE_VALUE) {
-    printf(
-        "************************PAVIGNOL: FindFirstFileW FOUND EXISTING "
-        "FILE!\n");
+  if (target_file_handle != INVALID_HANDLE_VALUE) {
+    auto file_cleanup = gtl::MakeCleanup(
+        [target_file_handle] { ::FindClose(target_file_handle); });
 
-    if (!::DeleteFileW(ws_translated_target.c_str())) {
-      printf(
-          "************************PAVIGNOL: DeleteFileW FAILED (first "
-          "time)!\n");
-
-      ::FindClose(find_file_handle);
-      string context(strings::StrCat("Failed to delete target: ", target));
-      return IOErrorFromWindowsError(context, ::GetLastError());
-    }
-
-    printf(
-        "************************PAVIGNOL: DeleteFileW SUCCEEDED (first "
-        "time)!\n");
-
-    ::FindClose(find_file_handle);
-
-    if (::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
-                      MOVEFILE_REPLACE_EXISTING)) {
-      printf(
-          "************************PAVIGNOL: MoveFileExW FINALLY SUCCEEDED!\n");
-
+    if (::DeleteFileW(ws_translated_target.c_str()) &&
+        ::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
+                      0)) {
       return Status::OK();
     }
-
-    printf("************************PAVIGNOL: MoveFileExW FAILED AGAIN!\n");
   }
 
-  // If the move failed, try to copy and delete instead
-  if (!::CopyFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
-                     nullptr, nullptr, nullptr, 0)) {
-    printf("************************PAVIGNOL: CopyFileExW FAILED!\n");
-
-    string context(strings::StrCat("Failed to copy: ", src, " to: ", target));
-    return IOErrorFromWindowsError(context, ::GetLastError());
-  }
-
-  printf("************************PAVIGNOL: CopyFileExW SUCCEEDED!\n");
-
-  if (!::DeleteFileW(ws_translated_src.c_str())) {
-    printf(
-        "************************PAVIGNOL: DeleteFileW FAILED (second "
-        "time)!\n");
-
-    string context(strings::StrCat("Failed to delete: ", src,
-                                   " after copying it to ", target));
-    return IOErrorFromWindowsError(context, ::GetLastError());
-  }
-
-  printf(
-      "************************PAVIGNOL: DeleteFileW SUCCEEDED (second "
-      "time)!\n");
-
-  return Status::OK();
+  string context(strings::StrCat("Failed to rename: ", src, " to: ", target));
+  return IOErrorFromWindowsError(context, GetLastError());
 }
 
 Status WindowsFileSystem::GetMatchingPaths(const string& pattern,
