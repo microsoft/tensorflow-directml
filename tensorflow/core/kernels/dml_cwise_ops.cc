@@ -965,6 +965,7 @@ class DmlBitwiseNotKernel : public DmlKernel {
     DCHECK(dtype == ctx->GetOutputDataType(0));
     if (Is64BitIntegerType(dtype)) {
       num_elements *= 2;
+      dtype = DT_UINT32;
     }
 
     std::array<uint32_t, 4> sizes = {1, 1, 1, num_elements};
