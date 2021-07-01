@@ -170,34 +170,15 @@ def main():
         exe_paths = [os.path.splitext(runfile)[0] for runfile in runfiles]
 
       for exe_path in exe_paths:
-        # When GTEST C++ tests crash, they don't produce any XML and we lose all
-        # the results. By running each test case in its own process, we make
-        # sure that all tests are ran and all XML results for non-crashing tests
-        # are being generated.
-        os.chmod(exe_path, 0o777)
+        # Read the json file to know how many shards to split the test into
+        shard_count = 1
+        json_path = os.path.splitext(exe_path)[0] + ".json"
 
-        if args.test_framework == "gtest":
-          shard_count = 0
-
-          exe_test_list = subprocess.run(
-              [exe_path, "--gtest_list_tests"],
-              check=True,
-              env=_get_tf_env(exe_path, args.test_framework),
-              stdout=subprocess.PIPE).stdout
-
-          for line in exe_test_list.decode("utf-8").splitlines():
-            if line.startswith("  "):
-              shard_count += 1
-        else:
-          # Read the json file to know how many shards to split the test into
-          shard_count = 1
-          json_path = os.path.splitext(exe_path)[0] + ".json"
-
-          if os.path.exists(json_path):
-            with open(json_path) as json_file:
-              params = json.load(json_file)
-              if "shard_count" in params:
-                shard_count = params["shard_count"]
+        if os.path.exists(json_path):
+          with open(json_path) as json_file:
+            params = json.load(json_file)
+            if "shard_count" in params:
+              shard_count = params["shard_count"]
 
         for shard_index in range(shard_count):
           # Don't gather device placement data on WSL for now
