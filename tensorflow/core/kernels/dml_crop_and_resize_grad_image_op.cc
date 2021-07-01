@@ -52,7 +52,8 @@ class CropAndResizeGradImageInitHelper : public InitializationHelper {
     const TensorShape& boxes_shape = ctx->input(1).shape();
     const TensorShape& box_index_shape = ctx->input(2).shape();
 
-    if (boxes_shape.num_elements() != 0 || boxes_shape.num_elements() != 0) {
+    if (boxes_shape.num_elements() != 0 ||
+        box_index_shape.num_elements() != 0) {
       OP_REQUIRES(ctx, boxes_shape.dims() == 2,
                   errors::InvalidArgument("boxes must be 2-D",
                                           boxes_shape.DebugString()));
