@@ -166,16 +166,16 @@ class DmlCropAndResizeGradBoxesKernel : public DmlKernel {
     const uint32_t batch_size = image_shape.dim_size(0);
     const uint32_t image_height = image_shape.dim_size(1);
     const uint32_t image_width = image_shape.dim_size(2);
-    constexpr bool computeOutputGradient = false;
-    constexpr bool computeOutputROIGradient = true;
+    constexpr bool compute_output_gradient = false;
+    constexpr bool compute_output_roi_gradient = true;
 
     auto results = dml::RoiAlignGrad(
         image, input_gradient, roi, batch_indices, DML_REDUCE_FUNCTION_AVERAGE,
         init_helper->GetInterpolationMode(), spatial_scale_x, spatial_scale_y,
         input_pixel_offset, output_pixel_offset, minimum_samples_per_output,
         maximum_samples_per_output, align_region_to_corners, batch_size,
-        image_height, image_width, computeOutputGradient,
-        computeOutputROIGradient);
+        image_height, image_width, compute_output_gradient,
+        compute_output_roi_gradient);
 
     // The result will be in order {x1, y1, x2, y2} as per DML's specification,
     // so we need to reverse them like we did for the input ROIs

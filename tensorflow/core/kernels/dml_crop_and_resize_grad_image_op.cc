@@ -177,16 +177,16 @@ class DmlCropAndResizeGradImageKernel : public DmlKernel {
     const uint32_t batch_size = output_gradient_shape.dim_size(0);
     const uint32_t image_height = output_gradient_shape.dim_size(1);
     const uint32_t image_width = output_gradient_shape.dim_size(2);
-    constexpr bool computeOutputGradient = true;
-    constexpr bool computeOutputROIGradient = false;
+    constexpr bool compute_output_gradient = true;
+    constexpr bool compute_output_roi_gradient = false;
 
     auto results = dml::RoiAlignGrad(
         {}, input_gradient, roi, batch_indices, DML_REDUCE_FUNCTION_AVERAGE,
         init_helper->GetInterpolationMode(), spatial_scale_x, spatial_scale_y,
         input_pixel_offset, output_pixel_offset, minimum_samples_per_output,
         maximum_samples_per_output, align_region_to_corners, batch_size,
-        image_height, image_width, computeOutputGradient,
-        computeOutputROIGradient);
+        image_height, image_width, compute_output_gradient,
+        compute_output_roi_gradient);
 
     auto result = results.outputGradient;
 
