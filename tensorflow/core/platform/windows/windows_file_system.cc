@@ -498,17 +498,11 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
   std::wstring ws_translated_src = Utf8ToWideChar(TranslateName(src));
   std::wstring ws_translated_target = Utf8ToWideChar(TranslateName(target));
 
-  // Try to move the file first
-  if (::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
-                    MOVEFILE_REPLACE_EXISTING)) {
-    return Status::OK();
-  }
-
-  // If moving the file fails even with the MOVEFILE_REPLACE_EXISTING flag, then
-  // it's possible that another process is still using the target file. In that
-  // scenario, deleting the target file before moving the source file will work
-  // because it allows the process to keep using the old handle while creating a
-  // new handle for the new file.
+  // Calling MoveFileExW with the MOVEFILE_REPLACE_EXISTING flag can fail if
+  // another process has a handle to the file that it didn't close yet. On the
+  // other hand, calling DeleteFileW + MoveFileExW will work in that scenario
+  // because it allows the process to keep using the old handle while also
+  // creating a new handle for the new file.
   WIN32_FIND_DATAW find_file_data;
   HANDLE target_file_handle =
       ::FindFirstFileW(ws_translated_target.c_str(), &find_file_data);
@@ -516,15 +510,21 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
     auto file_cleanup = gtl::MakeCleanup(
         [target_file_handle] { ::FindClose(target_file_handle); });
 
-    if (::DeleteFileW(ws_translated_target.c_str()) &&
-        ::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
-                      0)) {
-      return Status::OK();
+    if (!::DeleteFileW(ws_translated_target.c_str())) {
+      return IOErrorFromWindowsError(
+          strings::StrCat("Failed to rename: ", src, " to: ", target),
+          GetLastError());
     }
   }
 
-  string context(strings::StrCat("Failed to rename: ", src, " to: ", target));
-  return IOErrorFromWindowsError(context, GetLastError());
+  if (!::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
+                     0)) {
+    return IOErrorFromWindowsError(
+        strings::StrCat("Failed to rename: ", src, " to: ", target),
+        GetLastError());
+  }
+
+  return Status::OK();
 }
 
 Status WindowsFileSystem::GetMatchingPaths(const string& pattern,
