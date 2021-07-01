@@ -8154,6 +8154,8 @@ tf_kernel_library(
         "dml_cross_op.cc",
         "dml_inplace_ops.cc",
         "dml_crop_and_resize_op.cc",
+        "dml_crop_and_resize_grad_image_op.cc",
+        "dml_crop_and_resize_grad_boxes_op.cc",
     ],
     hdrs = [
         "dml_kernel_wrapper.h",
