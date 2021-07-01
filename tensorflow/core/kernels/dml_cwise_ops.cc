@@ -143,7 +143,7 @@ class DmlCompositeBinaryKernel : public DmlKernel {
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     ComPtr<IDMLCompiledOperator> compiled_op =
@@ -249,7 +249,7 @@ class DmlCompositeUnaryKernel : public DmlKernel {
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     ComPtr<IDMLCompiledOperator> compiled_op =
@@ -672,7 +672,7 @@ class DmlClipByValueKernel : public DmlKernel {
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     ComPtr<IDMLCompiledOperator> compiled_op =
@@ -734,7 +734,7 @@ class DmlBinaryWithZeroKernel : public DmlKernel {
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     ComPtr<IDMLCompiledOperator> compiled_op =
