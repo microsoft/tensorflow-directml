@@ -530,59 +530,57 @@ using DmlAvgPoolKernel = DmlPoolingKernel<DML_OPERATOR_AVERAGE_POOLING,
 using DmlMaxPoolKernel =
     DmlPoolingKernel<DML_OPERATOR_MAX_POOLING, DML_MAX_POOLING_OPERATOR_DESC>;
 
-#define DML_REGISTER_KERNELS(type)                                      \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("AvgPool").Device(DEVICE_DML).TypeConstraint<type>("T"),     \
-      DmlKernelWrapper<DmlAvgPoolKernel, PoolingShapeHelper>);          \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("AvgPool3D").Device(DEVICE_DML).TypeConstraint<type>("T"),   \
-      DmlKernelWrapper<DmlAvgPoolKernel, PoolingShapeHelper>);          \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("MaxPool").Device(DEVICE_DML).TypeConstraint<type>("T"),     \
-      DmlKernelWrapper<DmlMaxPoolKernel, PoolingShapeHelper>);          \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("MaxPool3D").Device(DEVICE_DML).TypeConstraint<type>("T"),   \
-      DmlKernelWrapper<DmlMaxPoolKernel, PoolingShapeHelper>);          \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("MaxPoolV2")                                                 \
-          .Device(DEVICE_DML)                                           \
-          .TypeConstraint<type>("T")                                    \
-          .HostMemory("ksize")                                          \
-          .HostMemory("strides"),                                       \
-      DmlKernelWrapper<DmlMaxPoolKernel, PoolingShapeHelper>);          \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("AvgPoolGrad")                                               \
-          .Device(DEVICE_DML)                                           \
-          .TypeConstraint<type>("T")                                    \
-          .HostMemory("orig_input_shape"),                              \
-      DmlKernelWrapper<DmlAvgPoolingGradKernel,                         \
-                       GetOutputShapeFromDimsTensorHelper<int32, 0>>);  \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("AvgPool3DGrad")                                             \
-          .Device(DEVICE_DML)                                           \
-          .TypeConstraint<type>("T")                                    \
-          .HostMemory("orig_input_shape"),                              \
-      DmlKernelWrapper<DmlAvgPoolingGradKernel,                         \
-                       GetOutputShapeFromDimsTensorHelper<int32, 0>>);  \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("MaxPoolGrad").Device(DEVICE_DML).TypeConstraint<type>("T"), \
-      DmlKernelWrapper<DmlMaxPoolGradKernel,                            \
-                       GetOutputShapeAsInputShapeHelper>);              \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("MaxPoolGradV2")                                             \
-          .Device(DEVICE_DML)                                           \
-          .TypeConstraint<type>("T")                                    \
-          .HostMemory("ksize")                                          \
-          .HostMemory("strides"),                                       \
-      DmlKernelWrapper<DmlMaxPoolGradKernel,                            \
-                       GetOutputShapeAsInputShapeHelper>);              \
-  REGISTER_KERNEL_BUILDER(                                              \
-      Name("MaxPool3DGrad")                                             \
-          .Device(DEVICE_DML)                                           \
-          .TypeConstraint<type>("T")                                    \
-          .TypeConstraint<type>("TInput"),                              \
-      DmlKernelWrapper<DmlMaxPoolGradKernel,                            \
-                       GetOutputShapeAsInputShapeHelper>);              \
+#define DML_REGISTER_KERNELS(type)                                             \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("AvgPool").Device(DEVICE_DML).TypeConstraint<type>("T"),            \
+      DmlKernelWrapper<DmlAvgPoolKernel, PoolingShapeHelper>);                 \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("AvgPool3D").Device(DEVICE_DML).TypeConstraint<type>("T"),          \
+      DmlKernelWrapper<DmlAvgPoolKernel, PoolingShapeHelper>);                 \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("MaxPool").Device(DEVICE_DML).TypeConstraint<type>("T"),            \
+      DmlKernelWrapper<DmlMaxPoolKernel, PoolingShapeHelper>);                 \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("MaxPool3D").Device(DEVICE_DML).TypeConstraint<type>("T"),          \
+      DmlKernelWrapper<DmlMaxPoolKernel, PoolingShapeHelper>);                 \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("MaxPoolV2")                                                        \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .HostMemory("ksize")                                                 \
+          .HostMemory("strides"),                                              \
+      DmlKernelWrapper<DmlMaxPoolKernel, PoolingShapeHelper>);                 \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("AvgPoolGrad")                                                      \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .HostMemory("orig_input_shape"),                                     \
+      DmlKernelWrapper<DmlAvgPoolingGradKernel,                                \
+                       GetOutputShapeFromDimsTensorHelper<int32, 0>>);         \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("AvgPool3DGrad")                                                    \
+          .Device(DEVICE_DML)                                                  \
+          .TypeConstraint<type>("T")                                           \
+          .HostMemory("orig_input_shape"),                                     \
+      DmlKernelWrapper<DmlAvgPoolingGradKernel,                                \
+                       GetOutputShapeFromDimsTensorHelper<int32, 0>>);         \
+  REGISTER_KERNEL_BUILDER(                                                     \
+      Name("MaxPoolGrad").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
+      DmlKernelWrapper<DmlMaxPoolGradKernel,                                   \
+                       GetOutputShapeAsInputShapeHelper>);                     \
+  REGISTER_KERNEL_BUILDER(Name("MaxPoolGradV2")                                \
+                              .Device(DEVICE_DML)                              \
+                              .TypeConstraint<type>("T")                       \
+                              .HostMemory("ksize")                             \
+                              .HostMemory("strides"),                          \
+                          DmlKernelWrapper<DmlMaxPoolGradKernel,               \
+                                           GetOutputShapeAsInputShapeHelper>); \
+  REGISTER_KERNEL_BUILDER(Name("MaxPool3DGrad")                                \
+                              .Device(DEVICE_DML)                              \
+                              .TypeConstraint<type>("T")                       \
+                              .TypeConstraint<type>("TInput"),                 \
+                          DmlKernelWrapper<DmlMaxPoolGradKernel,               \
+                                           GetOutputShapeAsInputShapeHelper>);
 
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
