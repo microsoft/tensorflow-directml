@@ -261,7 +261,7 @@ class DmlTransposeKernel : public DmlKernel {
 
     // TFDML #24881131
     if (is_int64) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
