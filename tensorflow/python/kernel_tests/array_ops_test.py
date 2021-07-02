@@ -572,9 +572,13 @@ class StridedSliceChecker(object):
 
 STRIDED_SLICE_TYPES = [
     dtypes.int32, dtypes.int64, dtypes.int16, dtypes.int8, dtypes.float32,
-    dtypes.float64, dtypes.complex64, dtypes.complex128, dtypes.bool
+    dtypes.bool
 ]
 
+# DML doesn't support float64 and complex types
+if test_util.gpu_device_type() != "DML":
+  STRIDED_SLICE_TYPES.extend(
+      [dtypes.float64, dtypes.complex64, dtypes.complex128])
 
 class StridedSliceTest(test_util.TensorFlowTestCase):
   """Test the strided slice operation with variants of slices."""

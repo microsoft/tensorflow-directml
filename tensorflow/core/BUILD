@@ -3690,6 +3690,7 @@ cc_library(
         "common_runtime/dml/dml_tensor_desc.cc",
         "common_runtime/dml/dml_upload_heap.cc",
         "common_runtime/dml/dml_util.cc",
+        "common_runtime/dml/dml_tracing.cc",
     ],
     hdrs = [
         "common_runtime/dml/dml_device_cache.h",
@@ -3718,6 +3719,7 @@ cc_library(
         "common_runtime/dml/dml_tensor_desc.h",
         "common_runtime/dml/dml_upload_heap.h",
         "common_runtime/dml/dml_util.h",
+        "common_runtime/dml/dml_tracing.h",
         "common_runtime/dml/dml_status.h",
         "common_runtime/device.h",
         "common_runtime/local_device.h",
@@ -3740,7 +3742,7 @@ cc_library(
         ":proto_text",
         ":stream_executor",
         "//tensorflow/stream_executor/platform:dso_loader",
-    ],
+    ] + if_windows(["@pix//:headers"]),
 )
 
 cc_library(
@@ -3776,7 +3778,7 @@ cc_library(
         "common_runtime/dml/dml_adapter.cc",
         "common_runtime/dml/dml_adapter_impl.cc",
         "common_runtime/dml/dml_error_handling.cc",
-        "common_runtime/dml/dml_tracing.cc",
+        "common_runtime/dml/dml_guids.cc",
     ],
     hdrs = [
         "common_runtime/dml/dml_common.h",
@@ -3784,15 +3786,17 @@ cc_library(
         "common_runtime/dml/dml_adapter.h",
         "common_runtime/dml/dml_adapter_impl.h",
         "common_runtime/dml/dml_adapter_heuristics.h",
-        "common_runtime/dml/dml_tracing.h",
+        "common_runtime/dml/dml_guids.h",
     ],
     linkstatic = 1,
     deps = [
         ":lib",
         ":lib_internal",
-        "//third_party/dml:dx_helpers",
         "@dml_redist//:headers",
-        "//third_party/dml:winadapter",
+        "@directml//:directmlx",
+        "@directx_headers//:directx_headers",
+        "@directx_headers//:directx_guids",
+        "@directx_headers//:directx_winadapter",
     ],
     alwayslink = 1,
     visibility = ["//visibility:public"],

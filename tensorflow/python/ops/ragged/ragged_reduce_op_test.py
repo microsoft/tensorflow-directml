@@ -339,7 +339,7 @@ class RaggedReduceOpsTest(test_util.TensorFlowTestCase,
     tensor = [[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]]
     expected = [2.0, 20.0]
     reduced = ragged_math_ops.reduce_mean(tensor, axis=1)
-    self.assertAllEqual(reduced, expected)
+    self.assertAllClose(reduced, expected)
 
   def testErrors(self):
     rt_input = ragged_factory_ops.constant([[1, 2, 3], [4, 5]])

@@ -33,22 +33,14 @@ class DmlCastKernel : public DmlKernel {
 
     DataType input_dtype = ctx->GetInputDataType(0);
     DataType output_dtype = ctx->GetOutputDataType(0);
-    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
-    DML_TENSOR_DATA_TYPE dml_out_dtype = DML_TENSOR_DATA_TYPE_UNKNOWN;
+    const DML_TENSOR_DATA_TYPE dml_out_dtype =
+        GetDmlDataTypeFromTfDataType(output_dtype);
 
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee
-    // that our output tensor's memory is zero'd, we need to do so manually
-    // prior to performing the cast.
-    if (Is64BitIntegerType(output_dtype)) {
-      // TFDML #24881131
-      // 64-bit data support should be revisited once DML supports these types
-      zero_outputs_ = true;
-      out_policy = GetEmulatedInt64TensorPolicy();
-      dml_out_dtype = DML_TENSOR_DATA_TYPE_UINT32;
-    } else {
-      dml_out_dtype = GetDmlDataTypeFromTfDataType(output_dtype);
-    }
+    // TFDML #24881131
+    const dml::TensorPolicy out_policy =
+        Is64BitUnsignedIntegerType(output_dtype)
+            ? GetEmulatedInt64TensorPolicy()
+            : dml::TensorPolicy::Default();
 
     // Tensor shape doesn't matter for Cast, so don't bother with DML's 4D
     // restrictions
@@ -81,6 +73,15 @@ class DmlCastKernel : public DmlKernel {
 
     auto result = dml::Cast(input_tensor, dml_out_dtype);
 
+    if (output_dtype == DT_BOOL) {
+      result = dml::Clip(result, 0.0, 1.0);
+    }
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(output_dtype)) {
+      result = dml::ConvertInt32ToInt64(scope, result);
+    }
+
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
@@ -88,16 +89,15 @@ class DmlCastKernel : public DmlKernel {
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
-    if (zero_outputs_) {
-      Tensor* output = ctx->GetOutputTensor(0);
+    Tensor* output = ctx->GetOutputTensor(0);
+
+    // TFDML #24881131
+    if (Is64BitUnsignedIntegerType(output->dtype())) {
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
     }
 
     return DmlKernel::Compute(ctx);
   }
-
- private:
-  bool zero_outputs_ = false;
 };
 
 #define DML_REGISTER_KERNEL_OUTPUT(output_type)              \

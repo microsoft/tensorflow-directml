@@ -33,7 +33,15 @@ Microsoft::WRL::ComPtr<IDMLDevice> CreateDmlDevice(
 // Converts a DML tensor data type to a TF tensor data type and vice versa.
 DataType GetTfDataTypeFromDmlDataType(DML_TENSOR_DATA_TYPE type);
 DML_TENSOR_DATA_TYPE GetDmlDataTypeFromTfDataType(DataType type);
+
+// TFDML #24881131
 bool Is64BitIntegerType(DataType type);
+
+// TFDML #24881131
+bool Is64BitSignedIntegerType(DataType type);
+
+// TFDML #24881131
+bool Is64BitUnsignedIntegerType(DataType type);
 
 // Converts a TF TensorShape into an array of uint32_t, and validates that the
 // shape is representable as uint32_t. This is useful because shapes in TF are

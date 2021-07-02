@@ -26,6 +26,7 @@ limitations under the License.
 #include <time.h>
 
 #include "tensorflow/core/lib/core/error_codes.pb.h"
+#include "tensorflow/core/lib/gtl/cleanup.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 #include "tensorflow/core/platform/env.h"
 #include "tensorflow/core/platform/file_system_helper.h"
@@ -492,17 +493,38 @@ Status WindowsFileSystem::GetFileSize(const string& fname, uint64* size) {
 }
 
 Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
-  Status result;
   // rename() is not capable of replacing the existing file as on Linux
   // so use OS API directly
   std::wstring ws_translated_src = Utf8ToWideChar(TranslateName(src));
   std::wstring ws_translated_target = Utf8ToWideChar(TranslateName(target));
-  if (!::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
-                     MOVEFILE_REPLACE_EXISTING)) {
-    string context(strings::StrCat("Failed to rename: ", src, " to: ", target));
-    result = IOErrorFromWindowsError(context, ::GetLastError());
+
+  // Calling MoveFileExW with the MOVEFILE_REPLACE_EXISTING flag can fail if
+  // another process has a handle to the file that it didn't close yet. On the
+  // other hand, calling DeleteFileW + MoveFileExW will work in that scenario
+  // because it allows the process to keep using the old handle while also
+  // creating a new handle for the new file.
+  WIN32_FIND_DATAW find_file_data;
+  HANDLE target_file_handle =
+      ::FindFirstFileW(ws_translated_target.c_str(), &find_file_data);
+  if (target_file_handle != INVALID_HANDLE_VALUE) {
+    auto file_cleanup = gtl::MakeCleanup(
+        [target_file_handle] { ::FindClose(target_file_handle); });
+
+    if (!::DeleteFileW(ws_translated_target.c_str())) {
+      return IOErrorFromWindowsError(
+          strings::StrCat("Failed to rename: ", src, " to: ", target),
+          GetLastError());
+    }
   }
-  return result;
+
+  if (!::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
+                     0)) {
+    return IOErrorFromWindowsError(
+        strings::StrCat("Failed to rename: ", src, " to: ", target),
+        GetLastError());
+  }
+
+  return Status::OK();
 }
 
 Status WindowsFileSystem::GetMatchingPaths(const string& pattern,

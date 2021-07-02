@@ -99,6 +99,17 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
     // means that the wait we perform below will return immediately, and the
     // loop will continue.
     uint64_t next_fence_value = state->fence->GetCompletedValue() + 1;
+
+    // Device removal will result in all fences reporting a completed value of
+    // UINT64_MAX; GetCompletedValue()+1 will overflow to 0. The intention
+    // here is to ensure all outstanding events are signaled, but this queue uses
+    // the *next* value (0) to flush events in a batch. If the device is removed
+    // we explicitly set the next_fence_value to UINT64_MAX so that all events
+    // are flushed then exit this thread.
+    bool device_removed = next_fence_value == 0;
+    if (device_removed) {
+      next_fence_value = std::numeric_limits<uint64_t>::max();
+    }
     state->current_awaited_fence_value = next_fence_value;
 
     // Find all the events that have fence values < next_fence_values. These
@@ -120,20 +131,33 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
       event.done_callback();
     }
 
+    if (device_removed) {
+      break;
+    }
+
+    bool event_queue_empty = state->events_by_fence_value.empty();
+
     // We've finished processing the events, so we can unlock the mutex now.
     lock.unlock();
 
     events_to_process.clear();
 
-    // Now wait for the fence to become signaled again. Recall that the choice
-    // of next_fence_value ensures this wait will complete no matter what value
-    // is signaled.
-    DmlGpuEvent next_event{next_fence_value, state->fence};
-    next_event.WaitForSignal();
+    // If the queue isn't empty then there are still events waiting for a fence
+    // value that hasn't been reached. The WaitForSignal below is to avoid a
+    // busy wait, but it's not required for correctness. WaitForSignal should
+    // NOT be invoked if the queue is already empty since another signal may
+    // never come (i.e. no more events are enqueued).
+    if (!event_queue_empty) {
+      // Now wait for the fence to become signaled again. Recall that the choice
+      // of next_fence_value ensures this wait will complete no matter what
+      // value is signaled.
+      DmlGpuEvent next_event{next_fence_value, state->fence};
+      next_event.WaitForSignal();
 
-    // We require monotonically increasing fence values; time is not allowed to
-    // go backward!
-    CHECK(state->fence->GetCompletedValue() >= next_fence_value);
+      // We require monotonically increasing fence values; time is not allowed
+      // to go backward!
+      CHECK(state->fence->GetCompletedValue() >= next_fence_value);
+    }
   }
 }
 

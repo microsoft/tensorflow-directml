@@ -216,7 +216,8 @@ class SumReductionTest(BaseReductionTest):
 
     # test that mean doesn't overflow
     # only on GPU, since it has the more accurate implementation
-    if not test.is_gpu_available():
+    # DML has the same behavior as the CPU and would overflow in this case
+    if not test.is_gpu_available(skip_devices="DML"):
       return
 
     arr = np.ones([68000], dtype=np.float16)

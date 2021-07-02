@@ -214,17 +214,6 @@ template <typename T>
 struct TfTensorTypeTraits;
 
 template <>
-struct TfTensorTypeTraits<float> {
-  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_FLOAT32;
-  static float FromFloat(float val) { return val; }
-  static DML_SCALAR_UNION ToDmlScalar(float val) {
-    DML_SCALAR_UNION scalar;
-    scalar.Float32 = val;
-    return scalar;
-  }
-};
-
-template <>
 struct TfTensorTypeTraits<Eigen::half> {
   static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_FLOAT16;
   static Eigen::half FromFloat(float val) {
@@ -238,11 +227,22 @@ struct TfTensorTypeTraits<Eigen::half> {
 };
 
 template <>
-struct TfTensorTypeTraits<uint32_t> {
-  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_UINT32;
-  static DML_SCALAR_UNION ToDmlScalar(uint32_t val) {
+struct TfTensorTypeTraits<float> {
+  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_FLOAT32;
+  static float FromFloat(float val) { return val; }
+  static DML_SCALAR_UNION ToDmlScalar(float val) {
     DML_SCALAR_UNION scalar;
-    scalar.UInt32 = val;
+    scalar.Float32 = val;
+    return scalar;
+  }
+};
+
+template <>
+struct TfTensorTypeTraits<uint8_t> {
+  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_UINT8;
+  static DML_SCALAR_UNION ToDmlScalar(uint8_t val) {
+    DML_SCALAR_UNION scalar;
+    scalar.UInt8 = val;
     return scalar;
   }
 };
@@ -258,11 +258,31 @@ struct TfTensorTypeTraits<uint16_t> {
 };
 
 template <>
+struct TfTensorTypeTraits<uint32_t> {
+  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_UINT32;
+  static DML_SCALAR_UNION ToDmlScalar(uint32_t val) {
+    DML_SCALAR_UNION scalar;
+    scalar.UInt32 = val;
+    return scalar;
+  }
+};
+
+template <>
 struct TfTensorTypeTraits<int32_t> {
   static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_INT32;
   static DML_SCALAR_UNION ToDmlScalar(int32_t val) {
     DML_SCALAR_UNION scalar;
     scalar.Int32 = val;
+    return scalar;
+  }
+};
+
+template <>
+struct TfTensorTypeTraits<int64_t> {
+  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_INT64;
+  static DML_SCALAR_UNION ToDmlScalar(int64_t val) {
+    DML_SCALAR_UNION scalar;
+    scalar.Int64 = val;
     return scalar;
   }
 };
@@ -288,6 +308,10 @@ Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
   );
   return scalar;
 }
+
+// TFDML #24881131
+Expression ConvertInt32ToInt64(Graph& scope, Expression tensor,
+                               uint32_t element_stride = 1);
 
 template <typename T>
 Expression Sequence(Graph& scope, T start, T step,

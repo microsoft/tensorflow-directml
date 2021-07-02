@@ -88,6 +88,13 @@ class DmlNonzeroCoordinatesKernel : public DmlKernel {
   }
 };
 
+#define TF_CALL_WHERE_DML_TYPES(m) \
+  TF_CALL_int8(m);                 \
+  TF_CALL_uint8(m);                \
+  TF_CALL_int64(m);                \
+  TF_CALL_float(m);                \
+  TF_CALL_bool(m);
+
 // Since DML_OPERATOR_NONZERO_COORDINATES has different outputs and output
 // shapes than TF's Where, we register our own dml-only operator that can be
 // called during initialization to get the output shape. The DML version of the
@@ -120,7 +127,7 @@ REGISTER_OP("DmlNonzeroCoordinates")
                           DmlKernelWrapper<DmlNonzeroCoordinatesKernel, \
                                            NonzeroCoordinatesShapeHelper>)
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNEL);
+TF_CALL_WHERE_DML_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 static Status ComputeNonzeroCoordinates(OpKernelContext* ctx,
@@ -264,7 +271,8 @@ class DmlWhereKernel : public OpKernel {
       Name("Where").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlWhereKernel);
 
-TF_CALL_DML_ALL_TYPES(REGISTER_KERNEL);
+TF_CALL_WHERE_DML_TYPES(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
+#undef TF_CALL_WHERE_DML_TYPES
 
 }  // namespace tensorflow

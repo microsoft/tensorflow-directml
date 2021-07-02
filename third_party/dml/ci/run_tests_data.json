@@ -13,7 +13,8 @@
         "portpicker"
       ],
       "windowsPipDeps": [
-        "windows-curses"
+        "windows-curses",
+        "pyreadline"
       ],
       "isPythonTest": true
     },

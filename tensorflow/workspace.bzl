@@ -34,6 +34,7 @@ load("//third_party/kissfft:workspace.bzl", kissfft = "repo")
 load("//third_party/keras_applications_archive:workspace.bzl", keras_applications = "repo")
 load("//third_party/pasta:workspace.bzl", pasta = "repo")
 load("//third_party/dml/redist:workspace.bzl", "dml_repository")
+load("//third_party/pix:workspace.bzl", "pix_repository")
 
 def initialize_third_party():
     """ Load third party repositories.  See above load() statements. """
@@ -89,9 +90,17 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     dml_repository(
         name = "dml_redist",
         package = "Microsoft.AI.DirectML.Preview",
-        version = "1.6.0-dev20210318",
+        version = "1.7.0-dev20210625",
         source = "https://api.nuget.org/v3/index.json",
         build_file = "//third_party/dml/redist:BUILD.bazel",
+    )
+
+    pix_repository(
+        name = "pix",
+        package = "WinPixEventRuntime",
+        version = "1.0.210209001",
+        source = "https://api.nuget.org/v3/index.json",
+        build_file = "//third_party/pix:BUILD.bazel",
     )
 
     # Point //external/local_config_arm_compiler to //external/arm_compiler
@@ -950,6 +959,28 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
             "https://storage.googleapis.com/mirror.tensorflow.org/github.com/GrahamDumpleton/wrapt/archive/1.11.1.tar.gz",
             "https://github.com/GrahamDumpleton/wrapt/archive/1.11.1.tar.gz",
         ],
+    )
+
+    tf_http_archive(
+        name = "directx_headers",
+        urls = [
+            "https://mirror.bazel.build/github.com/microsoft/DirectX-Headers/archive/v1.0.2.tar.gz",
+            "https://github.com/microsoft/DirectX-Headers/archive/v1.0.2.tar.gz",
+        ],
+        sha256 = "afeb932c1a92d7fa22f03565468256ce9cc46f0e7fc163cc34e2666313a7cd15",
+        strip_prefix = "DirectX-Headers-1.0.2",
+        build_file = clean_dep("//third_party:directx_headers.BUILD"),
+    )
+
+    tf_http_archive(
+        name = "directml",
+        urls = [
+            "https://mirror.bazel.build/github.com/microsoft/DirectML/archive/75854f4fe27e8f3bc9ad1b49331608db779e58b0.tar.gz",
+            "https://github.com/microsoft/DirectML/archive/75854f4fe27e8f3bc9ad1b49331608db779e58b0.tar.gz",
+        ],
+        sha256 = "ec68269602641ac3b8ca3f2674f1b9e3d2099bbb01bb4f28eeb5e0d49de94a6d",
+        strip_prefix = "DirectML-75854f4fe27e8f3bc9ad1b49331608db779e58b0",
+        build_file = clean_dep("//third_party:directml.BUILD"),
     )
 
 def tf_bind():

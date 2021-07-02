@@ -145,8 +145,10 @@ class StatefulScatterNdTest(test.TestCase):
         ref_var.initializer.run()
         tf_scatter(ref_var, indices, updates).eval()
 
+        tol = 1e-03 if repeat_indices or vtype == np.float16 else 1e-06
+
         # Compare
-        self.assertAllClose(new, self.evaluate(ref_var))
+        self.assertAllClose(new, self.evaluate(ref_var), atol=tol, rtol=tol)
 
   def _VariableRankTests(self, np_scatter, tf_scatter):
     for vtype in (np.int32, np.float16, np.float32, np.float64, np.complex64,

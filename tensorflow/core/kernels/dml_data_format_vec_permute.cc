@@ -22,30 +22,65 @@ limitations under the License.
 
 namespace tensorflow {
 
+// Ensure that `src` and `dst` define a valid permutation.
+// Ops defined in this file assume that user specifies a permutation via two
+// string attributes. This check validates that these attributes properly define
+// it to prevent security vulnerabilities.
+static bool IsValidPermutation(const std::string& src, const std::string& dst) {
+  if (src.size() != dst.size()) {
+    return false;
+  }
+
+  std::array<bool, 256> characters{};
+
+  // Every character in `src` must be present only once
+  for (const auto c : src) {
+    const uint8_t char_index = static_cast<uint8_t>(c);
+    if (characters[char_index]) {
+      return false;
+    }
+    characters[char_index] = true;
+  }
+
+  // Every character in `dst` must show up in `src` exactly once
+  for (const auto c : dst) {
+    const uint8_t char_index = static_cast<uint8_t>(c);
+    if (!characters[char_index]) {
+      return false;
+    }
+    characters[char_index] = false;
+  }
+
+  // At this point, characters[] has been switched to true and false exactly
+  // once for all character in `src` (and `dst`) so we have a valid permutation
+  return true;
+}
+
 class DmlDataFormatVecPermuteKernel : public OpKernel {
  public:
   explicit DmlDataFormatVecPermuteKernel(OpKernelConstruction* ctx)
       : OpKernel(ctx) {
     std::string src_format;
-    std::string dst_format;
-
     OP_REQUIRES_OK(ctx, ctx->GetAttr("src_format", &src_format));
+    OP_REQUIRES(ctx, src_format.size() == 4 || src_format.size() == 5,
+                errors::InvalidArgument(
+                    "Source format must be of length 4 or 5, received "
+                    "src_format = ",
+                    src_format));
+    std::string dst_format;
     OP_REQUIRES_OK(ctx, ctx->GetAttr("dst_format", &dst_format));
+    OP_REQUIRES(ctx, dst_format.size() == 4 || dst_format.size() == 5,
+                errors::InvalidArgument("Destination format must be of length "
+                                        "4 or 5, received dst_format = ",
+                                        dst_format));
+    OP_REQUIRES(
+        ctx, IsValidPermutation(src_format, dst_format),
+        errors::InvalidArgument(
+            "Destination and source format must determine a permutation, got ",
+            src_format, " and ", dst_format));
 
-    // The CPU and CUDA implementions don't check the size of src_format or
-    // dst_format and just leave garbage data for the dimensions that are not
-    // included. We do the same thing here.
-    size_t src_format_length = std::min<size_t>(src_format.length(), 4u);
-    size_t dst_format_length = std::min<size_t>(dst_format.length(), 4u);
-
-    for (size_t dst_index = 0; dst_index < dst_format_length; ++dst_index) {
-      for (size_t src_index = 0; src_index < src_format_length; ++src_index) {
-        if (dst_format[dst_index] == src_format[src_index]) {
-          permutations_.push_back(src_index);
-          break;
-        }
-      }
-    }
+    src_format_ = src_format;
+    dst_format_ = dst_format;
   }
 
   void Compute(OpKernelContext* ctx) override {
@@ -57,22 +92,73 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
                     "input must be a vector or 2D tensor, but got shape ",
                     input_shape.DebugString()));
 
+    const int full_dim_count = src_format_.size();
+    const int spatial_dim_count = full_dim_count - 2;
+
     if (input_shape.dims() == 1) {
-      OP_REQUIRES(
-          ctx, input_shape.dim_size(0) == 4,
-          errors::InvalidArgument("1D input must be of size 4, but got shape ",
-                                  input_shape.DebugString()));
+      OP_REQUIRES(ctx,
+                  input.NumElements() == spatial_dim_count ||
+                      input.NumElements() == full_dim_count,
+                  errors::InvalidArgument("1D input must be of size ",
+                                          spatial_dim_count, " or ",
+                                          full_dim_count, ", but got shape ",
+                                          input.shape().DebugString()));
     } else if (input_shape.dims() == 2) {
-      OP_REQUIRES(
-          ctx, input_shape.dim_size(0) == 4,
-          errors::InvalidArgument(
-              "First dimension of 2D input must be of size 4, but got shape ",
-              input_shape.DebugString()));
+      OP_REQUIRES(ctx,
+                  input.dim_size(0) == spatial_dim_count ||
+                      input.dim_size(0) == full_dim_count,
+                  errors::InvalidArgument("First dimension of 2D input must be "
+                                          "of size ",
+                                          spatial_dim_count, " or ",
+                                          full_dim_count, ", but got shape ",
+                                          input.shape().DebugString()));
       OP_REQUIRES(
           ctx, input_shape.dim_size(1) == 2,
           errors::InvalidArgument(
               "Second dimension of 2D input must be of size 2, but got shape ",
               input_shape.DebugString()));
+    }
+    std::string src_format = src_format_;
+    std::string dst_format = dst_format_;
+
+    if (input.dim_size(0) == spatial_dim_count) {
+      // If the input is a vector of size 2, treat the two elements as spatial
+      // dimensions.
+      auto keep_only_spatial_dimensions =
+          [spatial_dim_count](std::string* format_str) -> void {
+        auto new_end =
+            std::remove_if(format_str->begin(), format_str->end(),
+                           [spatial_dim_count](const char dim) {
+                             return dim != 'H' && dim != 'W' &&
+                                    (spatial_dim_count == 2 || dim != 'D');
+                           });
+        format_str->erase(new_end, format_str->end());
+      };
+      keep_only_spatial_dimensions(&src_format);
+      keep_only_spatial_dimensions(&dst_format);
+
+      if (spatial_dim_count == 3) {
+        OP_REQUIRES(
+            ctx, src_format.size() == 3 && dst_format.size() == 3,
+            errors::InvalidArgument(
+                "Format specifier must contain D, H and W for 2D case"));
+      } else {
+        DCHECK(spatial_dim_count == 2);
+        OP_REQUIRES(ctx, src_format.size() == 2 && dst_format.size() == 2,
+                    errors::InvalidArgument(
+                        "Format specifier must contain H and W for 2D case"));
+      }
+    }
+
+    absl::InlinedVector<uint32_t, 5> permutations;
+
+    for (size_t dst_index = 0; dst_index < dst_format.length(); ++dst_index) {
+      for (size_t src_index = 0; src_index < src_format.length(); ++src_index) {
+        if (dst_format[dst_index] == src_format[src_index]) {
+          permutations.push_back(src_index);
+          break;
+        }
+      }
     }
 
     Tensor* output = nullptr;
@@ -98,47 +184,17 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
 
     execution_context->ResourceBarrier(barriers);
 
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    int perm_stride = DataTypeSize(input.dtype()) * input_shape.dims();
-    bool is_64_bit_int = Is64BitIntegerType(output->dtype());
-    uint32_t permutation_size = is_64_bit_int ? perm_stride / 2 : perm_stride;
+    const int perm_stride = DataTypeSize(input.dtype()) * input_shape.dims();
 
-    // For int64 data types, we copy only half the data since the other half is
-    // most likely garbage data
-    if (is_64_bit_int) {
-      const uint8_t pattern[] = {0};
-      execution_context->FillBufferWithPattern(
-          output_buffer.Resource(), output_buffer.Offset(),
-          output_buffer.SizeInBytes(), pattern);
-    }
-
-    for (uint32_t i = 0; i < permutations_.size(); ++i) {
+    for (uint32_t i = 0; i < permutations.size(); ++i) {
       uint64_t dst_offset = output_buffer.Offset() + i * perm_stride;
       uint64_t src_offset =
-          input_buffer.Offset() + permutations_[i] * perm_stride;
+          input_buffer.Offset() + permutations[i] * perm_stride;
 
-      // For int64 data types, we need to do 2 to separate copies for 2D tensors
-      // in order to skip the garbage data between elements
-      if (is_64_bit_int && input.dims() == 2) {
-        execution_context->CopyBufferRegion(
-            output_buffer.Resource(), dst_offset,
-            D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, permutation_size / 2);
-
-        execution_context->CopyBufferRegion(
-            output_buffer.Resource(), dst_offset + permutation_size,
-            D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(),
-            src_offset + permutation_size, D3D12_RESOURCE_STATE_COPY_SOURCE,
-            permutation_size / 2);
-      } else {
-        execution_context->CopyBufferRegion(
-            output_buffer.Resource(), dst_offset,
-            D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, permutation_size);
-      }
+      execution_context->CopyBufferRegion(
+          output_buffer.Resource(), dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
+          input_buffer.Resource(), src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
+          perm_stride);
     }
 
     for (auto& barrier : barriers) {
@@ -149,7 +205,8 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
   }
 
  private:
-  absl::InlinedVector<uint32_t, 4> permutations_;
+  std::string src_format_;
+  std::string dst_format_;
 };
 
 #define REGISTER_KERNEL(type)                             \

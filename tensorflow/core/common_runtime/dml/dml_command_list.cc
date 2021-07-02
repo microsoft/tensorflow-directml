@@ -23,13 +23,11 @@ limitations under the License.
 namespace tensorflow {
 
 DmlCommandList::DmlCommandList(ID3D12Device* d3d_device, IDMLDevice* dml_device,
-                               D3D12_COMMAND_LIST_TYPE command_list_type,
-                               DmlAllocator* allocator)
+                               D3D12_COMMAND_LIST_TYPE command_list_type)
     : d3d_device_(d3d_device),
       dml_device_(dml_device),
       command_list_type_(command_list_type),
       descriptor_pool_(d3d_device, 2048),
-      allocator_(allocator),
       command_allocator_ring_(d3d_device, command_list_type) {
   DML_CHECK_SUCCEEDED(
       dml_device->CreateCommandRecorder(IID_PPV_ARGS(&recorder_)));
@@ -165,6 +163,8 @@ void DmlCommandList::InitializeOperator(IDMLOperatorInitializer* initializer,
 void DmlCommandList::ExecuteOperator(IDMLCompiledOperator* op,
                                      IDMLBindingTable* binding_table,
                                      ID3D12DescriptorHeap* descriptor_heap) {
+  DmlTracing::Instance().LogExecuteOperatorStart(op, d3d_command_list_.Get());
+
   // Record the execution work.
   SetDescriptorHeap(descriptor_heap);
   recorder_->RecordDispatch(d3d_command_list_.Get(), op, binding_table);
@@ -174,6 +174,8 @@ void DmlCommandList::ExecuteOperator(IDMLCompiledOperator* op,
       CD3DX12_RESOURCE_BARRIER::UAV(nullptr),
       CD3DX12_RESOURCE_BARRIER::Aliasing(nullptr, nullptr)};
   d3d_command_list_->ResourceBarrier(ABSL_ARRAYSIZE(barriers), barriers);
+
+  DmlTracing::Instance().LogExecuteOperatorEnd(d3d_command_list_.Get());
 }
 
 void DmlCommandList::ResourceBarrier(

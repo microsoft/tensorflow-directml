@@ -39,11 +39,6 @@ namespace tensorflow {
 DmlDevice::DmlDevice(const DmlDeviceState* state, const SessionOptions& options,
                      const DeviceAttributes& attributes)
     : LocalDevice(options, attributes), state_(state) {
-  // Create the DML BFC allocator
-  D3D12HeapAllocator* heap_allocator = state_->heap_allocator.get();
-  uint64_t memory_limit_in_bytes = attributes.memory_limit();
-  const GPUOptions& gpu_options = options.config.gpu_options();
-
   cpu_allocator_ = cpu_allocator();
 
   device_context_ = new DMLDeviceContext(

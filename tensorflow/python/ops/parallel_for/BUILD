@@ -137,6 +137,8 @@ cuda_py_test(
         # XLA is not enabled by default on Mac or Windows.
         "no_mac",
         "no_windows",
+        # XLA support is not enabled in DML builds
+        "no_dml",
     ],
     xla_enable_strict_auto_jit = True,
     xla_enabled = True,

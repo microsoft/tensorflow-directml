@@ -127,7 +127,6 @@ class DmlLRNKernel : public DmlKernel {
       Name("LRN").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlLRNKernel, GetOutputShapeAsInputShapeHelper>)
 TF_CALL_float(REGISTER_KERNEL);
-TF_CALL_half(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 
 class LRNGradInitHelper : public InitializationHelper {
@@ -230,7 +229,6 @@ class DmlLRNGradKernel : public DmlKernel {
       Name("LRNGrad").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlLRNGradKernel, GetOutputShapeAsInputShapeHelper>)
 TF_CALL_float(REGISTER_KERNEL);
-TF_CALL_half(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

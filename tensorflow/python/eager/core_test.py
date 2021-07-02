@@ -535,7 +535,6 @@ class TFETest(test_util.TensorFlowTestCase):
     x = constant_op.constant([[1., 2.], [3., 4.]])
     x = x.cpu()
     x = x.dml() if gpu_type == "DML" else x.gpu()
-    x = x.dml() if gpu_type == "DML" else x.gpu()
     x = x.cpu()
 
     # Invalid device
@@ -552,7 +551,6 @@ class TFETest(test_util.TensorFlowTestCase):
     with context.execution_mode(context.ASYNC):
       x = constant_op.constant([[1., 2.], [3., 4.]])
       x = x.cpu()
-      x = x.dml() if gpu_type == "DML" else x.gpu()
       x = x.dml() if gpu_type == "DML" else x.gpu()
       x = x.cpu()
       context.context().executor.wait()

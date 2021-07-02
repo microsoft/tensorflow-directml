@@ -136,17 +136,6 @@ class ResizeGradShapeHelper : public ShapeHelper {
   }
 };
 
-static bool CastInputToFloat(DML_INTERPOLATION_MODE mode, DataType data_type) {
-  switch (mode) {
-    case DML_INTERPOLATION_MODE_LINEAR:
-      return data_type != DT_FLOAT;
-    case DML_INTERPOLATION_MODE_NEAREST_NEIGHBOR:
-      return data_type != DT_FLOAT && data_type != DT_HALF;
-    default:
-      return false;
-  }
-}
-
 template <DML_INTERPOLATION_MODE interpolation_mode>
 class DmlResizeGradKernel : public DmlKernel {
  public:
@@ -161,10 +150,6 @@ class DmlResizeGradKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto scope = dml::Graph(ctx->GetDmlDevice());
     auto result = dml::InputTensor(scope, 0, inputs[0]);
-
-    if (CastInputToFloat(interpolation_mode, ctx->GetInputDataType(0))) {
-      result = dml::Cast(result, DML_TENSOR_DATA_TYPE_FLOAT32);
-    }
 
     bool align_corners = init_helper->AlignCorners();
     bool half_pixel_centers = init_helper->HalfPixelCenters();
@@ -216,7 +201,6 @@ class DmlResizeGradKernel : public DmlKernel {
                        ResizeGradShapeHelper<DML_INTERPOLATION_MODE_LINEAR>>);
 
 TF_CALL_float(DML_REGISTER_KERNEL);
-TF_CALL_half(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 #define DML_REGISTER_KERNEL(type)                                       \
@@ -229,9 +213,6 @@ TF_CALL_half(DML_REGISTER_KERNEL);
           DmlResizeGradKernel<DML_INTERPOLATION_MODE_NEAREST_NEIGHBOR>, \
           ResizeGradShapeHelper<DML_INTERPOLATION_MODE_NEAREST_NEIGHBOR>>);
 
-TF_CALL_uint8(DML_REGISTER_KERNEL);
-TF_CALL_int8(DML_REGISTER_KERNEL);
-TF_CALL_int32(DML_REGISTER_KERNEL);
 TF_CALL_half(DML_REGISTER_KERNEL);
 TF_CALL_float(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL

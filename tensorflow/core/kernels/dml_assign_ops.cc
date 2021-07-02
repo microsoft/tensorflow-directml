@@ -37,7 +37,7 @@ class DmlAssignOp : public AssignOp {
   }
 };
 
-template <DML_OPERATOR_TYPE op_type, typename DML_OPERATOR_SPECIFIC_DESC>
+template <typename Expression>
 class DmlAssignModifyOp : public DmlKernel {
  public:
   using InitHelper = NoOpInitializationHelper;
@@ -70,43 +70,51 @@ class DmlAssignModifyOp : public DmlKernel {
 
     tensors.outputs = {output};
 
-    auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
-
     // The input ref and the output ref must refer to the same memory
     tensors.output_refs_forwarding = {0};
 
-    DML_OPERATOR_SPECIFIC_DESC op_specific_desc = {};
-    op_specific_desc.ATensor = &inputs[0];
-    op_specific_desc.BTensor = &inputs[1];
-    op_specific_desc.OutputTensor = outputs.data();
+    auto inputs = GetDmlTensorDescs(tensors.inputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
+    auto a_tensor = dml::InputTensor(scope, 0, inputs[0]);
+    auto b_tensor = dml::InputTensor(scope, 1, inputs[1]);
+    auto result = Expression()(a_tensor, b_tensor);
 
-    DML_OPERATOR_DESC op_desc = {op_type, &op_specific_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(scope, result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
-template <DML_OPERATOR_TYPE op_type, typename DML_OPERATOR_SPECIFIC_DESC>
-using DmlAssignModifyOpWrapper =
-    DmlKernelWrapper<DmlAssignModifyOp<op_type, DML_OPERATOR_SPECIFIC_DESC>,
-                     GetOutputShapeAsInputShapeHelper>;
-
 // Only register 'Assign' on DML for the subset of types also supported by
 // 'Variable' (see variable_ops.cc.)
-#define REGISTER_DML_KERNEL(type)                                     \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("Assign").Device(DEVICE_DML).TypeConstraint<type>("T"),    \
-      DmlAssignOp);                                                   \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("AssignAdd").Device(DEVICE_DML).TypeConstraint<type>("T"), \
-      DmlAssignModifyOpWrapper<DML_OPERATOR_ELEMENT_WISE_ADD,         \
-                               DML_ELEMENT_WISE_ADD_OPERATOR_DESC>);  \
-  REGISTER_KERNEL_BUILDER(                                            \
-      Name("AssignSub").Device(DEVICE_DML).TypeConstraint<type>("T"), \
-      DmlAssignModifyOpWrapper<DML_OPERATOR_ELEMENT_WISE_SUBTRACT,    \
-                               DML_ELEMENT_WISE_SUBTRACT_OPERATOR_DESC>);
+#define REGISTER_DML_KERNEL(type)                                  \
+  REGISTER_KERNEL_BUILDER(                                         \
+      Name("Assign").Device(DEVICE_DML).TypeConstraint<type>("T"), \
+      DmlAssignOp);
 
 TF_CALL_DML_FLOAT_TYPES(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+TF_CALL_int64(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+#define REGISTER_DML_KERNEL(type)                                      \
+  REGISTER_KERNEL_BUILDER(                                             \
+      Name("AssignAdd").Device(DEVICE_DML).TypeConstraint<type>("T"),  \
+      DmlKernelWrapper<DmlAssignModifyOp<std::plus<dml::Expression>>,  \
+                       GetOutputShapeAsInputShapeHelper>);             \
+  REGISTER_KERNEL_BUILDER(                                             \
+      Name("AssignSub").Device(DEVICE_DML).TypeConstraint<type>("T"),  \
+      DmlKernelWrapper<DmlAssignModifyOp<std::minus<dml::Expression>>, \
+                       GetOutputShapeAsInputShapeHelper>);
+
+TF_CALL_DML_FLOAT_TYPES(REGISTER_DML_KERNEL);
+TF_CALL_int64(REGISTER_DML_KERNEL);
 #undef REGISTER_DML_KERNEL
 
 }  // namespace tensorflow

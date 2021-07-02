@@ -197,7 +197,7 @@ class OpCallbacksTest(test_util.TensorFlowTestCase):
         return math_ops.square(math_ops.sin(x))
 
       x = constant_op.constant(4.0)
-      self.assertAllClose(func0(x), np.square(np.sin(4.0)))
+      self.assertAllClose(func0(x), np.square(np.sin(4.0)), atol=7e-5)
 
     thread1.join()
 
@@ -258,7 +258,7 @@ class OpCallbacksTest(test_util.TensorFlowTestCase):
     with op_callbacks.op_callback(instrument_0.callback):
       x = constant_op.constant(2.0)
       y = math_ops.cos(x)
-      self.assertAllClose(y, np.cos(2.0))
+      self.assertAllClose(y, np.cos(2.0), atol=6e-6)
 
     thread_1.join()
 
@@ -462,7 +462,7 @@ class OpCallbacksTest(test_util.TensorFlowTestCase):
 
     x = constant_op.constant([-1.0, -1.0, 0.0], dtype=dtypes.float32)
     output = log_2plus_unique_x(x)
-    self.assertAllClose(output, np.sin([0.0, np.log(2.0)]))
+    self.assertAllClose(output, np.sin([0.0, np.log(2.0)]), atol=6e-6)
 
     # The following ops should have been captured by the callback
     # because they were constructed within the scope of `op_callback()`.
@@ -691,7 +691,7 @@ class OpCallbacksTest(test_util.TensorFlowTestCase):
 
       gradients = get_gradients()
       # Applying the chain rule.
-      self.assertAllClose(gradients, np.cos(3.0 * 3.0) * 3.0 * 2.0)
+      self.assertAllClose(gradients, np.cos(3.0 * 3.0) * 3.0 * 2.0, atol=4e-5)
       self.assertIn(_SQUARE_OP, instrument.graph_op_types)
       self.assertIn(_SIN_OP, instrument.graph_op_types)
       # The mul and cos ops are created for backprop.
@@ -701,7 +701,7 @@ class OpCallbacksTest(test_util.TensorFlowTestCase):
       # Check the ndarrays from runtime.
       cos_op_outputs = instrument.graph_internal_ndarrays[_COS_OP]
       self.assertEqual(len(cos_op_outputs), 1)
-      self.assertAllClose(cos_op_outputs[0], np.cos(3.0 * 3.0))
+      self.assertAllClose(cos_op_outputs[0], np.cos(3.0 * 3.0), atol=7e-6)
 
   def testKeraModelFit(self):
     # TODO(cais): The purely PyFunc (numpy_function) based instrumentation

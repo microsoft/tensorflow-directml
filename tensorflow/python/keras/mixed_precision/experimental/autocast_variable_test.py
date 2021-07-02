@@ -157,7 +157,7 @@ class AutoCastVariableTest(test.TestCase, parameterized.TestCase):
           self.assertAlmostEqual(21, self.evaluate(3 * x))
           self.assertAlmostEqual(49, self.evaluate(x * x))
           self.assertAlmostEqual(3.5, self.evaluate(x / 2))
-          self.assertAlmostEqual(1.5, self.evaluate(10.5 / x))
+          self.assertAllCloseAccordingToType(1.5, self.evaluate(10.5 / x))
           self.assertAlmostEqual(3, self.evaluate(x // 2))
           self.assertAlmostEqual(2, self.evaluate(15 // x))
           if read_dtype == dtypes.float32:

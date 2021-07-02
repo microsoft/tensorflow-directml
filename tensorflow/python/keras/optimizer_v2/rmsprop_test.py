@@ -172,8 +172,8 @@ class RMSpropOptimizerTest(test.TestCase):
             self.assertAllCloseAccordingToType(mom1_np, self.evaluate(mom1))
           self.assertAllCloseAccordingToType(rms0_np, self.evaluate(rms0))
           self.assertAllCloseAccordingToType(rms1_np, self.evaluate(rms1))
-          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
-          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
+          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0), half_rtol=2e-3)
+          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1), half_rtol=2e-3)
 
   @test_util.run_deprecated_v1
   def testDenseWithLearningRateDecay(self):

@@ -20,13 +20,31 @@ limitations under the License.
 #include "dml_tracing.h"
 #include "dml_util.h"
 #include "tensorflow/core/util/env_var.h"
+#include "tensorflow/stream_executor/platform/default/dso_loader.h"
+
+#if _WIN32
+typedef HRESULT(WINAPI* SetThreadDescriptionFn)(HANDLE hThread,
+                                                PCWSTR lpThreadDescription);
+
+static SetThreadDescriptionFn g_setThreadDescription = nullptr;
+#endif
 
 namespace tensorflow {
 
 DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
                                          IDMLDevice* dml_device,
-                                         ID3D12CommandQueue* queue,
-                                         DmlAllocator* allocator) {
+                                         ID3D12CommandQueue* queue) {
+#if _WIN32
+  auto kernel32_handle_or =
+      stream_executor::internal::CachedDsoLoader::GetKernel32DsoHandle();
+
+  if (kernel32_handle_or.ok()) {
+    tensorflow::Env::Default()->GetSymbolFromLibrary(
+        kernel32_handle_or.ValueOrDie(), "SetThreadDescription",
+        reinterpret_cast<void**>(&g_setThreadDescription));
+  }
+#endif
+
   dml_command_queue_ = std::make_shared<DmlCommandQueue>(queue);
 
   batch_state_ = std::make_shared<BatchState>();
@@ -55,7 +73,7 @@ DmlExecutionContext::DmlExecutionContext(ID3D12Device* d3d_device,
   }
 
   dml_command_list_ = std::make_shared<DmlCommandList>(
-      d3d_device, dml_device, dml_command_queue_->GetType(), allocator);
+      d3d_device, dml_device, dml_command_queue_->GetType());
 
   execution_thread_ =
       std::thread(ExecutionThreadProc, batch_state_, dml_command_list_,
@@ -211,6 +229,12 @@ D3D12_COMMAND_LIST_TYPE DmlExecutionContext::GetCommandListTypeForQueue()
     std::shared_ptr<DmlCommandList> command_list,
     std::shared_ptr<DmlCommandQueue> command_queue, uint32_t batch_flush_size,
     uint32_t batch_flush_time_us) {
+#if _WIN32
+  if (g_setThreadDescription) {
+    g_setThreadDescription(GetCurrentThread(), L"TFDML Execution Thread");
+  }
+#endif
+
   auto last_flush_time = std::chrono::steady_clock::now();
 
   while (true) {
@@ -252,6 +276,7 @@ D3D12_COMMAND_LIST_TYPE DmlExecutionContext::GetCommandListTypeForQueue()
     lock.unlock();
 
     if (flush) {
+      DmlTracing::Instance().LogExecutionContextFlush();
       // Record the commands into the command list.
       command_list->Open(batch_completion_event);
       for (auto& command : batch) {
@@ -268,7 +293,7 @@ D3D12_COMMAND_LIST_TYPE DmlExecutionContext::GetCommandListTypeForQueue()
 
       ID3D12CommandList* command_lists[] = {command_list->Get()};
       command_queue->ExecuteCommandLists(command_lists);
-      
+
       batch.clear();
       last_flush_time = std::chrono::steady_clock::now();
     }

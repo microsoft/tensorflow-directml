@@ -302,8 +302,6 @@ class MathTest(PForTestCase):
 
             self._test_loop_fn(loop_fn, 2)
 
-  # DML doesn't support 5D for some of the ops used in this test
-  @test_util.skip_dml
   def test_batch_matmul_broadcast(self):
     if not compat.forward_compatible(2019, 4, 25):
       self.skipTest("Skipping test for future functionality.")

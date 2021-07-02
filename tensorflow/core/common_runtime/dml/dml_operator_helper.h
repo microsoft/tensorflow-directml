@@ -58,6 +58,12 @@ class InitializationHelper {
     return false;
   }
 
+  virtual absl::optional<int> GetForwardableInputIndex(
+      OpKernelContext* ctx, absl::Span<const TensorShape> output_shapes,
+      int outputIndex) const {
+    return {};
+  }
+
   virtual ~InitializationHelper() = default;
 };
 

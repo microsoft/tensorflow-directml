@@ -295,12 +295,6 @@ using PadWrapper =
                               .TypeConstraint<Tpadding>("Tpaddings") \
                               .HostMemory("paddings")                \
                               .HostMemory("constant_values"),        \
-                          PadWrapper<T, Tpadding>);                  \
-  REGISTER_KERNEL_BUILDER(Name("MirrorPad")                          \
-                              .Device(DEVICE_DML)                    \
-                              .TypeConstraint<T>("T")                \
-                              .TypeConstraint<Tpadding>("Tpaddings") \
-                              .HostMemory("paddings"),               \
                           PadWrapper<T, Tpadding>);
 
 #define REGISTER_PAD_KERNELS(T)  \
@@ -311,10 +305,27 @@ using PadWrapper =
 // along with other devices in pad_op.cc).
 TF_CALL_half(REGISTER_PAD_KERNELS);
 TF_CALL_float(REGISTER_PAD_KERNELS);
-TF_CALL_uint8(REGISTER_PAD_KERNELS);
-TF_CALL_uint16(REGISTER_PAD_KERNELS);
-TF_CALL_uint32(REGISTER_PAD_KERNELS);
 TF_CALL_int8(REGISTER_PAD_KERNELS);
-TF_CALL_int16(REGISTER_PAD_KERNELS);
+TF_CALL_uint8(REGISTER_PAD_KERNELS);
+#undef REGISTER_PAD_KERNEL
+#undef REGISTER_PAD_KERNELS
+
+#define REGISTER_PAD_KERNELS(T)                                   \
+  REGISTER_KERNEL_BUILDER(Name("MirrorPad")                       \
+                              .Device(DEVICE_DML)                 \
+                              .TypeConstraint<T>("T")             \
+                              .TypeConstraint<int32>("Tpaddings") \
+                              .HostMemory("paddings"),            \
+                          PadWrapper<T, int32>);                  \
+  REGISTER_KERNEL_BUILDER(Name("MirrorPad")                       \
+                              .Device(DEVICE_DML)                 \
+                              .TypeConstraint<T>("T")             \
+                              .TypeConstraint<int64>("Tpaddings") \
+                              .HostMemory("paddings"),            \
+                          PadWrapper<T, int64>);
+
+TF_CALL_half(REGISTER_PAD_KERNELS);
+TF_CALL_float(REGISTER_PAD_KERNELS);
+#undef REGISTER_PAD_KERNELS
 
 }  // namespace tensorflow

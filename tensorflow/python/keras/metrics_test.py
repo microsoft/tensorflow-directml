@@ -75,8 +75,14 @@ class KerasSumTest(test.TestCase):
     self.assertEqual(self.evaluate(m.total), 0)
 
   def test_sum_with_sample_weight(self):
-    m = metrics.Sum(dtype=dtypes.float64)
-    self.assertEqual(m.dtype, dtypes.float64)
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+
+    m = metrics.Sum(dtype=dtype)
+    self.assertEqual(m.dtype, dtype)
     self.evaluate(variables.variables_initializer(m.variables))
 
     # check scalar weight
@@ -286,7 +292,11 @@ class KerasMeanTest(keras_parameterized.TestCase):
     # restore to the same checkpoint mean object
     checkpoint.restore(save_path).assert_consumed().run_restore_ops()
     self.evaluate(m(300.))
-    self.assertEqual(200., self.evaluate(m.result()))
+
+    if test.is_built_with_dml():
+      self.assertAlmostEqual(200., self.evaluate(m.result()), delta=2e-5)
+    else:
+      self.assertEqual(200., self.evaluate(m.result()))
 
     # restore to a different checkpoint mean object
     restore_mean = metrics.Mean()
@@ -295,7 +305,11 @@ class KerasMeanTest(keras_parameterized.TestCase):
     restore_update = restore_mean(300.)
     status.assert_consumed().run_restore_ops()
     self.evaluate(restore_update)
-    self.assertEqual(200., self.evaluate(restore_mean.result()))
+
+    if test.is_built_with_dml():
+      self.assertAlmostEqual(200., self.evaluate(restore_mean.result()), delta=2e-5)
+    else:
+      self.assertEqual(200., self.evaluate(restore_mean.result()))
     self.assertEqual(3, self.evaluate(restore_mean.count))
 
   def test_multiple_instances(self):
@@ -488,7 +502,10 @@ class KerasAccuracyTest(test.TestCase):
     update_op = acc_obj.update_state(rt1, rt2)
     self.evaluate(update_op)
     result = self.evaluate(acc_obj.result())
-    self.assertEqual(result, 1)  # 2/2
+    if test.is_built_with_dml():
+      self.assertAlmostEqual(result, 1, places=6)  # 2/2
+    else:
+      self.assertEqual(result, 1)  # 2/2
 
     # check with sample_weight
     rt1 = ragged_factory_ops.constant([[0, 0, 1], [0, 1, 0]])
@@ -1281,6 +1298,9 @@ class MeanIoUTest(test.TestCase):
     self.assertEqual(m_obj2.name, 'mean_iou')
     self.assertEqual(m_obj2.num_classes, 2)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_unweighted(self):
     y_pred = [0, 1, 0, 1]
     y_true = [0, 0, 1, 1]
@@ -1297,6 +1317,9 @@ class MeanIoUTest(test.TestCase):
     expected_result = (1 / (2 + 2 - 1) + 1 / (2 + 2 - 1)) / 2
     self.assertAllClose(self.evaluate(result), expected_result, atol=1e-3)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_weighted(self):
     y_pred = constant_op.constant([0, 1, 0, 1], dtype=dtypes.float32)
     y_true = constant_op.constant([0, 0, 1, 1])
@@ -1314,6 +1337,9 @@ class MeanIoUTest(test.TestCase):
     expected_result = (0.2 / (0.6 + 0.5 - 0.2) + 0.1 / (0.4 + 0.5 - 0.1)) / 2
     self.assertAllClose(self.evaluate(result), expected_result, atol=1e-3)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_multi_dim_input(self):
     y_pred = constant_op.constant([[0, 1], [0, 1]], dtype=dtypes.float32)
     y_true = constant_op.constant([[0, 0], [1, 1]])
@@ -1336,6 +1362,9 @@ class MeanIoUTest(test.TestCase):
     self.evaluate(variables.variables_initializer(m_obj.variables))
     self.assertAllClose(self.evaluate(m_obj.result()), 0, atol=1e-3)
 
+  # metrics.MeanIoU always accumulates the predictions in a float64 matrix,
+  # which isn't supported on a DML device
+  @test_util.skip_dml
   def test_zero_and_non_zero_entries(self):
     y_pred = constant_op.constant([1], dtype=dtypes.float32)
     y_true = constant_op.constant([1])
@@ -1378,7 +1407,12 @@ class MeanTensorTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_unweighted(self):
-    m = metrics.MeanTensor(dtype=dtypes.float64)
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+    m = metrics.MeanTensor(dtype=dtype)
 
     # check __call__()
     self.assertAllClose(self.evaluate(m([100, 40])), [100, 40])
@@ -1399,8 +1433,13 @@ class MeanTensorTest(test.TestCase):
 
   @test_util.run_in_graph_and_eager_modes
   def test_weighted(self):
-    m = metrics.MeanTensor(dtype=dtypes.float64)
-    self.assertEqual(m.dtype, dtypes.float64)
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+    m = metrics.MeanTensor(dtype=dtype)
+    self.assertEqual(m.dtype, dtype)
 
     # check scalar weight
     result_t = m([100, 30], sample_weight=0.5)
@@ -1428,7 +1467,7 @@ class MeanTensorTest(test.TestCase):
     self.assertAllClose(self.evaluate(m.count), [3, 1.4])
 
     # check weights expand
-    m = metrics.MeanTensor(dtype=dtypes.float64)
+    m = metrics.MeanTensor(dtype=dtype)
     self.evaluate(variables.variables_initializer(m.variables))
     result_t = m([[1], [5]], sample_weight=[1, 0.2])
     self.assertAllClose(self.evaluate(result_t), [[1], [5]])
@@ -1451,7 +1490,14 @@ class MeanTensorTest(test.TestCase):
   @test_util.run_in_graph_and_eager_modes
   def test_build_in_tf_function(self):
     """Ensure that variables are created correctly in a tf function."""
-    m = metrics.MeanTensor(dtype=dtypes.float64)
+
+    # DML doesn't support float64
+    if test_util.gpu_device_type() == 'DML':
+      dtype = dtypes.float32
+    else:
+      dtype = dtypes.float64
+
+    m = metrics.MeanTensor(dtype=dtype)
 
     @eager_function.defun
     def call_metric(x):

@@ -113,6 +113,9 @@ class AdamOptimizerTest(test.TestCase):
   @test_util.run_deprecated_v1
   def testSparse(self):
     for dtype in [dtypes.half, dtypes.float32, dtypes.float64]:
+      # DML doesn't support double
+      if test_util.IsBuiltWithDML() and dtype == dtypes.float64:
+        continue
       with self.cached_session():
         # Initialize variables for numpy implementation.
         m0, v0, m1, v1 = 0.0, 0.0, 0.0, 0.0
@@ -155,6 +158,7 @@ class AdamOptimizerTest(test.TestCase):
           self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
           self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
 
+  @test_util.skip_dml # DML doesn't support UnsortedSegmentSum and this test forces all ops on the same device
   @test_util.run_deprecated_v1
   def testSparseDevicePlacement(self):
     for index_dtype in [dtypes.int32, dtypes.int64]:
@@ -250,8 +254,8 @@ class AdamOptimizerTest(test.TestCase):
           var1_np, m1, v1 = adam_update_numpy(var1_np, grads1_np, t, m1, v1)
 
           # Validate updated params
-          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
-          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
+          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0), half_rtol=2e-3)
+          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1), half_rtol=2e-3)
 
   @test_util.run_in_graph_and_eager_modes(reset_test=True)
   def testResourceBasic(self):
@@ -304,13 +308,16 @@ class AdamOptimizerTest(test.TestCase):
               var1_np, grads1_np, t, m1, v1, v1hat)
 
           # Validate updated params
-          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0))
-          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1))
+          self.assertAllCloseAccordingToType(var0_np, self.evaluate(var0), half_rtol=2e-3)
+          self.assertAllCloseAccordingToType(var1_np, self.evaluate(var1), half_rtol=2e-3)
 
   @test_util.run_in_graph_and_eager_modes
   def testSparseWithAmsgrad(self):
     # dtypes.half does not work on gpu + eager.
     for dtype in [dtypes.float32, dtypes.float64]:
+      # DML doesn't support double
+      if test_util.IsBuiltWithDML() and dtype == dtypes.float64:
+        continue
       with self.cached_session():
         m0 = np.array([[0.0], [0.0]])
         v0 = np.array([[0.0], [0.0]])

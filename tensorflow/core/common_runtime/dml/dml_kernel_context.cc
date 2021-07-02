@@ -29,13 +29,11 @@ namespace tensorflow {
 
 DmlKernelConstruction::DmlKernelConstruction(
     const DmlDevice* device, OpKernelContext* op_ctx, const NodeDef* def,
-    const ShapeHelper* shape_helper,
     absl::Span<const TensorShape> output_shapes,
     std::shared_ptr<const InitializationHelper> init_helper)
     : device_(device),
       op_ctx_(op_ctx),
       def_(def),
-      shape_helper_(shape_helper),
       output_shapes_(output_shapes),
       init_helper_(init_helper) {}
 
@@ -202,7 +200,8 @@ void DmlKernelContext::EnqueueCallbackForGpuEvent(
 }
 
 DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
-    IDMLCompiledOperator* op, Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+    IDMLCompiledOperator* op,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
     ID3D12DescriptorHeap* heap_for_binding_table,
     _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,

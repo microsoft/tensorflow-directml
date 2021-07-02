@@ -70,12 +70,20 @@ static bool IsUmaAdapter(const DmlAdapter& adapter) {
                                         : D3D_FEATURE_LEVEL_11_0;
 
   ComPtr<ID3D12Device> d3d12_device;
-  DML_CHECK_SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
-                                        IID_PPV_ARGS(&d3d12_device)));
+  HRESULT hr = D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
+                                 IID_PPV_ARGS(&d3d12_device));
 
-  D3D12_FEATURE_DATA_ARCHITECTURE1 feature_data = {};
-  DML_CHECK_SUCCEEDED(d3d12_device->CheckFeatureSupport(
-      D3D12_FEATURE_ARCHITECTURE1, &feature_data, sizeof(feature_data)));
+  if (FAILED(hr)) {
+    return false;
+  }
+
+  D3D12_FEATURE_DATA_ARCHITECTURE feature_data = {};
+  hr = d3d12_device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE,
+                                         &feature_data, sizeof(feature_data));
+
+  if (FAILED(hr)) {
+    return false;
+  }
 
   return feature_data.CacheCoherentUMA;
 }
@@ -151,6 +159,14 @@ class DmlDeviceFactory : public DeviceFactory {
     for (uint32_t i : valid_adapter_indices) {
       const auto& adapter = device_cache.GetAdapter(i);
 
+      tensorflow::GPUOptions adapter_gpu_options = gpu_options;
+      const bool is_uma_adapter = IsUmaAdapter(adapter);
+      if (is_uma_adapter) {
+        // For adapters with unified memory architecture (UMA), which use system
+        // memory, allocate memory as needed rather than all of it upfront.
+        adapter_gpu_options.set_allow_growth(true);
+      }
+
       if (virtual_devices.empty() ||
           virtual_devices.Get(i).memory_limit_mb_size() == 0) {
         int64 memory_limit = 0;
@@ -159,7 +175,7 @@ class DmlDeviceFactory : public DeviceFactory {
           // limit as a fraction of TOTAL GPU memory
           uint64_t total_gpu_memory = adapter.GetTotalDedicatedMemory();
 
-          if (IsUmaAdapter(adapter)) {
+          if (is_uma_adapter) {
             // For adapters with unified memory architecture (UMA), add shared
             // memory to the total GPU memory
             total_gpu_memory += adapter.GetTotalSharedMemory();
@@ -175,7 +191,8 @@ class DmlDeviceFactory : public DeviceFactory {
         }
 
         const DmlDeviceState* device_state =
-            device_cache.GetOrCreateDeviceState(i, gpu_options, memory_limit);
+            device_cache.GetOrCreateDeviceState(i, adapter_gpu_options,
+                                                memory_limit);
 
         auto dml_device =
             CreateDevice(options, name_prefix, virtual_device_index,
@@ -195,7 +212,8 @@ class DmlDeviceFactory : public DeviceFactory {
           int64 memory_limit = static_cast<int64>(*it) * (1ll << 20);
 
           const DmlDeviceState* device_state =
-              device_cache.GetOrCreateDeviceState(i, gpu_options, memory_limit);
+              device_cache.GetOrCreateDeviceState(i, adapter_gpu_options,
+                                                  memory_limit);
           auto dml_device =
               CreateDevice(options, name_prefix, virtual_device_index,
                            device_state, memory_limit);

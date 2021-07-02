@@ -122,9 +122,10 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
                 errors::InvalidArgument("seed must have shape [2], not ",
                                         seed_t.shape().DebugString()));
 
-    OP_REQUIRES_OK(ctx, GenerateKey(seed_t, &key_, &counter_));
-
     output_shape_ = std::move(shape);
+    if (output_shape_.num_elements() == 0) return;
+
+    OP_REQUIRES_OK(ctx, GenerateKey(seed_t, &key_, &counter_));
 
     // This init helper is shared for both "StatelessRandomUniform" (real types)
     // and "StatelessRandomUniformInt" (integral types). The latter has two
@@ -152,6 +153,17 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
   const TensorShape& GetOutputShape() const { return output_shape_; }
   const random::PhiloxRandom::Key GetKey() const { return key_; }
   const random::PhiloxRandom::ResultType GetCounter() const { return counter_; }
+
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    for (size_t i = 0; i < output_shapes.size(); ++i) {
+      if (output_shapes[i].num_elements() != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
 
  private:
   TensorShape output_shape_;
@@ -293,7 +305,7 @@ TF_CALL_int32(DML_REGISTER_KERNEL);
 // ----------------------------------------------------------------------------
 
 template <typename TKernel, typename TShapeHelper,
-          DmlKernelCachePolicy cache_policy = DmlKernelCachePolicy::Default>
+          DmlKernelCachePolicy cache_policy = DmlKernelCachePolicy::Never>
 class DmlPhiloxWrapper
     : public DmlKernelWrapper<TKernel, TShapeHelper, cache_policy> {
  public:
@@ -325,7 +337,7 @@ class RandomUniformInitHelper : public InitializationHelper {
     // This init helper is shared for both "RandomUniform" (real types) and
     // "RandomUniformInt" (integral types). The latter has two extra host-memory
     // tensors for the min and max of the output range.
-    if (ctx->num_inputs() == 4) {
+    if (ctx->num_inputs() == 3) {
       const Tensor& minval = ctx->input(1);
       const Tensor& maxval = ctx->input(2);
       OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(minval.shape()),
@@ -334,6 +346,8 @@ class RandomUniformInitHelper : public InitializationHelper {
       OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(maxval.shape()),
                   errors::InvalidArgument("maxval must be 0-D, got shape ",
                                           maxval.shape().DebugString()));
+
+      if (output_shape_.num_elements() == 0) return;
 
       // Verify that minval < maxval. Note that we'll never reach this point
       // for empty output.  Zero impossible things are fine.
@@ -346,6 +360,17 @@ class RandomUniformInitHelper : public InitializationHelper {
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
+
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    for (size_t i = 0; i < output_shapes.size(); ++i) {
+      if (output_shapes[i].num_elements() != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
 
  private:
   TensorShape output_shape_;
@@ -461,6 +486,7 @@ class DmlRandomUniformKernel : public DmlKernel {
       Name("RandomUniform")               \
           .Device(DEVICE_DML)             \
           .HostMemory("shape")            \
+          .TypeConstraint<int32>("T")     \
           .TypeConstraint<type>("dtype"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
@@ -473,6 +499,7 @@ TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
           .HostMemory("shape")           \
           .HostMemory("minval")          \
           .HostMemory("maxval")          \
+          .TypeConstraint<int32>("T")    \
           .TypeConstraint<type>("Tout"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
 TF_CALL_int32(DML_REGISTER_KERNEL);

@@ -354,18 +354,25 @@ class DmlMatrixDiagPartKernel : public DmlKernel {
   }
 };  // namespace tensorflow
 
+#define REGISTER_DML_KERNEL(T)                                          \
+  REGISTER_KERNEL_BUILDER(                                              \
+      Name("MatrixDiagPart").Device(DEVICE_DML).TypeConstraint<T>("T"), \
+      DmlKernelWrapper<DmlMatrixDiagPartKernel<T>,                      \
+                       MatrixDiagPartShapeHelper<T>>);                  \
+  REGISTER_KERNEL_BUILDER(Name("MatrixDiagPartV2")                      \
+                              .Device(DEVICE_DML)                       \
+                              .TypeConstraint<T>("T")                   \
+                              .HostMemory("k")                          \
+                              .HostMemory("padding_value"),             \
+                          DmlKernelWrapper<DmlMatrixDiagPartKernel<T>,  \
+                                           MatrixDiagPartShapeHelper<T>>);
+
+TF_CALL_half(REGISTER_DML_KERNEL);
+TF_CALL_float(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
 #define REGISTER_DML_KERNEL(T)                                               \
-  REGISTER_KERNEL_BUILDER(                                                   \
-      Name("MatrixDiagPart").Device(DEVICE_DML).TypeConstraint<T>("T"),      \
-      DmlKernelWrapper<DmlMatrixDiagPartKernel<T>,                           \
-                       MatrixDiagPartShapeHelper<T>>);                       \
-  REGISTER_KERNEL_BUILDER(Name("MatrixDiagPartV2")                           \
-                              .Device(DEVICE_DML)                            \
-                              .TypeConstraint<T>("T")                        \
-                              .HostMemory("k")                               \
-                              .HostMemory("padding_value"),                  \
-                          DmlKernelWrapper<DmlMatrixDiagPartKernel<T>,       \
-                                           MatrixDiagPartShapeHelper<T>>);   \
   REGISTER_KERNEL_BUILDER(                                                   \
       Name("BatchMatrixDiagPart").Device(DEVICE_DML).TypeConstraint<T>("T"), \
       DmlKernelWrapper<DmlMatrixDiagPartKernel<T>,                           \
@@ -373,5 +380,5 @@ class DmlMatrixDiagPartKernel : public DmlKernel {
 
 TF_CALL_half(REGISTER_DML_KERNEL);
 TF_CALL_float(REGISTER_DML_KERNEL);
-TF_CALL_bool(REGISTER_DML_KERNEL)
+#undef REGISTER_DML_KERNEL
 }  // namespace tensorflow

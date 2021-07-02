@@ -1936,7 +1936,9 @@ class SessionTest(test_util.TensorFlowTestCase):
           sess.run(c)
 
     # Ensure that we did log device placement.
-    self.assertTrue('/replica:0/task:0/device:CPU:0' in str(log), str(log))
+    device_type = test_util.gpu_device_type() or "CPU"
+    device_name = '/replica:0/task:0/device:%s:0' % device_type
+    self.assertTrue(device_name in str(log), str(log))
 
   @test_util.run_v1_only('b/120545219')
   def testLocalMasterSessionTimeout(self):

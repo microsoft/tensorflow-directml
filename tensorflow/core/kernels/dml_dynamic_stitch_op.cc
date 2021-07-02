@@ -180,7 +180,10 @@ class DmlDynamicStitchKernel : public OpKernel {
                               .TypeConstraint<type>("T"), \
                           DmlDynamicStitchKernel)
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_int32(DML_REGISTER_KERNELS);
+TF_CALL_int64(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 }  // namespace tensorflow

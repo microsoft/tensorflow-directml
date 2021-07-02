@@ -85,6 +85,9 @@ class DmlCrossKernel : public DmlKernel {
     // Generate the indices [-2, -1, 0], which is the same as [1, 2, 0]
     auto indices = dml::Sequence<int32>(scope, -2, 1, {1, 1, 1, 3});
 
+    indices = dml::Reinterpret(indices, input1.GetOutputDesc().sizes,
+                               dml::TensorDimensions({0, 0, 0, 1}));
+
     // Generate the first vector:
     // [a, b, c] -> [b, c, a]
     constexpr uint32_t gather_axis = 3;
@@ -102,6 +105,18 @@ class DmlCrossKernel : public DmlKernel {
     // [y, z, x] -> [z, x, y]
     auto vector4 = dml::GatherElements(vector3, indices, 3);
 
+    const auto dtype = ctx->GetOutputDataType(0);
+    const bool is_low_precision_int = dtype == DT_UINT16 || dtype == DT_INT16 ||
+                                      dtype == DT_UINT8 || dtype == DT_INT8;
+
+    // DML doesn't support less than 32bits precision for multiply and subtract
+    if (is_low_precision_int) {
+      vector1 = dml::Cast(vector1, DML_TENSOR_DATA_TYPE_INT32);
+      vector2 = dml::Cast(vector2, DML_TENSOR_DATA_TYPE_INT32);
+      vector3 = dml::Cast(vector3, DML_TENSOR_DATA_TYPE_INT32);
+      vector4 = dml::Cast(vector4, DML_TENSOR_DATA_TYPE_INT32);
+    }
+
     // Multiply the first and last vectors together:
     // [b, c, a] * [z, x, y] = [bz, cx, ay]
     auto vector14 = vector1 * vector4;
@@ -113,6 +128,14 @@ class DmlCrossKernel : public DmlKernel {
     // Finally, subtract the second multiplied vector from the first one:
     // [bz-cy, cx-az, ay-bx]
     auto result = vector14 - vector23;
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(scope, result);
+    } else if (is_low_precision_int) {
+      const auto dml_dtype = GetDmlDataTypeFromTfDataType(dtype);
+      result = dml::Cast(result, dml_dtype);
+    }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
@@ -128,7 +151,12 @@ class DmlCrossKernel : public DmlKernel {
 
 TF_CALL_float(REGISTER_DML_KERNEL);
 TF_CALL_half(REGISTER_DML_KERNEL);
+TF_CALL_int64(REGISTER_DML_KERNEL);
 TF_CALL_int32(REGISTER_DML_KERNEL);
+TF_CALL_uint16(REGISTER_DML_KERNEL);
+TF_CALL_int16(REGISTER_DML_KERNEL);
+TF_CALL_uint8(REGISTER_DML_KERNEL);
+TF_CALL_int8(REGISTER_DML_KERNEL);
 #undef REGISTER_DML_KERNEL
 
 }  // namespace tensorflow

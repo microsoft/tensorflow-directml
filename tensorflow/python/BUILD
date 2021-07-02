@@ -4301,7 +4301,6 @@ cuda_py_test(
         "@absl_py//absl/testing:parameterized",
         "//third_party/py/numpy",
     ],
-    tags = ["no_windows"],
     xla_enable_strict_auto_jit = True,
 )
 
@@ -5739,6 +5738,8 @@ cuda_py_test(
         "//tensorflow/python/data/ops:dataset_ops",
     ],
     xla_enable_strict_auto_jit = True,
+    # Sporadic permissions issues on Windows related to moving/deleting temp dirs.
+    tags = ["no_windows"],
 )
 
 tf_py_test(
