@@ -145,12 +145,12 @@ def _run_test(exe_path, log_device_placement, shard_index, total_shard_count,
 
 
 def _is_distribute_test(exe_path):
-  temp_path = exe_path
+  remaining_path, tail = os.path.split(exe_path)
 
-  while temp_path != "":
-    temp_path, tail = os.path.split(temp_path)
+  while tail != "":
     if tail == "distribute":
       return True
+    remaining_path, tail = os.path.split(remaining_path)
 
   return False
 
@@ -197,18 +197,13 @@ def main():
           # Don't gather device placement data on WSL for now
           log_device_placement = os.name == "nt" and args.log_device_placement
 
-          if _is_distribute_test(exe_path):
-            futures.append(
-                sequential_executor.submit(_run_test, exe_path,
-                                           log_device_placement, shard_index,
-                                           shard_count, args.test_framework,
-                                           args.test_timeout))
-          else:
-            futures.append(
-                parallel_executor.submit(_run_test, exe_path,
-                                         log_device_placement, shard_index,
-                                         shard_count, args.test_framework,
-                                         args.test_timeout))
+          executor = sequential_executor if _is_distribute_test(
+              exe_path) else parallel_executor
+
+          futures.append(
+              executor.submit(_run_test, exe_path, log_device_placement,
+                              shard_index, shard_count, args.test_framework,
+                              args.test_timeout))
 
       for future in futures:
         future.result()
