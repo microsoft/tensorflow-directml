@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
-
 """Runs the tensorflow python tests."""
 
 import argparse
 import os
 import sys
 import subprocess
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor
 import tempfile
 import json
 import re
 import glob
+from contextlib import ExitStack
+
 
 def _parse_args():
   """Parses the arguments given to this script."""
@@ -23,22 +24,17 @@ def _parse_args():
       help="path to the directory that contains the test binaries",
       required=True)
 
-  parser.add_argument(
-      "--test_framework",
-      choices=["abseil", "gtest"],
-      help="test framework that the test binary is using",
-      required=True)
+  parser.add_argument("--test_framework",
+                      choices=["abseil", "gtest"],
+                      help="test framework that the test binary is using",
+                      required=True)
 
-  parser.add_argument(
-      "--log_device_placement",
-      action="store_true")
+  parser.add_argument("--log_device_placement", action="store_true")
 
-  parser.add_argument(
-      "--test_timeout",
-      default=300,
-      type=int)
+  parser.add_argument("--test_timeout", default=300, type=int)
 
   return parser.parse_args()
+
 
 def _get_tf_env(exe_path, test_framework):
   env_copy = os.environ.copy()
@@ -53,13 +49,9 @@ def _get_tf_env(exe_path, test_framework):
 
   return env_copy
 
-def _run_test(
-    exe_path,
-    log_device_placement,
-    shard_index,
-    total_shard_count,
-    test_framework,
-    test_timeout):
+
+def _run_test(exe_path, log_device_placement, shard_index, total_shard_count,
+              test_framework, test_timeout):
   """Runs a test executable in its own process."""
 
   # Insert the shard index in the name of the xml file
@@ -99,18 +91,17 @@ def _run_test(
       # exceptions are test failures that should not make the parent process
       # crash.
       try:
-        subprocess.run(
-            [exe_path, xml_output_arg],
-            stdout=stdout,
-            stderr=stderr,
-            env=env_copy,
-            stdin=subprocess.DEVNULL,
-            check=True,
-            universal_newlines=True,
-            timeout=test_timeout)
-      except KeyboardInterrupt: # pylint: disable=try-except-raise
+        subprocess.run([exe_path, xml_output_arg],
+                       stdout=stdout,
+                       stderr=stderr,
+                       env=env_copy,
+                       stdin=subprocess.DEVNULL,
+                       check=True,
+                       universal_newlines=True,
+                       timeout=test_timeout)
+      except KeyboardInterrupt:  # pylint: disable=try-except-raise
         raise
-      except Exception: # pylint: disable=broad-except
+      except Exception:  # pylint: disable=broad-except
         pass
       finally:
         print(f"Running '{exe_path}' with shard {shard_index}...")
@@ -152,53 +143,74 @@ def _run_test(
   finally:
     os.chdir(os.path.dirname(prev_dir))
 
+
+def _is_distribute_test(exe_path):
+  temp_path = exe_path
+
+  while temp_path != "":
+    temp_path, tail = os.path.split(temp_path)
+    if tail == "distribute":
+      return True
+
+  return False
+
+
+def _read_shard_count(exe_path):
+  # Read the json file to know how many shards to split the test into
+  shard_count = 1
+  json_path = os.path.splitext(exe_path)[0] + ".json"
+
+  if os.path.exists(json_path):
+    with open(json_path) as json_file:
+      params = json.load(json_file)
+      if "shard_count" in params:
+        shard_count = params["shard_count"]
+
+  return shard_count
+
+
 def main():
   args = _parse_args()
   absolute_binaries_path = os.path.join(sys.path[0], args.test_binaries_path)
-  processes_count = min(8, os.cpu_count())
+  process_count = min(8, os.cpu_count())
 
-  with concurrent.futures.ThreadPoolExecutor(processes_count) as executor:
-    futures = []
+  if os.name == "nt":
+    exe_paths = glob.glob(f"{absolute_binaries_path}/**/*.exe", recursive=True)
+  else:
+    runfiles = glob.glob(f"{absolute_binaries_path}/**/*.runfiles",
+                         recursive=True)
+    exe_paths = [os.path.splitext(runfile)[0] for runfile in runfiles]
 
-    try:
-      if os.name == "nt":
-        exe_paths = glob.glob(f"{absolute_binaries_path}/**/*.exe",
-                              recursive=True)
-      else:
-        runfiles = glob.glob(f"{absolute_binaries_path}/**/*.runfiles",
-                             recursive=True)
-        exe_paths = [os.path.splitext(runfile)[0] for runfile in runfiles]
+  futures = []
+
+  try:
+    with ExitStack() as stack:
+      # Distribute tests can launch many servers over a limited number of ports,
+      # so run them all in a sequential queue to avoid collisions
+      sequential_executor = stack.enter_context(ThreadPoolExecutor(1))
+      parallel_executor = stack.enter_context(ThreadPoolExecutor(process_count))
 
       for exe_path in exe_paths:
-        # Read the json file to know how many shards to split the test into
-        shard_count = 1
-        json_path = os.path.splitext(exe_path)[0] + ".json"
-
-        if os.path.exists(json_path):
-          with open(json_path) as json_file:
-            params = json.load(json_file)
-            if "shard_count" in params:
-              shard_count = params["shard_count"]
+        shard_count = _read_shard_count(exe_path)
 
         for shard_index in range(shard_count):
           # Don't gather device placement data on WSL for now
           log_device_placement = os.name == "nt" and args.log_device_placement
 
+          executor = sequential_executor if _is_distribute_test(
+              exe_path) else parallel_executor
+
           futures.append(
-              executor.submit(
-                  _run_test,
-                  exe_path,
-                  log_device_placement,
-                  shard_index,
-                  shard_count,
-                  args.test_framework,
-                  args.test_timeout))
+              executor.submit(_run_test, exe_path, log_device_placement,
+                              shard_index, shard_count, args.test_framework,
+                              args.test_timeout))
 
       for future in futures:
         future.result()
-    finally:
-      for future in futures:
-        future.cancel()
+  finally:
+    for future in futures:
+      future.cancel()
+
 
 if __name__ == "__main__":
   main()
