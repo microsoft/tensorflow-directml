@@ -61,6 +61,14 @@ class CondaEnv:
         shell=True,
         check=True)
 
+  def install_local_package(self, package_path):
+    subprocess.run(
+        f'{self.hook_command}'
+        f' && conda activate {self.env_name}'
+        f' && pip install -e "{package_path}"',
+        shell=True,
+        check=True)
+
   def run(self, args, variables=None):
     args_string = " ".join(args)
 

@@ -73,10 +73,6 @@ def _run_test(
 
   env_copy = _get_tf_env(exe_path, test_framework)
 
-  # Specifying a port server for portpicker is necessary to avoid race
-  # conditions when searching for unused ports. @unittest-portserver is the
-  # sample port server that portpicker provides for test environments.
-  env_copy["PORTSERVER_ADDRESS"] = "@unittest-portserver"
 
   if log_device_placement:
     env_copy["TF_CPP_LOG_DEVICE_PLACEMENT"] = "1"
@@ -85,6 +81,10 @@ def _run_test(
     env_copy["TEST_SRCDIR"] = exe_path + ".runfiles"
 
   if test_framework == "abseil":
+    # Specifying a port server for portpicker is necessary to avoid race
+    # conditions when searching for unused ports. @unittest-portserver is the
+    # sample port server that portpicker provides for test environments.
+    env_copy["PORTSERVER_ADDRESS"] = "@unittest-portserver"
     env_copy["TEST_TOTAL_SHARDS"] = str(total_shard_count)
     env_copy["TEST_SHARD_INDEX"] = str(shard_index)
     xml_output_arg = f"--xml_output_file={xml_path}"
@@ -165,14 +165,23 @@ def main():
   with concurrent.futures.ThreadPoolExecutor(processes_count) as executor:
     futures = []
 
+    if os.name == "nt":
+      exe_paths = glob.glob(f"{absolute_binaries_path}/**/*.exe",
+                            recursive=True)
+    else:
+      runfiles = glob.glob(f"{absolute_binaries_path}/**/*.runfiles",
+                            recursive=True)
+      exe_paths = [os.path.splitext(runfile)[0] for runfile in runfiles]
+
+    bin_root = os.path.split(sys.executable)[0]
+    if os.name == "nt":
+      portserver_path = os.path.join(bin_root, "Scripts", "portserver.py")
+    else:
+      portserver_path = os.path.join(bin_root, "portserver.py")
+
     try:
-      if os.name == "nt":
-        exe_paths = glob.glob(f"{absolute_binaries_path}/**/*.exe",
-                              recursive=True)
-      else:
-        runfiles = glob.glob(f"{absolute_binaries_path}/**/*.runfiles",
-                             recursive=True)
-        exe_paths = [os.path.splitext(runfile)[0] for runfile in runfiles]
+      # Launch the portserver daemon
+      portserver_process = subprocess.Popen(["python", portserver_path])
 
       for exe_path in exe_paths:
         # Read the json file to know how many shards to split the test into
@@ -202,6 +211,8 @@ def main():
       for future in futures:
         future.result()
     finally:
+      portserver_process.terminate()
+
       for future in futures:
         future.cancel()
 
