@@ -511,7 +511,6 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
         [target_file_handle] { ::FindClose(target_file_handle); });
 
     if (!::DeleteFileW(ws_translated_target.c_str())) {
-      printf("*******************PAVIGNOL: Delete Failed!!!\n");
       return IOErrorFromWindowsError(
           strings::StrCat("Failed to rename: ", src, " to: ", target),
           GetLastError());
@@ -520,7 +519,6 @@ Status WindowsFileSystem::RenameFile(const string& src, const string& target) {
 
   if (!::MoveFileExW(ws_translated_src.c_str(), ws_translated_target.c_str(),
                      0)) {
-    printf("*******************PAVIGNOL: Move Failed!!!\n");
     return IOErrorFromWindowsError(
         strings::StrCat("Failed to rename: ", src, " to: ", target),
         GetLastError());
