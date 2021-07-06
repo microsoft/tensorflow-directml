@@ -9,8 +9,10 @@
       "pipDeps": [
         "numpy==1.18.5",
         "h5py<3.0.0",
-        "scipy",
-        "portpicker"
+        "scipy"
+      ],
+      "localPipDeps": [
+        "python_portpicker"
       ],
       "windowsPipDeps": [
         "windows-curses",
