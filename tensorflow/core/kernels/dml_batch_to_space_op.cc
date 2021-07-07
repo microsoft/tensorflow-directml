@@ -46,6 +46,20 @@ class BaseBatchToSpaceInitHelper : public InitializationHelper {
 
   TensorShape GetOutputShape() const { return output_shape_; }
   int GetInternalBlockDims() const { return internal_block_dims_; }
+  bool GetIsSliceNeeded() const {
+    bool do_slice = false;
+    for (int i = 0; i < internal_block_dims_; ++i) {
+      int64 start_crop = internal_crops_[i * 2];
+      int64 end_crop = internal_crops_[i * 2 + 1];
+
+      // only do the slice if there is actually any cropping to do
+      if (start_crop != 0 || end_crop != 0) {
+        do_slice = true;
+      }
+    }
+
+    return do_slice;
+  }
 
  protected:
   void Initialize(OpKernelContext* ctx, const Tensor& orig_crops,
@@ -340,13 +354,16 @@ class DmlBatchToSpaceKernel : public DmlKernel {
         init_helper->GetInternalBlockSizes();
 
     dml::Expression output_before_slice;
-    dml::TensorDesc::Dimensions perm_reshaped_sizes;
 
     // For 4d cases we can use the DML Depth to Space operator
-    if (internal_input_shape.dims() == 4 &&
-        !Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+    if (internal_input_shape.dims() == 4) {
       auto input_sizes = input_desc.desc.GetSizes();
       auto input_strides = input_desc.desc.GetStrides();
+
+      if (input_strides.empty())
+      {
+        input_strides = ComputePackedStrides(input_sizes);
+      }
 
       // Permute input NCHW->WNCH
       dml::TensorDimensions input_tensor_sizes = {
@@ -366,12 +383,7 @@ class DmlBatchToSpaceKernel : public DmlKernel {
                                                          sizes[3], sizes[0]};
 
             // Calculate strides with the permuted sizes
-            dml::TensorStrides strides(dimension_count);
-            uint32_t stride = 1;
-            for (int i = 3; i >= 0; --i) {
-              strides[i] = stride;
-              stride *= output_tensor_sizes[i];
-            }
+            dml::TensorStrides strides = ComputePackedStrides(output_tensor_sizes);
 
             // Permute output strides NCHW->WNCH
             dml::TensorStrides output_tensor_strides = {strides[3], strides[0],
@@ -391,10 +403,22 @@ class DmlBatchToSpaceKernel : public DmlKernel {
       output_before_slice = dml::DepthToSpace(input, internal_block_sizes[0]);
       scope.SetTensorPolicy(old_policy);
 
-      auto outputPreSliceTensor = output_before_slice.Impl()->GetOutputDesc();
+      const dml::TensorDesc& output_before_slice_desc =
+          output_before_slice.GetOutputDesc();
+      // Now reinterpret for slicing
+      dml::TensorDimensions preslice_tensor_sizes = {
+          output_before_slice_desc.sizes[1], output_before_slice_desc.sizes[2],
+          output_before_slice_desc.sizes[3], output_before_slice_desc.sizes[0]};
+      dml::TensorStrides preslice_tensor_strides = {
+          (*output_before_slice_desc.strides)[1],
+          (*output_before_slice_desc.strides)[2],
+          (*output_before_slice_desc.strides)[3],
+          (*output_before_slice_desc.strides)[0]};
 
-      perm_reshaped_sizes = {outputPreSliceTensor.sizes[0], outputPreSliceTensor.sizes[1], outputPreSliceTensor.sizes[2], outputPreSliceTensor.sizes[3]};
+      output_before_slice = dml::Reinterpret(
+          output_before_slice, preslice_tensor_sizes, preslice_tensor_strides);
     } else {
+      // For cases which are not 4d we use the old algorithm
       uint32_t batch_size = internal_input_shape.dim_size(0);
       uint32_t block_shape_product = std::accumulate(
           internal_block_sizes.begin(), internal_block_sizes.end(), 1,
@@ -417,12 +441,7 @@ class DmlBatchToSpaceKernel : public DmlKernel {
       // Permute the reshaped input into [batch / prod(block_shape),
       // input_shape[1], block_shape[0], ..., input_shape[M], block_shape[M-1],
       // input_shape[M+1], ..., input_shape[N-1]]
-      uint32_t stride = 1;
-      dml::TensorDesc::Dimensions reshaped_strides(reshaped_sizes.size());
-      for (int i = reshaped_sizes.size() - 1; i >= 0; --i) {
-        reshaped_strides[i] = stride;
-        stride *= reshaped_sizes[i];
-      }
+      dml::TensorDesc::Dimensions reshaped_strides = ComputePackedStrides(reshaped_sizes);
 
       dml::TensorDesc::Dimensions perm_strides;
       perm_strides.reserve(reshaped_strides.size());
@@ -471,33 +490,27 @@ class DmlBatchToSpaceKernel : public DmlKernel {
       output_before_slice = dml::Reinterpret(permuted, perm_reshaped_sizes, {});
     }
 
-    // Finally, slice the appropriate dimensions
-    dml::TensorDesc::Dimensions slice_offsets(perm_reshaped_sizes.size());
-    dml::TensorDesc::Dimensions slice_sizes = perm_reshaped_sizes;
-    absl::InlinedVector<int32_t, 4> slice_strides(perm_reshaped_sizes.size(), 1);
+    const dml::TensorDimensions& output_before_slice_sizes =
+        output_before_slice.GetOutputDesc().sizes;
 
-    absl::Span<const int64> internal_crops = init_helper->GetInternalCrops();
+    dml::Expression result = output_before_slice;
+    if (init_helper->GetIsSliceNeeded()) {
+      // Finally, slice the appropriate dimensions
+      dml::TensorDesc::Dimensions slice_offsets(output_before_slice_sizes.size());
+      dml::TensorDesc::Dimensions slice_sizes = output_before_slice_sizes;
+      absl::InlinedVector<int32_t, 4> slice_strides(output_before_slice_sizes.size(), 1);
 
-    bool do_slice = false;
-    for (int i = 0; i < internal_block_dims; ++i) {
-      int64 start_crop = internal_crops[i * 2];
-      int64 end_crop = internal_crops[i * 2 + 1];
-      slice_offsets[i + 1] = start_crop;
-      slice_sizes[i + 1] = perm_reshaped_sizes[i + 1] - start_crop - end_crop;
+      absl::Span<const int64> internal_crops = init_helper->GetInternalCrops();
 
-      // only do the slice 
-      if (start_crop != 0 || end_crop != 0) {
-        do_slice = true;
+      for (int i = 0; i < internal_block_dims; ++i) {
+        int64 start_crop = internal_crops[i * 2];
+        int64 end_crop = internal_crops[i * 2 + 1];
+        slice_offsets[i + 1] = start_crop;
+        slice_sizes[i + 1] = output_before_slice_sizes[i + 1] - start_crop - end_crop;
       }
-    }
 
-    dml::Expression result;
-    if (do_slice) {
       result = dml::Slice(output_before_slice, slice_offsets, slice_sizes,
                           slice_strides);
-    } 
-    else {
-      result = output_before_slice;
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
