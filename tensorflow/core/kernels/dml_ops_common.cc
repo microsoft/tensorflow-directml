@@ -221,15 +221,15 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
             << " persistent resource for kernel "
             << ctx->GetOpKernelContext()->op_kernel().type_string();
 
-    persistent_resource_ =
-        ctx->AllocateDefaultBuffer(exec_binding_props.PersistentResourceSize);
+   DML_CHECK_SUCCEEDED(ctx->GetD3D12Device()->CreateCommittedResource(
+       &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+       D3D12_HEAP_FLAG_NONE,
+       &CD3DX12_RESOURCE_DESC::Buffer(exec_binding_props.PersistentResourceSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+       D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+       nullptr,
+       IID_PPV_ARGS(&persistent_resource_)));
 
-    OP_REQUIRES(ctx->GetOpKernelContext(), persistent_resource_,
-                errors::ResourceExhausted(
-                    "OOM when allocating a buffer of ",
-                    exec_binding_props.PersistentResourceSize, " bytes"));
-
-    persistent_resource_binding_ = persistent_resource_.GetBufferBinding();
+    persistent_resource_binding_ = {persistent_resource_.Get(), 0, exec_binding_props.PersistentResourceSize};
   }
 
   // Initialize the operator

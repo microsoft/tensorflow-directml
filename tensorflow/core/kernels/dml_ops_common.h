@@ -181,8 +181,9 @@ class DmlKernel {
  private:
   Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op_;
 
-  DmlBuffer persistent_resource_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> persistent_resource_;
   absl::optional<DML_BUFFER_BINDING> persistent_resource_binding_;
+  
   std::shared_ptr<const InitializationHelper> init_helper_;
 
   // The order and count of these descs match the DML operator, which might be

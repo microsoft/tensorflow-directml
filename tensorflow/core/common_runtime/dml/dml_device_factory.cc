@@ -188,6 +188,12 @@ class DmlDeviceFactory : public DeviceFactory {
           uint64_t available_gpu_memory = adapter.QueryAvailableLocalMemory();
 
           memory_limit = available_gpu_memory;
+
+          // Lower the memory limit to allow for a minimum amount of other usage on the system
+          const int64 min_system_memory = MinSystemMemory(available_gpu_memory);
+          if (min_system_memory < memory_limit) {
+            memory_limit -= min_system_memory;
+          }
         }
 
         const DmlDeviceState* device_state =
@@ -227,6 +233,37 @@ class DmlDeviceFactory : public DeviceFactory {
     }
 
     return Status::OK();
+  }
+
+  // This is adapted from the corresponding function from the GPU and uses the same heuristic for now.
+  int64 MinSystemMemory(int64 available_memory) {
+    // We use the following heuristic for now:
+    //
+    // If the available_memory is < 2GiB, we allocate 225MiB to system memory.
+    // Otherwise, allocate max(300MiB, 0.05 * available_memory) to system memory.
+    //
+    // In the future we could be more sophisticated by using a table of devices.
+    int64 min_system_memory;
+    if (available_memory < (1LL << 31)) {
+      // 225MiB
+      min_system_memory = 225 * 1024 * 1024;
+    } else {
+      // max(300 MiB, 0.05 * available_memory)
+      min_system_memory =
+          std::max(int64{314572800}, static_cast<int64>(available_memory * 0.05));
+    }
+  #if defined(__GNUC__) && defined(__OPTIMIZE__)
+  // Do nothing
+  #elif !defined(__GNUC__) && defined(NDEBUG)
+  // Do nothing
+  #else
+    // Double the amount of available GPU memory in non-opt builds (debug
+    // builds in windows); because in non-opt builds more system memory
+    // is necessary.
+    min_system_memory *= 2;
+  #endif
+
+    return min_system_memory;
   }
 };
 
