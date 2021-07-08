@@ -69,7 +69,7 @@ foreach ($TestGroup in $TestGroups)
         py "$PSScriptRoot\generate_absl_test_summary.py" `
             --log_path test_${TestGroup}_log.txt `
             --out_summary_path "$BuildArtifactsPath/test_${TestGroup}_summary.json" `
-            --out_error_log_path "$BuildArtifactsPath/test_${TestGroup}_errors.txt" --xml_paths ($TestResultFragments | Join-String -Separator " ")
+            --out_error_log_path "$BuildArtifactsPath/test_${TestGroup}_errors.txt" --xml_paths ($TestResultFragments -join " ")
 
         if ($LASTEXITCODE -ne 0)
         {
