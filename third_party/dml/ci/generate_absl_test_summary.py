@@ -65,7 +65,7 @@ def _parse_args():
 def _parse_test_crashes(test_log_path):
   test_crashes = []
 
-  path_pattern = re.compile(r"Running\s+'(.+\.exe)'.*")
+  path_pattern = re.compile(r"Running '.+' with shard \d+\.\.\.")
 
   with open(test_log_path, 'r', encoding='utf-16') as test_log:
     line = test_log.readline()
