@@ -17,8 +17,9 @@ limitations under the License.
 
 namespace tensorflow {
 
-DmlEventQueue::DmlEventQueue() {
+DmlEventQueue::DmlEventQueue(ID3D12Fence* fence) {
   shared_state_ = std::make_shared<SharedState>();
+  shared_state_->fence = fence;
 
   // Launch the thread, supplying it with a pointer to the shared state
   thread_ = std::thread(ThreadProc, shared_state_);
@@ -37,21 +38,46 @@ DmlEventQueue::~DmlEventQueue() {
   thread_.detach();
 }
 
-void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event,
-                            std::function<void()> done_callback) {
+void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event, DoneCallback done_callback) {
   std::unique_lock<std::mutex> lock(shared_state_->mutex);
-  shared_state_->events.push({std::move(gpu_event), std::move(done_callback)});
-  shared_state_->new_event_enqueued.notify_all();
+  const auto& state = shared_state_;
+
+  // Sanity: double check that we're only using one fence at a time, because
+  // otherwise monotonically increasing fence values no longer describe a
+  // linear timeline...
+  CHECK(state->fence.Get() == gpu_event.fence.Get());
+  DCHECK(state->fence->GetCompletedValue() + 1 >=
+         state->current_awaited_fence_value);
+
+  // If the thread is currently waiting on a fence value less or equal than the
+  // supplied gpu_event, it means the fence may or may not be signaled, and
+  // therefore should be queued to be processed by the thread. Otherwise, if the
+  // fence value is greater, it means it's definitely already been signaled and
+  // the callback should be invoked immediately.
+  if (state->current_awaited_fence_value <= gpu_event.fence_value) {
+    // Queue the event and notify the thread.
+    state->events_by_fence_value.emplace(gpu_event.fence_value,
+                                         Event{std::move(done_callback)});
+    state->new_event_enqueued.notify_all();
+  } else {
+    // Sanity: all prior events in the queue should have been processed already
+    DCHECK(state->events_by_fence_value.lower_bound(gpu_event.fence_value) ==
+           state->events_by_fence_value.begin());
+
+    done_callback();
+  }
 }
 
 /*static*/ void DmlEventQueue::ThreadProc(std::shared_ptr<SharedState> state) {
+  std::vector<Event> events_to_process;
+
   while (true) {
     std::unique_lock<std::mutex> lock(state->mutex);
     if (state->exit_requested) {
       break;
     }
 
-    if (state->events.empty()) {
+    if (state->events_by_fence_value.empty()) {
       // Wait for new events
       state->new_event_enqueued.wait(lock);
 
@@ -61,18 +87,77 @@ void DmlEventQueue::Enqueue(DmlGpuEvent gpu_event,
       continue;
     }
 
-    assert(!state->events.empty());
-    Event event = std::move(state->events.front());
-    state->events.pop();
+    DCHECK(!state->events_by_fence_value.empty());
+    DCHECK(events_to_process.empty());
 
-    // We've taken ownership of the event, which means we can now unlock the
-    // shared state
+    // Decide the next fence value to wait on. Using GetCompletedValue + 1
+    // ensures that *any* signal wakes this thread (assuming monotonically
+    // increasing fence values, which we require.)
+    //
+    // Note that because fences are asynchronous, this next_fence_value could
+    // become signaled at any time (even immediately). This is okay; it just
+    // means that the wait we perform below will return immediately, and the
+    // loop will continue.
+    uint64_t next_fence_value = state->fence->GetCompletedValue() + 1;
+
+    // Device removal will result in all fences reporting a completed value of
+    // UINT64_MAX; GetCompletedValue()+1 will overflow to 0. The intention
+    // here is to ensure all outstanding events are signaled, but this queue uses
+    // the *next* value (0) to flush events in a batch. If the device is removed
+    // we explicitly set the next_fence_value to UINT64_MAX so that all events
+    // are flushed then exit this thread.
+    bool device_removed = next_fence_value == 0;
+    if (device_removed) {
+      next_fence_value = std::numeric_limits<uint64_t>::max();
+    }
+    state->current_awaited_fence_value = next_fence_value;
+
+    // Find all the events that have fence values < next_fence_values. These
+    // events, by definition, have had their fence values signaled and can now
+    // be processed.
+    auto begin = state->events_by_fence_value.begin();
+    auto end = state->events_by_fence_value.lower_bound(next_fence_value);
+
+    // Move the signaled events into the vector
+    events_to_process.reserve(std::distance(begin, end));
+    for (auto it = begin; it != end; ++it) {
+      DCHECK(it->first < next_fence_value);
+      events_to_process.push_back(std::move(it->second));
+    }
+    state->events_by_fence_value.erase(begin, end);
+
+    // Process the events by invoking their done callback
+    for (const auto& event : events_to_process) {
+      event.done_callback();
+    }
+
+    if (device_removed) {
+      break;
+    }
+
+    bool event_queue_empty = state->events_by_fence_value.empty();
+
+    // We've finished processing the events, so we can unlock the mutex now.
     lock.unlock();
 
-    // Handle the event by blocking until it's signaled, then invoking the
-    // "done" callback
-    event.gpu_event.WaitForSignal();
-    event.done_callback();
+    events_to_process.clear();
+
+    // If the queue isn't empty then there are still events waiting for a fence
+    // value that hasn't been reached. The WaitForSignal below is to avoid a
+    // busy wait, but it's not required for correctness. WaitForSignal should
+    // NOT be invoked if the queue is already empty since another signal may
+    // never come (i.e. no more events are enqueued).
+    if (!event_queue_empty) {
+      // Now wait for the fence to become signaled again. Recall that the choice
+      // of next_fence_value ensures this wait will complete no matter what
+      // value is signaled.
+      DmlGpuEvent next_event{next_fence_value, state->fence};
+      next_event.WaitForSignal();
+
+      // We require monotonically increasing fence values; time is not allowed
+      // to go backward!
+      CHECK(state->fence->GetCompletedValue() >= next_fence_value);
+    }
   }
 }
 

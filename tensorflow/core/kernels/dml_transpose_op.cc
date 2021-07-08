@@ -26,7 +26,7 @@ namespace tensorflow {
 struct SimpleTranspose {
   TensorShape input_shape;
   TensorShape output_shape;
-  absl::InlinedVector<int, 5> permutations;
+  absl::InlinedVector<int, 8> permutations;
 };
 
 template <typename TPerm>
@@ -34,8 +34,8 @@ static SimpleTranspose SimplifyTranspose(const TensorShape& input_shape,
                                          const Tensor& perm_tensor) {
   auto perm_values = perm_tensor.flat<TPerm>();
 
-  absl::InlinedVector<int64, 5> simple_input_sizes(input_shape.dims());
-  absl::InlinedVector<int, 5> input_to_perm_map(input_shape.dims());
+  absl::InlinedVector<int64, 8> simple_input_sizes(input_shape.dims());
+  absl::InlinedVector<int, 8> input_to_perm_map(input_shape.dims());
   int input_index = static_cast<int>(perm_values(0));
   int dim_size = input_shape.dim_size(input_index);
   input_to_perm_map[input_index] = 0;
@@ -64,7 +64,7 @@ static SimpleTranspose SimplifyTranspose(const TensorShape& input_shape,
   // Shift collapsed input dimensions to the left and adjust the permutation
   // indices accordingly
   int input_left_shift = 0;
-  absl::InlinedVector<int, 5> simple_permutations(simple_input_sizes.size());
+  absl::InlinedVector<int, 8> simple_permutations(simple_input_sizes.size());
   for (int i = 0; i < simple_input_sizes.size(); ++i) {
     int perm_index = input_to_perm_map[i];
 
@@ -127,17 +127,30 @@ static std::vector<TensorShape> GetOutputShapesHelper(OpKernelContext* ctx) {
   return {std::move(output_shape)};
 }
 
-static DmlTensorLayout PermuteLayout(const DmlTensorLayout& input_layout,
-                                     absl::Span<const int> permutations) {
-  DmlTensorLayout output_layout(input_layout.size());
+// TFDML #24881131
+static dml::TensorStrides ComputeStrides(const TensorShape& input_shape,
+                                         absl::Span<const int> permutations,
+                                         uint32_t expected_dim_count,
+                                         bool is_uint64) {
+  DCHECK(input_shape.dims() == permutations.size());
 
-  for (int64 i = 0; i < permutations.size(); ++i) {
+  int leading_dims = permutations.size() < expected_dim_count
+                         ? expected_dim_count - permutations.size()
+                         : 0;
+
+  dml::TensorStrides output_strides(leading_dims + permutations.size(), 1);
+
+  uint32_t stride = is_uint64 ? 2 : 1;
+
+  for (int64 i = permutations.size() - 1; i >= 0; --i) {
     int input_dim_index = permutations[i];
-    CHECK(input_dim_index < input_layout.size());
-    output_layout[i] = input_layout[input_dim_index];
+    DCHECK(input_dim_index < output_strides.size());
+
+    output_strides[leading_dims + input_dim_index] = stride;
+    stride *= input_shape.dim_size(input_dim_index);
   }
 
-  return output_layout;
+  return output_strides;
 }
 
 class TransposeInitHelper : public InitializationHelper {
@@ -165,10 +178,9 @@ class TransposeInitHelper : public InitializationHelper {
             ? SimplifyTranspose<int32>(input_shape, perm_tensor)
             : SimplifyTranspose<int64>(input_shape, perm_tensor);
 
-    OP_REQUIRES(ctx,
-                simple_transpose_.input_shape.dims() <= kNcdhwDimensionCount,
+    OP_REQUIRES(ctx, simple_transpose_.input_shape.dims() <= 8,
                 errors::InvalidArgument(
-                    "DML doesn't support more than 5D for Transpose, but ",
+                    "DML doesn't support more than 8D for Transpose, but ",
                     simple_transpose_.input_shape.dims(),
                     " dimensions were provided."));
   }
@@ -201,55 +213,61 @@ class DmlTransposeKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 2);
     CHECK(ctx->GetOutputCount() == 1);
 
-    const TensorShape& input_shape = ctx->GetInputTensorShape(0);
     auto simple_transpose = init_helper->GetSimpleTranspose();
-
-    DmlTensorLayout input_layout =
-        GetDmlTensorLayout(FORMAT_NCHW, simple_transpose.input_shape.dims());
-
-    DmlTensorLayout output_layout =
-        PermuteLayout(input_layout, simple_transpose.permutations);
 
     DmlTensorInfo input;
     input.kernel_index = 0;
-    input.desc = DmlTensorDesc::Create(
-        ctx->GetInputDataType(0), simple_transpose.input_shape,
-        simple_transpose.input_shape, input_layout);
+    input.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0),
+                                       simple_transpose.input_shape,
+                                       simple_transpose.input_shape);
 
     DmlTensorInfo output;
     output.kernel_index = 0;
-    output.desc = DmlTensorDesc::Create(
-        ctx->GetOutputDataType(0), simple_transpose.output_shape,
-        simple_transpose.output_shape, output_layout);
+    output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0),
+                                        simple_transpose.output_shape,
+                                        simple_transpose.output_shape);
+
+    const auto out_policy = dml::TensorPolicy(
+        [ctx, simple_transpose](DML_TENSOR_DATA_TYPE dataType,
+                                DML_TENSOR_FLAGS flags,
+                                dml::Span<const uint32_t> sizes) {
+          const bool is_uint64 =
+              Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0));
+
+          uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
+
+          dml::TensorProperties props = {};
+          props.strides = ComputeStrides(simple_transpose.input_shape,
+                                         simple_transpose.permutations,
+                                         dimension_count, is_uint64);
+
+          props.guaranteedBaseOffsetAlignment = 0;
+
+          props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+              dataType, dimension_count, sizes.data(), props.strides->data());
+
+          return props;
+        });
 
     DmlKernelTensors tensors;
     tensors.inputs = {input};
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto result = dml::Identity(dml::InputTensor(scope, 0, inputs[0]));
 
-    DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-    identity_desc.InputTensor = inputs.data();
-    identity_desc.OutputTensor = outputs.data();
+    const bool is_int64 = Is64BitSignedIntegerType(ctx->GetOutputDataType(0));
 
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                 &identity_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    // TFDML #24881131
+    if (is_int64) {
+      result = dml::ConvertInt32ToInt64(result);
     }
 
-    return DmlKernel::Compute(ctx);
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
@@ -261,7 +279,16 @@ class DmlTransposeKernel : public DmlKernel {
           .HostMemory("perm"),       \
       DmlKernelWrapper<DmlTransposeKernel, TransposeShapeHelper>);
 
-TF_CALL_DML_ALL_TYPES(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
+TF_CALL_int64(REGISTER_KERNEL);
+TF_CALL_int32(REGISTER_KERNEL);
+TF_CALL_uint16(REGISTER_KERNEL);
+TF_CALL_int16(REGISTER_KERNEL);
+TF_CALL_uint8(REGISTER_KERNEL);
+TF_CALL_int8(REGISTER_KERNEL);
+
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

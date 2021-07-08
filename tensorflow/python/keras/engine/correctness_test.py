@@ -74,8 +74,6 @@ class SimpleBiasTest(keras_parameterized.TestCase):
         experimental_run_tf_function=testing_utils.should_run_tf_function())
     return model
 
-  # TFDML #25610992
-  @test_util.skip_dml
   def test_simple_bias_fit(self):
     x = np.array([[0.], [1.], [2.]])
     y = np.array([[0.5], [2.], [3.5]])
@@ -115,8 +113,6 @@ class MultipleInputTest(keras_parameterized.TestCase):
         experimental_run_tf_function=testing_utils.should_run_tf_function())
     return model
 
-  # TFDML #25610992
-  @test_util.skip_dml
   @parameterized.named_parameters(('subclassed', True), ('functional', False))
   def test_multiple_input_fit(self, subclassed):
     x = [
@@ -130,8 +126,6 @@ class MultipleInputTest(keras_parameterized.TestCase):
     history = model.fit(x, y, batch_size=3, epochs=5)
     self.assertAllClose(history.history['loss'], [1., 0.9, 0.8, 0.7, 0.6])
 
-  # TFDML #25610992
-  @test_util.skip_dml
   @parameterized.named_parameters(('subclassed', True), ('functional', False))
   def test_multiple_input_evaluate(self, subclassed):
     x = [
@@ -143,7 +137,8 @@ class MultipleInputTest(keras_parameterized.TestCase):
 
     model = self._get_multiple_input_model(subclassed)
     loss = model.evaluate(x, y, batch_size=3)
-    self.assertAlmostEqual(loss, 2.)
+    places = 6 if test.is_built_with_dml() else None
+    self.assertAlmostEqual(loss, 2., places=places)
 
   @parameterized.named_parameters(('subclassed', True), ('functional', False))
   def test_multiple_input_predict(self, subclassed):

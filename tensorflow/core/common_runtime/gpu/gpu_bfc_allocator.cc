@@ -83,11 +83,10 @@ GPUBFCAllocator::GPUBFCAllocator(SubAllocator* sub_allocator,
 GPUBFCAllocator::GPUBFCAllocator(SubAllocator* sub_allocator,
                                  size_t total_memory,
                                  const GPUOptions& gpu_options,
-                                 const string& name,
-                                 size_t max_allocation_size)
+                                 const string& name, size_t max_allocation_size)
     : BFCAllocator(sub_allocator, total_memory,
                    GPUBFCAllocator::GetAllowGrowthValue(gpu_options), name,
-                   GPUBFCAllocator::GetGarbageCollectionValue(),
+                   GPUBFCAllocator::GetGarbageCollectionValue(), 8,
                    max_allocation_size) {}
 
 }  // namespace tensorflow

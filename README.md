@@ -5,11 +5,18 @@
 | :warning: | **h5py 3.0.0 and 3.1.0 broke compatibility with TensorFlow. Please make sure that your environment has a different version of h5py before using TensorFlow-DirectML.** |
 
 
-| PyPI Release                                                                                                      | Build (directml branch)                                                                                                                                                                                                                 |
-| ----------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [![PyPI version](https://badge.fury.io/py/tensorflow-directml.svg)](https://badge.fury.io/py/tensorflow-directml) | [![Build Status](https://dev.azure.com/microsoft/WindowsAI/_apis/build/status/TensorFlow/TF%20-%20Nightly%20Build?branchName=directml)](https://dev.azure.com/microsoft/WindowsAI/_build/latest?definitionId=56563&branchName=directml) |
-
 [TensorFlow](https://www.tensorflow.org/) is an end-to-end open source platform for machine learning. This repository is a fork of [tensorflow](https://github.com/tensorflow/tensorflow) that leverages [DirectML](https://github.com/microsoft/DirectML) to provide cross-vendor hardware acceleration on Windows 10 and the Windows Subsystem for Linux (WSL). TensorFlow with DirectML enables training and inference of complex machine learning models on a wide range of DirectX 12-compatible hardware.
+
+**Latest Release**:  
+[![PyPI version](https://badge.fury.io/py/tensorflow-directml.svg)](https://badge.fury.io/py/tensorflow-directml) 
+
+## Questions, Issues, and Feedback
+
+- Ask a question: [Discussions](https://github.com/microsoft/tensorflow-directml/discussions)
+- Report a bug: [Issues](https://github.com/microsoft/tensorflow-directml/issues) 
+- Learn about our roadmap: [Wiki](https://github.com/microsoft/tensorflow-directml/wiki)
+
+You can also contact us directly at askdirectml@microsoft.com.
 
 ## Getting Started
 
@@ -33,7 +40,7 @@ The following resources provide additional background on DirectML and TensorFlow
   * Intel HD Graphics 5xx or newer
   * NVIDIA GeForce GTX 9xx series GPU or newer
 
-<sup>1</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required. NumPy 1.19.4 is [currently experiencing issues on Windows](https://github.com/numpy/numpy/wiki/FMod-Bug-on-Windows); this can be resolved by pinning the NumPy version, e.g. `pip install numpy==1.18.5`.
+<sup>1</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required. NumPy 1.19.4 is [requires the KB4598291 to properly work on Windows](https://github.com/numpy/numpy/wiki/FMod-Bug-on-Windows).
 
 ### Windows Subsystem for Linux
 
@@ -46,17 +53,11 @@ The following resources provide additional background on DirectML and TensorFlow
 
 <sup>2</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required.
 
-## Feedback
-
-For comments, questions, feedback, or if you're having problems, please [file an issue](https://github.com/microsoft/tensorflow-directml/issues) or contact us directly at askdirectml@microsoft.com.
-
-## Build
-
-See [BUILD.md](BUILD.md) for instructions on how to produce private builds of tensorflow-directml.
-
 ## Contribute
 
 If you would like to contribute to tensorflow-directml, please see our [contribution guidelines](CONTRIBUTING.md) and read the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct). We use [GitHub issues](https://github.com/microsoft/tensorflow/issues) for tracking requests and bugs. **Please do not report security vulnerabilities through public GitHub issues.** See SECURITY.md for more details.
+
+See [BUILD.md](BUILD.md) for instructions on how to produce private builds of tensorflow-directml.
 
 ## License
 

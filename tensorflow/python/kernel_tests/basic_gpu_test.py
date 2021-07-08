@@ -52,10 +52,8 @@ class GPUBinaryOpsTest(test.TestCase):
       out = tf_func(inx, iny)
       tf_cpu = self.evaluate(out)
 
-    self.assertAllClose(tf_cpu, tf_gpu)
+    self.assertAllClose(tf_cpu, tf_gpu, rtol=1e-5)
 
-  # TFDML #25508846
-  @test_util.skip_dml
   def testFloatBasic(self):
     x = np.linspace(-5, 20, 15).reshape(1, 3, 5).astype(np.float32)
     y = np.linspace(20, -5, 15).reshape(1, 3, 5).astype(np.float32)
@@ -93,13 +91,13 @@ class GPUBinaryOpsTest(test.TestCase):
 
 class MathBuiltinUnaryTest(test.TestCase):
 
-  def _compare(self, x, np_func, tf_func, use_gpu):
+  def _compare(self, x, np_func, tf_func, use_gpu, atol=1e-6):
     np_out = np_func(x)
     with self.cached_session(use_gpu=use_gpu) as sess:
       inx = ops.convert_to_tensor(x)
       ofunc = tf_func(inx)
       tf_out = self.evaluate(ofunc)
-    self.assertAllClose(np_out, tf_out)
+    self.assertAllClose(np_out, tf_out, atol=atol, rtol=1e-4)
 
   def _inv(self, x):
     return 1.0 / x
@@ -112,7 +110,7 @@ class MathBuiltinUnaryTest(test.TestCase):
     data_gt_1 = data + 2 # for x > 1
     self._compare(data, np.abs, math_ops.abs, use_gpu)
     self._compare(data, np.arccos, math_ops.acos, use_gpu)
-    self._compare(data, np.arcsin, math_ops.asin, use_gpu)
+    self._compare(data, np.arcsin, math_ops.asin, use_gpu, atol=1e-4)
     self._compare(data, np.arcsinh, math_ops.asinh, use_gpu)
     self._compare(data_gt_1, np.arccosh, math_ops.acosh, use_gpu)
     self._compare(data, np.arctan, math_ops.atan, use_gpu)
@@ -133,8 +131,6 @@ class MathBuiltinUnaryTest(test.TestCase):
     self._compare(data, np.tanh, math_ops.tanh, use_gpu)
     self._compare(data, np.arctanh, math_ops.atanh, use_gpu)
 
-  # TFDML #25508857
-  @test_util.skip_dml
   def testTypes(self):
     for dtype in [np.float32]:
       self._testDtype(dtype, use_gpu=True)

@@ -173,8 +173,8 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
 
   def _generate_dump_from_simple_addition_graph(self):
     with session.Session(config=no_rewrite_session_config()) as sess:
-      u_init_val = np.array([[5.0, 3.0], [-1.0, 0.0]])
-      v_init_val = np.array([[2.0], [-1.0]])
+      u_init_val = np.array([[5.0, 3.0], [-1.0, 0.0]], dtype=np.float32)
+      v_init_val = np.array([[2.0], [-1.0]], dtype=np.float32)
 
       # Use node names with overlapping namespace (i.e., parent directory) to
       # test concurrent, non-racing directory creation.
@@ -266,8 +266,6 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
       self.assertEqual("DebugNumericSummary;%s;0" % debug_urls[0],
                        debug_ops_spec[0].decode("utf-8"))
 
-  # TFDML #25510608
-  @test_util.skip_dml
   def testConcurrentDumpingToPathsWithOverlappingParentDirsWorks(self):
     results = self._generate_dump_from_simple_addition_graph()
     self.assertTrue(results.dump.loaded_partition_graphs())
@@ -305,8 +303,6 @@ class SessionDebugTestBase(test_util.TensorFlowTestCase):
         results.dump.get_dump_sizes_bytes("%s/read" % results.v_name, 0,
                                           "DebugIdentity")[0], 0)
 
-  # TFDML #25576363
-  @test_util.skip_dml
   def testGetOpTypeWorks(self):
     results = self._generate_dump_from_simple_addition_graph()
 

@@ -43,10 +43,10 @@ class GatherInitializationHelper : public InitializationHelper {
     if (ctx->input(0).dtype() == DT_RESOURCE) {
       OP_REQUIRES_OK(
           ctx, LookupResource(ctx, HandleFromInput(ctx, 0), &params_resource_));
-      params_resource_lock_.emplace(*params_resource_->mu());
+      params_resource_->mu()->lock_shared();
     }
 
-    const Tensor& params = GetParamsTensor(ctx);
+    const Tensor params = GetParamsTensor(ctx);
     const Tensor& indices = ctx->input(1);
 
     OP_REQUIRES(
@@ -115,20 +115,20 @@ class GatherInitializationHelper : public InitializationHelper {
   int32 GetBatchDims() const { return positive_batch_dims_; }
   int64 GetAxis() const { return axis_; }
 
-  const Tensor& GetParamsTensor(OpKernelContext* ctx) const {
+  const Tensor GetParamsTensor(OpKernelContext* ctx) const {
     return ctx->input(0).dtype() == DT_RESOURCE ? *params_resource_->tensor()
                                                 : ctx->input(0);
   }
 
-  void Unlock() const { params_resource_lock_.reset(); }
+  void Unlock() const {
+    if (params_resource_) {
+      params_resource_->mu()->unlock_shared();
+    }
+  }
 
  private:
   int64 axis_;
   int32 positive_batch_dims_;
-
-  // Since the initialization helper and the kernel share the same lifetime,
-  // the mutex should be unlocked before Compute finishes
-  mutable absl::optional<mutex_lock> params_resource_lock_;
   core::RefCountPtr<Var> params_resource_;
 };
 
@@ -141,7 +141,7 @@ class GatherShapeHelper : public ShapeHelper {
     auto init_helper = static_cast<const GatherInitializationHelper<TIndex>*>(
         initialization_helper);
 
-    const Tensor& params = init_helper->GetParamsTensor(ctx);
+    const Tensor params = init_helper->GetParamsTensor(ctx);
     const Tensor& indices = ctx->input(1);
 
     // The result shape is params.shape[:axis] + indices.shape[batch_dims:] +
@@ -237,7 +237,7 @@ class DmlGatherKernel : public DmlKernel {
     CHECK(ctx->GetInputCount() == 2 || ctx->GetInputCount() == 3);
     CHECK(ctx->GetOutputCount() == 1);
 
-    const Tensor& params_tensor =
+    const Tensor params_tensor =
         init_helper->GetParamsTensor(ctx->GetOpKernelContext());
 
     const TensorShape& indices_shape = ctx->GetInputTensorShape(1);
@@ -270,31 +270,18 @@ class DmlGatherKernel : public DmlKernel {
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-
-    // Create a custom tensor policy to correctly pad out strides for int64
-    // emulation
-    dml::TensorPolicy out_policy = dml::TensorPolicy::Default();
-    if (Is64BitIntegerType(ctx->GetInputDataType(0))) {
-      out_policy = GetEmulatedInt64TensorPolicy();
-    }
-
-    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
     auto indices_tensor = dml::InputTensor(scope, 1, inputs[1]);
-
-    // DML's Gather only supports uint32 for the indices tensor, but TF models
-    // use either int64 or int32. int64 already gets converted to uint32 with
-    // the strides hack
-    // (TFDML #24881131), so we
-    // only need to reinterpret the int32 data to uint32 here.
-    if (indices_tensor.GetOutputDesc().dataType == DML_TENSOR_DATA_TYPE_INT32) {
-      indices_tensor =
-          dml::Reinterpret(indices_tensor, DML_TENSOR_DATA_TYPE_UINT32);
-    }
 
     auto result =
         dml::Gather(input_tensor, indices_tensor, simple_gather.gather_axis,
                     simple_gather.index_dimensions);
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(result);
+    }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
@@ -303,10 +290,6 @@ class DmlGatherKernel : public DmlKernel {
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
     Tensor* output = ctx->GetOutputTensor(0);
 
     auto init_helper = ctx->GetInitializationHelper<InitHelper>();
@@ -319,20 +302,15 @@ class DmlGatherKernel : public DmlKernel {
 
     D3D12BufferRegion output_buffers[] = {ctx->CreateBufferForTensor(*output)};
 
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(output_buffers[0]);
-    }
-
     // Create bindings
     auto input_bindings = dml_util::GetBufferBindings(input_buffers);
     auto output_bindings = dml_util::GetBufferBindings(output_buffers);
 
-    DmlGpuEvent gpu_event =
-        ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                             input_bindings, output_bindings);
+    auto gpu_event_or_status =
+        DmlKernel::Compute(ctx, input_bindings, output_bindings);
 
     init_helper->Unlock();
-    return gpu_event;
+    return gpu_event_or_status;
   }
 };
 
@@ -367,7 +345,16 @@ using DmlResourceGatherWrapper =
                               .TypeConstraint<type>("Tparams")    \
                               .TypeConstraint<int64>("Tindices")  \
                               .HostMemory("axis"),                \
-                          DmlGatherWrapper<int64>)                \
+                          DmlGatherWrapper<int64>)
+
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
+TF_CALL_bool(DML_REGISTER_KERNELS);
+TF_CALL_int32(DML_REGISTER_KERNELS);
+TF_CALL_int64(DML_REGISTER_KERNELS);
+#undef DML_REGISTER_KERNELS
+
+#define DML_REGISTER_KERNELS(type)                                \
   REGISTER_KERNEL_BUILDER(Name("ResourceGather")                  \
                               .Device(DEVICE_DML)                 \
                               .HostMemory("resource")             \
@@ -381,7 +368,8 @@ using DmlResourceGatherWrapper =
                               .TypeConstraint<int64>("Tindices"), \
                           DmlResourceGatherWrapper<int64>)
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNELS);
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 }  // namespace tensorflow

@@ -58,6 +58,12 @@ class InitializationHelper {
     return false;
   }
 
+  virtual absl::optional<int> GetForwardableInputIndex(
+      OpKernelContext* ctx, absl::Span<const TensorShape> output_shapes,
+      int outputIndex) const {
+    return {};
+  }
+
   virtual ~InitializationHelper() = default;
 };
 
@@ -102,12 +108,21 @@ class ScalarOutputShapeHelper : public ShapeHelper {
   };
 };
 
-class GetOutputShapeAsInputShapeHelper : public ShapeHelper {
+template <int input_tensor_index>
+class GetOutputShapeFromInputShapeHelper : public ShapeHelper {
  public:
   std::vector<TensorShape> GetOutputShapes(
       OpKernelContext* ctx,
-      const InitializationHelper* initialization_helper) const override;
+      const InitializationHelper* initialization_helper) const override {
+    const Tensor& input_tensor =
+        ctx->input_is_ref(input_tensor_index)
+            ? ctx->mutable_input(input_tensor_index, false)
+            : ctx->input(input_tensor_index);
+    return {input_tensor.shape()};
+  }
 };
+
+using GetOutputShapeAsInputShapeHelper = GetOutputShapeFromInputShapeHelper<0>;
 
 class BroadcastedOutputShapeInitHelper : public InitializationHelper {
  public:
@@ -187,5 +202,6 @@ absl::InlinedVector<T, 5> IntTensorToVec(const tensorflow::Tensor& tensor) {
 }
 
 TensorShape BroadcastTensorShapes(absl::Span<const TensorShape> shapes);
+TensorShape ComputeFlatOuterDims(const TensorShape& orig, int64 num_out_dims);
 
 }  // namespace tensorflow

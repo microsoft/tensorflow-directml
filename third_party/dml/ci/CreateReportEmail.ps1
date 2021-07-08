@@ -11,6 +11,7 @@ param
     [Parameter(Mandatory)][string]$BuildArtifactsPath,
     [Parameter(Mandatory)][string]$PipelineRunID,
     [Parameter(Mandatory)][string]$AccessToken,
+    [Parameter(Mandatory)][string]$OutputHtmlPath,
     [string]$EmailTo
 )
 
@@ -38,8 +39,7 @@ $PipelineDuration = (Get-Date) - [datetime]$Run.StartTime
 # e.g. refs/heads/master -> master
 $ShortBranchName = $Run.SourceBranch -replace '^refs/heads/'
 
-$Organization = $env:SYSTEM_COLLECTIONURI -replace "^https://dev.azure.com/(\w+)/.*", '$1'
-$RunUrl = "https://dev.azure.com/$Organization/$env:SYSTEM_TEAMPROJECT/_build/results?buildId=$($PipelineRunID)"
+$RunUrl = "$env:SYSTEM_COLLECTIONURI$env:SYSTEM_TEAMPROJECT/_build/results?buildId=$($PipelineRunID)"
 
 # Only get commits associated with this build if there was at least one earlier successful build of this branch.
 $FirstRunOnBranch = $Ado.InvokeProjectApi("build/builds?definitions=$($Run.definition.id)&branchName=$($Run.SourceBranch)&`$top=1&resultFilter=succeeded&api-version=5.0", "GET", $null).Count -eq 0
@@ -428,26 +428,20 @@ if ($TestsArtifactsExist)
     $Html += "</table><br>"
 }
 
+$Html | Out-File $OutputHtmlPath -Encoding utf8
+Write-Host "##vso[task.uploadsummary]$(Resolve-Path $OutputHtmlPath)"
+
 # ---------------------------------------------------------------------------------------------------------------------
-# Email
+# Email Variables
 # ---------------------------------------------------------------------------------------------------------------------
 
 if ($EmailTo)
 {
-    $OverallResult = if ($TestRunResult) { $TestRunResult } else { $BuildResult }
-    $MailArgs = 
-    @{
-        'From'="$env:USERNAME@microsoft.com";
-        'To'=@($EmailTo);
-        'Subject'="$($Run.Definition.Name) ($ShortBranchName) - $($OverallResult)";
-        'Body'="$Html";
-        'BodyAsHtml'=$True;
-        'Priority'='Normal';
-        'SmtpServer'='smtphost.redmond.corp.microsoft.com'
-    }
+    # Save comma-separated list of email addresses in the "emailTo" ADO pipeline variable.
+    Write-Host "##vso[task.setVariable variable=emailTo;isOutput=true]$EmailTo"
     
-    Send-MailMessage @MailArgs
+    # Save email title in the "emailSubject" ADO pipeline variable.
+    $OverallResult = if ($TestRunResult) { $TestRunResult } else { $BuildResult }
+    $EmailSubject = "$($Run.Definition.Name) (${env:BUILD_REASON}:$ShortBranchName) - $($OverallResult)"
+    Write-Host "##vso[task.setVariable variable=emailSubject;isOutput=true]$emailSubject"
 }
-
-$Html | Out-File "Summary.md" -Encoding utf8
-Write-Host "##vso[task.uploadsummary]$(Resolve-Path Summary.md)"

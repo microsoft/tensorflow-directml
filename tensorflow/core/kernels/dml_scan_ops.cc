@@ -24,7 +24,7 @@ limitations under the License.
 namespace tensorflow {
 
 template <typename Tidx>
-class CumsumInitHelper : public InitializationHelper {
+class ScanInitHelper : public InitializationHelper {
  public:
   struct Attributes {
     explicit Attributes(OpKernelConstruction* ctx) {
@@ -36,7 +36,7 @@ class CumsumInitHelper : public InitializationHelper {
     bool exclusive;
   };
 
-  CumsumInitHelper(OpKernelContext* ctx, std::shared_ptr<const Attributes> attr)
+  ScanInitHelper(OpKernelContext* ctx, std::shared_ptr<const Attributes> attr)
       : attr_(attr) {
     const Tensor& input = ctx->input(0);
     const Tensor& tensor_axis = ctx->input(1);
@@ -63,13 +63,13 @@ class CumsumInitHelper : public InitializationHelper {
   int64 axis_;
 };
 
-template <typename Tidx>
-class DmlCumsumKernel : public DmlKernel {
+template <typename Tidx, typename ScanFunctor>
+class DmlScanKernel : public DmlKernel {
  public:
-  using InitHelper = CumsumInitHelper<Tidx>;
+  using InitHelper = ScanInitHelper<Tidx>;
 
-  explicit DmlCumsumKernel(DmlKernelConstruction* ctx,
-                           const InitHelper* init_helper) {
+  explicit DmlScanKernel(DmlKernelConstruction* ctx,
+                         const InitHelper* init_helper) {
     DCHECK(ctx->GetInputCount() == 2);
     DCHECK(ctx->GetOutputCount() == 1);
 
@@ -109,61 +109,92 @@ class DmlCumsumKernel : public DmlKernel {
     tensors.inputs = {input};
     tensors.outputs = {output};
 
-    auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
-
-    // The non-axis dimensions have already been collapsed together, so the dml
-    // axis is always "2"
+    // The non-axis dimensions have already been collapsed together, so the
+    // dml axis is always "2"
     constexpr uint32_t dml_axis = 2;
 
-    DML_CUMULATIVE_SUMMATION_OPERATOR_DESC cumsum_desc = {};
-    cumsum_desc.InputTensor = &inputs[0];
-    cumsum_desc.OutputTensor = &outputs[0];
-    cumsum_desc.Axis = dml_axis;
-    cumsum_desc.AxisDirection = axis_direction;
-    cumsum_desc.HasExclusiveSum = init_helper->IsExclusive();
+    auto inputs = GetDmlTensorDescs(tensors.inputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
+    const auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
+    auto result = ScanFunctor()(input_tensor, dml_axis, axis_direction,
+                                init_helper->IsExclusive());
 
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_CUMULATIVE_SUMMATION,
-                                 &cumsum_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(result);
     }
 
-    return DmlKernel::Compute(ctx);
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
-#define REGISTER_KERNELS(type)                                                \
-  REGISTER_KERNEL_BUILDER(Name("Cumsum")                                      \
-                              .Device(DEVICE_DML)                             \
-                              .TypeConstraint<type>("T")                      \
-                              .TypeConstraint<int32>("Tidx")                  \
-                              .HostMemory("axis"),                            \
-                          DmlKernelWrapper<DmlCumsumKernel<int32>,            \
-                                           GetOutputShapeAsInputShapeHelper>) \
-  REGISTER_KERNEL_BUILDER(Name("Cumsum")                                      \
-                              .Device(DEVICE_DML)                             \
-                              .TypeConstraint<type>("T")                      \
-                              .TypeConstraint<int64>("Tidx")                  \
-                              .HostMemory("axis"),                            \
-                          DmlKernelWrapper<DmlCumsumKernel<int64>,            \
-                                           GetOutputShapeAsInputShapeHelper>)
-TF_CALL_float(REGISTER_KERNELS);
-TF_CALL_int64(REGISTER_KERNELS);
-TF_CALL_uint64(REGISTER_KERNELS);
-TF_CALL_int32(REGISTER_KERNELS);
-TF_CALL_uint32(REGISTER_KERNELS);
+struct CumsumFunctor {
+  dml::Expression operator()(dml::Expression input, uint32_t axis,
+                             DML_AXIS_DIRECTION axis_direction,
+                             bool has_exclusive_sum) {
+    return dml::CumulativeSummation(input, axis, axis_direction,
+                                    has_exclusive_sum);
+  }
+};
+
+struct CumprodFunctor {
+  dml::Expression operator()(dml::Expression input, uint32_t axis,
+                             DML_AXIS_DIRECTION axis_direction,
+                             bool has_exclusive_product) {
+    return dml::CumulativeProduct(input, axis, axis_direction,
+                                  has_exclusive_product);
+  }
+};
+
+#define REGISTER_KERNELS(type)                              \
+  REGISTER_KERNEL_BUILDER(                                  \
+      Name("Cumsum")                                        \
+          .Device(DEVICE_DML)                               \
+          .TypeConstraint<type>("T")                        \
+          .TypeConstraint<int32>("Tidx")                    \
+          .HostMemory("axis"),                              \
+      DmlKernelWrapper<DmlScanKernel<int32, CumsumFunctor>, \
+                       GetOutputShapeAsInputShapeHelper>)   \
+  REGISTER_KERNEL_BUILDER(                                  \
+      Name("Cumsum")                                        \
+          .Device(DEVICE_DML)                               \
+          .TypeConstraint<type>("T")                        \
+          .TypeConstraint<int64>("Tidx")                    \
+          .HostMemory("axis"),                              \
+      DmlKernelWrapper<DmlScanKernel<int64, CumsumFunctor>, \
+                       GetOutputShapeAsInputShapeHelper>)
+
 TF_CALL_half(REGISTER_KERNELS);
+TF_CALL_float(REGISTER_KERNELS);
+TF_CALL_int32(REGISTER_KERNELS);
+TF_CALL_int64(REGISTER_KERNELS);
+#undef REGISTER_KERNELS
+
+#define REGISTER_KERNELS(type)                               \
+  REGISTER_KERNEL_BUILDER(                                   \
+      Name("Cumprod")                                        \
+          .Device(DEVICE_DML)                                \
+          .TypeConstraint<type>("T")                         \
+          .TypeConstraint<int32>("Tidx")                     \
+          .HostMemory("axis"),                               \
+      DmlKernelWrapper<DmlScanKernel<int32, CumprodFunctor>, \
+                       GetOutputShapeAsInputShapeHelper>)    \
+  REGISTER_KERNEL_BUILDER(                                   \
+      Name("Cumprod")                                        \
+          .Device(DEVICE_DML)                                \
+          .TypeConstraint<type>("T")                         \
+          .TypeConstraint<int64>("Tidx")                     \
+          .HostMemory("axis"),                               \
+      DmlKernelWrapper<DmlScanKernel<int64, CumprodFunctor>, \
+                       GetOutputShapeAsInputShapeHelper>)
+
+TF_CALL_half(REGISTER_KERNELS);
+TF_CALL_float(REGISTER_KERNELS);
+TF_CALL_int32(REGISTER_KERNELS);
+TF_CALL_int64(REGISTER_KERNELS);
 #undef REGISTER_KERNELS
 
 }  // namespace tensorflow

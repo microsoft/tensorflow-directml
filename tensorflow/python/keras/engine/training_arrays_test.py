@@ -39,6 +39,10 @@ class ValidationDatasetNoLimitTest(keras_parameterized.TestCase):
 
   def create_dataset(self, num_samples, batch_size):
     input_data = np.random.rand(num_samples, 1)
+
+    # Numpy allocates float64 by default, which isn't supported by DML
+    input_data = input_data.astype(np.float32)
+
     expected_data = input_data * 3
     dataset = dataset_ops.Dataset.from_tensor_slices((input_data,
                                                       expected_data))

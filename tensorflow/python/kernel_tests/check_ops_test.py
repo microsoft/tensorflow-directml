@@ -960,14 +960,14 @@ class EnsureShapeTest(test.TestCase):
   @test_util.disable_xla(
       "b/123337890")  # Dynamic shapes not supported now with XLA
   def testEnsuresDynamicShape_RaisesError(self):
-    placeholder = array_ops.placeholder(dtypes.int32)
-    derived = math_ops.divide(placeholder, 3, name="MyDivide")
+    placeholder = array_ops.placeholder(dtypes.float32)
+    derived = math_ops.multiply(placeholder, 3, name="MyMultiply")
     derived = check_ops.ensure_shape(derived, (3, 3, 3))
     feed_val = [[1], [2]]
     with self.cached_session() as sess:
       with self.assertRaisesWithPredicateMatch(
           errors.InvalidArgumentError,
-          r"Shape of tensor MyDivide \[2,1\] is not compatible with "
+          r"Shape of tensor MyMultiply \[2,1\] is not compatible with "
           r"expected shape \[3,3,3\]."):
         sess.run(derived, feed_dict={placeholder: feed_val})
 
@@ -975,7 +975,7 @@ class EnsureShapeTest(test.TestCase):
   @test_util.disable_xla(
       "b/123337890")  # Dynamic shapes not supported now with XLA
   def testEnsuresDynamicShape_RaisesErrorDimUnknown(self):
-    placeholder = array_ops.placeholder(dtypes.int32)
+    placeholder = array_ops.placeholder(dtypes.float32)
     derived = placeholder / 3
     derived = check_ops.ensure_shape(derived, (None, None, 3))
     feed_val = [[1], [2]]

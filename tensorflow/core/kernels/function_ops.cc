@@ -186,6 +186,7 @@ REGISTER_KERNEL_BUILDER(
                               .TypeConstraint<type>("T"),                      \
                           RetvalOp);                                           \
 
+TF_CALL_int32(DML_REGISTER_KERNEL);
 TF_CALL_resource(DML_REGISTER_KERNEL);
 TF_CALL_string(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL

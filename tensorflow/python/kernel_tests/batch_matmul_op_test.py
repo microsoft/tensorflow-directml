@@ -111,9 +111,8 @@ class BatchMatmulOpTest(test.TestCase):
     CompareNonEmpty(self, [5, 1, 2, 3], [1, 7, 3, 5])
     CompareNonEmpty(self, [5, 2, 2, 3], [3, 5])
     CompareNonEmpty(self, [2, 3], [5, 2, 3, 5])
-    if test_util.gpu_device_type() != "DML": # DML only supports up to 4D
-      CompareNonEmpty(self, [4, 5, 1, 2, 3], [1, 1, 3, 5])
-      CompareNonEmpty(self, [1, 2, 1, 4, 2, 1, 3, 4], [3, 2, 1, 1, 1, 2, 4, 2])
+    CompareNonEmpty(self, [4, 5, 1, 2, 3], [1, 1, 3, 5])
+    CompareNonEmpty(self, [1, 2, 1, 4, 2, 1, 3, 4], [3, 2, 1, 1, 1, 2, 4, 2])
 
   def _testEmpty(self, dtype, adjoint_a, adjoint_b, use_static_shape):
 
@@ -207,9 +206,8 @@ def _GetBatchMatmulGradientWithBroadcastingTest(dtype, adjoint_a, adjoint_b):
       CheckGradients(self, [2, 3], [5, 3, 5])
       CheckGradients(self, [5, 2, 5], [5, 3])
       CheckGradients(self, [5, 2, 2, 3], [3, 5])
-      if test_util.gpu_device_type() != "DML": # DML only supports up to 4D
-        CheckGradients(self, [4, 5, 1, 2, 3], [1, 1, 3, 5])
-        CheckGradients(self, [1, 2, 1, 4, 2, 1, 3, 4], [3, 2, 1, 1, 1, 2, 4, 2])
+      CheckGradients(self, [4, 5, 1, 2, 3], [1, 1, 3, 5])
+      CheckGradients(self, [1, 2, 1, 4, 2, 1, 3, 4], [3, 2, 1, 1, 1, 2, 4, 2])
 
   return Test
 

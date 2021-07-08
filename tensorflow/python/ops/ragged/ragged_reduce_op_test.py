@@ -43,8 +43,6 @@ def mean(*values):
 class RaggedReduceOpsTest(test_util.TensorFlowTestCase,
                           parameterized.TestCase):
 
-  # TFDML #25564529
-  @test_util.skip_dml
   @parameterized.parameters(
       #=========================================================================
       # Docstring examples.  RaggedTensor for testing is:
@@ -337,13 +335,11 @@ class RaggedReduceOpsTest(test_util.TensorFlowTestCase,
     reduced = ragged_math_ops.reduce_mean(rt_input, axis=1)
     self.assertEqualWithNan(self.evaluate(reduced), expected)
 
-  # TFDML #25576413
-  @test_util.skip_dml
   def testMeanWithTensorInputs(self):
     tensor = [[1.0, 2.0, 3.0], [10.0, 20.0, 30.0]]
     expected = [2.0, 20.0]
     reduced = ragged_math_ops.reduce_mean(tensor, axis=1)
-    self.assertAllEqual(reduced, expected)
+    self.assertAllClose(reduced, expected)
 
   def testErrors(self):
     rt_input = ragged_factory_ops.constant([[1, 2, 3], [4, 5]])

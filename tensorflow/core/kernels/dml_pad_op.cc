@@ -49,8 +49,9 @@ struct SimplePad {
 template <typename Tpadding>
 absl::optional<SimplePad> SimplifyPad(const TensorShape& input_shape,
                                       const Tensor& paddings_tensor,
+                                      bool constant_pad,
                                       size_t min_output_size = 4,
-                                      size_t max_output_size = 5) {
+                                      size_t max_output_size = 8) {
   auto paddings = paddings_tensor.matrix<Tpadding>();
   DCHECK(input_shape.dims() == paddings.dimension(0));
 
@@ -64,14 +65,21 @@ absl::optional<SimplePad> SimplifyPad(const TensorShape& input_shape,
 
     // Coalesce subsequent non-padded dims into the current dim.
     int j = i + 1;
-    while (j < paddings.dimension(0) && paddings(j, 0) == 0 &&
-           paddings(j, 1) == 0) {
-      auto other_dim_size = static_cast<uint32_t>(input_shape.dim_size(j));
-      size *= other_dim_size;
-      start_pad *= other_dim_size;
-      end_pad *= other_dim_size;
-      j++;
+
+    // Constant padding can collapse adjacent non-padded and padded dimensions
+    // because there's a single value to be padded, but the padding values for
+    // reflect and symmetric depend on the shape.
+    if (constant_pad || (paddings(i, 0) == 0 && paddings(i, 1) == 0)) {
+      while (j < paddings.dimension(0) && paddings(j, 0) == 0 &&
+             paddings(j, 1) == 0) {
+        auto other_dim_size = static_cast<uint32_t>(input_shape.dim_size(j));
+        size *= other_dim_size;
+        start_pad *= other_dim_size;
+        end_pad *= other_dim_size;
+        j++;
+      }
     }
+
     i = j;
 
     simple_pad.in_shape.push_back(size);
@@ -194,11 +202,12 @@ class PadInitHelper : public InitializationHelper {
       output_shape_.AddDim(before_d + size_d + after_d);
     }
 
-    simple_pad_ = SimplifyPad<Tpadding>(input.shape(), paddings);
+    bool constant_pad = padding_mode_ == DML_PADDING_MODE_CONSTANT;
+    simple_pad_ = SimplifyPad<Tpadding>(input.shape(), paddings, constant_pad);
     OP_REQUIRES(ctx, simple_pad_.has_value(),
                 errors::InvalidArgument(
-                    "DML can only handle up to 5D padding, but the given shape "
-                    "and paddings cannot be simplified to 5D."));
+                    "DML can only handle up to 8D padding, but the given shape "
+                    "and paddings cannot be simplified to 8D."));
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
@@ -286,12 +295,6 @@ using PadWrapper =
                               .TypeConstraint<Tpadding>("Tpaddings") \
                               .HostMemory("paddings")                \
                               .HostMemory("constant_values"),        \
-                          PadWrapper<T, Tpadding>);                  \
-  REGISTER_KERNEL_BUILDER(Name("MirrorPad")                          \
-                              .Device(DEVICE_DML)                    \
-                              .TypeConstraint<T>("T")                \
-                              .TypeConstraint<Tpadding>("Tpaddings") \
-                              .HostMemory("paddings"),               \
                           PadWrapper<T, Tpadding>);
 
 #define REGISTER_PAD_KERNELS(T)  \
@@ -302,10 +305,27 @@ using PadWrapper =
 // along with other devices in pad_op.cc).
 TF_CALL_half(REGISTER_PAD_KERNELS);
 TF_CALL_float(REGISTER_PAD_KERNELS);
-TF_CALL_uint8(REGISTER_PAD_KERNELS);
-TF_CALL_uint16(REGISTER_PAD_KERNELS);
-TF_CALL_uint32(REGISTER_PAD_KERNELS);
 TF_CALL_int8(REGISTER_PAD_KERNELS);
-TF_CALL_int16(REGISTER_PAD_KERNELS);
+TF_CALL_uint8(REGISTER_PAD_KERNELS);
+#undef REGISTER_PAD_KERNEL
+#undef REGISTER_PAD_KERNELS
+
+#define REGISTER_PAD_KERNELS(T)                                   \
+  REGISTER_KERNEL_BUILDER(Name("MirrorPad")                       \
+                              .Device(DEVICE_DML)                 \
+                              .TypeConstraint<T>("T")             \
+                              .TypeConstraint<int32>("Tpaddings") \
+                              .HostMemory("paddings"),            \
+                          PadWrapper<T, int32>);                  \
+  REGISTER_KERNEL_BUILDER(Name("MirrorPad")                       \
+                              .Device(DEVICE_DML)                 \
+                              .TypeConstraint<T>("T")             \
+                              .TypeConstraint<int64>("Tpaddings") \
+                              .HostMemory("paddings"),            \
+                          PadWrapper<T, int64>);
+
+TF_CALL_half(REGISTER_PAD_KERNELS);
+TF_CALL_float(REGISTER_PAD_KERNELS);
+#undef REGISTER_PAD_KERNELS
 
 }  // namespace tensorflow

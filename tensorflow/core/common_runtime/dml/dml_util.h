@@ -22,13 +22,26 @@ limitations under the License.
 
 namespace tensorflow {
 
+// Attempts to create an IDMLDevice. Returns an empty ComPtr if unsuccessful.
+Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(
+    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags);
+
+// Creates an IDMLDevice. Logs a fatal error and aborts if unsuccessful.
 Microsoft::WRL::ComPtr<IDMLDevice> CreateDmlDevice(
     ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags);
 
 // Converts a DML tensor data type to a TF tensor data type and vice versa.
 DataType GetTfDataTypeFromDmlDataType(DML_TENSOR_DATA_TYPE type);
 DML_TENSOR_DATA_TYPE GetDmlDataTypeFromTfDataType(DataType type);
+
+// TFDML #24881131
 bool Is64BitIntegerType(DataType type);
+
+// TFDML #24881131
+bool Is64BitSignedIntegerType(DataType type);
+
+// TFDML #24881131
+bool Is64BitUnsignedIntegerType(DataType type);
 
 // Converts a TF TensorShape into an array of uint32_t, and validates that the
 // shape is representable as uint32_t. This is useful because shapes in TF are

@@ -862,7 +862,7 @@ class FunctionalOpsTest(test.TestCase):
     use_gpu = not rewrite_with_while
     with self.test_session(use_gpu=use_gpu):
 
-      @function.Defun(dtypes.int32, *[dtypes.float64] * 3)
+      @function.Defun(dtypes.int32, *[dtypes.float32] * 3)
       def MLP(i, a, ws, bs):
         a = math_ops.tanh(math_ops.matmul(a, ws[i, :]) + bs[i, :])
         return a, ws, bs
@@ -886,9 +886,9 @@ class FunctionalOpsTest(test.TestCase):
     # Each layer have the same number of hidden unites (3), and the
     # activation function is tanh().  We feed the input (xval) with
     # batch size 2.
-    xval = np.random.normal(size=(2, 3))
-    wsval = np.random.normal(size=(5, 3, 3))
-    bsval = np.random.normal(size=(5, 3))
+    xval = np.random.normal(size=(2, 3)).astype(np.float32)
+    wsval = np.random.normal(size=(5, 3, 3)).astype(np.float32)
+    bsval = np.random.normal(size=(5, 3)).astype(np.float32)
     np_ans = self._npMLP(xval, wsval, bsval)
     tf_for_ans = self._tfMLP(xval, wsval, bsval, rewrite_with_while)
     self.assertAllClose(np_ans, tf_for_ans)

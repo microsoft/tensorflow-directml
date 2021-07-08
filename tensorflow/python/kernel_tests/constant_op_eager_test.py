@@ -47,22 +47,9 @@ class ConstantTest(test.TestCase):
       self.assertAllEqual(np_ans, tf_ans)
 
   def _testGpu(self, x):
-    np_ans = np.array(x)
-
-    skip_devices = []
-
-    if np_ans.dtype not in [np.float16,
-                            np.float32,
-                            np.uint8,
-                            np.uint16,
-                            np.uint32,
-                            np.int8,
-                            np.int16,
-                            np.int32]:
-      skip_devices = ["DML"]
-
-    device = test_util.gpu_device_name(skip_devices=skip_devices)
+    device = test_util.gpu_device_name()
     if device:
+      np_ans = np.array(x)
       with context.device(device):
         tf_ans = ops.convert_to_tensor(x).numpy()
       if np_ans.dtype in [np.float32, np.float64, np.complex64, np.complex128]:
@@ -467,8 +454,6 @@ class OnesTest(test.TestCase):
   def testConst(self):
     self.assertTrue(np.array_equal(self._Ones([2, 3]), np.array([[1] * 3] * 2)))
 
-  # TFDML #25508969
-  @test_util.skip_dml
   def testScalar(self):
     self.assertEqual(1, self._Ones([]))
     self.assertEqual(1, self._Ones(()))
@@ -586,8 +571,6 @@ class FillTest(test.TestCase):
       with self.assertRaises(errors_impl.InvalidArgumentError):
         array_ops.fill(shape, 7)
 
-  # TFDML #25508951
-  @test_util.skip_dml
   def testShapeFunctionEdgeCases(self):
     # Non-vector dimensions.
     with self.assertRaises(errors_impl.InvalidArgumentError):

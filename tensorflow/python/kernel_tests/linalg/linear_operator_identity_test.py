@@ -367,8 +367,6 @@ class LinearOperatorScaledIdentityTest(
       with self.assertRaisesOpError("not self-adjoint"):
         self.evaluate(operator.assert_self_adjoint())
 
-  # TFDML #25579096
-  @test_util.skip_dml
   def test_float16_matmul(self):
     # float16 cannot be tested by base test class because tf.linalg.solve does
     # not work with float16.
@@ -378,7 +376,7 @@ class LinearOperatorScaledIdentityTest(
           num_rows=2, multiplier=multiplier)
       x = rng.randn(2, 3).astype(np.float16)
       y = operator.matmul(x)
-      self.assertAllClose(multiplier[..., None, None] * x, self.evaluate(y))
+      self.assertAllCloseAccordingToType(multiplier[..., None, None] * x, self.evaluate(y))
 
   def test_non_scalar_num_rows_raises_static(self):
     # Many "test_...num_rows" tests are performed in LinearOperatorIdentity.

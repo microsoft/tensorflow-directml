@@ -429,8 +429,6 @@ class MultiWorkerCrossDeviceOpsTest(multi_worker_test_base.MultiWorkerTestBase,
       ],
       mode=["graph"])
 
-  # TFDML #25509335
-  @test_util.skip_dml
   @combinations.generate(multi_worker_allreduce_combinations)
   def testReductionAndBroadcast(self, cross_device_ops, devices):
     # Mimic the default device of multi-worker strategies.

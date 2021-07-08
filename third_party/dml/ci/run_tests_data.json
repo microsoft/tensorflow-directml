@@ -9,11 +9,14 @@
       "pipDeps": [
         "numpy==1.18.5",
         "h5py<3.0.0",
-        "scipy",
-        "portpicker"
+        "scipy"
+      ],
+      "localPipDeps": [
+        "python_portpicker"
       ],
       "windowsPipDeps": [
-        "windows-curses"
+        "windows-curses",
+        "pyreadline"
       ],
       "isPythonTest": true
     },
@@ -21,6 +24,14 @@
       "script": "tfdml_test_runner.py",
       "arguments": {
         "--test_binaries_path": "test_binaries/core",
+        "--test_framework": "gtest"
+      },
+      "isPythonTest": false
+    },
+    "c": {
+      "script": "tfdml_test_runner.py",
+      "arguments": {
+        "--test_binaries_path": "test_binaries/c",
         "--test_framework": "gtest"
       },
       "isPythonTest": false

@@ -32,7 +32,7 @@ namespace tensorflow {
 class DmlKernelManagerTest : public ::testing::Test {
  public:
   DmlKernelManagerTest()
-      : ctx_(nullptr, nullptr, nullptr, nullptr, {}, nullptr),
+      : ctx_(nullptr, nullptr, nullptr, {}, nullptr),
         init_helper_(nullptr, nullptr),
         kernel_manager_() {}
 
@@ -280,6 +280,7 @@ TEST_F(DmlKernelManagerTest, QueueReference) {
   // fence = 1
   // kernel1 should be released
   DML_CHECK_SUCCEEDED(fence->Signal(1));
+  DML_CHECK_SUCCEEDED(fence->SetEventOnCompletion(1, nullptr));
   kernel_manager_.ReleaseCompletedReferences();
   EXPECT_TRUE(kernel1_weak.expired());
   EXPECT_TRUE(!kernel2_weak.expired());
@@ -287,6 +288,7 @@ TEST_F(DmlKernelManagerTest, QueueReference) {
   // fence = 2
   // Both kernels should be released
   DML_CHECK_SUCCEEDED(fence->Signal(2));
+  DML_CHECK_SUCCEEDED(fence->SetEventOnCompletion(2, nullptr));
   kernel_manager_.ReleaseCompletedReferences();
   EXPECT_TRUE(kernel1_weak.expired());
   EXPECT_TRUE(kernel2_weak.expired());

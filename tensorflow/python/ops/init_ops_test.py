@@ -181,6 +181,8 @@ class InitializersTest(test.TestCase):
 
     if test.is_built_with_rocm():
       self.skipTest('Disable subtest on ROCm due to missing QR op support')
+    if test.is_built_with_dml():
+      self.skipTest('Disable subtest on DirectML due to missing QR op support')
 
     with ops.Graph().as_default() as g:
       with ops.device(test_util.gpu_device_name()):

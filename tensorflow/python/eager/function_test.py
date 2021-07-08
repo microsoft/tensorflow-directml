@@ -1019,9 +1019,6 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
     y = f(x, x).cpu()
     self.assertAllEqual(y, [2.])
     
-  # DML doesn't support resource scatter/gather
-  # TFDML #25923582
-  @test_util.skip_dml
   @test_util.run_gpu_only
   @test_util.run_in_graph_and_eager_modes
   def testFunctionWithResourcesOnDifferentDevices(self):
@@ -1332,9 +1329,6 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
     with ops.device('cpu:1'):
       self.assertEqual(0., self.evaluate(default_graph_function()))
            
-  # Device placement in function tests doesn't appear to work correctly in DML
-  # TFDML #25980363
-  @test_util.skip_dml
   @test_util.run_gpu_only
   @test_util.run_in_graph_and_eager_modes
   def testColocateWithRespected(self):
@@ -2237,9 +2231,6 @@ class FunctionTest(test.TestCase, parameterized.TestCase):
         ValueError, 'All inputs to `ConcreteFunction`s must be Tensors;.*'):
       graph_function('Not a Tensor.')
       
-  # Device placement in function tests doesn't appear to work correctly in DML
-  # TFDML #25980363
-  @test_util.skip_dml
   def testSwapImplementationWithGrapplerPlugin(self):
     # Set the min_graph_nodes to -1 since the graph in this test is too small,
     # and will be ignored by grappler if don't set this.

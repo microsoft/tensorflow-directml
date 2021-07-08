@@ -53,13 +53,11 @@ class DmlDeepCopyKernel : public OpKernel {
 
     execution_context->ResourceBarrier(barriers);
 
-    constexpr uint64_t dst_offset = 0;
-    constexpr uint64_t src_offset = 0;
-
     execution_context->CopyBufferRegion(
-        output_buffer.Resource(), dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
-        input_buffer.Resource(), src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
-        input.TotalBytes());
+        output_buffer.Resource(), output_buffer.Offset(),
+        D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(),
+        input_buffer.Offset(), D3D12_RESOURCE_STATE_COPY_SOURCE,
+        output_buffer.SizeInBytes());
 
     for (auto& barrier : barriers) {
       std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
@@ -74,7 +72,9 @@ class DmlDeepCopyKernel : public OpKernel {
       Name("DeepCopy").Device(DEVICE_DML).TypeConstraint<TYPE>("T"), \
       DmlDeepCopyKernel);
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNEL);
+TF_CALL_half(DML_REGISTER_KERNEL);
+TF_CALL_float(DML_REGISTER_KERNEL);
+TF_CALL_int64(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow

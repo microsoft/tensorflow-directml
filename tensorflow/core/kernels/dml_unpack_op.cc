@@ -142,22 +142,6 @@ class DmlUnpackKernel : public DmlKernel {
     DML_OPERATOR_DESC op_desc = {DML_OPERATOR_SPLIT, &desc};
     Initialize(ctx, std::move(tensors), op_desc);
   }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    for (uint32_t i = 0; i < ctx->GetOutputCount(); ++i) {
-      Tensor* output = ctx->GetOutputTensor(i);
-
-      if (Is64BitIntegerType(output->dtype())) {
-        ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
-      }
-    }
-
-    return DmlKernel::Compute(ctx);
-  }
 };
 
 #define REGISTER_KERNEL(type)                                      \
@@ -169,13 +153,8 @@ class DmlUnpackKernel : public DmlKernel {
 // unpack_op.cc).
 TF_CALL_float(REGISTER_KERNEL);
 TF_CALL_half(REGISTER_KERNEL);
-TF_CALL_uint32(REGISTER_KERNEL);
-TF_CALL_uint16(REGISTER_KERNEL);
 TF_CALL_uint8(REGISTER_KERNEL);
-TF_CALL_int16(REGISTER_KERNEL);
-TF_CALL_int8(REGISTER_KERNEL);
 TF_CALL_bool(REGISTER_KERNEL);
-TF_CALL_uint64(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

@@ -201,8 +201,6 @@ class BatchTest(test_base.DatasetTestBase, parameterized.TestCase):
     ]
     self.assertDatasetProduces(dataset, expected_output=expected_output)
 
-  # TFDML #25561718
-  @test_util.skip_dml
   @combinations.generate(test_base.default_test_combinations())
   def testRaggedWithDifferentShapes(self):
     dataset = dataset_ops.Dataset.range(10).map(ragged_math_ops.range).batch(5)

@@ -188,8 +188,6 @@ class CoreLayerIntegrationTest(keras_parameterized.TestCase):
     pred_dataset = pred_dataset.map(pred_map_fn).batch(batch_size)
     model.predict(pred_dataset, verbose=2)
 
-  # TFDML #25564745
-  @tf_test_util.skip_dml
   @keras_parameterized.run_all_keras_modes(always_skip_v1=False)
   @parameterized.named_parameters(*OUTPUT_TEST_CASES)
   def test_model_loops(self, layer_to_test, input_shape, fuzz_dims,

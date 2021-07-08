@@ -19,6 +19,7 @@ from __future__ import division
 from __future__ import print_function
 
 import math
+import os
 
 from absl.testing import parameterized
 import numpy as np
@@ -27,6 +28,7 @@ from six.moves import xrange  # pylint: disable=redefined-builtin
 from tensorflow.python.eager import def_function
 from tensorflow.python.framework import constant_op
 from tensorflow.python.framework import dtypes
+from tensorflow.python.framework import errors
 from tensorflow.python.framework import ops
 from tensorflow.python.framework import tensor_spec
 from tensorflow.python.framework import test_util
@@ -1120,6 +1122,8 @@ class MomentsTest(test_lib.TestCase):
     self.doOutputTest((10, 10, 10, 30), (0, 1, 2))
 
   def testOutput4DInput123(self):
+    if os.name == "nt":
+      self.skipTest("This test doesn't work on Windows")
     self.doOutputTest((10, 10, 10, 30), (1, 2, 3))
 
 
@@ -1173,6 +1177,33 @@ class DataFormatDimMapTest(test_lib.TestCase):
       y_val = self.evaluate(y)
       self.assertAllEqual(y_val, y_val_expected)
 
+  def testNDHWCtoNCDHW(self):
+    x_val = [1, -4, -3, -2]
+    y_val_expected = [2, 2, 3, 4]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_dim_map(x, src_format="NDHWC", dst_format="NCDHW")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, y_val_expected)
+
+  def testNDHWCtoDHWNC(self):
+    x_val = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4]
+    y_val_expected = [3, 0, 1, 2, 4, 3, 0, 1, 2, 4]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_dim_map(x, src_format="NDHWC", dst_format="DHWNC")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, y_val_expected)
+
+  def testDNHWCtoWHDCN(self):
+    x_val = [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4]
+    y_val_expected = [4, 2, 1, 0, 3, 4, 2, 1, 0, 3]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_dim_map(x, src_format="NDHWC", dst_format="WHDCN")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, y_val_expected)
+
   def testArbitraryASCII(self):
     x_val = [-4, -3, -2, -1, 0, 1, 2, 3]
     y_val_expected = [3, 2, 1, 0, 3, 2, 1, 0]
@@ -1181,6 +1212,46 @@ class DataFormatDimMapTest(test_lib.TestCase):
     with test_util.use_gpu():
       y_val = self.evaluate(y)
       self.assertAllEqual(y_val, y_val_expected)
+
+  @test_util.disable_xla("XLA catches the error and rethrows as different one")
+  def testInvalidLength(self):
+    x = [-4, -3, -2, -1, 0, 1, 2, 3]
+    with self.assertRaisesRegex(errors.InvalidArgumentError,
+                                "Source format must be of length 4 or 5"):
+      op = nn_ops.data_format_dim_map(
+          x, src_format="12345678", dst_format="87654321")
+      with test_util.use_gpu():
+        self.evaluate(op)
+
+  @test_util.disable_xla("XLA catches the error and rethrows as different one")
+  def testDuplicateSrc(self):
+    x = [-4, -3, -2, -1, 0, 1, 2, 3]
+    with self.assertRaisesRegex(
+        errors.InvalidArgumentError,
+        "Destination and source format must determine a permutation"):
+      op = nn_ops.data_format_dim_map(x, src_format="1233", dst_format="4321")
+      with test_util.use_gpu():
+        self.evaluate(op)
+
+  @test_util.disable_xla("XLA catches the error and rethrows as different one")
+  def testDuplicateDst(self):
+    x = [-4, -3, -2, -1, 0, 1, 2, 3]
+    with self.assertRaisesRegex(
+        errors.InvalidArgumentError,
+        "Destination and source format must determine a permutation"):
+      op = nn_ops.data_format_dim_map(x, src_format="1234", dst_format="3321")
+      with test_util.use_gpu():
+        self.evaluate(op)
+
+  @test_util.disable_xla("XLA catches the error and rethrows as different one")
+  def testExtraSpecifiers(self):
+    x = [-4, -3, -2, -1, 0, 1, 2, 3]
+    with self.assertRaisesRegex(
+        errors.InvalidArgumentError,
+        "Destination and source format must determine a permutation"):
+      op = nn_ops.data_format_dim_map(x, src_format="1234", dst_format="5321")
+      with test_util.use_gpu():
+        self.evaluate(op)
 
 
 class DataFormatVectorPermuteTest(test_lib.TestCase):
@@ -1193,6 +1264,66 @@ class DataFormatVectorPermuteTest(test_lib.TestCase):
       y_val = self.evaluate(y)
       self.assertAllEqual(y_val, [7, 3, 4, 9])
 
+  def testNHWCToNCHW_Size2(self):
+    x_val = [4, 9]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(x)
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [4, 9])
+
+  def testNDHWCtoNCDHW(self):
+    x_val = [7, 4, 9, 3, 5]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="NDHWC", dst_format="NCDHW")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [7, 5, 4, 9, 3])
+
+  def testNDHWCtoNCDHW_Size3(self):
+    x_val = [4, 9, 3]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="NDHWC", dst_format="NCDHW")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [4, 9, 3])
+
+  def testNHWCToWHCN(self):
+    x_val = [7, 4, 9, 3]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(x, src_format="NHWC", dst_format="WHCN")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [9, 4, 3, 7])
+
+  def testNHWCToWHCN_Size2(self):
+    x_val = [4, 9]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(x, src_format="NHWC", dst_format="WHCN")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [9, 4])
+
+  def testNDHWCToWHDCN(self):
+    x_val = [7, 4, 9, 3, 5]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="NDHWC", dst_format="WHDCN")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [3, 9, 4, 5, 7])
+
+  def testNDHWCToWHDCN_Size3(self):
+    x_val = [4, 9, 3]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="NDHWC", dst_format="WHDCN")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [3, 9, 4])
+
   def testNCHWToNHWC(self):
     x_val = [7, 4, 9, 3]
     x = constant_op.constant(x_val)
@@ -1200,6 +1331,31 @@ class DataFormatVectorPermuteTest(test_lib.TestCase):
     with test_util.use_gpu():
       y_val = self.evaluate(y)
       self.assertAllEqual(y_val, [7, 9, 3, 4])
+
+  def testNCHWToNHWC_Size2(self):
+    x_val = [9, 3]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(x, src_format="NCHW", dst_format="NHWC")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [9, 3])
+
+  def testNCDHWToNDHWC(self):
+    x_val = [7, 4, 9, 3, 5]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(x, src_format="NCDHW", dst_format="NDHWC")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [7, 9, 3, 5, 4])
+
+  def testNCDHWToNDHWC_Size3(self):
+    x_val = [9, 3, 5]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="NCDHW", dst_format="NDHWC")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [9, 3, 5])
 
   def testNHWCToHWNC(self):
     x_val = [7, 4, 9, 3]
@@ -1248,6 +1404,85 @@ class DataFormatVectorPermuteTest(test_lib.TestCase):
     with test_util.use_gpu():
       y_val = self.evaluate(y)
       self.assertAllEqual(y_val, [[7, 4], [4, 5], [5, 1], [9, 3]])
+
+  def testNDHWCToNCDHW2D(self):
+    x_val = [[7, 4], [9, 3], [4, 5], [5, 1], [8, 2]]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="NDHWC", dst_format="NCDHW")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [[7, 4], [8, 2], [9, 3], [4, 5], [5, 1]])
+
+  def testNDHWCToDHWNC2D(self):
+    x_val = [[7, 4], [9, 3], [4, 5], [5, 1], [8, 2]]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="NDHWC", dst_format="DHWNC")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [[9, 3], [4, 5], [5, 1], [7, 4], [8, 2]])
+
+  def testDHWNCToNDHWC2D(self):
+    x_val = [[7, 4], [9, 3], [4, 5], [5, 1], [8, 2]]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="DHWNC", dst_format="NDHWC")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [[5, 1], [7, 4], [9, 3], [4, 5], [8, 2]])
+
+  def testNCDHWToNDHWC2D(self):
+    x_val = [[7, 4], [9, 3], [4, 5], [5, 1], [8, 2]]
+    x = constant_op.constant(x_val)
+    y = nn_ops.data_format_vec_permute(
+        x, src_format="NCDHW", dst_format="NDHWC")
+    with test_util.use_gpu():
+      y_val = self.evaluate(y)
+      self.assertAllEqual(y_val, [[7, 4], [4, 5], [5, 1], [8, 2], [9, 3]])
+
+  @test_util.disable_xla("XLA catches the error and rethrows as different one")
+  def testInvalidLength(self):
+    x = [0, 1, 2, 3]
+    with self.assertRaisesRegex(errors.InvalidArgumentError,
+                                "Source format must be of length 4 or 5"):
+      op = nn_ops.data_format_vec_permute(
+          x, src_format="12345678", dst_format="87654321")
+      with test_util.use_gpu():
+        self.evaluate(op)
+
+  @test_util.disable_xla("XLA catches the error and rethrows as different one")
+  def testDuplicateSrc(self):
+    x = [0, 1, 2, 3]
+    with self.assertRaisesRegex(
+        errors.InvalidArgumentError,
+        "Destination and source format must determine a permutation"):
+      op = nn_ops.data_format_vec_permute(
+          x, src_format="1233", dst_format="4321")
+      with test_util.use_gpu():
+        self.evaluate(op)
+
+  @test_util.disable_xla("XLA catches the error and rethrows as different one")
+  def testDuplicateDst(self):
+    x = [0, 1, 2, 3]
+    with self.assertRaisesRegex(
+        errors.InvalidArgumentError,
+        "Destination and source format must determine a permutation"):
+      op = nn_ops.data_format_vec_permute(
+          x, src_format="1234", dst_format="3321")
+      with test_util.use_gpu():
+        self.evaluate(op)
+
+  @test_util.disable_xla("XLA catches the error and rethrows as different one")
+  def testExtraSpecifiers(self):
+    x = [0, 1, 2, 3]
+    with self.assertRaisesRegex(
+        errors.InvalidArgumentError,
+        "Destination and source format must determine a permutation"):
+      op = nn_ops.data_format_vec_permute(
+          x, src_format="1234", dst_format="5321")
+      with test_util.use_gpu():
+        self.evaluate(op)
 
 
 @test_util.run_all_in_graph_and_eager_modes

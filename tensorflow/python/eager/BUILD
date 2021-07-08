@@ -261,7 +261,6 @@ cuda_py_test(
     tags = [
         "no_mac",  # fails on this branch
         "no_rocm",
-        "no_windows",  #TODO(b/139745667)
     ],
     xla_enable_strict_auto_jit = True,
 )
@@ -274,6 +273,10 @@ cuda_py_test(
         ":test",
     ],
     shard_count = 5,
+    tags = [
+        "no_oss",  # fails on this branch
+        "no_pip",  # fails on this branch
+    ],
     xla_enable_strict_auto_jit = True,
 )
 
@@ -692,6 +695,8 @@ cuda_py_test(
     tags = [
         "no_mac",
         "no_windows",
+        # XLA support is not enabled in DML builds
+        "no_dml",
     ],
     xla_enabled = True,
 )

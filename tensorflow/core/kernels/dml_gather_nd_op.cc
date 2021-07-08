@@ -17,8 +17,10 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_operator_helper.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/framework/register_types.h"
+#include "tensorflow/core/framework/resource_var.h"
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
+#include "tensorflow/core/lib/gtl/cleanup.h"
 
 namespace tensorflow {
 
@@ -29,7 +31,14 @@ class GatherNdInitHelper : public InitializationHelper {
 
   explicit GatherNdInitHelper(OpKernelContext* ctx,
                               std::shared_ptr<const Attributes> attr) {
-    const Tensor& params = ctx->input(0);
+    if (ctx->input(0).dtype() == DT_RESOURCE) {
+      OP_REQUIRES_OK(
+          ctx, LookupResource(ctx, HandleFromInput(ctx, 0), &params_resource_));
+      params_resource_->mu()->lock_shared();
+      locked_ = true;
+    }
+
+    const Tensor params = GetParamsTensor(ctx);
     const Tensor& indices = ctx->input(1);
 
     OP_REQUIRES(ctx, TensorShapeUtils::IsVectorOrHigher(params.shape()),
@@ -105,7 +114,7 @@ class GatherNdInitHelper : public InitializationHelper {
 
   bool IsNoOpKernel(OpKernelContext* ctx,
                     absl::Span<const TensorShape> output_shapes) const final {
-    const Tensor& params = ctx->input(0);
+    const Tensor params = GetParamsTensor(ctx);
     const Tensor& indices = ctx->input(1);
 
     int64 indices_leading_dims = 1;
@@ -124,8 +133,28 @@ class GatherNdInitHelper : public InitializationHelper {
 
   TensorShape GetOutputShape() const { return output_shape_; }
 
+  Tensor GetParamsTensor(OpKernelContext* ctx) const {
+    if (ctx->input(0).dtype() == DT_RESOURCE) {
+      return params_resource_ ? *params_resource_->tensor()
+                              : ctx->mutable_input(0, false);
+    } else {
+      return ctx->input(0);
+    }
+  }
+
+  void Unlock() const {
+    if (params_resource_ && locked_) {
+      params_resource_->mu()->unlock_shared();
+      locked_ = false;
+    }
+  }
+
+  virtual ~GatherNdInitHelper() { Unlock(); }
+
  private:
   TensorShape output_shape_;
+  core::RefCountPtr<Var> params_resource_;
+  mutable bool locked_ = false;
 };
 
 template <typename TIndex>
@@ -147,7 +176,10 @@ class DmlGatherNdKernel : public DmlKernel {
   using InitHelper = GatherNdInitHelper<TIndex>;
 
   DmlGatherNdKernel(DmlKernelConstruction* ctx, const InitHelper* init_helper) {
-    const TensorShape& params_shape = ctx->GetInputTensorShape(0);
+    const Tensor params =
+        init_helper->GetParamsTensor(ctx->GetOpKernelContext());
+
+    const TensorShape& params_shape = params.shape();
     const TensorShape& indices_shape = ctx->GetInputTensorShape(1);
     const TensorShape& output_shape = ctx->GetOutputTensorShape(0);
 
@@ -198,12 +230,14 @@ class DmlGatherNdKernel : public DmlKernel {
     DmlTensorInfo params_tensor;
     params_tensor.kernel_index = 0;
     params_tensor.desc = DmlTensorDesc::Create(
-        ctx->GetInputDataType(0), flat_params_shape, flat_params_shape);
+        params.dtype(), flat_params_shape, flat_params_shape);
 
     DmlTensorInfo output_tensor;
     output_tensor.kernel_index = 0;
     output_tensor.desc = DmlTensorDesc::Create(
         ctx->GetOutputDataType(0), flat_output_shape, flat_output_shape);
+
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
     // When the indices' last dimension is 0, we gather the entire tensor
     if (last_indices_dim == 0) {
@@ -212,11 +246,14 @@ class DmlGatherNdKernel : public DmlKernel {
       tensors.outputs = {output_tensor};
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
-
-      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto params = dml::InputTensor(scope, 0, input_descs[0]);
       auto result = dml::Tile(
           params, {static_cast<uint32_t>(indices_leading_dims), 1, 1, 1});
+
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(result);
+      }
 
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
@@ -233,32 +270,68 @@ class DmlGatherNdKernel : public DmlKernel {
       tensors.outputs = {output_tensor};
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto output_descs = GetDmlTensorDescs(tensors.outputs);
+      auto params = dml::InputTensor(scope, 0, input_descs[0]);
+      auto indices = dml::InputTensor(scope, 1, input_descs[1]);
 
-      DML_GATHER_ND_OPERATOR_DESC gather_nd_desc = {};
-      gather_nd_desc.InputTensor = &input_descs[0];
-      gather_nd_desc.IndicesTensor = &input_descs[1];
-      gather_nd_desc.OutputTensor = &output_descs[0];
-      gather_nd_desc.InputDimensionCount = flat_params_shape.dims();
-      gather_nd_desc.IndicesDimensionCount = flat_indices_shape.dims();
+      auto result = dml::GatherND(params, indices, flat_params_shape.dims(),
+                                  flat_indices_shape.dims(), 0);
 
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_GATHER_ND, &gather_nd_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(result);
+      }
+
+      Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+          scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+      Initialize(ctx, std::move(tensors), compiled_op.Get());
     }
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
+    auto init_helper = ctx->GetInitializationHelper<InitHelper>();
 
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    auto lock_cleanup =
+        gtl::MakeCleanup([init_helper] { init_helper->Unlock(); });
+
+    const Tensor params_tensor =
+        init_helper->GetParamsTensor(ctx->GetOpKernelContext());
+
+    const Tensor& indices_tensor = ctx->GetInputTensor(1);
+    int64 last_indices_dim = indices_tensor.dim_size(indices_tensor.dims() - 1);
+
+    // Create input buffers
+    absl::InlinedVector<D3D12BufferRegion, 2> input_buffers;
+    input_buffers.push_back(ctx->CreateBufferForTensor(params_tensor));
+
+    // Create input bindings
+    absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 2> input_bindings;
+    input_bindings.push_back(input_buffers[0].GetBufferBinding());
+
+    // When last_indices_dim == 0, we use a tile instead of a gather, and
+    // therefore we don't need a second input
+    if (last_indices_dim != 0) {
+      input_buffers.push_back(ctx->CreateBufferForTensor(indices_tensor));
+      input_bindings.push_back(input_buffers[1].GetBufferBinding());
     }
 
-    return DmlKernel::Compute(ctx);
+    DmlGpuEvent gpu_event;
+    absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 1> output_bindings;
+
+    Tensor* output = ctx->GetOutputTensor(0);
+
+    D3D12BufferRegion output_buffer = ctx->CreateBufferForTensor(*output);
+
+    output_bindings.push_back(output_buffer.GetBufferBinding());
+
+    auto status_or_event =
+        DmlKernel::Compute(ctx, input_bindings, output_bindings);
+    if (!status_or_event.ok()) {
+      return status_or_event;
+    }
+
+    gpu_event = ctx->InsertUavBarrier();
+    return gpu_event;
   }
 };
 
@@ -278,7 +351,28 @@ using DmlGatherNdWrapper =
                               .TypeConstraint<int64>("Tindices"), \
                           DmlGatherNdWrapper<int64>)
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNELS);
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
+TF_CALL_int32(DML_REGISTER_KERNELS);
+TF_CALL_int64(DML_REGISTER_KERNELS);
+#undef DML_REGISTER_KERNELS
+
+#define DML_REGISTER_KERNELS(type)                                \
+  REGISTER_KERNEL_BUILDER(Name("ResourceGatherNd")                \
+                              .Device(DEVICE_DML)                 \
+                              .HostMemory("resource")             \
+                              .TypeConstraint<type>("dtype")      \
+                              .TypeConstraint<int32>("Tindices"), \
+                          DmlGatherNdWrapper<int32>)              \
+  REGISTER_KERNEL_BUILDER(Name("ResourceGatherNd")                \
+                              .Device(DEVICE_DML)                 \
+                              .HostMemory("resource")             \
+                              .TypeConstraint<type>("dtype")      \
+                              .TypeConstraint<int64>("Tindices"), \
+                          DmlGatherNdWrapper<int64>)
+
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 }  // namespace tensorflow

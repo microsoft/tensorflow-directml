@@ -1620,8 +1620,6 @@ class BackendCrossEntropyLossesTest(test.TestCase):
         t, p, from_logits=True, axis=0),
     self.assertArrayNear(self.evaluate(result)[0], [.002, 0, .17], 1e-3)
 
-  # TFDML #25611034
-  @test_util.skip_dml
   @test_util.run_in_graph_and_eager_modes
   def test_sparse_categorical_crossentropy_loss_with_unknown_rank_tensor(self):
     t = keras.backend.placeholder()

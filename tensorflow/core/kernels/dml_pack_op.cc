@@ -140,30 +140,26 @@ class DmlPackKernel : public DmlKernel {
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
 
-    DML_JOIN_OPERATOR_DESC desc = {};
-    desc.Axis = kNchwDimensionCount - 2;
-    desc.InputCount = inputs.size();
-    desc.InputTensors = inputs.data();
-    desc.OutputTensor = outputs.data();
+    std::vector<dml::Expression> input_tensors;
+    input_tensors.reserve(inputs.size());
 
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_JOIN, &desc};
-    Initialize(ctx, std::move(tensors), op_desc);
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    for (int i = 0; i < inputs.size(); ++i) {
+      input_tensors.push_back(dml::InputTensor(scope, i, inputs[i]));
     }
 
-    return DmlKernel::Compute(ctx);
+    auto result = dml::Join(input_tensors, kNchwDimensionCount - 2);
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
@@ -173,7 +169,11 @@ class DmlPackKernel : public DmlKernel {
       DmlKernelWrapper<DmlPackKernel, PackShapeHelper>)
 
 // TODO(b/25387198): A special kernel exists for int32 (see pack_op.cc).
-TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_int64(REGISTER_KERNEL);
+TF_CALL_int16(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

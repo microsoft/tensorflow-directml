@@ -167,12 +167,20 @@ class DmlKernel {
   absl::InlinedVector<D3D12BufferRegion, 4> CreateOutputBuffers(
       DmlKernelContext* ctx) const;
 
+  // Same as Compute(), except that it allows for custom input/output bindings.
+  StatusOr<DmlGpuEvent> Compute(
+      DmlKernelContext* ctx,
+      absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
+      absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings)
+      const;
+
   const DML_BUFFER_BINDING* GetPersistentResourceBinding() const;
 
   IDMLCompiledOperator* GetCompiledOp() const { return compiled_op_.Get(); }
 
  private:
   Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op_;
+
   DmlBuffer persistent_resource_;
   absl::optional<DML_BUFFER_BINDING> persistent_resource_binding_;
   std::shared_ptr<const InitializationHelper> init_helper_;
@@ -206,17 +214,6 @@ template <typename T>
 struct TfTensorTypeTraits;
 
 template <>
-struct TfTensorTypeTraits<float> {
-  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_FLOAT32;
-  static float FromFloat(float val) { return val; }
-  static DML_SCALAR_UNION ToDmlScalar(float val) {
-    DML_SCALAR_UNION scalar;
-    scalar.Float32 = val;
-    return scalar;
-  }
-};
-
-template <>
 struct TfTensorTypeTraits<Eigen::half> {
   static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_FLOAT16;
   static Eigen::half FromFloat(float val) {
@@ -230,11 +227,22 @@ struct TfTensorTypeTraits<Eigen::half> {
 };
 
 template <>
-struct TfTensorTypeTraits<uint32_t> {
-  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_UINT32;
-  static DML_SCALAR_UNION ToDmlScalar(uint32_t val) {
+struct TfTensorTypeTraits<float> {
+  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_FLOAT32;
+  static float FromFloat(float val) { return val; }
+  static DML_SCALAR_UNION ToDmlScalar(float val) {
     DML_SCALAR_UNION scalar;
-    scalar.UInt32 = val;
+    scalar.Float32 = val;
+    return scalar;
+  }
+};
+
+template <>
+struct TfTensorTypeTraits<uint8_t> {
+  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_UINT8;
+  static DML_SCALAR_UNION ToDmlScalar(uint8_t val) {
+    DML_SCALAR_UNION scalar;
+    scalar.UInt8 = val;
     return scalar;
   }
 };
@@ -250,6 +258,16 @@ struct TfTensorTypeTraits<uint16_t> {
 };
 
 template <>
+struct TfTensorTypeTraits<uint32_t> {
+  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_UINT32;
+  static DML_SCALAR_UNION ToDmlScalar(uint32_t val) {
+    DML_SCALAR_UNION scalar;
+    scalar.UInt32 = val;
+    return scalar;
+  }
+};
+
+template <>
 struct TfTensorTypeTraits<int32_t> {
   static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_INT32;
   static DML_SCALAR_UNION ToDmlScalar(int32_t val) {
@@ -259,23 +277,40 @@ struct TfTensorTypeTraits<int32_t> {
   }
 };
 
+template <>
+struct TfTensorTypeTraits<int64_t> {
+  static constexpr DML_TENSOR_DATA_TYPE dml_type = DML_TENSOR_DATA_TYPE_INT64;
+  static DML_SCALAR_UNION ToDmlScalar(int64_t val) {
+    DML_SCALAR_UNION scalar;
+    scalar.Int64 = val;
+    return scalar;
+  }
+};
+
 }  // namespace tensorflow
 
 // Extends DirectMLX with tensorflow helpers
 namespace dml {
 
+DML_SCALAR_UNION ScalarUnion(double value, DML_TENSOR_DATA_TYPE data_type);
+
 template <typename T>
 Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
+  dml::TensorDesc::Dimensions scalar_dims(sizes.size(), 1);
+  dml::TensorDesc::Dimensions scalar_strides(sizes.size(), 0);
+
   auto scalar = dml::Reinterpret(
       dml::FillValueConstant(
-          scope, dml::TensorDesc::Dimensions{1, 1, 1, 1},
-          tensorflow::TfTensorTypeTraits<T>::dml_type,
+          scope, scalar_dims, tensorflow::TfTensorTypeTraits<T>::dml_type,
           tensorflow::TfTensorTypeTraits<T>::ToDmlScalar(value)),
-      sizes,                                  /* broadcast shape */
-      dml::TensorDesc::Dimensions{0, 0, 0, 0} /* broadcast strides */
+      sizes,         /* broadcast shape */
+      scalar_strides /* broadcast strides */
   );
   return scalar;
 }
+
+// TFDML #24881131
+Expression ConvertInt32ToInt64(Expression int32_tensor);
 
 template <typename T>
 Expression Sequence(Graph& scope, T start, T step,

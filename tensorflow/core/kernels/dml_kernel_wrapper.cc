@@ -17,6 +17,7 @@ limitations under the License.
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 
 #include "tensorflow/core/common_runtime/dml/dml_operator_helper.h"
+#include "tensorflow/core/common_runtime/dml/dml_tracing.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 
 namespace tensorflow {
@@ -28,6 +29,9 @@ DmlKernelWrapperBase::DmlKernelWrapperBase(OpKernelConstruction* ctx,
       node_def_(std::make_shared<NodeDef>(ctx->def())) {}
 
 void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
+  DmlTracing::Instance().LogKernelCompute(ctx->op_kernel().type_string(),
+                                          ctx->op_kernel().name());
+
   const DmlDevice* dml_device = static_cast<const DmlDevice*>(ctx->device());
   const DmlKernelManager& kernel_manager = *dml_device->GetKernelManager();
 
@@ -99,9 +103,40 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
       return;
     }
 
+    std::vector<std::pair<int, int>> forwardIndices;
+    forwardIndices.reserve(ctx->num_outputs());
+
+    for (int i = 0; i < ctx->num_outputs(); ++i) {
+      absl::optional<int> inputIndexToForward =
+          shared_helper->GetForwardableInputIndex(ctx, output_shapes, i);
+      // If the input is considered forwardable for the op, and the shapes match
+      if (inputIndexToForward) {
+        forwardIndices.emplace_back(
+            std::make_pair(inputIndexToForward.value(), i));
+      } else {
+        // If not all outputs are forwardable, we will forward nothing and
+        // proceed with the kernel normally.
+        forwardIndices.clear();
+        break;
+      }
+    }
+
+    // If we are forwarding (if this vector is not empty)
+    if (!forwardIndices.empty()) {
+      for (size_t i = 0U; i < forwardIndices.size(); ++i) {
+        int inputIndex = forwardIndices[i].first;
+        int outputIndex = forwardIndices[i].second;
+        const Tensor& input = ctx->input_is_ref(inputIndex)
+                                  ? ctx->mutable_input(inputIndex, false)
+                                  : ctx->input(inputIndex);
+        ctx->set_output(outputIndex, input);
+      }
+
+      return;
+    }
+
     DmlKernelConstruction dml_construction(dml_device, ctx, node_def_.get(),
-                                           shape_helper, output_shapes,
-                                           shared_helper);
+                                           output_shapes, shared_helper);
 
     if (cache_policy_ == DmlKernelCachePolicy::Never) {
       // This kernel has requested to never be cached; create a new one

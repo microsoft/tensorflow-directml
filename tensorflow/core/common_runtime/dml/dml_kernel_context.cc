@@ -29,13 +29,11 @@ namespace tensorflow {
 
 DmlKernelConstruction::DmlKernelConstruction(
     const DmlDevice* device, OpKernelContext* op_ctx, const NodeDef* def,
-    const ShapeHelper* shape_helper,
     absl::Span<const TensorShape> output_shapes,
     std::shared_ptr<const InitializationHelper> init_helper)
     : device_(device),
       op_ctx_(op_ctx),
       def_(def),
-      shape_helper_(shape_helper),
       output_shapes_(output_shapes),
       init_helper_(init_helper) {}
 
@@ -65,29 +63,38 @@ D3D12BufferRegion DmlKernelConstruction::CreateBufferForTensor(
   return dml_util::CreateBufferForTensor(device_, tensor);
 }
 
-void DmlKernelConstruction::InitializeOperator(
-    IDMLCompiledOperator* op,
-    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
-    absl::Span<const DML_BUFFER_BINDING> input_bindings) {
-  // Set up the persistent resource binding
-  DML_BINDING_DESC persistent_binding_desc = {};
+DescriptorAllocation DmlKernelConstruction::AllocateDescriptors(
+    size_t size_in_descriptors) const {
+  return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
+}
+
+void DmlKernelConstruction::EnqueueCallbackForGpuEvent(
+    DmlGpuEvent gpu_event, std::function<void()> callback) const {
+  device_->GetEventQueue()->Enqueue(std::move(gpu_event), std::move(callback));
+}
+
+DmlGpuEvent DmlKernelConstruction::BindAndInitializeOperator(
+    IDMLOperatorInitializer* initializer,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+    ID3D12DescriptorHeap* heap_for_binding_table,
+    _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
+    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding) {
+  // Bind the temporary resource
+  if (temporary_resource_binding) {
+    DML_BINDING_DESC temporary_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                                               temporary_resource_binding};
+    binding_table->BindTemporaryResource(&temporary_binding_desc);
+  }
+
+  // Bind the persistent resource
   if (persistent_resource_binding) {
-    persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
-                               persistent_resource_binding};
+    DML_BINDING_DESC persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                                                persistent_resource_binding};
+    binding_table->BindOutputs(1, &persistent_binding_desc);
   }
 
-  // Set up the input array binding, if necessary. This is used if OWNED_BY_DML
-  // is specified.
-  DML_BUFFER_ARRAY_BINDING input_array_binding = {};
-  DML_BINDING_DESC input_binding_desc = {};
-  if (!input_bindings.empty()) {
-    input_array_binding.Bindings = input_bindings.data();
-    input_array_binding.BindingCount = static_cast<UINT>(input_bindings.size());
-    input_binding_desc = {DML_BINDING_TYPE_BUFFER_ARRAY, &input_array_binding};
-  }
-
-  device_->GetExecutionContext()->InitializeOperator(
-      op, persistent_binding_desc, input_binding_desc);
+  return device_->GetExecutionContext()->InitializeOperator(
+      initializer, std::move(binding_table), heap_for_binding_table);
 }
 
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {
@@ -182,17 +189,39 @@ D3D12BufferRegion DmlKernelContext::CreateBufferForTensor(
   return dml_util::CreateBufferForTensor(device_, tensor);
 }
 
-DmlGpuEvent DmlKernelContext::ExecuteOperator(
+DescriptorAllocation DmlKernelContext::AllocateDescriptors(
+    size_t size_in_descriptors) const {
+  return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
+}
+
+void DmlKernelContext::EnqueueCallbackForGpuEvent(
+    DmlGpuEvent gpu_event, std::function<void()> callback) const {
+  device_->GetEventQueue()->Enqueue(std::move(gpu_event), std::move(callback));
+}
+
+DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
     IDMLCompiledOperator* op,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+    ID3D12DescriptorHeap* heap_for_binding_table,
+    _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
     _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
     absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
     absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings) {
-  // Set up the persistent resource binding
-  DML_BINDING_DESC persistent_binding_desc = {};
+  // Bind the temporary resource
+  DML_BINDING_DESC temporary_binding_desc = {DML_BINDING_TYPE_NONE, nullptr};
+  if (temporary_resource_binding) {
+    temporary_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                              temporary_resource_binding};
+  }
+  binding_table->BindTemporaryResource(&temporary_binding_desc);
+
+  // Bind the persistent resource
+  DML_BINDING_DESC persistent_binding_desc = {DML_BINDING_TYPE_NONE, nullptr};
   if (persistent_resource_binding) {
     persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
                                persistent_resource_binding};
   }
+  binding_table->BindPersistentResource(&persistent_binding_desc);
 
   // Set up the input bindings
   absl::InlinedVector<DML_BINDING_DESC, 8> input_binding_descs;
@@ -204,6 +233,8 @@ DmlGpuEvent DmlKernelContext::ExecuteOperator(
 
     input_binding_descs.push_back(desc);
   }
+  binding_table->BindInputs(static_cast<UINT>(input_binding_descs.size()),
+                            input_binding_descs.data());
 
   // Set up the output bindings
   absl::InlinedVector<DML_BINDING_DESC, 4> output_binding_descs;
@@ -215,9 +246,11 @@ DmlGpuEvent DmlKernelContext::ExecuteOperator(
 
     output_binding_descs.push_back(desc);
   }
+  binding_table->BindOutputs(static_cast<UINT>(output_binding_descs.size()),
+                             output_binding_descs.data());
 
   return device_->GetExecutionContext()->ExecuteOperator(
-      op, persistent_binding_desc, input_binding_descs, output_binding_descs);
+      op, std::move(binding_table), heap_for_binding_table);
 }
 
 DmlGpuEvent DmlKernelContext::GetCurrentCompletionEvent() const {
@@ -253,10 +286,7 @@ DmlGpuEvent DmlKernelContext::ZeroBuffer(const D3D12BufferRegion& dst) const {
 }
 
 DmlGpuEvent DmlKernelContext::InsertUavBarrier() const {
-  D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
-
-  return device_->GetExecutionContext()->ResourceBarrier(
-      absl::Span<D3D12_RESOURCE_BARRIER>(&barrier, 1));
+  return device_->GetExecutionContext()->UavBarrier();
 }
 
 DmlGpuEvent DmlKernelContext::FillBufferWithPattern(

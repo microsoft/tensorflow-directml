@@ -368,7 +368,7 @@ class SparseTensorInputTest(keras_parameterized.TestCase):
         self.assertAllEqual(expected_output, result)
       if action == "evaluate":
         result = model.evaluate(input_data, expected_output, **kwargs)
-        self.assertAllEqual(1.0, result[-1])
+        self.assertAllClose(1.0, result[-1])
       if action == "fit":
         # TODO(momernick): What's the best way of validating that fit happened?
         _ = model.fit(input_data, expected_output, shuffle=False, **kwargs)
@@ -423,7 +423,7 @@ class ScipySparseTensorInputTest(keras_parameterized.TestCase,
         ([5, 6, 7, 8], ([0, 1, 1, 2], [0, 0, 1, 1])), shape=[3, 3])
     expected_output_2 = np.array([[5, -1, -1], [6, 7, -1], [-1, 8, -1]])
     output_2 = model.evaluate(input_data_2, expected_output_2, steps=1)
-    self.assertAllEqual(1.0, output_2[-1])
+    self.assertAllClose(1.0, output_2[-1])
 
   def test_sparse_scipy_predict_input_dicts_via_input_layer_args(self):
     # Create a model that accepts a sparse input and converts the sparse tensor
@@ -490,7 +490,7 @@ class ScipySparseTensorInputTest(keras_parameterized.TestCase,
     }
     expected_output_2 = np.array([[5, -1, -1], [6, 7, -1], [-1, 8, -1]])
     output_2 = model.evaluate(input_data_2, expected_output_2, steps=1)
-    self.assertAllEqual(1.0, output_2[-1])
+    self.assertAllClose(1.0, output_2[-1])
 
 
 @keras_parameterized.run_with_all_model_types

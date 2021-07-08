@@ -19,10 +19,12 @@ limitations under the License.
 #include "tensorflow/core/framework/register_types.h"
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
+#include "tensorflow/core/kernels/random_op.h"
 #include "tensorflow/core/kernels/stateless_random_ops.h"
 #include "tensorflow/core/util/guarded_philox_random.h"
 
 namespace tensorflow {
+using CPUDevice = Eigen::ThreadPoolDevice;
 
 // Helpers to convert random uniform bits to a real uniform distribution. This
 // approach outputs a floating-point value with sign=0 (positive), exponent=2^0,
@@ -75,6 +77,36 @@ dml::Expression UniformHalf(dml::Graph& scope, dml::Expression input_state,
   return dml::Reinterpret(result, DML_TENSOR_DATA_TYPE_FLOAT16) - 1.0f;
 }
 
+// Compute a + b where a is a signed type and b is unsigned. Requires the result
+// is representable in the range of a's data type. See SignedAdd from
+// random_distributions.h.
+dml::Expression SignedAdd(dml::Expression a, dml::Expression b) {
+  auto b_div_2 = b / 2;
+  return a + dml::Reinterpret(b_div_2, a.GetOutputDesc().dataType) +
+         dml::Reinterpret(b - b_div_2, a.GetOutputDesc().dataType);
+}
+
+// Produces a uniform distribution of integers in the range [min_value,
+// max_value). See UniformDistribution<Generator, int32> from
+// random_distributions.h. Requires min_value < max_value.
+dml::Expression UniformInt(dml::Graph& graph, dml::Expression input_state,
+                           int32_t min_value, int32_t max_value,
+                           uint32_t element_count) {
+  dml::TensorDimensions shape = {1, 1, 1, element_count};
+
+  auto generator = dml::RandomGenerator(input_state, shape, false);
+  auto random_bits = generator.values;
+
+  auto lo = dml::ScalarTensor(graph, min_value, shape);
+
+  uint32_t max_value_unsigned = static_cast<uint32_t>(max_value);
+  uint32_t min_value_unsigned = static_cast<uint32_t>(min_value);
+  uint32_t range_value = max_value_unsigned - min_value_unsigned;
+  auto range = dml::ScalarTensor(graph, range_value, shape);
+
+  return SignedAdd(lo, random_bits % range);
+}
+
 class StatelessRandomUniformInitHelper : public InitializationHelper {
  public:
   using Attributes = EmptyAttributes;
@@ -90,14 +122,48 @@ class StatelessRandomUniformInitHelper : public InitializationHelper {
                 errors::InvalidArgument("seed must have shape [2], not ",
                                         seed_t.shape().DebugString()));
 
+    output_shape_ = std::move(shape);
+    if (output_shape_.num_elements() == 0) return;
+
     OP_REQUIRES_OK(ctx, GenerateKey(seed_t, &key_, &counter_));
 
-    output_shape_ = std::move(shape);
+    // This init helper is shared for both "StatelessRandomUniform" (real types)
+    // and "StatelessRandomUniformInt" (integral types). The latter has two
+    // extra host-memory tensors for the min and max of the output range.
+    if (ctx->num_inputs() == 4) {
+      const Tensor& minval = ctx->input(2);
+      const Tensor& maxval = ctx->input(3);
+      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(minval.shape()),
+                  errors::InvalidArgument("minval must be 0-D, got shape ",
+                                          minval.shape().DebugString()));
+      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(maxval.shape()),
+                  errors::InvalidArgument("maxval must be 0-D, got shape ",
+                                          maxval.shape().DebugString()));
+
+      // Verify that minval < maxval. Note that we'll never reach this point
+      // for empty output.  Zero impossible things are fine.
+      const auto lo = minval.scalar<int32>()();
+      const auto hi = maxval.scalar<int32>()();
+      OP_REQUIRES(ctx, lo < hi,
+                  errors::InvalidArgument("Need minval < maxval, got ", lo,
+                                          " >= ", hi));
+    }
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
   const random::PhiloxRandom::Key GetKey() const { return key_; }
   const random::PhiloxRandom::ResultType GetCounter() const { return counter_; }
+
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    for (size_t i = 0; i < output_shapes.size(); ++i) {
+      if (output_shapes[i].num_elements() != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
 
  private:
   TensorShape output_shape_;
@@ -165,9 +231,14 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     dml::Expression result;
     if (ctx->GetOutputDataType(0) == DT_FLOAT) {
       result = UniformFloat(scope, input_state, num_elements);
-    } else {
-      DCHECK(ctx->GetOutputDataType(0) == DT_HALF);
+    } else if (ctx->GetOutputDataType(0) == DT_HALF) {
       result = UniformHalf(scope, input_state, num_elements);
+    } else {
+      DCHECK(ctx->GetOutputDataType(0) == DT_INT32);
+      int min_value = ctx->GetConstantInputTensor(2).scalar<int32>()();
+      int max_value = ctx->GetConstantInputTensor(3).scalar<int32>()();
+      result =
+          UniformInt(scope, input_state, min_value, max_value, num_elements);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -201,8 +272,7 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     ctx->CopyHostToBuffer(input_state_buffer.Resource(),
                           input_state_buffer.Offset(), byte_span);
 
-    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                                input_bindings, output_bindings);
+    return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 };
 
@@ -218,10 +288,24 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
+#define DML_REGISTER_KERNEL(type)                       \
+  REGISTER_KERNEL_BUILDER(                              \
+      Name("StatelessRandomUniformInt")                 \
+          .Device(DEVICE_DML)                           \
+          .HostMemory("shape")                          \
+          .HostMemory("seed")                           \
+          .HostMemory("minval")                         \
+          .HostMemory("maxval")                         \
+          .TypeConstraint<type>("dtype"),               \
+      DmlKernelWrapper<DmlStatelessRandomUniformKernel, \
+                       StatelessRandomUniformShapeHelper>);
+TF_CALL_int32(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
 // ----------------------------------------------------------------------------
 
 template <typename TKernel, typename TShapeHelper,
-          DmlKernelCachePolicy cache_policy = DmlKernelCachePolicy::Default>
+          DmlKernelCachePolicy cache_policy = DmlKernelCachePolicy::Never>
 class DmlPhiloxWrapper
     : public DmlKernelWrapper<TKernel, TShapeHelper, cache_policy> {
  public:
@@ -249,9 +333,44 @@ class RandomUniformInitHelper : public InitializationHelper {
     TensorShape shape;
     OP_REQUIRES_OK(ctx, ctx->op_kernel().MakeShape(shape_t, &shape));
     output_shape_ = std::move(shape);
+
+    // This init helper is shared for both "RandomUniform" (real types) and
+    // "RandomUniformInt" (integral types). The latter has two extra host-memory
+    // tensors for the min and max of the output range.
+    if (ctx->num_inputs() == 3) {
+      const Tensor& minval = ctx->input(1);
+      const Tensor& maxval = ctx->input(2);
+      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(minval.shape()),
+                  errors::InvalidArgument("minval must be 0-D, got shape ",
+                                          minval.shape().DebugString()));
+      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(maxval.shape()),
+                  errors::InvalidArgument("maxval must be 0-D, got shape ",
+                                          maxval.shape().DebugString()));
+
+      if (output_shape_.num_elements() == 0) return;
+
+      // Verify that minval < maxval. Note that we'll never reach this point
+      // for empty output.  Zero impossible things are fine.
+      const auto lo = minval.scalar<int32>()();
+      const auto hi = maxval.scalar<int32>()();
+      OP_REQUIRES(ctx, lo < hi,
+                  errors::InvalidArgument("Need minval < maxval, got ", lo,
+                                          " >= ", hi));
+    }
   }
 
   const TensorShape& GetOutputShape() const { return output_shape_; }
+
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    for (size_t i = 0; i < output_shapes.size(); ++i) {
+      if (output_shapes[i].num_elements() != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
 
  private:
   TensorShape output_shape_;
@@ -311,9 +430,14 @@ class DmlRandomUniformKernel : public DmlKernel {
     dml::Expression result;
     if (ctx->GetOutputDataType(0) == DT_FLOAT) {
       result = UniformFloat(scope, input_state, num_output_elements_);
-    } else {
-      DCHECK(ctx->GetOutputDataType(0) == DT_HALF);
+    } else if (ctx->GetOutputDataType(0) == DT_HALF) {
       result = UniformHalf(scope, input_state, num_output_elements_);
+    } else {
+      DCHECK(ctx->GetOutputDataType(0) == DT_INT32);
+      int min_value = ctx->GetConstantInputTensor(1).scalar<int32>()();
+      int max_value = ctx->GetConstantInputTensor(2).scalar<int32>()();
+      result = UniformInt(scope, input_state, min_value, max_value,
+                          num_output_elements_);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -353,8 +477,7 @@ class DmlRandomUniformKernel : public DmlKernel {
     ctx->CopyHostToBuffer(state_buffer_->Resource(), state_buffer_->Offset(),
                           byte_span);
 
-    return ctx->ExecuteOperator(GetCompiledOp(), GetPersistentResourceBinding(),
-                                input_bindings, output_bindings);
+    return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
 };
 
@@ -363,8 +486,88 @@ class DmlRandomUniformKernel : public DmlKernel {
       Name("RandomUniform")               \
           .Device(DEVICE_DML)             \
           .HostMemory("shape")            \
+          .TypeConstraint<int32>("T")     \
           .TypeConstraint<type>("dtype"), \
       DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
+TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+#define DML_REGISTER_KERNEL(type)        \
+  REGISTER_KERNEL_BUILDER(               \
+      Name("RandomUniformInt")           \
+          .Device(DEVICE_DML)            \
+          .HostMemory("shape")           \
+          .HostMemory("minval")          \
+          .HostMemory("maxval")          \
+          .TypeConstraint<int32>("T")    \
+          .TypeConstraint<type>("Tout"), \
+      DmlPhiloxWrapper<DmlRandomUniformKernel, RandomUniformShapeHelper>);
+TF_CALL_int32(DML_REGISTER_KERNEL);
+#undef DML_REGISTER_KERNEL
+
+// ----------------------------------------------------------------------------
+
+// Emulates a DML philox PRNG+distribution by executing it on the CPU and
+// copying the results to the GPU.
+template <class Distribution>
+class DmlEmulatedPhiloxRandomKernel : public OpKernel {
+ public:
+  typedef typename Distribution::ResultElementType T;
+  explicit DmlEmulatedPhiloxRandomKernel(OpKernelConstruction* ctx)
+      : OpKernel(ctx) {
+    OP_REQUIRES_OK(ctx, generator_.Init(ctx));
+  }
+
+  void Compute(OpKernelContext* ctx) override {
+    const Tensor& shape = ctx->input(0);
+
+    TensorShape output_shape;
+    OP_REQUIRES_OK(ctx, MakeShape(shape, &output_shape));
+
+    AllocatorAttributes host_attrs;
+    host_attrs.set_on_host(true);
+
+    Tensor host_output;
+    OP_REQUIRES_OK(
+        ctx, ctx->allocate_temp(ctx->expected_output_dtype(0), output_shape,
+                                &host_output, host_attrs));
+
+    auto output_flat = host_output.flat<T>();
+    functor::FillPhiloxRandom<CPUDevice, Distribution>()(
+        ctx, ctx->eigen_device<CPUDevice>(),
+        // Multiplier 256 is the same as in FillPhiloxRandomTask; do not change
+        // it just here.
+        generator_.ReserveRandomOutputs(output_flat.size(), 256),
+        output_flat.data(), output_flat.size(), Distribution());
+
+    Tensor* output;
+    OP_REQUIRES_OK(ctx, ctx->allocate_output(0, output_shape, &output));
+
+    Device* device = static_cast<Device*>(ctx->device());
+    ctx->op_device_context()->CopyCPUTensorToDevice(
+        &host_output, device, output, [](const Status& s) { TF_CHECK_OK(s); });
+  }
+
+ private:
+  GuardedPhiloxRandom generator_;
+};
+
+#define DML_REGISTER_KERNEL(type)                                        \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("RandomStandardNormal")                                       \
+          .Device(DEVICE_DML)                                            \
+          .HostMemory("shape")                                           \
+          .TypeConstraint<type>("dtype"),                                \
+      DmlEmulatedPhiloxRandomKernel<                                     \
+          random::NormalDistribution<random::PhiloxRandom, type>>);      \
+  REGISTER_KERNEL_BUILDER(                                               \
+      Name("TruncatedNormal")                                            \
+          .Device(DEVICE_DML)                                            \
+          .HostMemory("shape")                                           \
+          .TypeConstraint<type>("dtype"),                                \
+      DmlEmulatedPhiloxRandomKernel<random::TruncatedNormalDistribution< \
+          random::SingleSampleAdapter<random::PhiloxRandom>, type>>);
+
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 

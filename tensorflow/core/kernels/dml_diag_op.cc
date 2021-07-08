@@ -72,12 +72,11 @@ class DmlDiagKernel : public DmlKernel {
 
     // TODO #24881131: 64-bit data support should be revisited
     // TFDML #24881131
-    auto dtype_tf = ctx->GetOutputDataType(0);
-    bool is_64_bit_type = Is64BitIntegerType(dtype_tf);
-    auto dtype_dml = is_64_bit_type ? DML_TENSOR_DATA_TYPE_UINT32
-                                    : GetDmlDataTypeFromTfDataType(dtype_tf);
-    uint64_t end_padding_in_bytes = is_64_bit_type ? sizeof(uint32_t) : 0;
-    uint32_t stride_multiplier = is_64_bit_type ? 2 : 1;
+    const auto dtype_tf = ctx->GetOutputDataType(0);
+    const bool is_64_bit_type = Is64BitIntegerType(dtype_tf);
+    const auto dtype_dml = GetDmlDataTypeFromTfDataType(dtype_tf);
+    const uint64_t end_padding_in_bytes = is_64_bit_type ? sizeof(uint32_t) : 0;
+    const uint32_t stride_multiplier = is_64_bit_type ? 2 : 1;
 
     // Flatten the output into a vector and use strides to skip over zeros
     auto num_elements = static_cast<uint32_t>(input_shape.num_elements());
@@ -99,15 +98,39 @@ class DmlDiagKernel : public DmlKernel {
     tensors.outputs = {output};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
 
-    DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-    identity_desc.InputTensor = &inputs[0];
-    identity_desc.OutputTensor = &outputs[0];
+    const auto out_policy = dml::TensorPolicy(
+        [](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
+           dml::Span<const uint32_t> sizes) {
+          uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
 
-    DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                 &identity_desc};
-    Initialize(ctx, std::move(tensors), op_desc);
+          const uint32_t num_elements = std::accumulate(
+              sizes.begin(), sizes.end(), 1u, std::multiplies<uint32_t>());
+
+          dml::TensorDimensions strides(dimension_count);
+          strides.back() = (num_elements + 1);
+
+          dml::TensorProperties props = {};
+          props.guaranteedBaseOffsetAlignment = 0;
+          props.strides = std::move(strides);
+          props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+              dataType, dimension_count, sizes.data(), props.strides->data());
+          return props;
+        });
+
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
+    auto result = dml::Identity(input_tensor);
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
@@ -124,7 +147,6 @@ class DmlDiagKernel : public DmlKernel {
       Name("Diag").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlDiagKernel, DiagShapeHelper>)
 
-TF_CALL_half(REGISTER_KERNEL);
 TF_CALL_float(REGISTER_KERNEL);
 TF_CALL_int32(REGISTER_KERNEL);
 TF_CALL_int64(REGISTER_KERNEL);

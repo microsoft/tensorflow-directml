@@ -116,8 +116,8 @@ class DmlCheckNumericsKernel : public DmlKernel {
     op_ctx->op_device_context()->CopyDeviceTensorToCPU(
         output_tensor, "", device, &is_error_tensor,
         [&note, &status](const Status& copy_status) {
-          note.Notify();
           status = copy_status;
+          note.Notify();
         });
 
     note.WaitForNotification();

@@ -38,7 +38,7 @@ parameters:
 - name: testGroups
   displayName: Test Groups
   type: object
-  default: [python, core]
+  default: [python, core, c]
 
 - name: enableTests
   displayName: Enable Tests
@@ -87,7 +87,7 @@ stages:
   ${{if not(parameters.enableTests)}}:
     dependsOn: [buildStage]
   condition: succeededOrFailed()
-  pool: DirectML-Build
+  pool: Package ES Standard Build
   jobs:
   - template: report.yml
     parameters:

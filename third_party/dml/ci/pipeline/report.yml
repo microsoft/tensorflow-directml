@@ -48,7 +48,8 @@ jobs:
           ${{parameters.testResultsArtifactName}}/agent_summary.json
 
   - task: PowerShell@2
-    displayName: Create Report Email
+    name: createHtml
+    displayName: Create Report HTML
     condition: succeededOrFailed()
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -60,4 +61,13 @@ jobs:
         -BuildArtifactsPath $(System.ArtifactsDirectory)/${{parameters.buildMetadataArtifactName}}
         -PipelineRunID $(Build.BuildID)
         -AccessToken $(System.AccessToken)
+        -OutputHtmlPath $(System.ArtifactsDirectory)/results.html
         -EmailTo ${{parameters.emailTo}}
+
+  - task: PkgESSendMail@10
+    displayName: Send Email
+    inputs:
+      to: $(createHtml.emailTo)
+      subject: $(createHtml.emailSubject)
+      bodyFile: $(System.ArtifactsDirectory)/results.html
+      isHtml: true

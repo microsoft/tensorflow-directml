@@ -149,8 +149,6 @@ class RaggedMapOpTest(test_util.TensorFlowTestCase,
       ),
   ])
 
-  # TFDML #25576420
-  @test_util.skip_dml
   def testRaggedMap(
       self,
       fn,
@@ -169,7 +167,11 @@ class RaggedMapOpTest(test_util.TensorFlowTestCase,
 
     expected_rt = ragged_factory_ops.constant(
         expected_output, ragged_rank=expected_ragged_rank)
-    self.assertAllEqual(expected_rt, output)
+
+    if expected_rt.dtype == dtypes.string:
+      self.assertAllEqual(expected_rt, output)
+    else:
+      self.assertAllClose(expected_rt, output)
 
   def testRaggedMapOnStructure(self):
     batman = ragged_factory_ops.constant([[1, 2, 3], [4], [5, 6, 7]])

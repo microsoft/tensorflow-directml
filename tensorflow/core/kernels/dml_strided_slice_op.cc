@@ -17,8 +17,11 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_operator_helper.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/framework/register_types.h"
+#include "tensorflow/core/framework/resource_mgr.h"
+#include "tensorflow/core/framework/resource_var.h"
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 #include "tensorflow/core/kernels/dml_ops_common.h"
+#include "tensorflow/core/lib/gtl/cleanup.h"
 #include "tensorflow/core/util/strided_slice_op.h"
 
 namespace tensorflow {
@@ -51,7 +54,7 @@ static absl::optional<SimplifiedSlice> SimplifySlice(
     const gtl::InlinedVector<int64, 4>& canonical_begins,
     const gtl::InlinedVector<int64, 4>& canonical_ends,
     const gtl::InlinedVector<int64, 4>& strides, uint32_t min_output_size = 4,
-    uint32_t max_output_size = 5) {
+    uint32_t max_output_size = 8) {
   assert(input_shape.dims() == begins.size());
   assert(input_shape.dims() == ends.size());
   assert(input_shape.dims() == strides.size());
@@ -211,10 +214,18 @@ class StridedSliceInitHelper : public InitializationHelper {
     int32 ellipsis_mask, new_axis_mask, shrink_axis_mask;
   };
 
-  // StridedSlice is only a no-op if the first input or its output is empty
   bool IsNoOpKernel(
       OpKernelContext* ctx,
       absl::Span<const TensorShape> output_shapes) const override {
+    const bool is_grad_op = ctx->num_inputs() == 5;
+
+    if (is_grad_op) {
+      // For StridedSliceGrad, the last input is the input gradient
+      return ctx->input(4).NumElements() == 0 ||
+             output_shapes[0].num_elements() == 0;
+    }
+
+    // StridedSlice is only a no-op if the first input or its output is empty
     return ctx->input(0).NumElements() == 0 ||
            output_shapes[0].num_elements() == 0;
   }
@@ -275,7 +286,7 @@ class StridedSliceInitHelper : public InitializationHelper {
     if (!simple_slice_) {
       OP_REQUIRES(
           ctx, simple_slice_,
-          errors::InvalidArgument("DML only support slicing up to 5D inputs, "
+          errors::InvalidArgument("DML only support slicing up to 8D inputs, "
                                   "but received ",
                                   input_shape.dims()));
     }
@@ -317,7 +328,8 @@ class DmlStridedSliceKernel : public DmlKernel {
 
     auto simple_slice = init_helper->GetSimplifiedSlice();
     auto dtype_tf = ctx->GetInputDataType(0);
-    DML_TENSOR_DATA_TYPE dtype_dml = DML_TENSOR_DATA_TYPE_UNKNOWN;
+    const DML_TENSOR_DATA_TYPE dtype_dml =
+        GetDmlDataTypeFromTfDataType(dtype_tf);
 
     // TODO #24881131: 64-bit data support should be revisited
     // TFDML #24881131
@@ -330,7 +342,6 @@ class DmlStridedSliceKernel : public DmlKernel {
       stride *= simple_slice->output_sizes[i];
     }
     if (Is64BitIntegerType(dtype_tf)) {
-      dtype_dml = DML_TENSOR_DATA_TYPE_UINT32;
       for (auto& stride : simple_slice->input_strides) {
         stride *= 2;
       }
@@ -338,8 +349,6 @@ class DmlStridedSliceKernel : public DmlKernel {
         output_strides[i] *= 2;
       }
       end_padding_in_bytes = sizeof(uint32_t);
-    } else {
-      dtype_dml = GetDmlDataTypeFromTfDataType(dtype_tf);
     }
 
     DmlTensorInfo input;
@@ -357,47 +366,31 @@ class DmlStridedSliceKernel : public DmlKernel {
     tensors.inputs = {input};
     tensors.outputs = {output};
 
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto result = dml::InputTensor(scope, 0, inputs[0]);
 
     if (init_helper->IsIdentity()) {
-      DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-      identity_desc.InputTensor = inputs.data();
-      identity_desc.OutputTensor = outputs.data();
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                   &identity_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      result = dml::Identity(result);
     } else {
-      DML_SLICE1_OPERATOR_DESC slice_desc = {};
-      slice_desc.InputTensor = inputs.data();
-      slice_desc.OutputTensor = outputs.data();
-      slice_desc.InputWindowSizes = simple_slice->window_sizes.data();
-      slice_desc.InputWindowStrides = simple_slice->window_strides.data();
-      slice_desc.InputWindowOffsets = simple_slice->window_offset.data();
-      slice_desc.DimensionCount = simple_slice->input_sizes.size();
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_SLICE1, &slice_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
-    }
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      result =
+          dml::Slice(result, simple_slice->window_offset,
+                     simple_slice->window_sizes, simple_slice->window_strides);
     }
 
-    return DmlKernel::Compute(ctx);
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
-#define REGISTER_KERNELS(type)       \
+#define REGISTER_KERNEL(type)        \
   REGISTER_KERNEL_BUILDER(           \
       Name("StridedSlice")           \
           .Device(DEVICE_DML)        \
@@ -408,8 +401,12 @@ class DmlStridedSliceKernel : public DmlKernel {
       DmlKernelWrapper<DmlStridedSliceKernel, StridedSliceShapeHelper>)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // strided_slice_op.cc).
-TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(REGISTER_KERNELS);
-#undef REGISTER_KERNELS
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
+TF_CALL_int8(REGISTER_KERNEL);
+TF_CALL_int64(REGISTER_KERNEL);
+#undef REGISTER_KERNEL
 
 // ----------------------------------------
 // StridedSliceGrad
@@ -426,7 +423,8 @@ class DmlStridedSliceGradKernel : public DmlKernel {
 
     auto simple_slice = init_helper->GetSimplifiedSlice();
     auto dtype_tf = ctx->GetInputDataType(4);
-    DML_TENSOR_DATA_TYPE dtype_dml = DML_TENSOR_DATA_TYPE_UNKNOWN;
+    const DML_TENSOR_DATA_TYPE dtype_dml =
+        GetDmlDataTypeFromTfDataType(dtype_tf);
 
     // TODO #24881131: 64-bit data support should be revisited
     // TFDML #24881131
@@ -439,7 +437,6 @@ class DmlStridedSliceGradKernel : public DmlKernel {
       stride *= simple_slice->output_sizes[i];
     }
     if (Is64BitIntegerType(dtype_tf)) {
-      dtype_dml = DML_TENSOR_DATA_TYPE_UINT32;
       for (auto& stride : simple_slice->input_strides) {
         stride *= 2;
       }
@@ -447,8 +444,6 @@ class DmlStridedSliceGradKernel : public DmlKernel {
         output_strides[i] *= 2;
       }
       end_padding_in_bytes = sizeof(uint32_t);
-    } else {
-      dtype_dml = GetDmlDataTypeFromTfDataType(dtype_tf);
     }
 
     DmlTensorInfo input;
@@ -466,47 +461,31 @@ class DmlStridedSliceGradKernel : public DmlKernel {
     tensors.inputs = {input};
     tensors.outputs = {output};
 
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto outputs = GetDmlTensorDescs(tensors.outputs);
+    auto result = dml::InputTensor(scope, 0, inputs[0]);
 
     if (init_helper->IsIdentity()) {
-      DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-      identity_desc.InputTensor = inputs.data();
-      identity_desc.OutputTensor = outputs.data();
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                   &identity_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      result = dml::Identity(result);
     } else {
-      DML_SLICE_GRAD_OPERATOR_DESC slice_desc = {};
-      slice_desc.InputGradientTensor = inputs.data();
-      slice_desc.OutputGradientTensor = outputs.data();
-      slice_desc.InputWindowSizes = simple_slice->window_sizes.data();
-      slice_desc.InputWindowStrides = simple_slice->window_strides.data();
-      slice_desc.InputWindowOffsets = simple_slice->window_offset.data();
-      slice_desc.DimensionCount = simple_slice->input_sizes.size();
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_SLICE_GRAD, &slice_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
-    }
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      result = dml::SliceGrad(
+          result, simple_slice->input_sizes, simple_slice->window_offset,
+          simple_slice->window_sizes, simple_slice->window_strides);
     }
 
-    return DmlKernel::Compute(ctx);
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
-#define REGISTER_KERNELS(type)       \
+#define REGISTER_KERNEL(type)        \
   REGISTER_KERNEL_BUILDER(           \
       Name("StridedSliceGrad")       \
           .Device(DEVICE_DML)        \
@@ -518,7 +497,312 @@ class DmlStridedSliceGradKernel : public DmlKernel {
       DmlKernelWrapper<DmlStridedSliceGradKernel, StridedSliceShapeHelper>)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // strided_slice_op.cc).
-TF_CALL_DML_ALL_TYPES_EXCEPT_INT32(REGISTER_KERNELS);
-#undef REGISTER_KERNELS
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
+TF_CALL_int8(REGISTER_KERNEL);
+TF_CALL_int64(REGISTER_KERNEL);
+#undef REGISTER_KERNEL
+
+class StridedSliceAssignInitHelper : public InitializationHelper {
+ public:
+  struct Attributes {
+    explicit Attributes(OpKernelConstruction* ctx) {
+      OP_REQUIRES_OK(ctx, ctx->GetAttr("begin_mask", &begin_mask));
+      OP_REQUIRES_OK(ctx, ctx->GetAttr("end_mask", &end_mask));
+      OP_REQUIRES_OK(ctx, ctx->GetAttr("ellipsis_mask", &ellipsis_mask));
+      OP_REQUIRES_OK(ctx, ctx->GetAttr("new_axis_mask", &new_axis_mask));
+      OP_REQUIRES_OK(ctx, ctx->GetAttr("shrink_axis_mask", &shrink_axis_mask));
+    }
+
+    int32 begin_mask, end_mask;
+    int32 ellipsis_mask, new_axis_mask, shrink_axis_mask;
+  };
+
+  bool IsNoOpKernel(
+      OpKernelContext* ctx,
+      absl::Span<const TensorShape> output_shapes) const override {
+    if (!output_shapes.empty() && output_shapes[0].num_elements() == 0) {
+      return true;
+    }
+
+    if (ctx->input(4).NumElements() == 0) {
+      return true;
+    }
+
+    auto lock_cleanup = gtl::MakeCleanup([this] { Unlock(); });
+    const Tensor input_tensor = GetInputTensor(ctx);
+
+    if (input_tensor.NumElements() == 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  StridedSliceAssignInitHelper(OpKernelContext* ctx,
+                               std::shared_ptr<const Attributes> attr) {
+    DCHECK(ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE);
+
+    if (ctx->input(0).dtype() == DT_RESOURCE) {
+      OP_REQUIRES_OK(
+          ctx, LookupResource(ctx, HandleFromInput(ctx, 0), &input_resource_));
+      input_resource_->mu()->lock_shared();
+      locked_ = true;
+    }
+
+    const Tensor input = GetInputTensor(ctx);
+
+    TensorShape processing_shape;
+    bool slice_dim0 = true;
+    bool is_simple_slice = true;
+    gtl::InlinedVector<int64, 4> begin;
+    gtl::InlinedVector<int64, 4> end;
+    gtl::InlinedVector<int64, 4> strides;
+
+    TensorShape input_shape = input.shape();
+    TensorShape final_shape;
+
+    OP_REQUIRES_OK(
+        ctx, ValidateStridedSliceOp(
+                 &ctx->input(1), &ctx->input(2), ctx->input(3), input_shape,
+                 attr->begin_mask, attr->end_mask, attr->ellipsis_mask,
+                 attr->new_axis_mask, attr->shrink_axis_mask, &processing_shape,
+                 &final_shape, &is_identity_, &is_simple_slice, &slice_dim0,
+                 &begin, &end, &strides));
+
+    if (processing_shape.num_elements()) {
+      TensorShape values_shape = ctx->input(4).shape();
+      OP_REQUIRES(
+          ctx, final_shape == values_shape,
+          errors::Unimplemented(
+              "sliced l-value shape ", final_shape.DebugString(),
+              " does not match r-value shape ", values_shape.DebugString(),
+              ". Automatic broadcasting not ", "yet implemented."));
+    }
+
+    // Attempt to simplify the slice into a lower-rank slice.
+    simple_slice_ = SimplifySlice(input_shape, begin, end, strides);
+    if (!simple_slice_) {
+      OP_REQUIRES(
+          ctx, simple_slice_,
+          errors::InvalidArgument("DML only support slicing up to 8D inputs, "
+                                  "but received ",
+                                  input_shape.dims()));
+    }
+  }
+
+  Tensor GetInputTensor(OpKernelContext* ctx) const {
+    DCHECK(ctx->input_is_ref(0) || ctx->input(0).dtype() == DT_RESOURCE);
+
+    return input_resource_ ? *input_resource_->tensor()
+                           : ctx->mutable_input(0, false);
+  }
+
+  void Unlock() const {
+    if (input_resource_ && locked_) {
+      input_resource_->mu()->unlock_shared();
+      locked_ = false;
+    }
+  }
+
+  const absl::optional<SimplifiedSlice>& GetSimplifiedSlice() const {
+    return simple_slice_;
+  }
+
+  const bool IsIdentity() const { return is_identity_; }
+
+ private:
+  absl::optional<SimplifiedSlice> simple_slice_;
+  core::RefCountPtr<Var> input_resource_;
+  mutable bool locked_ = false;
+  bool is_identity_;
+};
+
+class DmlStridedSliceAssignKernel : public DmlKernel {
+ public:
+  using InitHelper = StridedSliceAssignInitHelper;
+
+  explicit DmlStridedSliceAssignKernel(DmlKernelConstruction* ctx,
+                                       const InitHelper* init_helper) {
+    const Tensor input = init_helper->GetInputTensor(ctx->GetOpKernelContext());
+    const TensorShape& input_shape = input.shape();
+    const TensorShape& updates_shape = ctx->GetInputTensorShape(4);
+
+    auto simple_slice = init_helper->GetSimplifiedSlice();
+    auto dtype_tf = ctx->GetInputDataType(4);
+
+    dml::TensorDimensions collapsed_input_sizes = {
+        1,
+        1,
+        1,
+        static_cast<uint32_t>(input_shape.num_elements()),
+    };
+
+    dml::TensorDimensions collapsed_updates_sizes = {
+        1,
+        1,
+        1,
+        static_cast<uint32_t>(updates_shape.num_elements()),
+    };
+
+    DmlTensorInfo updates;
+    updates.kernel_index = 4;
+    updates.desc = DmlTensorDesc::Create(dtype_tf, collapsed_updates_sizes,
+                                         collapsed_updates_sizes);
+
+    DmlTensorInfo output;
+    output.kernel_index = 0;
+    output.desc = DmlTensorDesc::Create(dtype_tf, collapsed_input_sizes,
+                                        collapsed_input_sizes);
+
+    DmlKernelTensors tensors;
+    tensors.inputs = {updates};
+
+    if (!init_helper->IsIdentity()) {
+      DmlTensorInfo original_input;
+      original_input.kernel_index = 0;
+      original_input.desc = DmlTensorDesc::Create(
+          dtype_tf, collapsed_input_sizes, collapsed_input_sizes);
+
+      tensors.inputs.push_back(original_input);
+    }
+
+    tensors.outputs = {output};
+
+    if (input.dtype() != DT_RESOURCE) {
+      // The input ref and the output ref must refer to the same memory
+      tensors.output_refs_forwarding = {0};
+    }
+
+    auto scope = dml::Graph(ctx->GetDmlDevice());
+    auto inputs = GetDmlTensorDescs(tensors.inputs);
+    auto updates_tensor = dml::InputTensor(scope, 0, inputs[0]);
+
+    dml::Expression result;
+
+    if (init_helper->IsIdentity()) {
+      result = dml::Identity(updates_tensor);
+    } else {
+      auto original_input_tensor = dml::InputTensor(scope, 1, inputs[1]);
+
+      auto indices_start = dml::ScalarUnion(0, DML_TENSOR_DATA_TYPE_UINT32);
+      auto indices_delta = dml::ScalarUnion(1, DML_TENSOR_DATA_TYPE_UINT32);
+
+      auto indices = dml::FillValueSequence(scope, simple_slice->input_sizes,
+                                            DML_TENSOR_DATA_TYPE_UINT32,
+                                            indices_start, indices_delta);
+
+      auto sliced_indices =
+          dml::Slice(indices, simple_slice->window_offset,
+                     simple_slice->window_sizes, simple_slice->window_strides);
+
+      sliced_indices =
+          dml::Reinterpret(sliced_indices, collapsed_updates_sizes, {});
+
+      result = dml::ScatterElements(original_input_tensor, sliced_indices,
+                                    updates_tensor, 3);
+    }
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetInputDataType(4))) {
+      result = dml::ConvertInt32ToInt64(result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
+  }
+
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
+    auto init_helper = ctx->GetInitializationHelper<InitHelper>();
+
+    auto lock_cleanup =
+        gtl::MakeCleanup([init_helper] { init_helper->Unlock(); });
+
+    const Tensor input_tensor =
+        init_helper->GetInputTensor(ctx->GetOpKernelContext());
+
+    // Identity can be done in-place
+    if (init_helper->IsIdentity()) {
+      D3D12BufferRegion input_buffer =
+          ctx->CreateBufferForTensor(ctx->GetInputTensor(4));
+
+      D3D12BufferRegion output_buffer =
+          ctx->CreateBufferForTensor(input_tensor);
+
+      absl::optional<DML_BUFFER_BINDING> input_bindings[] = {
+          input_buffer.GetBufferBinding(),
+      };
+
+      absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
+          output_buffer.GetBufferBinding(),
+      };
+
+      return DmlKernel::Compute(ctx, input_bindings, output_bindings);
+    }
+
+    // Create input buffers
+    D3D12BufferRegion input_buffers[] = {
+        ctx->CreateBufferForTensor(ctx->GetInputTensor(4)),
+        ctx->CreateBufferForTensor(input_tensor),
+    };
+
+    // Create input bindings
+    absl::optional<DML_BUFFER_BINDING> input_bindings[] = {
+        input_buffers[0].GetBufferBinding(),
+        input_buffers[1].GetBufferBinding(),
+    };
+
+    DmlBuffer output_buffer =
+        ctx->AllocateDefaultBuffer(input_buffers[1].SizeInBytes());
+
+    absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
+        output_buffer.GetBufferBinding(),
+    };
+
+    auto status_or_event =
+        DmlKernel::Compute(ctx, input_bindings, output_bindings);
+    if (!status_or_event.ok()) {
+      return status_or_event;
+    }
+
+    ctx->CopyBufferToBuffer(input_buffers[1].Resource(),
+                            input_buffers[1].Offset(), output_buffer.Resource(),
+                            output_buffer.Offset(),
+                            output_buffer.SizeInBytes());
+
+    return ctx->InsertUavBarrier();
+  }
+};
+
+#define REGISTER_KERNEL(type)                                                 \
+  REGISTER_KERNEL_BUILDER(Name("StridedSliceAssign")                          \
+                              .Device(DEVICE_DML)                             \
+                              .TypeConstraint<type>("T")                      \
+                              .HostMemory("begin")                            \
+                              .HostMemory("end")                              \
+                              .HostMemory("strides"),                         \
+                          DmlKernelWrapper<DmlStridedSliceAssignKernel,       \
+                                           GetOutputShapeAsInputShapeHelper>) \
+  REGISTER_KERNEL_BUILDER(                                                    \
+      Name("ResourceStridedSliceAssign")                                      \
+          .Device(DEVICE_DML)                                                 \
+          .TypeConstraint<type>("T")                                          \
+          .HostMemory("ref")                                                  \
+          .HostMemory("begin")                                                \
+          .HostMemory("end")                                                  \
+          .HostMemory("strides"),                                             \
+      DmlKernelWrapper<DmlStridedSliceAssignKernel, NoOutputShapeHelper,      \
+                       DmlKernelCachePolicy::Never>)                          \
+// TODO(b/25387198): A special kernel exists for int32 (see
+// strided_slice_op.cc).
+TF_CALL_half(REGISTER_KERNEL);
+TF_CALL_float(REGISTER_KERNEL);
+TF_CALL_bool(REGISTER_KERNEL);
+TF_CALL_int8(REGISTER_KERNEL);
+TF_CALL_int64(REGISTER_KERNEL);
+#undef REGISTER_KERNEL
 
 }  // namespace tensorflow

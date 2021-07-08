@@ -91,12 +91,10 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
     with self.assertRaises(errors.InvalidArgumentError):
       self.evaluate(opt.get_value())
 
-  # TFDML #25510189
-  @test_util.skip_dml
   def testAddN(self):
     devices = ["/cpu:0"]
     if test_util.is_gpu_available():
-      devices.append("/gpu:0")
+      devices.append(test_util.gpu_device_type())
     for device in devices:
       with ops.device(device):
         # With value
@@ -119,12 +117,10 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
                                              opt_none1.value_structure)
         self.assertFalse(self.evaluate(add_opt.has_value()))
 
-  # TFDML #25510189
-  @test_util.skip_dml
   def testNestedAddN(self):
     devices = ["/cpu:0"]
     if test_util.is_gpu_available():
-      devices.append("/gpu:0")
+      devices.append(test_util.gpu_device_type())
     for device in devices:
       with ops.device(device):
         opt1 = optional_ops.Optional.from_value([1, 2.0])
@@ -141,12 +137,10 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
                                                    opt1.value_structure)
         self.assertAllEqual(inner_add_opt.get_value(), [4, 6.0])
 
-  # TFDML #25510189
-  @test_util.skip_dml
   def testZerosLike(self):
     devices = ["/cpu:0"]
     if test_util.is_gpu_available():
-      devices.append("/gpu:0")
+      devices.append(test_util.gpu_device_type())
     for device in devices:
       with ops.device(device):
         # With value
@@ -165,12 +159,10 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
                                                opt_none.value_structure)
         self.assertFalse(self.evaluate(zeros_opt.has_value()))
 
-  # TFDML #25510189
-  @test_util.skip_dml
   def testNestedZerosLike(self):
     devices = ["/cpu:0"]
     if test_util.is_gpu_available():
-      devices.append("/gpu:0")
+      devices.append(test_util.gpu_device_type())
     for device in devices:
       with ops.device(device):
         opt1 = optional_ops.Optional.from_value(1.0)
@@ -194,7 +186,7 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
       optional_none = optional_ops.Optional.none_from_structure(
           tensor_spec.TensorSpec([], dtypes.float32))
 
-    with ops.device("/gpu:0"):
+    with ops.device(test_util.gpu_device_type()):
       gpu_optional_with_value = optional_ops._OptionalImpl(
           array_ops.identity(optional_with_value._variant_tensor),
           optional_with_value.value_structure)
@@ -226,7 +218,7 @@ class OptionalTest(test_base.DatasetTestBase, parameterized.TestCase):
           (optional_with_value._variant_tensor, optional_none._variant_tensor,
            1.0))
 
-    with ops.device("/gpu:0"):
+    with ops.device(test_util.gpu_device_type()):
       gpu_nested_optional = optional_ops._OptionalImpl(
           array_ops.identity(nested_optional._variant_tensor),
           nested_optional.value_structure)

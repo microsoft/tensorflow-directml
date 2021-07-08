@@ -18,6 +18,7 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_adapter.h"
 #include "tensorflow/core/common_runtime/dml/dml_adapter_impl.h"
 #include "tensorflow/core/common_runtime/dml/dml_device.h"
+#include "tensorflow/stream_executor/platform/default/dso_loader.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -29,18 +30,8 @@ namespace tensorflow {
 // different approach if the data shows that many people with old hardware
 // want to use our package.
 // TFDML #28244592
-static bool SupportsAllDataTypes(const DmlAdapter& adapter) {
-  D3D_FEATURE_LEVEL feature_level = adapter.IsComputeOnly()
-                                        ? D3D_FEATURE_LEVEL_1_0_CORE
-                                        : D3D_FEATURE_LEVEL_11_0;
-
-  ComPtr<ID3D12Device> d3d12_device;
-  DML_CHECK_SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
-                                        IID_PPV_ARGS(&d3d12_device)));
-
-  ComPtr<IDMLDevice> dml_device =
-      CreateDmlDevice(d3d12_device.Get(), DML_CREATE_DEVICE_FLAG_NONE);
-
+static bool SupportsAllDataTypes(const DmlAdapter& adapter,
+                                 IDMLDevice* dml_device) {
   std::array<DML_TENSOR_DATA_TYPE, 8> data_types = {
       DML_TENSOR_DATA_TYPE_FLOAT32, DML_TENSOR_DATA_TYPE_FLOAT16,
       DML_TENSOR_DATA_TYPE_UINT32,  DML_TENSOR_DATA_TYPE_UINT16,
@@ -50,23 +41,108 @@ static bool SupportsAllDataTypes(const DmlAdapter& adapter) {
 
   return std::all_of(
       data_types.begin(), data_types.end(),
-      [&dml_device](DML_TENSOR_DATA_TYPE data_type) {
+      [&dml_device, &adapter](DML_TENSOR_DATA_TYPE data_type) {
         DML_FEATURE_QUERY_TENSOR_DATA_TYPE_SUPPORT query{data_type};
         DML_FEATURE_DATA_TENSOR_DATA_TYPE_SUPPORT support;
 
-        DML_CHECK_SUCCEEDED(dml_device->CheckFeatureSupport(
+        auto hr = dml_device->CheckFeatureSupport(
             DML_FEATURE_TENSOR_DATA_TYPE_SUPPORT, sizeof(query), &query,
-            sizeof(support), &support));
+            sizeof(support), &support);
+        if (FAILED(hr)) {
+          LOG(WARNING) << "CheckFeatureSupport (data type = " << data_type
+                       << ") failed for adapter: " << adapter.Name();
+          return false;
+        }
 
-        return support.IsSupported;
+        return static_cast<bool>(support.IsSupported);
       });
 }
 
+// Even though we successfully created a DML Device, some APIs required by
+// DirectML may still be missing. We compile a dummy identity operator to make
+// sure that we don't fail later on.
+static bool CanCompileOperator(IDMLDevice* dml_device) {
+  uint32_t sizes[4] = {1, 1, 1, 1};
+
+  DML_BUFFER_TENSOR_DESC buffer_tensor_desc;
+  buffer_tensor_desc.DataType = DML_TENSOR_DATA_TYPE_FLOAT32;
+  buffer_tensor_desc.Flags = DML_TENSOR_FLAG_NONE;
+  buffer_tensor_desc.DimensionCount = 4;
+  buffer_tensor_desc.Sizes = sizes;
+  buffer_tensor_desc.Strides = nullptr;
+  buffer_tensor_desc.TotalTensorSizeInBytes =
+      DMLCalcBufferTensorSize(DML_TENSOR_DATA_TYPE_FLOAT32, 4, sizes, nullptr);
+  buffer_tensor_desc.GuaranteedBaseOffsetAlignment = 0;
+
+  DML_TENSOR_DESC tensor_desc;
+  tensor_desc.Type = DML_TENSOR_TYPE_BUFFER;
+  tensor_desc.Desc = &buffer_tensor_desc;
+
+  DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc;
+  identity_desc.InputTensor = &tensor_desc;
+  identity_desc.OutputTensor = &tensor_desc;
+  identity_desc.ScaleBias = nullptr;
+
+  DML_OPERATOR_DESC op_desc;
+  op_desc.Type = DML_OPERATOR_ELEMENT_WISE_IDENTITY;
+  op_desc.Desc = &identity_desc;
+
+  ComPtr<IDMLOperator> dml_op;
+
+  if (FAILED(dml_device->CreateOperator(&op_desc, IID_PPV_ARGS(&dml_op)))) {
+    return false;
+  }
+
+  ComPtr<IDMLCompiledOperator> dml_compiled_op;
+  return SUCCEEDED(dml_device->CompileOperator(
+      dml_op.Get(), DML_EXECUTION_FLAG_NONE, IID_PPV_ARGS(&dml_compiled_op)));
+}
+
+static bool SupportsDmlDevice(const DmlAdapter& adapter) {
+  ComPtr<ID3D12Device> d3d12_device;
+  D3D_FEATURE_LEVEL feature_level = adapter.IsComputeOnly()
+                                        ? D3D_FEATURE_LEVEL_1_0_CORE
+                                        : D3D_FEATURE_LEVEL_11_0;
+
+  if (!SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
+                                   IID_PPV_ARGS(&d3d12_device)))) {
+    LOG(WARNING) << "Could not create Direct3D device for adapter: "
+                 << adapter.Name();
+    return false;
+  }
+
+  ComPtr<IDMLDevice> dml_device =
+      TryCreateDmlDevice(d3d12_device.Get(), DML_CREATE_DEVICE_FLAG_NONE);
+  if (!dml_device) {
+    LOG(WARNING) << "Could not create DirectML device for adapter: "
+                 << adapter.Name();
+    return false;
+  }
+
+  return SupportsAllDataTypes(adapter, dml_device.Get()) &&
+         CanCompileOperator(dml_device.Get());
+}
+
 static std::vector<DmlAdapter> FilterAdapters() {
+  // Fail early if DirectML library cannot be located or loaded.
+  auto dml_handle_or =
+      stream_executor::internal::CachedDsoLoader::GetDirectMLDsoHandle();
+  if (!dml_handle_or.ok()) {
+    auto path = getenv("TF_DIRECTML_PATH");
+    if (path) {
+      LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
+                   << path;
+    } else {
+      LOG(WARNING) << "Could not load DirectML.";
+    }
+
+    return {};
+  }
+
   std::vector<DmlAdapter> adapters = EnumerateAdapters();
   adapters.erase(std::remove_if(adapters.begin(), adapters.end(),
                                 [](const DmlAdapter& adapter) {
-                                  return !SupportsAllDataTypes(adapter);
+                                  return !SupportsDmlDevice(adapter);
                                 }),
                  adapters.end());
 
@@ -118,6 +194,53 @@ const DmlDeviceState* DmlDeviceCache::GetOrCreateDeviceState(
 
 const DmlAdapter& DmlDeviceCache::GetAdapter(uint32_t adapter_index) const {
   return adapters_[adapter_index];
+}
+
+Status DmlDeviceCache::MapDeviceIdToAdapterIndex(int device_id,
+                                                 uint32_t adapter_index) {
+  // Try to insert the device_id -> adapter_index mapping. This will fail if the
+  // device_id has already been mapped, but that's OK so long as the mapping
+  // remains the same.
+  absl::optional<uint32_t> prev_adapter_index;
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto result =
+        device_id_to_adapter_index_map_.insert({device_id, adapter_index});
+    if (!result.second) {
+      prev_adapter_index = result.first->second;
+    }
+  }
+
+  if (prev_adapter_index && (*prev_adapter_index != adapter_index)) {
+    return errors::AlreadyExists(
+        "TensorFlow device (DML:", device_id,
+        ") is being mapped to "
+        "multiple DML devices (",
+        adapter_index, " now, and ", *prev_adapter_index,
+        " previously), which is not supported. "
+        "This may be the result of providing different GPU configurations "
+        "(ConfigProto.gpu_options, for example different visible_device_list)"
+        " when creating multiple Sessions in the same process. This is not "
+        " currently supported, see "
+        "https://github.com/tensorflow/tensorflow/issues/19083");
+  }
+
+  return Status::OK();
+}
+
+Status DmlDeviceCache::GetAdapterIndexFromDeviceId(int device_id,
+                                                   uint32_t* adapter_index) {
+  {
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto result = device_id_to_adapter_index_map_.find(device_id);
+    if (result != device_id_to_adapter_index_map_.end()) {
+      *adapter_index = result->second;
+      return Status::OK();
+    }
+  }
+
+  return errors::NotFound("TensorFlow device DML:", device_id,
+                          " was not registered");
 }
 
 DmlDeviceCache::DmlDeviceCache() : adapters_(FilterAdapters()) {

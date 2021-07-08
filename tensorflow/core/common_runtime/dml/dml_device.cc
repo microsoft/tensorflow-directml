@@ -21,6 +21,7 @@ limitations under the License.
 #include "dml_event_queue.h"
 #include "dml_kernel_manager.h"
 #include "dml_readback_heap.h"
+#include "dml_tracing.h"
 #include "dml_upload_heap.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/framework/device_base.h"
@@ -38,11 +39,6 @@ namespace tensorflow {
 DmlDevice::DmlDevice(const DmlDeviceState* state, const SessionOptions& options,
                      const DeviceAttributes& attributes)
     : LocalDevice(options, attributes), state_(state) {
-  // Create the DML BFC allocator
-  D3D12HeapAllocator* heap_allocator = state_->heap_allocator.get();
-  uint64_t memory_limit_in_bytes = attributes.memory_limit();
-  const GPUOptions& gpu_options = options.config.gpu_options();
-
   cpu_allocator_ = cpu_allocator();
 
   device_context_ = new DMLDeviceContext(
@@ -179,6 +175,7 @@ Status DmlDevice::FillContextMap(const Graph* graph,
 }
 
 void DmlDevice::DebugOnSessionRunStart() {
+  DmlTracing::Instance().LogSessionRunStart();
   if (state_->sharing_contract) {
     state_->sharing_contract->BeginCapturableWork(
         PIX_EVAL_CAPTURABLE_WORK_GUID);
@@ -186,6 +183,7 @@ void DmlDevice::DebugOnSessionRunStart() {
 }
 
 void DmlDevice::DebugOnSessionRunEnd() {
+  DmlTracing::Instance().LogSessionRunEnd();
   if (state_->sharing_contract) {
     state_->sharing_contract->EndCapturableWork(PIX_EVAL_CAPTURABLE_WORK_GUID);
   }

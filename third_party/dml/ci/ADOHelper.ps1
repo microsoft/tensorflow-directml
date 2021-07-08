@@ -41,7 +41,7 @@ class ADOHelper
 
     [ADOHelper] static CreateFromPipeline($PersonalAccessToken)
     {
-        if (($env:SYSTEM_TEAMPROJECT -match "^https://(\w+)\.visualstudio\.com") -or
+        if (($env:SYSTEM_COLLECTIONURI -match "^https://(\w+)\.visualstudio\.com") -or
             ($env:SYSTEM_COLLECTIONURI -match "^https://dev.azure.com/(\w+)/"))
         {
             $AdoAccount = $Matches[1]

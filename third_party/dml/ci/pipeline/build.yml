@@ -218,8 +218,9 @@ jobs:
       - powershell: |
           $ZipPath = "$(System.ArtifactsDirectory)\${{artifact}}.zip"
           Compress-Archive -Path '$(TfArtifactsPathWin)\artifacts' -DestinationPath $ZipPath -Verbose
-          New-Item -ItemType Directory -Path '${{parameters.archiveSharePath}}' -Force
-          Copy-Item -Path $ZipPath -Destination '${{parameters.archiveSharePath}}' -Verbose
+          $TargetPath = "${{parameters.archiveSharePath}}\$(Build.BuildNumber)"
+          New-Item -ItemType Directory -Path $TargetPath -Force
+          Copy-Item -Path $ZipPath -Destination $TargetPath -Verbose
         displayName: Copy to Network Share
         continueOnError: true
 

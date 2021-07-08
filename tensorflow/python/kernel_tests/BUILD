@@ -796,6 +796,7 @@ tf_py_test(
         "//tensorflow/python:parsing_ops",
         "//tensorflow/python:platform",
     ],
+    tags = ["no_mac"],
 )
 
 tf_py_test(
@@ -2029,7 +2030,6 @@ cuda_py_test(
     ],
     grpc_enabled = True,
     shard_count = 2,
-    tags = ["no_windows"],
     xla_enable_strict_auto_jit = True,
 )
 

@@ -62,8 +62,6 @@ class SigmoidCrossEntropyWithLogitsTest(test.TestCase):
           labels=targets, logits=logits, name="mylogistic")
     self.assertEqual("mylogistic", loss.op.name)
 
-  # TFDML #25510038
-  @test_util.skip_dml
   def testLogisticOutput(self):
     for use_gpu in [True, False]:
       for dtype in [dtypes.float32, dtypes.float16]:
@@ -73,10 +71,8 @@ class SigmoidCrossEntropyWithLogitsTest(test.TestCase):
               labels=targets, logits=logits)
           np_loss = np.array(losses).astype(np.float32)
           tf_loss = self.evaluate(loss)
-        self.assertAllClose(np_loss, tf_loss, atol=0.001)
+        self.assertAllClose(np_loss, tf_loss, atol=0.002)
 
-  # TFDML #25510047
-  @test_util.skip_dml
   def testLogisticOutputMultiDim(self):
     for use_gpu in [True, False]:
       for dtype in [dtypes.float32, dtypes.float16]:
@@ -86,7 +82,7 @@ class SigmoidCrossEntropyWithLogitsTest(test.TestCase):
               labels=targets, logits=logits)
           np_loss = np.array(losses).astype(np.float32)
           tf_loss = self.evaluate(loss)
-        self.assertAllClose(np_loss, tf_loss, atol=0.001)
+        self.assertAllClose(np_loss, tf_loss, atol=0.002)
 
   @test_util.run_deprecated_v1
   def testGradient(self):

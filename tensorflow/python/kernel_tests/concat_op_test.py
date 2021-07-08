@@ -207,7 +207,7 @@ class ConcatOpTest(test.TestCase):
   @test_util.run_deprecated_v1
   def testGradientsSimple(self):
     self._testGradientsSimple(dtypes.float32)
-    self._testGradientsSimple(dtypes.complex64, skip_devices=["DML"])
+    self._testGradientsSimple(dtypes.complex64)
 
   @test_util.run_deprecated_v1
   def testGradientsFirstDim(self):

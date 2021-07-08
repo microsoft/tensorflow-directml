@@ -117,10 +117,6 @@ class DmlSparseXentKernel : public DmlKernel {
     tensors.inputs[1]->desc = DmlTensorDesc::Create(ctx->GetInputDataType(1),
                                                     labels_sizes, labels_sizes);
 
-    // Here we use reinterpret to change sparse label's type. TIndex type can
-    // be one of int32 or int64 and we need to convert it to uint32.
-    tensors.inputs[1]->desc.ForceUnsignedDataType();
-
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 

@@ -471,11 +471,12 @@ def check_bazel_version(min_version, max_version):
   Returns:
     The bazel version detected.
   """
-  if which('bazel') is None:
+  bazel_executable = which('bazel')
+  if bazel_executable is None:
     print('Cannot find bazel. Please install bazel.')
     sys.exit(0)
   curr_version = run_shell(
-      ['bazel', '--batch', '--bazelrc=/dev/null', 'version'])
+      [bazel_executable, '--batch', '--bazelrc=/dev/null', 'version'])
 
   for line in curr_version.split('\n'):
     if 'Build label: ' in line:

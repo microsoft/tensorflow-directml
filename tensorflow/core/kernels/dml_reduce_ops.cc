@@ -66,6 +66,35 @@ class ReduceInitializationHelper : public InitializationHelper {
     return false;
   }
 
+  absl::optional<int> GetForwardableInputIndex(
+      OpKernelContext* ctx, absl::Span<const TensorShape> output_shapes,
+      int outputIndex) const override {
+    // For reduce, we can only forward input 0 to output 0
+    if (outputIndex != 0) {
+      return {};
+    }
+
+    const Tensor& input =
+        ctx->input_is_ref(0) ? ctx->mutable_input(0, false) : ctx->input(0);
+    // Make sure the shapes match so we can forward
+    if (input.shape() != output_shapes[outputIndex]) {
+      return {};
+    }
+
+    bool is_identity =
+        !is_arg_function_ && (reduction_helper_.ndims() == 0 ||
+                              (reduction_helper_.ndims() == 1 &&
+                               !reduction_helper_.reduce_first_axis()));
+
+    absl::optional<int> return_val;
+    if (is_identity)
+    {
+      return_val = 0;
+    }
+
+    return return_val;
+  }
+
   ReduceInitializationHelper(OpKernelContext* ctx,
                              std::shared_ptr<const Attributes> attr) {
     // We delegate most of the work to TF's existing ReductionHelper
@@ -73,6 +102,12 @@ class ReduceInitializationHelper : public InitializationHelper {
     const Tensor& axes_tensor = ctx->input(1);
     OP_REQUIRES_OK(ctx, reduction_helper_.Simplify(data_tensor, axes_tensor,
                                                    attr->keep_dims));
+
+    OP_REQUIRES(
+        ctx, reduction_helper_.data_reshape().dims() <= 8,
+        errors::InvalidArgument(
+            "DML doesn't support more than 8 dimensions for Reduction after "
+            "simplifying the inputs and collapsing axes together."));
   }
 
   const ReductionHelper& GetReductionHelper() const {
@@ -81,6 +116,9 @@ class ReduceInitializationHelper : public InitializationHelper {
 
  private:
   ReductionHelper reduction_helper_;
+  static constexpr bool is_arg_function_ =
+      reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
+      reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
 };
 
 template <DML_REDUCE_FUNCTION reduce_function>
@@ -165,6 +203,19 @@ class DmlReduceKernel : public DmlKernel {
         reduce_function == DML_REDUCE_FUNCTION_MIN ||
         reduce_function == DML_REDUCE_FUNCTION_MAX;
 
+    // Arg functions in TF are defined with an int64 output, but since the
+    // indices cannot be negative we output uint32 values with strides instead
+    // of int32 with padding
+    const bool double_strides =
+        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0)) ||
+        (is_arg_function_ &&
+         Is64BitSignedIntegerType(ctx->GetOutputDataType(0)));
+
+    // TFDML #24881131
+    const dml::TensorPolicy out_policy = double_strides
+                                             ? GetEmulatedInt64TensorPolicy()
+                                             : dml::TensorPolicy::Default();
+
     // Special-case for Prod operator: when reducing an empty tensor, we
     // explicitly need to return a value of 1.0 (not zero, which is the
     // default for a no-op'd operator)
@@ -175,43 +226,38 @@ class DmlReduceKernel : public DmlKernel {
       DmlKernelTensors tensors;
       tensors.outputs.resize(1);
 
-      constexpr uint32_t dml_output_shape[] = {1u};
+      TensorShape dml_output_shape({
+          ctx->GetOutputTensorShape(0).num_elements(),
+      });
 
       tensors.outputs[0].emplace();
       tensors.outputs[0]->desc = DmlTensorDesc::Create(
           output_type, dml_output_shape, dml_output_shape);
       tensors.outputs[0]->kernel_index = 0;
 
-      auto output_descs = GetDmlTensorDescs(tensors.outputs);
+      auto value_datatype = GetDmlDataTypeFromTfDataType(output_type);
+      DML_SCALAR_UNION value{};
 
-      DML_FILL_VALUE_CONSTANT_OPERATOR_DESC fill_desc = {};
-      fill_desc.OutputTensor = &output_descs[0];
-      fill_desc.ValueDataType = GetDmlDataTypeFromTfDataType(output_type);
-
-      switch (fill_desc.ValueDataType) {
+      switch (value_datatype) {
         case DML_TENSOR_DATA_TYPE_FLOAT32: {
-          fill_desc.Value.Float32 =
-              EmptyKernelReturnValue<float>(reduce_function);
+          value.Float32 = EmptyKernelReturnValue<float>(reduce_function);
         } break;
 
         case DML_TENSOR_DATA_TYPE_FLOAT16: {
           // Copy the bits as a UINT16
-          fill_desc.Value.UInt16 =
-              EmptyKernelReturnValue<Eigen::half>(reduce_function).x;
+          value.UInt16 = EmptyKernelReturnValue<Eigen::half>(reduce_function).x;
         } break;
 
         case DML_TENSOR_DATA_TYPE_UINT32: {
-          fill_desc.Value.UInt32 =
-              EmptyKernelReturnValue<uint32>(reduce_function);
+          value.UInt32 = EmptyKernelReturnValue<uint32>(reduce_function);
         } break;
 
         case DML_TENSOR_DATA_TYPE_INT32: {
-          fill_desc.Value.Int32 =
-              EmptyKernelReturnValue<int32>(reduce_function);
+          value.Int32 = EmptyKernelReturnValue<int32>(reduce_function);
         } break;
 
         case DML_TENSOR_DATA_TYPE_UINT8: {
-          fill_desc.Value.UInt8 = EmptyKernelReturnValue<bool>(reduce_function);
+          value.UInt8 = EmptyKernelReturnValue<bool>(reduce_function);
         } break;
 
         default:
@@ -219,23 +265,31 @@ class DmlReduceKernel : public DmlKernel {
           LOG(FATAL) << "Unsupported datatype";
       }
 
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_FILL_VALUE_CONSTANT,
-                                   &fill_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      const auto output_sizes = tensors.outputs[0]->desc.GetSizes();
+
+      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+      auto result = dml::FillValueConstant(
+          scope,
+          dml::TensorDimensions(output_sizes.begin(), output_sizes.end()),
+          value_datatype, value);
+
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(result);
+      }
+
+      Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+          scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+      Initialize(ctx, std::move(tensors), compiled_op.Get());
 
       return;
     }
 
-    // ARGMIN and ARGMAX are special reduce functions that can never be replaced
-    // by identity
-    constexpr bool is_arg_function =
-        reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
-        reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
-
     // This logic copied from the CPU implementation:
     // tensorflow/core/kernels/reduction_ops_common.h(155)
     bool is_identity =
-        !is_arg_function &&
+        !is_arg_function_ &&
         (reduce_helper.ndims() == 0 ||
          (reduce_helper.ndims() == 1 && !reduce_helper.reduce_first_axis()));
 
@@ -257,26 +311,42 @@ class DmlReduceKernel : public DmlKernel {
       tensors.outputs = {in_out_tensor};
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto output_descs = GetDmlTensorDescs(tensors.outputs);
+      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+      auto result = dml::Identity(dml::InputTensor(scope, 0, input_descs[0]));
 
-      DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC identity_desc = {};
-      identity_desc.InputTensor = &input_descs[0];
-      identity_desc.OutputTensor = &output_descs[0];
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(result);
+      }
 
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY,
-                                   &identity_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+          scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
+      Initialize(ctx, std::move(tensors), compiled_op.Get());
+
+      return;
+    }
+
+    // Unlike other reduction operators, the behavior for arg functions when
+    // there are no axes to reduce is to output 0's everywhere
+    is_no_op_ =
+        is_arg_function_ &&
+        (reduce_helper.ndims() == 0 ||
+         (reduce_helper.ndims() == 1 && !reduce_helper.reduce_first_axis()));
+
+    if (is_no_op_) {
+      zero_outputs_ = true;
+      InitializeAsNoOp(ctx);
       return;
     }
 
     // The input shape after adjacent reduction axes have been collapsed.
     const TensorShape& input_shape = reduce_helper.data_reshape();
 
-    // DML's reduction operator only supports up to 4 dimensions
-    CHECK(input_shape.dims() <= kNchwDimensionCount);
-
-    uint32_t reduce_axis_offset = kNchwDimensionCount - input_shape.dims();
+    uint32_t reduce_axis_offset =
+        input_shape.dims() >= kNchwDimensionCount
+            ? 0
+            : kNchwDimensionCount - input_shape.dims();
 
     // Compute the DML reduce axes based on the input shape. If
     // reduce_first_axis() is true we reduce over axes 0 and 2, otherwise we
@@ -306,11 +376,12 @@ class DmlReduceKernel : public DmlKernel {
       }
     }
 
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee
-    // that our output tensor's memory is zero'd, we need to do so manually
-    // prior to running the reduction.
-    if (Is64BitIntegerType(ctx->GetOutputDataType(0))) {
+    // Only Arg functions need the output to be zero'ed since they're the only
+    // functions that output strided uint32. Other reduction functions either
+    // use non-strided types or use int64, which got its upper bits initialized
+    // in the constructor already.
+    // TFDML #24881131
+    if (is_arg_function_ && Is64BitIntegerType(ctx->GetOutputDataType(0))) {
       zero_outputs_ = true;
     }
 
@@ -327,8 +398,9 @@ class DmlReduceKernel : public DmlKernel {
                                         output_shape);
 
     // Coerce the output datatype to unsigned, for argmin/argmax
-    if (DataTypeIsInteger(output.desc.GetTfDataType())) {
+    if (is_arg_function_ && DataTypeIsInteger(output.desc.GetTfDataType())) {
       output.desc.ForceUnsignedDataType();
+      zero_outputs_ = true;
     }
 
     DmlKernelTensors tensors;
@@ -338,49 +410,58 @@ class DmlReduceKernel : public DmlKernel {
     DML_TENSOR_DATA_TYPE dml_input_data_type =
         GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));
 
+    auto input_descs = GetDmlTensorDescs(tensors.inputs);
+    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto result = dml::InputTensor(scope, 0, input_descs[0]);
+
     // For logical operators like Any and All, we need to cast from uint8 to
     // float
     if (dml_input_data_type != DML_TENSOR_DATA_TYPE_FLOAT32 &&
         dml_input_data_type != DML_TENSOR_DATA_TYPE_FLOAT16) {
-      auto input_descs = GetDmlTensorDescs(tensors.inputs);
-
-      auto scope = dml::Graph(ctx->GetDmlDevice());
-      auto result = dml::InputTensor(scope, 0, input_descs[0]);
       result = dml::Cast(result, DML_TENSOR_DATA_TYPE_FLOAT32);
       result = dml::Reduce(result, reduce_function, reduce_axes);
       result = dml::Cast(result, dml_input_data_type);
-
-      Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
-          scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
-
-      Initialize(ctx, std::move(tensors), compiled_op.Get());
     } else {
-      auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto output_descs = GetDmlTensorDescs(tensors.outputs);
-
-      DML_REDUCE_OPERATOR_DESC reduce_desc = {};
-      reduce_desc.InputTensor = &input_descs[0];
-      reduce_desc.OutputTensor = &output_descs[0];
-      reduce_desc.Function = reduce_function;
-      reduce_desc.AxisCount = static_cast<UINT>(reduce_axes.size());
-      reduce_desc.Axes = reduce_axes.data();
-
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_REDUCE, &reduce_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      result = dml::Reduce(result, reduce_function, reduce_axes);
     }
+
+    // Arg functions never return negative indices, so even though TF only
+    // supports int64, we can safely use uint32 with strides instead of int32
+    // with strides
+    // TFDML #24881131
+    if (!is_arg_function_ &&
+        Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(result);
+    }
+
+    Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+    Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
+  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
       ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+    }
+
+    if (is_no_op_) {
+      return ctx->GetCurrentCompletionEvent();
     }
 
     return DmlKernel::Compute(ctx);
   }
 
  private:
+  bool is_no_op_ = false;
   bool zero_outputs_ = false;
+
+  // ARGMIN and ARGMAX are special reduce functions that can never be replaced
+  // by identity
+  static constexpr bool is_arg_function_ =
+      reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
+      reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
 };
 
 template <DML_REDUCE_FUNCTION reduce_function, typename TAxis>
@@ -405,7 +486,7 @@ using DmlReduceWrapper =
 // reduction_ops_sum.cc).
 TF_CALL_float(DML_REGISTER_KERNELS);
 TF_CALL_half(DML_REGISTER_KERNELS);
-TF_CALL_uint32(DML_REGISTER_KERNELS);
+TF_CALL_int64(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 #define DML_REGISTER_KERNELS(type)                           \
@@ -444,7 +525,6 @@ TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNELS);
 TF_CALL_float(DML_REGISTER_KERNELS);
 TF_CALL_half(DML_REGISTER_KERNELS);
 TF_CALL_int32(DML_REGISTER_KERNELS);
-TF_CALL_uint32(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 #define DML_REGISTER_KERNELS(type)                                           \
@@ -464,7 +544,6 @@ TF_CALL_uint32(DML_REGISTER_KERNELS);
 // reduction_ops_min.cc).
 TF_CALL_float(DML_REGISTER_KERNELS);
 TF_CALL_half(DML_REGISTER_KERNELS);
-TF_CALL_uint32(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 #define DML_REGISTER_KERNELS(type)                                           \
@@ -484,7 +563,24 @@ TF_CALL_uint32(DML_REGISTER_KERNELS);
 // reduction_ops_max.cc).
 TF_CALL_float(DML_REGISTER_KERNELS);
 TF_CALL_half(DML_REGISTER_KERNELS);
-TF_CALL_uint32(DML_REGISTER_KERNELS);
+TF_CALL_int64(DML_REGISTER_KERNELS);
+#undef DML_REGISTER_KERNELS
+
+#define DML_REGISTER_KERNELS(type)                                          \
+  REGISTER_KERNEL_BUILDER(Name("EuclideanNorm")                             \
+                              .Device(DEVICE_DML)                           \
+                              .TypeConstraint<type>("T")                    \
+                              .TypeConstraint<int32>("Tidx")                \
+                              .HostMemory("reduction_indices"),             \
+                          DmlReduceWrapper<DML_REDUCE_FUNCTION_L2, int32>); \
+  REGISTER_KERNEL_BUILDER(Name("EuclideanNorm")                             \
+                              .Device(DEVICE_DML)                           \
+                              .TypeConstraint<type>("T")                    \
+                              .TypeConstraint<int64>("Tidx")                \
+                              .HostMemory("reduction_indices"),             \
+                          DmlReduceWrapper<DML_REDUCE_FUNCTION_L2, int64>);
+TF_CALL_float(DML_REGISTER_KERNELS);
+TF_CALL_half(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 #define DML_REGISTER_KERNELS(type)                          \

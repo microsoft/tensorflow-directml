@@ -46,12 +46,6 @@ import traceback
 
 import numpy as np
 
-# TODO: Investigate why this needs to come before pywrap_tensorflow in the
-# WSL+DML build.
-# TFDML #25949798
-if sys.platform.startswith('linux'):
-  import google.protobuf.internal._api_implementation
-
 from tensorflow.python import pywrap_tensorflow
 
 # Protocol buffers

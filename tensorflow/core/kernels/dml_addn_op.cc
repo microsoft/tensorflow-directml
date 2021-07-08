@@ -73,25 +73,16 @@ class DmlAddNKernel : public DmlKernel {
         result += dml::InputTensor(scope, i, inputs[i]);
       }
 
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(result);
+      }
+
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
       Initialize(ctx, std::move(tensors), compiled_op.Get());
     }
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
-    }
-
-    return DmlKernel::Compute(ctx);
   }
 };
 
@@ -103,9 +94,7 @@ class DmlAddNKernel : public DmlKernel {
 // TODO(b/25387198): A special kernel exists for int32 (see aggregate_ops.cc).
 TF_CALL_float(REGISTER_KERNEL);
 TF_CALL_half(REGISTER_KERNEL);
-TF_CALL_uint32(REGISTER_KERNEL);
 TF_CALL_int64(REGISTER_KERNEL);
-TF_CALL_uint64(REGISTER_KERNEL);
 #undef REGISTER_KERNEL
 
 }  // namespace tensorflow

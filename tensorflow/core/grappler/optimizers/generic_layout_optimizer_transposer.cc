@@ -1667,6 +1667,7 @@ bool IsDefaultLayoutSensitiveOp(const NodeDef& node) {
                                                    "FusedBatchNormV2",
                                                    "FusedBatchNormV3",
                                                    "FusedConv2DBiasActivation",
+                                                   "_FusedConv2D",
                                                    "MaxPool",
                                                    "SpaceToDepth"};
   return default_layout_sensitive_ops.find(node.op()) !=

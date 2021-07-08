@@ -43,13 +43,4 @@ DmlGpuEvent DmlCommandQueue::GetNextCompletionEvent() {
   return DmlGpuEvent{last_fence_value_ + 1, fence_};
 }
 
-void DmlCommandQueue::Close() {
-  // Wait for flushed work:
-  assert(!closing_);
-  closing_ = true;
-  DmlGpuEvent event = GetCurrentCompletionEvent();
-  event.WaitForSignal();
-  closing_ = false;
-}
-
 }  // namespace tensorflow

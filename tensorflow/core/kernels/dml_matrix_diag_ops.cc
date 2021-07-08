@@ -184,9 +184,12 @@ class DmlMatrixDiagKernel : public DmlKernel {
       batch_size *= input_shape.dim_size(i);
     }
 
-    auto elem_count_per_batch = static_cast<uint32_t>(input_shape.num_elements() / batch_size);
-    auto output_height = static_cast<uint32_t>(output_shape.dim_size(output_shape.dims() - 2));
-    auto output_width = static_cast<uint32_t>(output_shape.dim_size(output_shape.dims() - 1));
+    auto elem_count_per_batch =
+        static_cast<uint32_t>(input_shape.num_elements() / batch_size);
+    auto output_height =
+        static_cast<uint32_t>(output_shape.dim_size(output_shape.dims() - 2));
+    auto output_width =
+        static_cast<uint32_t>(output_shape.dim_size(output_shape.dims() - 1));
 
     // Flatten the input into a batch of vectors
     TensorShape flattened_input_shape({batch_size, 1, 1, elem_count_per_batch});
@@ -341,6 +344,13 @@ class DmlMatrixDiagKernel : public DmlKernel {
       Name("MatrixDiag").Device(DEVICE_DML).TypeConstraint<type>("T"),      \
       DmlKernelWrapper<DmlMatrixDiagKernel<type>,                           \
                        MatrixDiagShapeHelper<type>>);                       \
+
+TF_CALL_float(REGISTER_DML_KERNEL);
+TF_CALL_half(REGISTER_DML_KERNEL);
+TF_CALL_bool(REGISTER_DML_KERNEL);
+#undef REGISTER_DML_KERNEL
+
+#define REGISTER_DML_KERNEL(type)                                           \
   REGISTER_KERNEL_BUILDER(                                                  \
       Name("BatchMatrixDiag").Device(DEVICE_DML).TypeConstraint<type>("T"), \
       DmlKernelWrapper<DmlMatrixDiagKernel<type>,                           \
@@ -348,7 +358,6 @@ class DmlMatrixDiagKernel : public DmlKernel {
 
 TF_CALL_float(REGISTER_DML_KERNEL);
 TF_CALL_half(REGISTER_DML_KERNEL);
-TF_CALL_bool(REGISTER_DML_KERNEL);
 #undef REGISTER_DML_KERNEL
 
 }  // namespace tensorflow

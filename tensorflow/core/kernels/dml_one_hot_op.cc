@@ -152,6 +152,13 @@ class DmlOneHotKernel : public DmlKernel {
     indices_info.desc = DmlTensorDesc::Create(indices_type, indices_shape_dml,
                                               indices_shape_dml);
 
+    // Although DML's OneHot supports int32, the way it handles negative indices
+    // is different from TensorFlow. In negative indices in DML are relative to
+    // the end, but in TensorFlow they are always out of bounds. By forcing the
+    // indices to be unsigned we make sure that they are always out of bounds if
+    // their signed representation is negative.
+    indices_info.desc.ForceUnsignedDataType();
+
     DmlTensorInfo on_value_info = {};
     on_value_info.kernel_index = 2;
     on_value_info.desc = DmlTensorDesc{value_type, {1, 1, 1, 1}};
@@ -176,28 +183,36 @@ class DmlOneHotKernel : public DmlKernel {
     auto on_value = dml::InputTensor(scope, 1, inputs[1]);
     auto off_value = dml::InputTensor(scope, 2, inputs[2]);
 
-    // DML's OneHot only supports uint32 for the indices tensor, but TF models
-    // use either int64 or int32. int64 already gets converted to uint32 with
-    // the strides hack
-    // (TFDML #24881131), so we
-    // only need to reinterpret the int32 data to uint32 here.
-    if (indices.GetOutputDesc().dataType == DML_TENSOR_DATA_TYPE_INT32) {
-      indices = dml::Reinterpret(indices, DML_TENSOR_DATA_TYPE_UINT32);
+    // DML's OneHot doesn't support uint8
+    if (indices.GetOutputDesc().dataType == DML_TENSOR_DATA_TYPE_UINT8) {
+      indices = dml::Cast(indices, DML_TENSOR_DATA_TYPE_UINT32);
     }
 
     // TF provides the on/off values as separate tensors, but DML expects a
     // single two-element tensor with values [off, on].
     auto values = dml::Join({off_value, on_value}, 3);
-    auto one_hot = dml::OneHot(indices, values, depth, axis_dml);
+    auto result = dml::OneHot(indices, values, depth, axis_dml);
+
+    // TFDML #24881131
+    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+      result = dml::ConvertInt32ToInt64(result);
+    }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
-        scope.Compile(DML_EXECUTION_FLAG_NONE, {one_hot});
+        scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
     Initialize(ctx, std::move(tensors), compiled_op.Get());
   }
 };
 
 #define DML_REGISTER_KERNELS(type)                          \
+  REGISTER_KERNEL_BUILDER(                                  \
+      Name("OneHot")                                        \
+          .Device(DEVICE_DML)                               \
+          .TypeConstraint<type>("T")                        \
+          .TypeConstraint<uint8>("TI")                      \
+          .HostMemory("depth"),                             \
+      DmlKernelWrapper<DmlOneHotKernel, OneHotShapeHelper>) \
   REGISTER_KERNEL_BUILDER(                                  \
       Name("OneHot")                                        \
           .Device(DEVICE_DML)                               \
@@ -213,16 +228,11 @@ class DmlOneHotKernel : public DmlKernel {
           .HostMemory("depth"),                             \
       DmlKernelWrapper<DmlOneHotKernel, OneHotShapeHelper>)
 
-// Composite operators can't easily support int64
-TF_CALL_float(DML_REGISTER_KERNELS);
 TF_CALL_half(DML_REGISTER_KERNELS);
-TF_CALL_uint32(DML_REGISTER_KERNELS);
-TF_CALL_uint16(DML_REGISTER_KERNELS);
-TF_CALL_uint8(DML_REGISTER_KERNELS);
-TF_CALL_int32(DML_REGISTER_KERNELS);
-TF_CALL_int16(DML_REGISTER_KERNELS);
-TF_CALL_int8(DML_REGISTER_KERNELS);
+TF_CALL_float(DML_REGISTER_KERNELS);
 TF_CALL_bool(DML_REGISTER_KERNELS);
+TF_CALL_int32(DML_REGISTER_KERNELS);
+TF_CALL_int64(DML_REGISTER_KERNELS);
 #undef DML_REGISTER_KERNELS
 
 }  // namespace tensorflow

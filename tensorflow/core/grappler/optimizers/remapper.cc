@@ -251,6 +251,16 @@ bool IsGpuCompatibleDataType(const NodeDef* contraction,
   }
 }
 
+bool IsDmlCompatibleDataType(const NodeDef* contraction,
+                             const string& type_attr = "T") {
+  DataType dtype = GetDataTypeFromAttr(*contraction, type_attr);
+  if (IsConv2D(*contraction) || IsMatMul(*contraction)) {
+    return dtype == DT_FLOAT;
+  } else {
+    return false;
+  }
+}
+
 bool IsCpuCompatibleDataFormat(const NodeDef* conv2d) {
   DCHECK(IsConv2D(*conv2d)) << "Expected Conv2D op";
   const string& data_format = conv2d->attr().at(kDataFormat).s();
@@ -258,6 +268,12 @@ bool IsCpuCompatibleDataFormat(const NodeDef* conv2d) {
 }
 
 bool IsGpuCompatibleDataFormat(const NodeDef* conv2d) {
+  DCHECK(IsConv2D(*conv2d)) << "Expected Conv2D op";
+  const string& data_format = conv2d->attr().at(kDataFormat).s();
+  return data_format == "NHWC" || data_format == "NCHW";
+}
+
+bool IsDmlCompatibleDataFormat(const NodeDef* conv2d) {
   DCHECK(IsConv2D(*conv2d)) << "Expected Conv2D op";
   const string& data_format = conv2d->attr().at(kDataFormat).s();
   return data_format == "NHWC" || data_format == "NCHW";
@@ -275,6 +291,12 @@ bool IsGpuCompatibleConv2D(const NodeDef* conv2d) {
          IsGpuCompatibleDataFormat(conv2d);
 }
 
+bool IsDmlCompatibleConv2D(const NodeDef* conv2d) {
+  DCHECK(IsConv2D(*conv2d)) << "Expected Conv2D op";
+  return NodeIsOnDml(conv2d) && IsDmlCompatibleDataType(conv2d) &&
+         IsDmlCompatibleDataFormat(conv2d);
+}
+
 bool IsCpuCompatibleMatMul(const NodeDef* matmul) {
   DCHECK(IsMatMul(*matmul)) << "Expected MatMul op";
 #ifndef INTEL_MKL
@@ -284,6 +306,11 @@ bool IsCpuCompatibleMatMul(const NodeDef* matmul) {
 #else
   return false;
 #endif  // !INTEL_MKL
+}
+
+bool IsDmlCompatibleMatMul(const NodeDef* matmul) {
+  DCHECK(IsMatMul(*matmul)) << "Expected MatMul op";
+  return NodeIsOnDml(matmul) && IsDmlCompatibleDataType(matmul);
 }
 
 // Checks if we can rewrite a pattern to the `_Fused{Conv2D,MatMul}` on CPU.
@@ -329,18 +356,42 @@ bool IsGpuCompatible(const RemapperContext& ctx,
 }
 bool IsGpuCompatible(const RemapperContext& ctx,
                      const ContractionWithBiasAdd& matched) {
-  const GraphDef* graph = ctx.graph_view.graph();
-  const NodeDef& contraction_node = graph->node(matched.contraction);
-  string task, device;
-
-  bool is_on_dml = DeviceNameUtils::SplitDeviceName(contraction_node.device(),
-                                                    &task, &device) &&
-                   absl::StartsWith(device, DEVICE_DML);
-
-  return is_on_dml && IsConv2D(contraction_node) &&
-         IsGpuCompatibleConv2D(&contraction_node);
+  return false;
 }
 bool IsGpuCompatible(const RemapperContext& ctx,
+                     const ContractionWithSqueezeAndBiasAdd& matched) {
+  return false;
+}
+
+// Checks if we can rewrite a pattern to the `_Fused{Conv2D,MatMul}` on DML.
+bool IsDmlCompatible(const RemapperContext& ctx,
+                     const ContractionWithBiasAddAndActivation& matched) {
+  const GraphDef* graph = ctx.graph_view.graph();
+  const NodeDef& contraction_node = graph->node(matched.contraction);
+
+  if (IsConv2D(contraction_node)) {
+    return IsDmlCompatibleConv2D(&contraction_node);
+  } else if (IsMatMul(contraction_node)) {
+    // DML's _FusedMatMul kernel does not support relu6.
+    const NodeDef& activation_node = graph->node(matched.activation);
+    bool is_relu_or_elu = IsRelu(activation_node) || IsElu(activation_node);
+    return is_relu_or_elu && IsDmlCompatibleMatMul(&contraction_node);
+  } else {
+    return false;
+  }
+}
+bool IsDmlCompatible(const RemapperContext& ctx,
+                     const ContractionWithBiasAdd& matched) {
+  const NodeDef& node = ctx.graph_view.graph()->node(matched.contraction);
+  if (IsConv2D(node)) {
+    return IsDmlCompatibleConv2D(&node);
+  } else if (IsMatMul(node)) {
+    return IsDmlCompatibleMatMul(&node);
+  } else {
+    return false;
+  }
+}
+bool IsDmlCompatible(const RemapperContext& ctx,
                      const ContractionWithSqueezeAndBiasAdd& matched) {
   return false;
 }
@@ -348,7 +399,8 @@ bool IsGpuCompatible(const RemapperContext& ctx,
 // Returns true if the given pattern is supported on the assigned device.
 template <typename Pattern>
 bool IsDeviceCompatible(const RemapperContext& ctx, Pattern& matched) {
-  return IsCpuCompatible(ctx, matched) || IsGpuCompatible(ctx, matched);
+  return IsCpuCompatible(ctx, matched) || IsGpuCompatible(ctx, matched) ||
+         IsDmlCompatible(ctx, matched);
 }
 
 bool IsSupportedActivation(const NodeDef& node) {
@@ -965,9 +1017,9 @@ bool FindFusedBatchNormEx(const RemapperContext& ctx, int node_index,
     const auto* fused_batch_norm_node_def = fused_batch_norm.node();
     if (!IsFusedBatchNorm(*fused_batch_norm_node_def)) return false;
 
-    // We fuse FusedBatchNorm only on GPU, because on CPU we fuse it with
+    // We fuse FusedBatchNorm only on GPU/DML, because on CPU we fuse it with
     // contraction (MatMul or Conv2D node).
-    if (!NodeIsOnGpu(fused_batch_norm_node_def)) return false;
+    if (NodeIsOnCpu(fused_batch_norm_node_def)) return false;
 
     DataType t_dtype = GetDataTypeFromAttr(*fused_batch_norm_node_def, "T");
     if (t_dtype != DT_FLOAT && t_dtype != DT_HALF) return false;
@@ -1002,7 +1054,7 @@ bool FindFusedBatchNormEx(const RemapperContext& ctx, int node_index,
       if (!valid_channel_dim) return false;
 
       // cuDNN must support CUDNN_BATCHNORM_SPATIAL_PERSISTENT mode.
-      if (!BatchnormSpatialPersistentEnabled()) return false;
+      if (NodeIsOnGpu(fused_batch_norm_node_def) && !BatchnormSpatialPersistentEnabled()) return false;
     }
 
     // FusedBatchNormV2 and V3 have an extra type parameter.

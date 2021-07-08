@@ -101,7 +101,7 @@ class LogSumExpTest(test_util.TensorFlowTestCase):
         y_tf_np = math_ops.reduce_logsumexp(x_np).eval()
         y_np = log(np.sum(exp(x_np)))
         if test_util.gpu_device_type() == "DML" and dtype == np.float16:
-          self.assertAllClose(y_tf_np, y_np, rtol=1e-3)
+          self.assertAllClose(y_tf_np, y_np, rtol=2e-3)
         else:
           self.assertAllClose(y_tf_np, y_np)
 
@@ -140,7 +140,7 @@ class LogSumExpTest(test_util.TensorFlowTestCase):
         self.assertEqual(y_tf_np.ndim, x_np.ndim)
         y_np = log(np.sum(exp(x_np), keepdims=True))
         if test_util.gpu_device_type() == "DML" and dtype == np.float16:
-          self.assertAllClose(y_tf_np, y_np, rtol=1e-3)
+          self.assertAllClose(y_tf_np, y_np, rtol=2e-3)
         else:
           self.assertAllClose(y_tf_np, y_np)
 

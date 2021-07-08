@@ -57,7 +57,7 @@ struct SimpleTile {
 template <typename Tmultiples>
 absl::optional<SimpleTile> SimplifyTile(const TensorShape& input_shape,
                                         const Tensor& multiples_tensor,
-                                        uint32_t output_size = 4) {
+                                        uint32_t output_size = 8) {
   SimpleTile desc = {};
   desc.input_shape.resize(output_size, 1);
   desc.output_shape.resize(output_size, 1);
@@ -156,14 +156,13 @@ class TileInitializationHelper : public InitializationHelper {
     const TensorShape& input_shape = ctx->input(0).shape();
     const Tensor& multiples = ctx->input(1);
 
-    // DML only supports tiling 4D tensors. Attempt to simplify into 4D.
-    simple_tile_ =
-        SimplifyTile<Tmultiples>(input_shape, multiples, kNchwDimensionCount);
+    // DML only supports tiling 8D tensors. Attempt to simplify into 8D.
+    simple_tile_ = SimplifyTile<Tmultiples>(input_shape, multiples, 8);
     OP_REQUIRES(ctx, simple_tile_,
                 errors::InvalidArgument(
-                    "DML doesn't support more than 4 dimensions for Tile after "
+                    "DML doesn't support more than 8 dimensions for Tile after "
                     "collapsing non-repeatable dimensions together, but could "
-                    "not simplify the given shape to 4D."));
+                    "not simplify the given shape to 8D."));
   }
 
   const absl::optional<SimpleTile>& GetSimpleTile() const {
@@ -189,6 +188,8 @@ class DmlTileKernel : public DmlKernel {
     const auto& out_shape = simple_tile->output_shape;
     auto dtype = ctx->GetInputDataType(0);
 
+    auto scope = dml::Graph(ctx->GetDmlDevice());
+
     if (simple_tile->is_identity_op) {
       DmlTensorInfo input;
       input.kernel_index = 0;
@@ -203,14 +204,18 @@ class DmlTileKernel : public DmlKernel {
       tensors.outputs = {output};
 
       auto inputs = GetDmlTensorDescs(tensors.inputs);
-      auto outputs = GetDmlTensorDescs(tensors.outputs);
+      auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
+      auto result = dml::Identity(input_tensor);
 
-      DML_ELEMENT_WISE_IDENTITY_OPERATOR_DESC desc = {};
-      desc.InputTensor = inputs.data();
-      desc.OutputTensor = outputs.data();
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(result);
+      }
 
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_ELEMENT_WISE_IDENTITY, &desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+          scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+      Initialize(ctx, std::move(tensors), compiled_op.Get());
     } else {
       DmlTensorInfo input;
       input.kernel_index = 0;
@@ -225,31 +230,19 @@ class DmlTileKernel : public DmlKernel {
       tensors.outputs = {output};
 
       auto inputs = GetDmlTensorDescs(tensors.inputs);
-      auto outputs = GetDmlTensorDescs(tensors.outputs);
+      auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
+      auto result = dml::Tile(input_tensor, simple_tile->repeats);
 
-      DML_TILE_OPERATOR_DESC tile_desc = {};
-      tile_desc.InputTensor = inputs.data();
-      tile_desc.OutputTensor = outputs.data();
-      tile_desc.RepeatsCount = simple_tile->repeats.size();
-      tile_desc.Repeats = simple_tile->repeats.data();
+      // TFDML #24881131
+      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
+        result = dml::ConvertInt32ToInt64(result);
+      }
 
-      DML_OPERATOR_DESC op_desc = {DML_OPERATOR_TILE, &tile_desc};
-      Initialize(ctx, std::move(tensors), op_desc);
+      Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
+          scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
+
+      Initialize(ctx, std::move(tensors), compiled_op.Get());
     }
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    // Currently, 64-bit integers in DML are emulated using 32-bit integers
-    // using striding to emulate a larger type. Because we can't guarantee that
-    // our output tensor's memory is zero'd, we need to do so manually prior to
-    // running running gather.
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    if (Is64BitIntegerType(output->dtype())) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
-    }
-
-    return DmlKernel::Compute(ctx);
   }
 };
 
@@ -271,7 +264,12 @@ using DmlTileWrapper =
                               .HostMemory("multiples"),            \
                           DmlTileWrapper<int64>);
 
-TF_CALL_DML_ALL_TYPES(DML_REGISTER_KERNEL);
+TF_CALL_bool(DML_REGISTER_KERNEL);
+TF_CALL_float(DML_REGISTER_KERNEL);
+TF_CALL_half(DML_REGISTER_KERNEL);
+TF_CALL_int16(DML_REGISTER_KERNEL);
+TF_CALL_int32(DML_REGISTER_KERNEL);
+TF_CALL_int64(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
 }  // namespace tensorflow
