@@ -221,15 +221,29 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
             << " persistent resource for kernel "
             << ctx->GetOpKernelContext()->op_kernel().type_string();
 
-    persistent_resource_ =
-        ctx->AllocateDefaultBuffer(exec_binding_props.PersistentResourceSize);
+   CD3DX12_HEAP_PROPERTIES default_heap_properties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+   CD3DX12_RESOURCE_DESC persistent_resource_desc = CD3DX12_RESOURCE_DESC::Buffer(
+       exec_binding_props.PersistentResourceSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+   
+   HRESULT hr = ctx->GetD3D12Device()->CreateCommittedResource(
+       &default_heap_properties,
+       D3D12_HEAP_FLAG_NONE,
+       &persistent_resource_desc,
+       D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+       nullptr,
+       IID_PPV_ARGS(&persistent_resource_));
 
-    OP_REQUIRES(ctx->GetOpKernelContext(), persistent_resource_,
-                errors::ResourceExhausted(
-                    "OOM when allocating a buffer of ",
-                    exec_binding_props.PersistentResourceSize, " bytes"));
+    if (dml_util::HrIsOutOfMemory(hr)) {
+      assert(!persistent_resource_);
+      OP_REQUIRES(ctx->GetOpKernelContext(), persistent_resource_,
+            errors::ResourceExhausted(
+                "OOM when allocating a persistent resource buffer of ",
+                exec_binding_props.PersistentResourceSize, " bytes"));
+    }
+  
+    DML_CHECK_SUCCEEDED(hr);
 
-    persistent_resource_binding_ = persistent_resource_.GetBufferBinding();
+    persistent_resource_binding_ = {persistent_resource_.Get(), 0, exec_binding_props.PersistentResourceSize};
   }
 
   // Initialize the operator
