@@ -62,12 +62,12 @@ def _parse_args():
   return parser.parse_args()
 
 
-def _parse_test_crashes(test_log_path):
+def _parse_test_crashes(log_path):
   test_crashes = []
 
   path_pattern = re.compile(r"Running '.+' with shard \d+\.\.\.")
 
-  with open(test_log_path, 'r', encoding='utf-16') as test_log:
+  with open(log_path, 'r', encoding='utf-16') as test_log:
     line = test_log.readline()
 
     current_test_title = None
@@ -197,7 +197,7 @@ def _generate_test_summary(xml_paths, test_crashes):
 
 def main():
   args = _parse_args()
-  test_crashes = _parse_test_crashes(args.test_log_path)
+  test_crashes = _parse_test_crashes(args.log_path)
   test_summary = _generate_test_summary(args.xml_paths, test_crashes)
 
   with open(args.out_summary_path, 'w') as outfile:
