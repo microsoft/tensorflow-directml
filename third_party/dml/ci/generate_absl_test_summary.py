@@ -34,6 +34,8 @@ import re
 import argparse
 import xml.etree.ElementTree as ET
 import json
+import glob
+import os
 
 CrashedTestInfo = collections.namedtuple('CrashedTestInfo', 'name path error')
 
@@ -54,9 +56,8 @@ def _parse_args():
                       help="path to the error log to output",
                       required=True)
 
-  parser.add_argument("--xml_paths",
-                      help="paths of the xml files produced by ABSL test",
-                      nargs='+',
+  parser.add_argument("--xml_files_dir",
+                      help="paths of directory where the xml files are located",
                       required=True)
 
   return parser.parse_args()
@@ -117,7 +118,10 @@ def _parse_test_crashes(log_path):
   return test_crashes
 
 
-def _generate_test_summary(xml_paths, test_crashes):
+def _generate_test_summary(xml_files_dir, test_crashes):
+  xml_paths = glob.glob(os.path.join(xml_files_dir, '**', '*_test_result.xml'),
+                        recursive=True)
+
   test_summary = {}
   test_summary['Time'] = 0.0
   test_summary['Tests'] = []
@@ -130,8 +134,8 @@ def _generate_test_summary(xml_paths, test_crashes):
 
   for xml_path in xml_paths:
     # The module name is encoded in the name of the file
-    module = re.sub(r'.*absltest_results_(.+)\.xml',
-                    lambda match: match.group(1), xml_path)
+    module = re.sub(r'(.+)_test_result\.xml', lambda match: match.group(1),
+                    xml_path)
 
     root = ET.parse(xml_path).getroot()
 
@@ -173,14 +177,14 @@ def _generate_test_summary(xml_paths, test_crashes):
 
           json_test_case['Errors'] = ''.join(error_strings).replace(
               '&#xA', '     ')
-        elif test_case.attrib['status'] == 'run' or test_case.attrib[
-            'result'] == 'completed':
+        elif (test_case.attrib['status'] == 'run' or
+              test_case.attrib['result'] == 'completed'):
           # Passed GTEST tests are logged as "run" while passed abseil tests are
           # logged as "completed"
           json_test_case['Result'] = 'Pass'
           test_summary['Counts']['Passed'] += 1
-        elif test_case.attrib['status'] == 'skipped' or test_case.attrib[
-            'result'] == 'suppressed':
+        elif (test_case.attrib['status'] == 'skipped' or
+              test_case.attrib['result'] == 'suppressed'):
           # Skipped GTEST tests are logged as "skipped" while skipped abseil
           # tests are logged as "suppressed"
           json_test_case['Result'] = 'Skipped'
@@ -198,7 +202,7 @@ def _generate_test_summary(xml_paths, test_crashes):
 def main():
   args = _parse_args()
   test_crashes = _parse_test_crashes(args.log_path)
-  test_summary = _generate_test_summary(args.xml_paths, test_crashes)
+  test_summary = _generate_test_summary(args.xml_files_dir, test_crashes)
 
   with open(args.out_summary_path, 'w') as outfile:
     json.dump(test_summary, outfile)
