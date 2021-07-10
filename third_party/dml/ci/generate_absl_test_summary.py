@@ -66,7 +66,7 @@ def _parse_args():
 def _parse_test_crashes(log_path):
   test_crashes = []
 
-  path_pattern = re.compile(r"Running '.+' with shard \d+\.\.\.")
+  path_pattern = re.compile(r"Running '(.+)' with shard \d+\.\.\.")
 
   with open(log_path, 'r', encoding='utf-16') as test_log:
     line = test_log.readline()
