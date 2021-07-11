@@ -137,7 +137,13 @@ def _generate_test_summary(xml_files_dir, test_crashes):
     module = re.sub(r'(.+)_test_result\.xml', lambda match: match.group(1),
                     xml_path)
 
-    root = ET.parse(xml_path).getroot()
+    try:
+      root = ET.parse(xml_path).getroot()
+    except ET.ParseError as e:
+      print('xml_path: ' + xml_path)
+      with open(xml_path) as f:
+        print(f.read())
+      raise e
 
     # Since all processes start at the same time, the total execution time is
     # the time it took for the slowest one to finish
