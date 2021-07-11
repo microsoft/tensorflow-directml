@@ -147,7 +147,7 @@ def _generate_test_summary(xml_files_dir, test_crashes):
       test_suite_name = test_suite.attrib['name']
 
       for test_case in test_suite.findall('testcase'):
-        test_case_name = test_case.attrib('name')
+        test_case_name = test_case.attrib['name']
         json_test_case = {}
         json_test_case['Name'] = f'{test_suite_name}.{test_case_name}'
         json_test_case['Module'] = module
