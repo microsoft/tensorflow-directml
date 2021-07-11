@@ -141,7 +141,7 @@ def _generate_test_summary(xml_files_dir, test_crashes):
 
     # Since all processes start at the same time, the total execution time is
     # the time it took for the slowest one to finish
-    test_summary['Time'] = max(test_summary['Time'], root.attrib['time'])
+    test_summary['Time'] = max(test_summary['Time'], float(root.attrib['time']))
 
     for test_suite in root.findall('testsuite'):
       test_suite_name = test_suite.attrib['name']
