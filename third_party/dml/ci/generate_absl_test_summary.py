@@ -151,7 +151,7 @@ def _generate_test_summary(xml_files_dir, test_crashes):
         json_test_case = {}
         json_test_case['Name'] = f'{test_suite_name}.{test_case_name}'
         json_test_case['Module'] = module
-        json_test_case['Time'] = test_case.attrib['Time']
+        json_test_case['Time'] = test_case.attrib['time']
 
         # Failures are saved as children nodes instead of attributes
         failures = test_case.findall('failure') + test_case.findall('error')
