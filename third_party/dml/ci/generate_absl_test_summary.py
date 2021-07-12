@@ -181,21 +181,25 @@ def _generate_test_summary(xml_files_dir, test_crashes):
 
           json_test_case['Errors'] = ''.join(error_strings).replace(
               '&#xA', '     ')
-        elif (test_case.attrib['status'] == 'run' or
-              test_case.attrib['result'] == 'completed'):
-          # Passed GTEST tests are logged as "run" while passed abseil tests are
-          # logged as "completed"
-          json_test_case['Result'] = 'Pass'
-          test_summary['Counts']['Passed'] += 1
-        elif (test_case.attrib['status'] == 'skipped' or
-              test_case.attrib['result'] == 'suppressed'):
-          # Skipped GTEST tests are logged as "skipped" while skipped abseil
-          # tests are logged as "suppressed"
-          json_test_case['Result'] = 'Skipped'
-          test_summary['Counts']['Skipped'] += 1
         else:
-          json_test_case['Result'] = 'Blocked'
-          test_summary['Counts']['Blocked'] += 1
+          try:
+            status = test_case.attrib['status']
+            pass_string = 'run'
+            skip_string = 'skipped'
+          except KeyError:
+            status = test_case.attrib['result']
+            pass_string = 'completed'
+            skip_string = 'suppressed'
+
+          if status == pass_string:
+            json_test_case['Result'] = 'Pass'
+            test_summary['Counts']['Passed'] += 1
+          elif status == skip_string:
+            json_test_case['Result'] = 'Skipped'
+            test_summary['Counts']['Skipped'] += 1
+          else:
+            json_test_case['Result'] = 'Blocked'
+            test_summary['Counts']['Blocked'] += 1
 
         test_summary['Counts']['Total'] += 1
         test_summary['Tests'].append(json_test_case)
