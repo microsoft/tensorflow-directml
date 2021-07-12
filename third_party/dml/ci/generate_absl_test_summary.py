@@ -139,8 +139,8 @@ def _generate_test_summary(xml_files_dir, test_crashes):
 
     try:
       root = ET.parse(xml_path).getroot()
-    except ET.ParseError as e:
-      print('Skipping empty XML: ' + e)
+    except ET.ParseError:
+      print('Skipping empty XML')
       continue
 
     # Since all processes start at the same time, the total execution time is
