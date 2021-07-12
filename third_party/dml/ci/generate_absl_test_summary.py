@@ -60,6 +60,14 @@ def _parse_args():
                       help="paths of directory where the xml files are located",
                       required=True)
 
+  parser.add_argument("--start_time",
+                      help="the start time of the tests",
+                      required=True)
+
+  parser.add_argument("--end_time",
+                      help="the end time of the tests",
+                      required=True)
+
   return parser.parse_args()
 
 
@@ -211,9 +219,16 @@ def main():
   args = _parse_args()
   test_crashes = _parse_test_crashes(args.log_path)
   test_summary = _generate_test_summary(args.xml_files_dir, test_crashes)
+  json_root = {
+      'Time': {
+          'Start': args.start_time,
+          'End': args.end_time
+      },
+      'Summary': [test_summary]
+  }
 
   with open(args.out_summary_path, 'w') as outfile:
-    json.dump(test_summary, outfile)
+    json.dump(json_root, outfile)
 
   if 'Errors' in test_summary:
     with open(args.out_error_log_path, 'w') as outfile:

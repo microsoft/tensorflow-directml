@@ -36,10 +36,8 @@ if ($RunOnWsl)
 
 foreach ($TestGroup in $TestGroups)
 {
-    $Results = @{'Time'=@{}}
-
     Write-Host "Testing $TestGroup..."
-    $Results.Time.Start = (Get-Date).ToString()
+    $StartTime = (Get-Date).ToString()
 
     if ($RunOnWsl)
     {
@@ -59,7 +57,7 @@ foreach ($TestGroup in $TestGroups)
         $TestResultFragments = (Get-ChildItem $BuildArtifactsPath -Filter '*_test_result.xml' -Recurse).FullName
     }
 
-    $Results.Time.End = (Get-Date).ToString()
+    $EndTime = (Get-Date).ToString()
 
     if ($TestResultFragments.Count -gt 0)
     {
@@ -70,7 +68,9 @@ foreach ($TestGroup in $TestGroups)
             --log_path "$PSScriptRoot/test_${TestGroup}_log.txt" `
             --out_summary_path "$BuildArtifactsPath/test_${TestGroup}_summary.json" `
             --out_error_log_path "$BuildArtifactsPath/test_${TestGroup}_errors.txt" `
-            --xml_files_dir $BuildArtifactsPath
+            --xml_files_dir $BuildArtifactsPath `
+            --start_time "$StartTime" `
+            --end_time "$EndTime"
 
         if ($LASTEXITCODE -ne 0)
         {
