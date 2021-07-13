@@ -190,19 +190,13 @@ def _generate_test_summary(xml_files_dir, test_crashes):
           json_test_case['Errors'] = ''.join(error_strings).replace(
               '&#xA', '     ')
         else:
-          try:
-            status = test_case.attrib['status']
-            pass_string = 'run'
-            skip_string = 'skipped'
-          except KeyError:
-            status = test_case.attrib['result']
-            pass_string = 'completed'
-            skip_string = 'suppressed'
+          status = test_case.attrib.get('status', '')
+          result = test_case.attrib.get('result', '')
 
-          if status == pass_string:
+          if status == 'run' or result == 'completed':
             json_test_case['Result'] = 'Pass'
             test_summary['Counts']['Passed'] += 1
-          elif status == skip_string:
+          elif status == 'skipped' or result == 'suppressed':
             json_test_case['Result'] = 'Skipped'
             test_summary['Counts']['Skipped'] += 1
           else:
