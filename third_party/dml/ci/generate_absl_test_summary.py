@@ -84,41 +84,33 @@ def _parse_test_crashes(log_path):
 
     while line:
       if line.startswith('[ RUN      ]'):
-        if current_test_title is not None:
-          # Ideally we would include the stack trace in the error messages, but
-          # if there are many crashes it can blow up the size of the json file
-          # to more than 4GB. Also, the error output of different tests in the
-          # test log may be interleaved so we can't reliably parse anything
-          # here.
-          error_message = f'Fatal error in {current_test_title}: Aborted'
-          test_info = CrashedTestInfo(name=current_test_title,
-                                      path=current_test_path,
-                                      error=error_message)
-          test_crashes.append(test_info)
-          current_test_title = None
-
         current_test_title = line[line.index(']') + 2:].rstrip('\n')
       else:
         if (line.startswith('[       OK ]') or
             line.startswith('[  FAILED  ]') or line.startswith('[  SKIPPED ]')):
           current_test_title = None
-        else:
+        elif current_test_title is not None:
           path_matches = path_pattern.match(line)
 
+          # If we started running a new executable without seeing the OK, FAILED
+          # or SKIPPED tag, we know that we have a crash
           if path_matches is not None:
-            if current_test_title is not None:
-              error_message = f'Fatal error in {current_test_title}: Aborted'
-              test_info = CrashedTestInfo(name=current_test_title,
-                                          path=current_test_path,
-                                          error=error_message)
-              test_crashes.append(test_info)
-              current_test_title = None
+            error_message = f'Fatal error in {current_test_title}: Aborted'
+            test_info = CrashedTestInfo(name=current_test_title,
+                                        path=current_test_path,
+                                        error=error_message)
+            test_crashes.append(test_info)
+            current_test_title = None
 
             current_test_path = path_matches.group(1)
 
       line = test_log.readline()
 
     if current_test_title is not None:
+      # Ideally we would include the stack trace in the error messages, but if
+      # there are many crashes it can blow up the size of the json file to more
+      # than 4GB. Also, the error output of different tests in the test log may
+      # be interleaved so we can't reliably parse anything here.
       error_message = f'Fatal error in {current_test_title}: Aborted'
       test_info = CrashedTestInfo(name=current_test_title,
                                   path=current_test_path,
