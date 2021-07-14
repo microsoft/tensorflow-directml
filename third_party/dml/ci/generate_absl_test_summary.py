@@ -200,19 +200,19 @@ def _generate_test_summary(xml_files_dir, test_crashes):
         test_summary['Counts']['Total'] += 1
         test_summary['Tests'].append(json_test_case)
 
-    # Add the test cases gathered from the crashes
-    for test_crash in test_crashes:
-      json_test_case = {
-          'Name': test_crash.name,
-          'Module': test_crash.path,
-          'Time': '0',
-          'Result': 'Fail',
-          'Errors': test_crash.error,
-      }
+  # Add the test cases gathered from the crashes
+  for test_crash in test_crashes:
+    json_test_case = {
+        'Name': test_crash.name,
+        'Module': test_crash.path,
+        'Time': '0',
+        'Result': 'Fail',
+        'Errors': test_crash.error,
+    }
 
-      test_summary['Counts']['Failed'] += 1
-      test_summary['Counts']['Total'] += 1
-      test_summary['Tests'].append(json_test_case)
+    test_summary['Counts']['Failed'] += 1
+    test_summary['Counts']['Total'] += 1
+    test_summary['Tests'].append(json_test_case)
 
   return test_summary
 
