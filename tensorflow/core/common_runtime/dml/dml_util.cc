@@ -299,6 +299,16 @@ dml::TensorPolicy GetEmulatedInt64TensorPolicy() {
   });
 }
 
+dml::TensorStrides ComputePackedStrides(const dml::Span<const uint32_t>& sizes) {
+  dml::TensorStrides strides(sizes.size());
+  uint32_t stride = 1;
+  for (int i = sizes.size() - 1; i >= 0; --i) {
+    strides[i] = stride;
+    stride *= sizes[i];
+  }
+  return strides;
+}
+
 namespace dml_util {
 
 void CopyTensorInSameDevice(OpKernelContext* op_ctx, Tensor* dst,
