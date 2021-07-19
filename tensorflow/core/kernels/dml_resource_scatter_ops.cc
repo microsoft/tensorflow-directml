@@ -242,9 +242,11 @@ class DmlResourceScatterNDUpdateKernel : public DmlKernel {
 
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
-        ctx->CreateBufferForTensor(params_tensor),
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(1)),
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(2)),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(params_tensor),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            ctx->GetInputTensor(1)),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            ctx->GetInputTensor(2)),
     };
 
     // Create input bindings
@@ -429,7 +431,8 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
                              Is64BitIntegerType(indices_dtype));
 
     const uint32_t buffer_size = indices_last_dim * DataTypeSize(indices_dtype);
-    strides_buffer_ = ctx->AllocateDefaultBuffer(buffer_size);
+    strides_buffer_ =
+        ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(buffer_size);
 
     OP_REQUIRES(ctx->GetOpKernelContext(), strides_buffer_,
                 errors::ResourceExhausted("OOM when allocating a buffer of ",
@@ -466,16 +469,18 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
     auto byte_ptr = reinterpret_cast<const uint8_t*>(strides.data());
     auto byte_span = absl::MakeSpan(byte_ptr, strides.size() * sizeof(Index));
 
-    const auto status_or_event = ctx->CopyHostToBuffer(
-        strides_buffer_->Resource(), strides_buffer_->Offset(), byte_span);
+    const auto status_or_event = ctx->GetDmlDeviceContext()->CopyHostToBuffer(
+        strides_buffer_->Region(), byte_span);
 
     TF_RETURN_IF_ERROR(status_or_event.status());
 
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
-        ctx->CreateBufferForTensor(params_tensor),
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(1)),
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(2)),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(params_tensor),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            ctx->GetInputTensor(1)),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            ctx->GetInputTensor(2)),
     };
 
     // Create input bindings
@@ -491,7 +496,8 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
     const bool isTensorInput = init_helper->IsTensorInput();
     if (isTensorInput) {
       D3D12BufferRegion output_buffer =
-          ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
+          ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+              *ctx->GetOutputTensor(0));
       output_bindings.push_back(output_buffer.GetBufferBinding());
 
       auto status_or_event =
@@ -502,7 +508,8 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
 
     } else {
       DmlBuffer output_buffer =
-          ctx->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
+          ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(
+              input_buffers[0].SizeInBytes());
       output_bindings.push_back(output_buffer.GetBufferBinding());
 
       auto status_or_event =
@@ -510,12 +517,10 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
       if (!status_or_event.ok()) {
         return status_or_event;
       }
-      ctx->CopyBufferToBuffer(input_buffers[0].Resource(),
-                              input_buffers[0].Offset(),
-                              output_buffer.Resource(), output_buffer.Offset(),
-                              output_buffer.SizeInBytes());
+      ctx->GetDmlDeviceContext()->CopyBufferToBuffer(input_buffers[0],
+                                                     output_buffer.Region());
     }
-    gpu_event = ctx->InsertUavBarrier();
+    gpu_event = ctx->GetDmlDeviceContext()->InsertUavBarrier();
     return gpu_event;
   }
 };

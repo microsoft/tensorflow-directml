@@ -165,7 +165,7 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
     OP_REQUIRES_OK(ctx, ctx->allocate_output(0, input_shape, &output));
 
     DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
-    const auto& execution_context = device->GetExecutionContext();
+    auto device_context = static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
     D3D12BufferRegion input_buffer =
         dml_util::CreateBufferForTensor(device, input);
@@ -173,35 +173,13 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
     D3D12BufferRegion output_buffer =
         dml_util::CreateBufferForTensor(device, *output);
 
-    std::array<D3D12_RESOURCE_BARRIER, 2> barriers = {
-        CD3DX12_RESOURCE_BARRIER::Transition(
-            input_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            D3D12_RESOURCE_STATE_COPY_SOURCE),
-        CD3DX12_RESOURCE_BARRIER::Transition(
-            output_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            D3D12_RESOURCE_STATE_COPY_DEST),
-    };
-
-    execution_context->ResourceBarrier(barriers);
-
     const int perm_stride = DataTypeSize(input.dtype()) * input_shape.dims();
 
     for (uint32_t i = 0; i < permutations.size(); ++i) {
-      uint64_t dst_offset = output_buffer.Offset() + i * perm_stride;
-      uint64_t src_offset =
-          input_buffer.Offset() + permutations[i] * perm_stride;
-
-      execution_context->CopyBufferRegion(
-          output_buffer.Resource(), dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
-          input_buffer.Resource(), src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
-          perm_stride);
+      device_context->CopyBufferToBuffer(
+          output_buffer.Subregion(i * perm_stride),
+          input_buffer.Subregion(permutations[i] * perm_stride, perm_stride));
     }
-
-    for (auto& barrier : barriers) {
-      std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
-    }
-
-    execution_context->ResourceBarrier(barriers);
   }
 
  private:

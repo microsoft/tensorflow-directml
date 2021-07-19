@@ -30,13 +30,13 @@ DmlUploadHeap::DmlUploadHeap(ID3D12Device* device,
       execution_context_(execution_context) {}
 
 StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
-    ID3D12Resource* dst, uint64_t dst_offset, D3D12_RESOURCE_STATES dst_state,
-    absl::Span<const uint8_t> src) {
+    const D3D12BufferRegion& dst, absl::Span<const uint8_t> src) {
   std::unique_lock<std::mutex> lock(mutex_);
   TF_RETURN_IF_ERROR(execution_context_->GetCommandRecorderStatus());
 
   assert(!src.empty());
-  assert(dst->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
+  assert(dst.ResourceInFixedState()->GetDesc().Dimension ==
+         D3D12_RESOURCE_DIMENSION_BUFFER);
 
   InvariantChecker checker(this);
 
@@ -58,10 +58,13 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
          src.size());
   chunk->resource->Unmap(0, nullptr);
 
+  auto upload_resource = D3D12BufferRegion(offset_in_chunk, src.size(),
+                                           D3D12_RESOURCE_STATE_GENERIC_READ,
+                                           chunk->resource.Get());
+
   // Copy from the upload heap into the destination resource
   DmlGpuEvent done_event = execution_context_->CopyBufferRegion(
-      dst, dst_offset, dst_state, chunk->resource.Get(), offset_in_chunk,
-      D3D12_RESOURCE_STATE_GENERIC_READ, src.size());
+      dst, upload_resource);
 
   // Add an allocation entry to the chunk
   chunk->allocations.push_back(Allocation{static_cast<uint64_t>(src.size()),

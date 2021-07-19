@@ -129,17 +129,19 @@ class DmlInplaceKernel : public DmlKernel {
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
+    auto device_context = ctx->GetDmlDeviceContext();
+
     D3D12BufferRegion input_buffer =
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(0));
+        device_context->CreateBufferForTensor(ctx->GetInputTensor(0));
 
     D3D12BufferRegion indices_buffer =
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(1));
+        device_context->CreateBufferForTensor(ctx->GetInputTensor(1));
 
     D3D12BufferRegion updates_buffer =
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(2));
+        device_context->CreateBufferForTensor(ctx->GetInputTensor(2));
 
     D3D12BufferRegion output_buffer =
-        ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
+        device_context->CreateBufferForTensor(*ctx->GetOutputTensor(0));
 
     const absl::optional<DML_BUFFER_BINDING> input_bindings[3] = {
         input_buffer.GetBufferBinding(),
@@ -158,11 +160,9 @@ class DmlInplaceKernel : public DmlKernel {
       return status_or_gpu_event;
     }
 
-    ctx->CopyBufferToBuffer(input_buffer.Resource(), input_buffer.Offset(),
-                            output_buffer.Resource(), output_buffer.Offset(),
-                            input_buffer.SizeInBytes());
+    device_context->CopyBufferToBuffer(input_buffer, output_buffer);
 
-    return ctx->InsertUavBarrier();
+    return device_context->InsertUavBarrier();
   }
 };
 

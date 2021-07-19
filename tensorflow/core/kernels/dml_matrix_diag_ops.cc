@@ -319,7 +319,7 @@ class DmlMatrixDiagKernel : public DmlKernel {
       // Fill the buffer with the padding value since we use strides to skip
       // over elements
       Tensor* output = ctx->GetOutputTensor(0);
-      ctx->FillBufferWithValue(ctx->CreateBufferForTensor(*output),
+      ctx->GetDmlDeviceContext()->FillBufferWithValue(ctx->GetDmlDeviceContext()->CreateBufferForTensor(*output),
                                static_cast<float>(padding_value_));
     }
 

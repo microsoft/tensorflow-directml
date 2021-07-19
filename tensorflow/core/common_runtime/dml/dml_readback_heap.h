@@ -34,9 +34,7 @@ class DmlReadbackHeap : public DmlPooledHeap {
   // event becomes signaled. Both the dst buffer and src resource must stay
   // alive until the copy is complete.
   StatusOr<DmlGpuEvent> ReadbackFromGpu(absl::Span<uint8_t> dst,
-                                        ID3D12Resource* src,
-                                        uint64_t src_offset,
-                                        D3D12_RESOURCE_STATES src_state);
+                                        const D3D12BufferRegion& src);
 
  private:
   std::mutex mutex_;

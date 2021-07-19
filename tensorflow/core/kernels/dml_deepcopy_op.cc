@@ -42,28 +42,7 @@ class DmlDeepCopyKernel : public OpKernel {
     D3D12BufferRegion output_buffer =
         dml_util::CreateBufferForTensor(device, *output);
 
-    std::array<D3D12_RESOURCE_BARRIER, 2> barriers = {
-        CD3DX12_RESOURCE_BARRIER::Transition(
-            input_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            D3D12_RESOURCE_STATE_COPY_SOURCE),
-        CD3DX12_RESOURCE_BARRIER::Transition(
-            output_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            D3D12_RESOURCE_STATE_COPY_DEST),
-    };
-
-    execution_context->ResourceBarrier(barriers);
-
-    execution_context->CopyBufferRegion(
-        output_buffer.Resource(), output_buffer.Offset(),
-        D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(),
-        input_buffer.Offset(), D3D12_RESOURCE_STATE_COPY_SOURCE,
-        output_buffer.SizeInBytes());
-
-    for (auto& barrier : barriers) {
-      std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
-    }
-
-    execution_context->ResourceBarrier(barriers);
+    execution_context->CopyBufferRegion(output_buffer, input_buffer);
   }
 };
 

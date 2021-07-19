@@ -443,11 +443,11 @@ class DmlReduceKernel : public DmlKernel {
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->GetDmlDeviceContext()->ZeroBuffer(ctx->GetDmlDeviceContext()->CreateBufferForTensor(*output));
     }
 
     if (is_no_op_) {
-      return ctx->GetCurrentCompletionEvent();
+      return ctx->GetDmlDeviceContext()->GetCurrentCompletionEvent();
     }
 
     return DmlKernel::Compute(ctx);

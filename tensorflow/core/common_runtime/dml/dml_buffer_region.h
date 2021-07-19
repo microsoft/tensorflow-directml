@@ -24,15 +24,17 @@ class D3D12HeapAllocator;
 // Represents a region of a D3D12 buffer resource. A buffer region has an
 // underlying ID3D12Resource* (of D3D12_RESOURCE_DIMENSION_BUFFER), an offset in
 // bytes from the beginning of that buffer, and a size in bytes of the region.
-// This object owns the underlying D3D12 resource; once this object is
-// destructed the resource is returned back to its parent allocator.
 class D3D12BufferRegion {
  public:
   D3D12BufferRegion() = default;
-  D3D12BufferRegion(D3D12HeapAllocator* allocator, uint32_t allocation_id,
-                  Microsoft::WRL::ComPtr<ID3D12Resource> resource,
-                  uint64_t offset, uint64_t size_in_bytes);
-  ~D3D12BufferRegion();
+
+  // References a region of a resource that remains in a fixed state.
+  D3D12BufferRegion(
+      uint64_t offset, uint64_t size_in_bytes,
+      D3D12_RESOURCE_STATES resource_state,
+      Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state = nullptr,
+      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state = nullptr);
 
   // Move-only
   D3D12BufferRegion(const D3D12BufferRegion&) = delete;
@@ -40,20 +42,33 @@ class D3D12BufferRegion {
   D3D12BufferRegion(D3D12BufferRegion&&) = default;
   D3D12BufferRegion& operator=(D3D12BufferRegion&&) = default;
 
-  ID3D12Resource* Resource() const;
+  ID3D12Resource* ResourceInFixedState() const;
+  ID3D12Resource* ResourceInCopySrcState() const;
+  ID3D12Resource* ResourceInCopyDstState() const;
   uint64_t Offset() const;
   uint64_t SizeInBytes() const;
+  D3D12_RESOURCE_STATES ResourceState() const;
 
   DML_BUFFER_BINDING GetBufferBinding() const;
 
   explicit operator bool() const { return resource_ != nullptr; }
 
+  // Creates a subregion at an offset from the start of this region. If no size is provided
+  // the region runs to the end of the current region.
+  inline D3D12BufferRegion Subregion(uint64_t offset, uint64_t size_in_bytes = 0) const {
+    size_in_bytes = size_in_bytes == 0 ? size_in_bytes_ - offset : size_in_bytes;
+    return D3D12BufferRegion(offset_ + offset, size_in_bytes, resource_state_,
+                             resource_, resource_copy_src_state_,
+                             resource_copy_dst_state_);
+  }
+
  private:
-  D3D12HeapAllocator* allocator_ = nullptr;
-  uint32_t allocation_id_ = 0;
   Microsoft::WRL::ComPtr<ID3D12Resource> resource_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state_;
   uint64_t offset_ = 0;
   uint64_t size_in_bytes_ = 0;
+  D3D12_RESOURCE_STATES resource_state_ = D3D12_RESOURCE_STATE_COMMON;
 };
 
 }  // namespace tensorflow

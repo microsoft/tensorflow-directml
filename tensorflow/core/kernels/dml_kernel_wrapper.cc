@@ -93,11 +93,7 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
         if (output_tensor->NumElements() != 0) {
           D3D12BufferRegion buffer =
               dml_util::CreateBufferForTensor(dml_device, *output_tensor);
-
-          const uint8_t fill_pattern[] = {0};
-          dml_device->GetExecutionContext()->FillBufferWithPattern(
-              buffer.Resource(), buffer.Offset(), buffer.SizeInBytes(),
-              fill_pattern);
+          static_cast<DMLDeviceContext*>(ctx->op_device_context())->ZeroBuffer(buffer);
         }
       }
       return;

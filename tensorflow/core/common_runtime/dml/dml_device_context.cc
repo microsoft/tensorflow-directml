@@ -35,19 +35,13 @@ void DMLDeviceContext::CopyCPUTensorToDevice(const Tensor* cpu_tensor,
 
   const void* src_data = DMAHelper::base(cpu_tensor);
 
-  D3D12BufferRegion dst = dml_util::CreateBufferForTensor(
-      static_cast<DmlDevice*>(device), *device_tensor);
-  ID3D12Resource* dst_data = dst.Resource();
-  const uint64_t dst_offset = dst.Offset();
-  const auto dst_state =
-      D3D12_RESOURCE_STATE_UNORDERED_ACCESS;  // GPU resources are always kept
-                                              // in UAV state
+  D3D12BufferRegion dst = CreateBufferForTensor(*device_tensor);
 
   auto byte_span = absl::Span<const uint8_t>(
       static_cast<const uint8_t*>(src_data), total_bytes);
 
-  StatusOr<DmlGpuEvent> status_or_event = upload_heap_->BeginUploadToGpu(
-      dst_data, dst_offset, dst_state, byte_span);
+  StatusOr<DmlGpuEvent> status_or_event =
+      upload_heap_->BeginUploadToGpu(dst, byte_span);
 
   // Immediately signal completion even though we haven't actually kicked off
   // the GPU, or waited for it to complete. This is because from the framework's
@@ -67,25 +61,10 @@ void DMLDeviceContext::CopyTensorInSameDevice(const Tensor* input_tensor,
     return;
   }
 
-  D3D12BufferRegion src = dml_util::CreateBufferForTensor(
-      static_cast<DmlDevice*>(device), *input_tensor);
-  ID3D12Resource* src_data = src.Resource();
-  const uint64_t src_offset = src.Offset();
-  const auto src_state =
-      D3D12_RESOURCE_STATE_UNORDERED_ACCESS;  // GPU resources are always kept
-                                              // in UAV state
+  D3D12BufferRegion src = CreateBufferForTensor(*input_tensor);
+  D3D12BufferRegion dst = CreateBufferForTensor(*output_tensor);
 
-  D3D12BufferRegion dst = dml_util::CreateBufferForTensor(
-      static_cast<DmlDevice*>(device), *output_tensor);
-  ID3D12Resource* dst_data = dst.Resource();
-  const uint64_t dst_offset = dst.Offset();
-  const auto dst_state =
-      D3D12_RESOURCE_STATE_UNORDERED_ACCESS;  // GPU resources are always kept
-                                              // in UAV state
-
-  (void)execution_context_->CopyBufferRegion(dst_data, dst_offset, dst_state,
-                                             src_data, src_offset, src_state,
-                                             total_bytes);
+  (void)execution_context_->CopyBufferRegion(dst, src.Subregion(0, total_bytes));
 
   // Immediately signal completion even though we haven't actually kicked off
   // the GPU, or waited for it to complete. This is because from the framework's
@@ -105,13 +84,7 @@ void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
     return;
   }
 
-  D3D12BufferRegion src = dml_util::CreateBufferForTensor(
-      static_cast<DmlDevice*>(device), *device_tensor);
-  ID3D12Resource* src_data = src.Resource();
-  const uint64_t src_offset = src.Offset();
-  const auto src_state =
-      D3D12_RESOURCE_STATE_UNORDERED_ACCESS;  // GPU resources are always kept
-                                              // in UAV state
+  D3D12BufferRegion src = CreateBufferForTensor(*device_tensor);
 
   void* dst_data = DMAHelper::base(cpu_tensor);
 
@@ -120,8 +93,8 @@ void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
   auto byte_span =
       absl::Span<uint8_t>(static_cast<uint8_t*>(dst_data), total_bytes);
 
-  StatusOr<DmlGpuEvent> status_or_event = readback_heap_->ReadbackFromGpu(
-      byte_span, src_data, src_offset, src_state);
+  StatusOr<DmlGpuEvent> status_or_event =
+      readback_heap_->ReadbackFromGpu(byte_span, src);
 
   if (!status_or_event.ok()) {
     done(status_or_event.status());
@@ -146,6 +119,153 @@ void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
     done(Status::OK());
   };
   event_queue_->Enqueue(status_or_event.ConsumeValueOrDie(), callback);
+}
+
+// TODO: consider moving this code into EC outside of lock
+DmlGpuEvent DMLDeviceContext::BindAndInitializeOperator(
+    IDMLOperatorInitializer* initializer,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+    ID3D12DescriptorHeap* heap_for_binding_table,
+    _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
+    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding) {
+  // Bind the temporary resource
+  if (temporary_resource_binding) {
+    DML_BINDING_DESC temporary_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                                               temporary_resource_binding};
+    binding_table->BindTemporaryResource(&temporary_binding_desc);
+  }
+
+  // Bind the persistent resource
+  if (persistent_resource_binding) {
+    DML_BINDING_DESC persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                                                persistent_resource_binding};
+    binding_table->BindOutputs(1, &persistent_binding_desc);
+  }
+
+  return execution_context_->InitializeOperator(
+      initializer, std::move(binding_table), heap_for_binding_table);
+}
+
+// TODO: consider moving this code into EC outside of lock
+DmlGpuEvent DMLDeviceContext::BindAndExecuteOperator(
+    IDMLCompiledOperator* op,
+    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
+    ID3D12DescriptorHeap* heap_for_binding_table,
+    _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
+    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
+    absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
+    absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings) {
+  // Bind the temporary resource
+  DML_BINDING_DESC temporary_binding_desc = {DML_BINDING_TYPE_NONE, nullptr};
+  if (temporary_resource_binding) {
+    temporary_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                              temporary_resource_binding};
+  }
+  binding_table->BindTemporaryResource(&temporary_binding_desc);
+
+  // Bind the persistent resource
+  DML_BINDING_DESC persistent_binding_desc = {DML_BINDING_TYPE_NONE, nullptr};
+  if (persistent_resource_binding) {
+    persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
+                               persistent_resource_binding};
+  }
+  binding_table->BindPersistentResource(&persistent_binding_desc);
+
+  // Set up the input bindings
+  absl::InlinedVector<DML_BINDING_DESC, 8> input_binding_descs;
+  for (const auto& binding : input_bindings) {
+    DML_BINDING_DESC desc = {DML_BINDING_TYPE_NONE, nullptr};
+    if (binding) {
+      desc = {DML_BINDING_TYPE_BUFFER, &binding.value()};
+    }
+
+    input_binding_descs.push_back(desc);
+  }
+  binding_table->BindInputs(static_cast<UINT>(input_binding_descs.size()),
+                            input_binding_descs.data());
+
+  // Set up the output bindings
+  absl::InlinedVector<DML_BINDING_DESC, 4> output_binding_descs;
+  for (const auto& binding : output_bindings) {
+    DML_BINDING_DESC desc = {DML_BINDING_TYPE_NONE, nullptr};
+    if (binding) {
+      desc = {DML_BINDING_TYPE_BUFFER, &binding.value()};
+    }
+
+    output_binding_descs.push_back(desc);
+  }
+  binding_table->BindOutputs(static_cast<UINT>(output_binding_descs.size()),
+                             output_binding_descs.data());
+
+  return execution_context_->ExecuteOperator(
+      op, std::move(binding_table), heap_for_binding_table);
+}
+
+DmlGpuEvent DMLDeviceContext::InsertUavBarrier() const {
+  return execution_context_->UavBarrier();
+}
+
+DmlGpuEvent DMLDeviceContext::GetCurrentCompletionEvent() const {
+  return execution_context_->GetCurrentCompletionEvent();
+}
+
+void DMLDeviceContext::EnqueueCallbackForGpuEvent(
+    DmlGpuEvent gpu_event, std::function<void()> callback) const {
+  event_queue_->Enqueue(std::move(gpu_event), std::move(callback));
+}
+
+DmlBuffer DMLDeviceContext::AllocateDefaultBuffer(uint64_t num_bytes) const {
+  return DmlBuffer(allocator_, num_bytes);
+}
+
+D3D12BufferRegion DMLDeviceContext::CreateBufferForTensor(
+    const Tensor& tensor) const {
+  const void* p = tensor.tensor_data().data();
+
+  // Important: we must use AllocatedBytes() here and not TotalBytes() because
+  // AllocatedBytes includes the necessary padding and alignment, whereas
+  // TotalBytes is exactly equal to the number of elements multiplied by the
+  // element size.
+  uint64_t size_in_bytes = tensor.AllocatedBytes();
+
+  auto region = allocator_->CreateBufferRegion(p, size_in_bytes);
+
+  // DML always requires at least 4 byte alignment in all cases, so both the
+  // offset and size must certainly be divisible by 4
+  DCHECK(region.Offset() % 4 == 0);
+  DCHECK(region.SizeInBytes() % 4 == 0);
+
+  return region;
+}
+
+DescriptorAllocation DMLDeviceContext::AllocateDescriptors(
+    size_t size_in_descriptors) const {
+  return descriptor_allocator_->Alloc(size_in_descriptors);
+}
+
+DmlGpuEvent DMLDeviceContext::CopyBufferToBuffer(
+    const D3D12BufferRegion& dst, const D3D12BufferRegion& src) const {
+  return execution_context_->CopyBufferRegion(
+      dst, src);
+}
+
+StatusOr<DmlGpuEvent> DMLDeviceContext::CopyHostToBuffer(
+    const D3D12BufferRegion& dst,
+    absl::Span<const uint8_t> src) const {
+  return upload_heap_->BeginUploadToGpu(dst, src);
+}
+
+// Fills dst region with zeroes.
+DmlGpuEvent DMLDeviceContext::ZeroBuffer(const D3D12BufferRegion& dst) const {
+  uint8_t pattern[] = {0};
+  return FillBufferWithPattern(dst, pattern);
+}
+
+// Fills dst region with a repeating byte pattern.
+DmlGpuEvent DMLDeviceContext::FillBufferWithPattern(
+    const D3D12BufferRegion& dst, absl::Span<const uint8_t> value) const {
+  return execution_context_->FillBufferWithPattern(
+      dst, value);
 }
 
 }  // namespace tensorflow

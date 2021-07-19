@@ -39,8 +39,7 @@ static void SetTensorToZero(OpKernelContext* ctx, const Tensor& tensor) {
   uint8_t pattern[] = {0};
 
   device->GetExecutionContext()->FillBufferWithPattern(
-      output_buffer.Resource(), output_buffer.Offset(),
-      output_buffer.SizeInBytes(), pattern);
+      output_buffer, pattern);
 }
 
 static Status DmlZerosLikeTensor(OpKernelContext* ctx, const Tensor& x,

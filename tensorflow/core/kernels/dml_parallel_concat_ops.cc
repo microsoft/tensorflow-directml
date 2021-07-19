@@ -83,12 +83,10 @@ class DmlParallelConcatUpdateKernel : public OpKernel {
     // Guard the row index range
     const int64 row_index = (loc_ % nrows + nrows) % nrows;
     const uint64_t dst_offset = output_buffer.Offset() + row_index * stride;
-    const uint64_t src_offset = update_buffer.Offset();
 
     device->GetExecutionContext()->CopyBufferRegion(
-        output_buffer.Resource(), dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
-        update_buffer.Resource(), src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
-        stride);
+        output_buffer.Subregion(dst_offset),
+        update_buffer.Subregion(0, stride));
 
     ctx->set_output(0, output_tensor);
   }
