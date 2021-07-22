@@ -34,19 +34,19 @@ D3D12BufferRegion::D3D12BufferRegion(
   CHECK(resource_ != nullptr);
   CHECK(size_in_bytes_ != 0);
 
-  uint64_t buffer_size = resource->GetDesc().Width;
+  uint64_t buffer_size = resource_->GetDesc().Width;
   CHECK(offset_ < buffer_size);
   CHECK(size_in_bytes_ <= buffer_size - offset);
 
   assert(resource_->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
-  assert(!resource_copy_src_state ||
-         (resource_copy_src_state->GetDesc().Dimension ==
+  assert(!resource_copy_src_state_ ||
+         (resource_copy_src_state_->GetDesc().Dimension ==
               D3D12_RESOURCE_DIMENSION_BUFFER &&
-          resource_copy_src_state->GetDesc().Width == buffer_size));
-  assert(!resource_copy_dst_state ||
-         (resource_copy_dst_state->GetDesc().Dimension ==
+          resource_copy_src_state_->GetDesc().Width == buffer_size));
+  assert(!resource_copy_dst_state_ ||
+         (resource_copy_dst_state_->GetDesc().Dimension ==
               D3D12_RESOURCE_DIMENSION_BUFFER &&
-          resource_copy_dst_state->GetDesc().Width == buffer_size));
+          resource_copy_dst_state_->GetDesc().Width == buffer_size));
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInFixedState() const {
