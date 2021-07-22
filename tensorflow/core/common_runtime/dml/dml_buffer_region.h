@@ -47,7 +47,7 @@ class D3D12BufferRegion {
   ID3D12Resource* ResourceInCopyDstState() const;
   uint64_t Offset() const;
   uint64_t SizeInBytes() const;
-  D3D12_RESOURCE_STATES ResourceState() const;
+  D3D12_RESOURCE_STATES ResourceState() const { return resource_state_; }
 
   DML_BUFFER_BINDING GetBufferBinding() const;
 
