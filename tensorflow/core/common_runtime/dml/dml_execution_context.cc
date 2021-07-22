@@ -111,10 +111,10 @@ DmlGpuEvent DmlExecutionContext::CopyBufferRegionRaw(
 
 DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
     const D3D12BufferRegion& dst, const D3D12BufferRegion& src) {
-  DCHECK(src.SizeInBytes() <= dst.SizeInBytes());
-  DCHECK(dst.SizeInBytes() + dst.Offset() <=
+  CHECK(src.SizeInBytes() <= dst.SizeInBytes());
+  CHECK(dst.SizeInBytes() + dst.Offset() <=
          dst.ResourceInFixedState()->GetDesc().Width);
-  DCHECK(src.SizeInBytes() + src.Offset() <=
+  CHECK(src.SizeInBytes() + src.Offset() <=
          src.ResourceInFixedState()->GetDesc().Width);
 
   // Most D3D12BufferRegions have the same logical resource in three states:

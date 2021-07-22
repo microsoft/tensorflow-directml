@@ -160,8 +160,9 @@ class DmlInplaceKernel : public DmlKernel {
       return status_or_gpu_event;
     }
 
+    uint64_t copy_size = std::min(output_buffer.SizeInBytes(), input_buffer.SizeInBytes());
     device_context->CopyBufferToBuffer(
-        input_buffer, output_buffer.Subregion(0, input_buffer.SizeInBytes()));
+        input_buffer, output_buffer.Subregion(0, copy_size));
 
     return device_context->InsertUavBarrier();
   }

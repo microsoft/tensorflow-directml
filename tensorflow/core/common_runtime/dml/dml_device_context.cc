@@ -121,7 +121,6 @@ void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
   event_queue_->Enqueue(status_or_event.ConsumeValueOrDie(), callback);
 }
 
-// TODO: consider moving this code into EC outside of lock
 DmlGpuEvent DMLDeviceContext::BindAndInitializeOperator(
     IDMLOperatorInitializer* initializer,
     Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
@@ -146,7 +145,6 @@ DmlGpuEvent DMLDeviceContext::BindAndInitializeOperator(
       initializer, std::move(binding_table), heap_for_binding_table);
 }
 
-// TODO: consider moving this code into EC outside of lock
 DmlGpuEvent DMLDeviceContext::BindAndExecuteOperator(
     IDMLCompiledOperator* op,
     Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
