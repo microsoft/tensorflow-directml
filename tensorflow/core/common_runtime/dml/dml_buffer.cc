@@ -43,15 +43,15 @@ DmlBuffer::~DmlBuffer() {
 }
 
 ID3D12Resource* DmlBuffer::ResourceInFixedState() const {
-  return buffer_region_ ? buffer_region_.ResourceInFixedState() : nullptr;
+  return buffer_region_.ResourceInFixedState();
 }
 
 ID3D12Resource* DmlBuffer::ResourceInCopySrcState() const {
-  return buffer_region_ ? buffer_region_.ResourceInCopySrcState() : nullptr;
+  return buffer_region_.ResourceInCopySrcState();
 }
 
 ID3D12Resource* DmlBuffer::ResourceInCopyDstState() const {
-  return buffer_region_ ? buffer_region_.ResourceInCopyDstState() : nullptr;
+  return buffer_region_.ResourceInCopyDstState();
 }
 
 uint64_t DmlBuffer::Offset() const {

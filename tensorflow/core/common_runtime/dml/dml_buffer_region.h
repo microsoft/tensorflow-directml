@@ -53,12 +53,17 @@ class D3D12BufferRegion {
 
   explicit operator bool() const { return resource_ != nullptr; }
 
-  // Creates a subregion at an offset from the start of this region. If no size is provided
-  // the region runs to the end of the current region.
-  inline D3D12BufferRegion Subregion(uint64_t offset, uint64_t size_in_bytes = 0) const {
-    CHECK(offset < size_in_bytes_); // start of subregion must be within current region
-    size_in_bytes = size_in_bytes == 0 ? size_in_bytes_ - offset : size_in_bytes;
-    CHECK(size_in_bytes <= size_in_bytes_ - offset); // end of subregion must be within current region
+  // Creates a subregion at an offset from the start of this region. If no size
+  // is provided the region runs to the end of the current region.
+  inline D3D12BufferRegion Subregion(uint64_t offset,
+                                     uint64_t size_in_bytes = 0) const {
+    // start of subregion must be within current region
+    CHECK(offset < size_in_bytes_);
+    size_in_bytes =
+        size_in_bytes == 0 ? size_in_bytes_ - offset : size_in_bytes;
+    // end of subregion must be within current region
+    CHECK(size_in_bytes <= size_in_bytes_ - offset);
+
     return D3D12BufferRegion(offset_ + offset, size_in_bytes, resource_state_,
                              resource_, resource_copy_src_state_,
                              resource_copy_dst_state_);

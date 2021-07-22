@@ -31,29 +31,35 @@ D3D12BufferRegion::D3D12BufferRegion(
       resource_(std::move(resource)),
       resource_copy_src_state_(std::move(resource_copy_src_state)),
       resource_copy_dst_state_(std::move(resource_copy_dst_state)) {
-  assert(resource_ != nullptr);
-  assert(size_in_bytes_ != 0);
+
+  CHECK(resource_ != nullptr);
+  CHECK(size_in_bytes_ != 0);
+
+  uint64_t buffer_size = resource->GetDesc().Width;
+  CHECK(offset_ < buffer_size);
+  CHECK(size_in_bytes_ <= buffer_size - offset);
+
   assert(resource_->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
-  assert(
-      !resource_copy_src_state ||
-      (resource_copy_src_state->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER &&
-       resource_copy_src_state->GetDesc().Width == resource->GetDesc().Width));
-  assert(
-      !resource_copy_dst_state ||
-      (resource_copy_dst_state->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER &&
-       resource_copy_dst_state->GetDesc().Width == resource->GetDesc().Width));
+  assert(!resource_copy_src_state ||
+         (resource_copy_src_state->GetDesc().Dimension ==
+              D3D12_RESOURCE_DIMENSION_BUFFER &&
+          resource_copy_src_state->GetDesc().Width == buffer_size));
+  assert(!resource_copy_dst_state ||
+         (resource_copy_dst_state->GetDesc().Dimension ==
+              D3D12_RESOURCE_DIMENSION_BUFFER &&
+          resource_copy_dst_state->GetDesc().Width == buffer_size));
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInFixedState() const {
-  return resource_ ? resource_.Get() : nullptr;
+  return resource_.Get();
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInCopySrcState() const {
-  return resource_copy_src_state_ ? resource_copy_src_state_.Get() : nullptr;
+  return resource_copy_src_state_.Get();
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInCopyDstState() const {
-  return resource_copy_dst_state_ ? resource_copy_dst_state_.Get() : nullptr;
+  return resource_copy_dst_state_.Get();
 }
 
 uint64_t D3D12BufferRegion::Offset() const { return resource_ ? offset_ : 0; }
