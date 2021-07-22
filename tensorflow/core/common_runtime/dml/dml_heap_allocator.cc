@@ -101,7 +101,7 @@ D3D12HeapAllocator::TryCreateTiledAllocation(uint64_t size_in_bytes) {
                                     D3D12_RESOURCE_STATE_COPY_SOURCE,
                                     D3D12_RESOURCE_STATE_COPY_DEST};
 
-  for (int i = 0; i < ARRAYSIZE(resources); i++) {
+  for (int i = 0; i < ABSL_ARRAYSIZE(resources); i++) {
     HRESULT create_resource_hr = device_->CreateReservedResource(
         &resource_desc, states[i], nullptr, IID_PPV_ARGS(resources[i]));
 
@@ -216,7 +216,7 @@ D3D12HeapAllocator::TryCreateUntiledAllocation(uint64_t size_in_bytes) {
                                     D3D12_RESOURCE_STATE_COPY_SOURCE,
                                     D3D12_RESOURCE_STATE_COPY_DEST};
 
-  for (int i = 0; i < ARRAYSIZE(resources); i++) {
+  for (int i = 0; i < ABSL_ARRAYSIZE(resources); i++) {
     HRESULT create_resource_hr = device_->CreatePlacedResource(
         allocation.heaps.front().Get(), 0, &resource_desc, states[i], nullptr,
         IID_PPV_ARGS(resources[i]));
