@@ -82,7 +82,7 @@ class DmlParallelConcatUpdateKernel : public OpKernel {
 
     // Guard the row index range
     const int64 row_index = (loc_ % nrows + nrows) % nrows;
-    const uint64_t dst_offset = output_buffer.Offset() + row_index * stride;
+    const uint64_t dst_offset = row_index * stride;
 
     device->GetExecutionContext()->CopyBufferRegion(
         output_buffer.Subregion(dst_offset),

@@ -79,7 +79,7 @@ void DmlConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
 
   D3D12BufferRegion dst =
       dml_util::CreateBufferForTensor(device, *output_tensor);
-  uint64_t dst_offset = dst.Offset();
+  uint64_t dst_offset = 0;
 
   for (PersistentTensor& value : values) {
     const Tensor& input_tensor = *value.AccessTensor(ctx);
@@ -93,7 +93,7 @@ void DmlConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
         dml_util::CreateBufferForTensor(device, input_tensor);
 
     device_context->CopyBufferToBuffer(
-        dst, src.Subregion(0, bytes_to_copy));
+        dst.Subregion(dst_offset), src.Subregion(0, bytes_to_copy));
 
     dst_offset += bytes_to_copy;
     CHECK(dst_offset <= dst.ResourceInCopyDstState()->GetDesc().Width);

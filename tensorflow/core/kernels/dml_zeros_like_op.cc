@@ -31,15 +31,11 @@ template <typename T>
 static Status DmlVariantZerosLike(OpKernelContext* ctx, const T& x, T* y);
 
 static void SetTensorToZero(OpKernelContext* ctx, const Tensor& tensor) {
-  DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
+  auto device_context = static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
-  D3D12BufferRegion output_buffer =
-      dml_util::CreateBufferForTensor(device, tensor);
+  D3D12BufferRegion output_buffer = device_context->CreateBufferForTensor(tensor);
 
-  uint8_t pattern[] = {0};
-
-  device->GetExecutionContext()->FillBufferWithPattern(
-      output_buffer, pattern);
+  device_context->ZeroBuffer(output_buffer);
 }
 
 static Status DmlZerosLikeTensor(OpKernelContext* ctx, const Tensor& x,

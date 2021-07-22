@@ -160,7 +160,8 @@ class DmlInplaceKernel : public DmlKernel {
       return status_or_gpu_event;
     }
 
-    device_context->CopyBufferToBuffer(input_buffer, output_buffer);
+    device_context->CopyBufferToBuffer(
+        input_buffer, output_buffer.Subregion(0, input_buffer.SizeInBytes()));
 
     return device_context->InsertUavBarrier();
   }

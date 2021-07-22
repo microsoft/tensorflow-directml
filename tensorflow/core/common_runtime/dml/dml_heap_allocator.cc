@@ -84,8 +84,8 @@ absl::optional<D3D12HeapAllocator::Allocation>
 D3D12HeapAllocator::TryCreateTiledAllocation(uint64_t size_in_bytes) {
   Allocation allocation = {};
 
-  // Initialize the pool with a single reserved resource. The resource may be
-  // larger than the requested size to ensure a whole number of tiles.
+  // The allocation may be larger than the requested size to ensure a whole
+  // number of tiles.
   const uint64_t resource_size_in_tiles =
       1 + (size_in_bytes - 1) / D3D12_TILED_RESOURCE_TILE_SIZE_IN_BYTES;
   const uint64_t resource_size_in_bytes =
@@ -192,7 +192,8 @@ absl::optional<D3D12HeapAllocator::Allocation>
 D3D12HeapAllocator::TryCreateUntiledAllocation(uint64_t size_in_bytes) {
   Allocation allocation = {};
 
-  // Create the allocation's sole heap.
+  // Create the allocation's sole heap. The allocation may be larger than the
+  // requested size to ensure a whole number of tiles.
   allocation.heaps.resize(1);
   D3D12_HEAP_DESC heap_desc =
       CD3DX12_HEAP_DESC(size_in_bytes, heap_properties_, 0, heap_flags_);
@@ -204,7 +205,7 @@ D3D12HeapAllocator::TryCreateUntiledAllocation(uint64_t size_in_bytes) {
   }
   DML_CHECK_SUCCEEDED(create_heap_hr);
 
-  // Initialize the pool with a single placed resource.
+  // Create large placed resource that spans the heap.
   D3D12_RESOURCE_DESC resource_desc =
       CD3DX12_RESOURCE_DESC::Buffer(size_in_bytes, resource_flags_);
 
@@ -302,7 +303,7 @@ D3D12BufferRegion D3D12HeapAllocator::CreateBufferRegion(
   Allocation* allocation = &it->second;
 
   return D3D12BufferRegion(
-      tagged_ptr.offset, size_in_bytes, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+      tagged_ptr.offset, size_in_bytes, initial_state_,
       allocation->resource, allocation->resource_copy_src_state,
       allocation->resource_copy_dst_state);
 }
