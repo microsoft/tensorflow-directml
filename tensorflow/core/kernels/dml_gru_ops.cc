@@ -228,7 +228,9 @@ class DmlGruBlockCellOp : public DmlKernel {
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     for (int i = 0; i < ctx->GetOutputCount(); ++i) {
-      ctx->GetDmlDeviceContext()->ZeroBuffer(ctx->GetDmlDeviceContext()->CreateBufferForTensor(*ctx->GetOutputTensor(i)));
+      ctx->GetDmlDeviceContext()->ZeroBuffer(
+          ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+              *ctx->GetOutputTensor(i)));
     }
     return DmlKernel::Compute(ctx);
   }

@@ -31,9 +31,11 @@ template <typename T>
 static Status DmlVariantZerosLike(OpKernelContext* ctx, const T& x, T* y);
 
 static void SetTensorToZero(OpKernelContext* ctx, const Tensor& tensor) {
-  auto device_context = static_cast<DMLDeviceContext*>(ctx->op_device_context());
+  auto device_context =
+      static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
-  D3D12BufferRegion output_buffer = device_context->CreateBufferForTensor(tensor);
+  D3D12BufferRegion output_buffer =
+      device_context->CreateBufferForTensor(tensor);
 
   device_context->ZeroBuffer(output_buffer);
 }

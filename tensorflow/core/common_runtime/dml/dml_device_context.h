@@ -46,7 +46,7 @@ class DMLDeviceContext : public DeviceContext {
         event_queue_(event_queue),
         upload_heap_(upload_heap),
         readback_heap_(readback_heap),
-        allocator_(allocator), 
+        allocator_(allocator),
         descriptor_allocator_(descriptor_allocator) {}
 
   // --------------------------------

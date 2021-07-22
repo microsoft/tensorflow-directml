@@ -727,7 +727,8 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
     // Identity can be done in-place
     if (init_helper->IsIdentity()) {
       D3D12BufferRegion input_buffer =
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(ctx->GetInputTensor(4));
+          ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+              ctx->GetInputTensor(4));
 
       D3D12BufferRegion output_buffer =
           ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensor);
@@ -745,7 +746,8 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
 
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(ctx->GetInputTensor(4)),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            ctx->GetInputTensor(4)),
         ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensor),
     };
 
@@ -755,8 +757,8 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
         input_buffers[1].GetBufferBinding(),
     };
 
-    DmlBuffer output_buffer =
-        ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(input_buffers[1].SizeInBytes());
+    DmlBuffer output_buffer = ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(
+        input_buffers[1].SizeInBytes());
 
     absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
         output_buffer.GetBufferBinding(),
@@ -768,7 +770,8 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
       return status_or_event;
     }
 
-    ctx->GetDmlDeviceContext()->CopyBufferToBuffer(input_buffers[1], output_buffer.Region());
+    ctx->GetDmlDeviceContext()->CopyBufferToBuffer(input_buffers[1],
+                                                   output_buffer.Region());
 
     return ctx->GetDmlDeviceContext()->InsertUavBarrier();
   }

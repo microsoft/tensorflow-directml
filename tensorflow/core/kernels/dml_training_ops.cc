@@ -201,7 +201,8 @@ class DmlTrainingKernel : public DmlKernel {
     // Create input buffers
     absl::InlinedVector<D3D12BufferRegion, 16> input_buffers;
     for (const Tensor& input_tensor : input_tensors) {
-      input_buffers.push_back(ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensor));
+      input_buffers.push_back(
+          ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensor));
     }
 
     // Create input bindings
@@ -227,7 +228,8 @@ class DmlTrainingKernel : public DmlKernel {
       } else {
         uint64_t intermediate_resource_size = input_tensors[i].TotalBytes();
         DmlBuffer intermediate_buffer =
-            ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(intermediate_resource_size);
+            ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(
+                intermediate_resource_size);
         output_bindings.push_back(intermediate_buffer.GetBufferBinding());
         intermediate_buffers.push_back(std::move(intermediate_buffer));
       }
@@ -255,7 +257,8 @@ class DmlTrainingKernel : public DmlKernel {
 
         auto& input_buffer = input_buffers[input_index];
 
-        ctx->GetDmlDeviceContext()->CopyBufferToBuffer(input_buffer, intermediate_buffers[output_index].Region());
+        ctx->GetDmlDeviceContext()->CopyBufferToBuffer(
+            input_buffer, intermediate_buffers[output_index].Region());
       }
 
       status_or_gpu_event = ctx->GetDmlDeviceContext()->InsertUavBarrier();
@@ -443,7 +446,8 @@ class DmlApplyAdamKernel : public DmlTrainingKernel {
     TF_RETURN_IF_ERROR(op_ctx->allocate_temp(DT_UINT32, {}, &t_tensor));
 
     // Upload the training step scalar T to the GPU buffer
-    D3D12BufferRegion dst = ctx->GetDmlDeviceContext()->CreateBufferForTensor(t_tensor);
+    D3D12BufferRegion dst =
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(t_tensor);
     auto src = absl::MakeSpan(reinterpret_cast<const uint8_t*>(&t), sizeof(t));
     TF_RETURN_IF_ERROR(
         ctx->GetDmlDeviceContext()->CopyHostToBuffer(dst, src).status());
@@ -457,11 +461,16 @@ class DmlApplyAdamKernel : public DmlTrainingKernel {
     };
 
     D3D12BufferRegion input_buffers[] = {
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensors[0]),  // InputParameters (var)
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensors[1]),  // InputFirstMoment (m)
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensors[2]),  // InputSecondMoment (v)
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensors[3]),  // Gradient (grad)
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensors[4]),  // TrainingStep
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            input_tensors[0]),  // InputParameters (var)
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            input_tensors[1]),  // InputFirstMoment (m)
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            input_tensors[2]),  // InputSecondMoment (v)
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            input_tensors[3]),  // Gradient (grad)
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            input_tensors[4]),  // TrainingStep
     };
 
     absl::optional<DML_BUFFER_BINDING> input_bindings[] = {
@@ -1237,13 +1246,13 @@ class DmlApplyKerasMomentumKernel : public DmlTrainingKernel {
   }
 };
 
-#define REGISTER_KERNEL(type)                                                  \
-  REGISTER_KERNEL_BUILDER(                                                     \
-      Name("ResourceApplyKerasMomentum")                                       \
-          .Device(DEVICE_DML)                                                  \
-          .HostMemory("var")                                                   \
-          .HostMemory("accum")                                                 \
-          .TypeConstraint<type>("T"),                                          \
+#define REGISTER_KERNEL(type)            \
+  REGISTER_KERNEL_BUILDER(               \
+      Name("ResourceApplyKerasMomentum") \
+          .Device(DEVICE_DML)            \
+          .HostMemory("var")             \
+          .HostMemory("accum")           \
+          .TypeConstraint<type>("T"),    \
       DmlKernelWrapper<DmlApplyKerasMomentumKernel, NoOutputShapeHelper>);
 
 TF_CALL_DML_FLOAT_TYPES(REGISTER_KERNEL);

@@ -141,7 +141,8 @@ class DmlDynamicStitchKernel : public OpKernel {
         const uint64_t src_offset = byte_stride * i;
         const uint64_t dst_offset = byte_stride * output_idx;
 
-        auto device_context = static_cast<DMLDeviceContext*>(ctx->op_device_context());
+        auto device_context =
+            static_cast<DMLDeviceContext*>(ctx->op_device_context());
         device_context->CopyBufferToBuffer(
             output_buffer.Subregion(dst_offset),
             input_buffer.Subregion(src_offset, byte_stride));

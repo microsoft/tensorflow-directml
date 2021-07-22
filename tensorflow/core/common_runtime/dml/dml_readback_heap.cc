@@ -65,8 +65,8 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
   // Copy from the source resource into the readback heap. `gpu_done_event` is
   // the event that will be signaled when the copy to the readback heap
   // completes on the GPU.
-  DmlGpuEvent gpu_done_event =
-      execution_context_->CopyBufferRegion(readback_resource, src.Subregion(0, dst.size()));
+  DmlGpuEvent gpu_done_event = execution_context_->CopyBufferRegion(
+      readback_resource, src.Subregion(0, dst.size()));
 
   // Get the event which will become signaled once the readback into `dst` has
   // fully completed on the CPU.

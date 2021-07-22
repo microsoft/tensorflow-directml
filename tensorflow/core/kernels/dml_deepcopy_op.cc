@@ -42,10 +42,11 @@ class DmlDeepCopyKernel : public OpKernel {
     D3D12BufferRegion output_buffer =
         dml_util::CreateBufferForTensor(device, *output);
 
-    uint64_t copy_size = std::min(output_buffer.SizeInBytes(), input_buffer.SizeInBytes());
+    uint64_t copy_size =
+        std::min(output_buffer.SizeInBytes(), input_buffer.SizeInBytes());
 
-    execution_context->CopyBufferRegion(
-        output_buffer, input_buffer.Subregion(0, copy_size));
+    execution_context->CopyBufferRegion(output_buffer,
+                                        input_buffer.Subregion(0, copy_size));
   }
 };
 

@@ -92,8 +92,8 @@ void DmlConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
     D3D12BufferRegion src =
         dml_util::CreateBufferForTensor(device, input_tensor);
 
-    device_context->CopyBufferToBuffer(
-        dst.Subregion(dst_offset), src.Subregion(0, bytes_to_copy));
+    device_context->CopyBufferToBuffer(dst.Subregion(dst_offset),
+                                       src.Subregion(0, bytes_to_copy));
 
     dst_offset += bytes_to_copy;
     CHECK(dst_offset <= dst.ResourceInCopyDstState()->GetDesc().Width);

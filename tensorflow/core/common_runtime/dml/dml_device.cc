@@ -44,9 +44,7 @@ DmlDevice::DmlDevice(const DmlDeviceState* state, const SessionOptions& options,
   device_context_ = new DMLDeviceContext(
       state_->execution_context.get(), state_->event_queue.get(),
       state_->upload_heap.get(), state_->readback_heap.get(),
-      state_->dml_allocator.get(),
-      state_->descriptor_allocator.get()
-      );
+      state_->dml_allocator.get(), state_->descriptor_allocator.get());
   set_dml_device_context(device_context_);
 }
 

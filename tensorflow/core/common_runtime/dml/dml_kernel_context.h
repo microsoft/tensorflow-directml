@@ -20,8 +20,8 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_buffer_region.h"
 #include "tensorflow/core/common_runtime/dml/dml_common.h"
 #include "tensorflow/core/common_runtime/dml/dml_descriptor_bfc_allocator.h"
-#include "tensorflow/core/common_runtime/dml/dml_gpu_event.h"
 #include "tensorflow/core/common_runtime/dml/dml_device_context.h"
+#include "tensorflow/core/common_runtime/dml/dml_gpu_event.h"
 #include "tensorflow/core/framework/op_kernel.h"
 
 namespace tensorflow {

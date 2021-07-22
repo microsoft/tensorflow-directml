@@ -113,9 +113,9 @@ DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
     const D3D12BufferRegion& dst, const D3D12BufferRegion& src) {
   CHECK(src.SizeInBytes() <= dst.SizeInBytes());
   CHECK(dst.SizeInBytes() + dst.Offset() <=
-         dst.ResourceInFixedState()->GetDesc().Width);
+        dst.ResourceInFixedState()->GetDesc().Width);
   CHECK(src.SizeInBytes() + src.Offset() <=
-         src.ResourceInFixedState()->GetDesc().Width);
+        src.ResourceInFixedState()->GetDesc().Width);
 
   // Most D3D12BufferRegions have the same logical resource in three states:
   // UAV, COPY_SRC, and COPY_DST. Resources allocated through upload & readback

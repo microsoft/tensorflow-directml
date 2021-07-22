@@ -381,8 +381,10 @@ class DmlScatterUpdateKernel : public DmlKernel {
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
         ctx->GetDmlDeviceContext()->CreateBufferForTensor(params_tensor),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(ctx->GetInputTensor(1)),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(ctx->GetInputTensor(2)),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            ctx->GetInputTensor(1)),
+        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+            ctx->GetInputTensor(2)),
     };
 
     // Create input bindings
@@ -408,7 +410,8 @@ class DmlScatterUpdateKernel : public DmlKernel {
       gpu_event = status_or_event.ValueOrDie();
     } else {
       DmlBuffer output_buffer =
-          ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(input_buffers[0].SizeInBytes());
+          ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(
+              input_buffers[0].SizeInBytes());
 
       absl::optional<DML_BUFFER_BINDING> output_bindings[] = {
           output_buffer.GetBufferBinding(),
@@ -421,7 +424,7 @@ class DmlScatterUpdateKernel : public DmlKernel {
       }
 
       ctx->GetDmlDeviceContext()->CopyBufferToBuffer(input_buffers[0],
-                              output_buffer.Region());
+                                                     output_buffer.Region());
 
       gpu_event = ctx->GetDmlDeviceContext()->InsertUavBarrier();
     }

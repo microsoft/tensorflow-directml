@@ -165,7 +165,8 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
     OP_REQUIRES_OK(ctx, ctx->allocate_output(0, input_shape, &output));
 
     DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
-    auto device_context = static_cast<DMLDeviceContext*>(ctx->op_device_context());
+    auto device_context =
+        static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
     D3D12BufferRegion input_buffer =
         dml_util::CreateBufferForTensor(device, input);

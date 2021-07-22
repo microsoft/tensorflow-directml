@@ -64,7 +64,8 @@ void DMLDeviceContext::CopyTensorInSameDevice(const Tensor* input_tensor,
   D3D12BufferRegion src = CreateBufferForTensor(*input_tensor);
   D3D12BufferRegion dst = CreateBufferForTensor(*output_tensor);
 
-  (void)execution_context_->CopyBufferRegion(dst, src.Subregion(0, total_bytes));
+  (void)execution_context_->CopyBufferRegion(dst,
+                                             src.Subregion(0, total_bytes));
 
   // Immediately signal completion even though we haven't actually kicked off
   // the GPU, or waited for it to complete. This is because from the framework's
@@ -195,8 +196,8 @@ DmlGpuEvent DMLDeviceContext::BindAndExecuteOperator(
   binding_table->BindOutputs(static_cast<UINT>(output_binding_descs.size()),
                              output_binding_descs.data());
 
-  return execution_context_->ExecuteOperator(
-      op, std::move(binding_table), heap_for_binding_table);
+  return execution_context_->ExecuteOperator(op, std::move(binding_table),
+                                             heap_for_binding_table);
 }
 
 DmlGpuEvent DMLDeviceContext::InsertUavBarrier() const {
@@ -243,13 +244,11 @@ DescriptorAllocation DMLDeviceContext::AllocateDescriptors(
 
 DmlGpuEvent DMLDeviceContext::CopyBufferToBuffer(
     const D3D12BufferRegion& dst, const D3D12BufferRegion& src) const {
-  return execution_context_->CopyBufferRegion(
-      dst, src);
+  return execution_context_->CopyBufferRegion(dst, src);
 }
 
 StatusOr<DmlGpuEvent> DMLDeviceContext::CopyHostToBuffer(
-    const D3D12BufferRegion& dst,
-    absl::Span<const uint8_t> src) const {
+    const D3D12BufferRegion& dst, absl::Span<const uint8_t> src) const {
   return upload_heap_->BeginUploadToGpu(dst, src);
 }
 
@@ -262,8 +261,7 @@ DmlGpuEvent DMLDeviceContext::ZeroBuffer(const D3D12BufferRegion& dst) const {
 // Fills dst region with a repeating byte pattern.
 DmlGpuEvent DMLDeviceContext::FillBufferWithPattern(
     const D3D12BufferRegion& dst, absl::Span<const uint8_t> value) const {
-  return execution_context_->FillBufferWithPattern(
-      dst, value);
+  return execution_context_->FillBufferWithPattern(dst, value);
 }
 
 }  // namespace tensorflow

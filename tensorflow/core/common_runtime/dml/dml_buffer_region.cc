@@ -31,7 +31,6 @@ D3D12BufferRegion::D3D12BufferRegion(
       resource_(std::move(resource)),
       resource_copy_src_state_(std::move(resource_copy_src_state)),
       resource_copy_dst_state_(std::move(resource_copy_dst_state)) {
-
   CHECK(resource_ != nullptr);
   CHECK(size_in_bytes_ != 0);
 

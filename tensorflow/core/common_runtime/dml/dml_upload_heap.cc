@@ -63,8 +63,8 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
                                            chunk->resource.Get());
 
   // Copy from the upload heap into the destination resource
-  DmlGpuEvent done_event = execution_context_->CopyBufferRegion(
-      dst, upload_resource);
+  DmlGpuEvent done_event =
+      execution_context_->CopyBufferRegion(dst, upload_resource);
 
   // Add an allocation entry to the chunk
   chunk->allocations.push_back(Allocation{static_cast<uint64_t>(src.size()),
