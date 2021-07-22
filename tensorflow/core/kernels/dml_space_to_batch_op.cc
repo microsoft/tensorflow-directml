@@ -45,7 +45,7 @@ class BaseSpaceToBatchInitHelper : public InitializationHelper {
     return internal_paddings_;
   }
 
-  bool GetIsPaddingRequired() const {
+  bool IsPaddingRequired() const {
     return std::any_of(internal_paddings_.begin(), internal_paddings_.end(),
                        [](int64 i) { return i != 0; });
   }
@@ -346,7 +346,7 @@ class DmlSpaceToBatchKernel : public DmlKernel {
     }
 
     dml::Expression padded = input;
-    if (init_helper->GetIsPaddingRequired()) {
+    if (init_helper->IsPaddingRequired()) {
       padded = dml::Padding(input, DML_PADDING_MODE_CONSTANT, 0, start_paddings,
                             end_paddings);
     }

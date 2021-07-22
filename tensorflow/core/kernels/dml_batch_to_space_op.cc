@@ -46,7 +46,7 @@ class BaseBatchToSpaceInitHelper : public InitializationHelper {
 
   TensorShape GetOutputShape() const { return output_shape_; }
   int GetInternalBlockDims() const { return internal_block_dims_; }
-  bool GetIsSliceNeeded() const {
+  bool IsSliceRequired() const {
     bool do_slice = false;
     for (int i = 0; i < internal_block_dims_; ++i) {
       int64 start_crop = internal_crops_[i * 2];
@@ -213,8 +213,8 @@ class BaseBatchToSpaceInitHelper : public InitializationHelper {
       return {};
     }
 
-    const Tensor& input =
-        ctx->input_is_ref(0) ? ctx->mutable_input(0, false) : ctx->input(0);
+    const Tensor& input = ctx->input(0);
+    
     // Make sure the shapes match so we can forward
     if (input.shape() != output_shapes[outputIndex]) {
       return {};
@@ -494,7 +494,7 @@ class DmlBatchToSpaceKernel : public DmlKernel {
         output_before_slice.GetOutputDesc().sizes;
 
     dml::Expression result = output_before_slice;
-    if (init_helper->GetIsSliceNeeded()) {
+    if (init_helper->IsSliceRequired()) {
       // Finally, slice the appropriate dimensions
       dml::TensorDesc::Dimensions slice_offsets(output_before_slice_sizes.size());
       dml::TensorDesc::Dimensions slice_sizes = output_before_slice_sizes;
