@@ -144,10 +144,10 @@ class DmlCheckNumericsKernel : public DmlKernel {
     } else {
       // If everything is fine, we simply copy the input to the output
       D3D12BufferRegion input_buffer =
-          dml_util::CreateBufferForTensor(device, ctx->GetInputTensor(0));
+          dml_util::GetBufferForTensor(device, ctx->GetInputTensor(0));
 
       D3D12BufferRegion output_buffer =
-          dml_util::CreateBufferForTensor(device, *output_tensor);
+          dml_util::GetBufferForTensor(device, *output_tensor);
 
       ctx->GetDmlDeviceContext()->CopyBufferToBuffer(
           output_buffer,

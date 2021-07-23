@@ -137,7 +137,7 @@ class DmlDiagKernel : public DmlKernel {
     // Zero the buffer since we use strides to skip over elements
     Tensor* output = ctx->GetOutputTensor(0);
     ctx->GetDmlDeviceContext()->ZeroBuffer(
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(*output));
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(*output));
 
     return DmlKernel::Compute(ctx);
   }

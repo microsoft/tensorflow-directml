@@ -47,7 +47,7 @@ class DmlEmptyKernel : public OpKernel {
           static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
       D3D12BufferRegion output_buffer =
-          dml_util::CreateBufferForTensor(device, *output_tensor);
+          dml_util::GetBufferForTensor(device, *output_tensor);
 
       device_context->ZeroBuffer(output_buffer);
     }

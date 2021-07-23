@@ -242,10 +242,10 @@ class DmlResourceScatterNDUpdateKernel : public DmlKernel {
 
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(params_tensor),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(params_tensor),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(1)),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(2)),
     };
 
@@ -476,10 +476,10 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
 
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(params_tensor),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(params_tensor),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(1)),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(2)),
     };
 
@@ -496,7 +496,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
     const bool isTensorInput = init_helper->IsTensorInput();
     if (isTensorInput) {
       D3D12BufferRegion output_buffer =
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(
               *ctx->GetOutputTensor(0));
       output_bindings.push_back(output_buffer.GetBufferBinding());
 

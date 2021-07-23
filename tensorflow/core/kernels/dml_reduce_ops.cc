@@ -443,7 +443,7 @@ class DmlReduceKernel : public DmlKernel {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
       ctx->GetDmlDeviceContext()->ZeroBuffer(
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(*output));
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output));
     }
 
     if (is_no_op_) {

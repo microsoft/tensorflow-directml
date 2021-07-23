@@ -132,16 +132,16 @@ class DmlInplaceKernel : public DmlKernel {
     auto device_context = ctx->GetDmlDeviceContext();
 
     D3D12BufferRegion input_buffer =
-        device_context->CreateBufferForTensor(ctx->GetInputTensor(0));
+        device_context->GetBufferForTensor(ctx->GetInputTensor(0));
 
     D3D12BufferRegion indices_buffer =
-        device_context->CreateBufferForTensor(ctx->GetInputTensor(1));
+        device_context->GetBufferForTensor(ctx->GetInputTensor(1));
 
     D3D12BufferRegion updates_buffer =
-        device_context->CreateBufferForTensor(ctx->GetInputTensor(2));
+        device_context->GetBufferForTensor(ctx->GetInputTensor(2));
 
     D3D12BufferRegion output_buffer =
-        device_context->CreateBufferForTensor(*ctx->GetOutputTensor(0));
+        device_context->GetBufferForTensor(*ctx->GetOutputTensor(0));
 
     const absl::optional<DML_BUFFER_BINDING> input_bindings[3] = {
         input_buffer.GetBufferBinding(),

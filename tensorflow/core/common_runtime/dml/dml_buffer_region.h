@@ -29,12 +29,11 @@ class D3D12BufferRegion {
   D3D12BufferRegion() = default;
 
   // References a region of a resource that remains in a fixed state.
-  D3D12BufferRegion(
-      uint64_t offset, uint64_t size_in_bytes,
-      D3D12_RESOURCE_STATES resource_state,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state = nullptr,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state = nullptr);
+  D3D12BufferRegion(uint64_t offset, uint64_t size_in_bytes,
+                    D3D12_RESOURCE_STATES resource_state,
+                    ID3D12Resource* resource,
+                    ID3D12Resource* resource_copy_src_state = nullptr,
+                    ID3D12Resource* resource_copy_dst_state = nullptr);
 
   // Move-only
   D3D12BufferRegion(const D3D12BufferRegion&) = delete;
@@ -70,9 +69,9 @@ class D3D12BufferRegion {
   }
 
  private:
-  Microsoft::WRL::ComPtr<ID3D12Resource> resource_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state_;
+  ID3D12Resource* resource_;
+  ID3D12Resource* resource_copy_src_state_;
+  ID3D12Resource* resource_copy_dst_state_;
   uint64_t offset_ = 0;
   uint64_t size_in_bytes_ = 0;
   D3D12_RESOURCE_STATES resource_state_ = D3D12_RESOURCE_STATE_COMMON;

@@ -169,10 +169,10 @@ class DmlDataFormatVecPermuteKernel : public OpKernel {
         static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
     D3D12BufferRegion input_buffer =
-        dml_util::CreateBufferForTensor(device, input);
+        dml_util::GetBufferForTensor(device, input);
 
     D3D12BufferRegion output_buffer =
-        dml_util::CreateBufferForTensor(device, *output);
+        dml_util::GetBufferForTensor(device, *output);
 
     const int perm_stride = DataTypeSize(input.dtype()) * input_shape.dims();
 

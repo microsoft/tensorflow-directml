@@ -71,9 +71,9 @@ class DmlParallelConcatUpdateKernel : public OpKernel {
     Tensor output_tensor = value_tensor;
 
     D3D12BufferRegion update_buffer =
-        dml_util::CreateBufferForTensor(device, update_tensor);
+        dml_util::GetBufferForTensor(device, update_tensor);
     D3D12BufferRegion output_buffer =
-        dml_util::CreateBufferForTensor(device, output_tensor);
+        dml_util::GetBufferForTensor(device, output_tensor);
 
     const int64 nrows = output_tensor.dim_size(0);
     const int dtype_size_in_bytes = DataTypeSize(output_tensor.dtype());

@@ -35,7 +35,7 @@ static void SetTensorToZero(OpKernelContext* ctx, const Tensor& tensor) {
       static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
   D3D12BufferRegion output_buffer =
-      device_context->CreateBufferForTensor(tensor);
+      device_context->GetBufferForTensor(tensor);
 
   device_context->ZeroBuffer(output_buffer);
 }

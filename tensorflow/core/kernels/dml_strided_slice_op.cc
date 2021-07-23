@@ -727,11 +727,11 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
     // Identity can be done in-place
     if (init_helper->IsIdentity()) {
       D3D12BufferRegion input_buffer =
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(
               ctx->GetInputTensor(4));
 
       D3D12BufferRegion output_buffer =
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensor);
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(input_tensor);
 
       absl::optional<DML_BUFFER_BINDING> input_bindings[] = {
           input_buffer.GetBufferBinding(),
@@ -746,9 +746,9 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
 
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(4)),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensor),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(input_tensor),
     };
 
     // Create input bindings

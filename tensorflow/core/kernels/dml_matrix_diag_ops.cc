@@ -320,7 +320,7 @@ class DmlMatrixDiagKernel : public DmlKernel {
       // over elements
       Tensor* output = ctx->GetOutputTensor(0);
       ctx->GetDmlDeviceContext()->FillBufferWithValue(
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(*output),
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output),
           static_cast<float>(padding_value_));
     }
 

@@ -303,7 +303,7 @@ class DmlGatherNdKernel : public DmlKernel {
     // Create input buffers
     absl::InlinedVector<D3D12BufferRegion, 2> input_buffers;
     input_buffers.push_back(
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(params_tensor));
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(params_tensor));
 
     // Create input bindings
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 2> input_bindings;
@@ -313,7 +313,7 @@ class DmlGatherNdKernel : public DmlKernel {
     // therefore we don't need a second input
     if (last_indices_dim != 0) {
       input_buffers.push_back(
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(indices_tensor));
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(indices_tensor));
       input_bindings.push_back(input_buffers[1].GetBufferBinding());
     }
 
@@ -323,7 +323,7 @@ class DmlGatherNdKernel : public DmlKernel {
     Tensor* output = ctx->GetOutputTensor(0);
 
     D3D12BufferRegion output_buffer =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(*output);
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(*output);
 
     output_bindings.push_back(output_buffer.GetBufferBinding());
 

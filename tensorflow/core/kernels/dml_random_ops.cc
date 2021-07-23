@@ -251,7 +251,7 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     DmlBuffer input_state_buffer =
         ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(6 * sizeof(uint32_t));
     D3D12BufferRegion output_buffer =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             *ctx->GetOutputTensor(0));
 
     if (!input_state_buffer) {
@@ -451,7 +451,7 @@ class DmlRandomUniformKernel : public DmlKernel {
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx,
                                 GuardedPhiloxRandom& generator) const {
     D3D12BufferRegion output_buffer =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             *ctx->GetOutputTensor(0));
 
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 1> input_bindings;

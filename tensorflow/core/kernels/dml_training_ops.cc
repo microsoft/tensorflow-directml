@@ -202,7 +202,7 @@ class DmlTrainingKernel : public DmlKernel {
     absl::InlinedVector<D3D12BufferRegion, 16> input_buffers;
     for (const Tensor& input_tensor : input_tensors) {
       input_buffers.push_back(
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensor));
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(input_tensor));
     }
 
     // Create input bindings
@@ -447,7 +447,7 @@ class DmlApplyAdamKernel : public DmlTrainingKernel {
 
     // Upload the training step scalar T to the GPU buffer
     D3D12BufferRegion dst =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(t_tensor);
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(t_tensor);
     auto src = absl::MakeSpan(reinterpret_cast<const uint8_t*>(&t), sizeof(t));
     TF_RETURN_IF_ERROR(
         ctx->GetDmlDeviceContext()->CopyHostToBuffer(dst, src).status());
@@ -461,15 +461,15 @@ class DmlApplyAdamKernel : public DmlTrainingKernel {
     };
 
     D3D12BufferRegion input_buffers[] = {
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             input_tensors[0]),  // InputParameters (var)
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             input_tensors[1]),  // InputFirstMoment (m)
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             input_tensors[2]),  // InputSecondMoment (v)
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             input_tensors[3]),  // Gradient (grad)
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             input_tensors[4]),  // TrainingStep
     };
 

@@ -94,7 +94,7 @@ class DmlCastKernel : public DmlKernel {
     // TFDML #24881131
     if (Is64BitUnsignedIntegerType(output->dtype())) {
       ctx->GetDmlDeviceContext()->ZeroBuffer(
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(*output));
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output));
     }
 
     return DmlKernel::Compute(ctx);

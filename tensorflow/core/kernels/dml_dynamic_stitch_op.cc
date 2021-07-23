@@ -114,13 +114,13 @@ class DmlDynamicStitchKernel : public OpKernel {
       }
 
       D3D12BufferRegion input_buffer =
-          dml_util::CreateBufferForTensor(device, data_tensor);
+          dml_util::GetBufferForTensor(device, data_tensor);
 
       input_buffers.push_back(std::move(input_buffer));
     }
 
     D3D12BufferRegion output_buffer =
-        dml_util::CreateBufferForTensor(device, *output_tensor);
+        dml_util::GetBufferForTensor(device, *output_tensor);
 
     DCHECK(indices_inputs.size() == data_inputs.size());
     for (int tensor_idx = 0; tensor_idx < indices_inputs.size(); ++tensor_idx) {

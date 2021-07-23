@@ -168,6 +168,10 @@ D3D12HeapAllocator::TryCreateTiledAllocation(uint64_t size_in_bytes) {
     D3D12_TILE_REGION_SIZE resource_region_size = {};
     resource_region_size.NumTiles = resource_size_in_tiles;
 
+    // This is a brand new allocation/resource, so the tile mappings are
+    // guaranteed to be set (on the GPU timeline) by the time any code can
+    // reference the returned resource. We only execute operations on a single
+    // hardware queue so there is no need to wait or signal.
     queue_->CopyTileMappings(
         allocation.resource_copy_src_state.Get(),  // dstResource
         &resource_start_coordinate,                // dstCoordinate
@@ -302,9 +306,10 @@ D3D12BufferRegion D3D12HeapAllocator::CreateBufferRegion(
 
   Allocation* allocation = &it->second;
 
-  return D3D12BufferRegion(
-      tagged_ptr.offset, size_in_bytes, initial_state_, allocation->resource,
-      allocation->resource_copy_src_state, allocation->resource_copy_dst_state);
+  return D3D12BufferRegion(tagged_ptr.offset, size_in_bytes, initial_state_,
+                           allocation->resource.Get(),
+                           allocation->resource_copy_src_state.Get(),
+                           allocation->resource_copy_dst_state.Get());
 }
 
 absl::optional<uint32_t> D3D12HeapAllocator::TryReserveAllocationID() {

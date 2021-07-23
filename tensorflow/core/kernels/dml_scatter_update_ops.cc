@@ -380,10 +380,10 @@ class DmlScatterUpdateKernel : public DmlKernel {
 
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(params_tensor),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(params_tensor),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(1)),
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(2)),
     };
 

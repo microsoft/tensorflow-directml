@@ -270,15 +270,15 @@ class DmlScatterNdKernel : public DmlKernel {
         ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(input_buffer_size_);
 
     D3D12BufferRegion indices_buffer =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(0));
 
     D3D12BufferRegion updates_buffer =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             ctx->GetInputTensor(1));
 
     D3D12BufferRegion output_buffer =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             *ctx->GetOutputTensor(0));
 
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 3> input_bindings;

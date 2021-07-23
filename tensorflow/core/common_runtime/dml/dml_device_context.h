@@ -107,7 +107,7 @@ class DMLDeviceContext : public DeviceContext {
   DmlBuffer AllocateDefaultBuffer(uint64_t num_bytes) const;
 
   // Retrives the D3D12 default heap buffer backing the specified tensor.
-  D3D12BufferRegion CreateBufferForTensor(const Tensor& tensor) const;
+  D3D12BufferRegion GetBufferForTensor(const Tensor& tensor) const;
 
   // Allocates a range of D3D12 descriptors at least size_in_descriptors large.
   // When the returned object is destructed, the descriptors are freed back to

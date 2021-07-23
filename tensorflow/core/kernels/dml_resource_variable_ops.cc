@@ -92,9 +92,9 @@ class DmlUpdateVariableOp : public DmlKernel {
         &dml_util::CopyTensorInSameDevice));
 
     D3D12BufferRegion var_resource =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(*var_tensor);
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(*var_tensor);
     D3D12BufferRegion value_resource =
-        ctx->GetDmlDeviceContext()->CreateBufferForTensor(value);
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(value);
 
     absl::optional<DML_BUFFER_BINDING> input_bindings[] = {
         var_resource.GetBufferBinding(),

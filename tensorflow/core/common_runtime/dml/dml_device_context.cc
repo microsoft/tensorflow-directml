@@ -35,7 +35,7 @@ void DMLDeviceContext::CopyCPUTensorToDevice(const Tensor* cpu_tensor,
 
   const void* src_data = DMAHelper::base(cpu_tensor);
 
-  D3D12BufferRegion dst = CreateBufferForTensor(*device_tensor);
+  D3D12BufferRegion dst = GetBufferForTensor(*device_tensor);
 
   auto byte_span = absl::Span<const uint8_t>(
       static_cast<const uint8_t*>(src_data), total_bytes);
@@ -61,8 +61,8 @@ void DMLDeviceContext::CopyTensorInSameDevice(const Tensor* input_tensor,
     return;
   }
 
-  D3D12BufferRegion src = CreateBufferForTensor(*input_tensor);
-  D3D12BufferRegion dst = CreateBufferForTensor(*output_tensor);
+  D3D12BufferRegion src = GetBufferForTensor(*input_tensor);
+  D3D12BufferRegion dst = GetBufferForTensor(*output_tensor);
 
   (void)execution_context_->CopyBufferRegion(dst,
                                              src.Subregion(0, total_bytes));
@@ -85,7 +85,7 @@ void DMLDeviceContext::CopyDeviceTensorToCPU(const Tensor* device_tensor,
     return;
   }
 
-  D3D12BufferRegion src = CreateBufferForTensor(*device_tensor);
+  D3D12BufferRegion src = GetBufferForTensor(*device_tensor);
 
   void* dst_data = DMAHelper::base(cpu_tensor);
 
@@ -217,7 +217,7 @@ DmlBuffer DMLDeviceContext::AllocateDefaultBuffer(uint64_t num_bytes) const {
   return DmlBuffer(allocator_, num_bytes);
 }
 
-D3D12BufferRegion DMLDeviceContext::CreateBufferForTensor(
+D3D12BufferRegion DMLDeviceContext::GetBufferForTensor(
     const Tensor& tensor) const {
   const void* p = tensor.tensor_data().data();
 

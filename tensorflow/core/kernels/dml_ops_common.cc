@@ -397,7 +397,7 @@ absl::InlinedVector<D3D12BufferRegion, 8> DmlKernel::CreateInputBuffers(
 
       const Tensor& input_tensor = ctx->GetInputTensor(kernel_index);
       input_buffers[i] =
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(input_tensor);
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(input_tensor);
     }
   }
 
@@ -415,7 +415,7 @@ absl::InlinedVector<D3D12BufferRegion, 4> DmlKernel::CreateOutputBuffers(
 
       Tensor* output_tensor = ctx->GetOutputTensor(kernel_index);
       output_buffers[i] =
-          ctx->GetDmlDeviceContext()->CreateBufferForTensor(*output_tensor);
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output_tensor);
     }
   }
 
