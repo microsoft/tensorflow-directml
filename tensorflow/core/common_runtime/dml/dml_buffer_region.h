@@ -69,9 +69,9 @@ class D3D12BufferRegion {
   }
 
  private:
-  ID3D12Resource* resource_;
-  ID3D12Resource* resource_copy_src_state_;
-  ID3D12Resource* resource_copy_dst_state_;
+  ID3D12Resource* resource_ = nullptr;
+  ID3D12Resource* resource_copy_src_state_ = nullptr;
+  ID3D12Resource* resource_copy_dst_state_ = nullptr;
   uint64_t offset_ = 0;
   uint64_t size_in_bytes_ = 0;
   D3D12_RESOURCE_STATES resource_state_ = D3D12_RESOURCE_STATE_COMMON;
