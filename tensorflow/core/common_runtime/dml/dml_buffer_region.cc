@@ -19,17 +19,18 @@ limitations under the License.
 
 namespace tensorflow {
 
-D3D12BufferRegion::D3D12BufferRegion(uint64_t offset, uint64_t size_in_bytes,
-                                     D3D12_RESOURCE_STATES resource_state,
-                                     ID3D12Resource* resource,
-                                     ID3D12Resource* resource_copy_src_state,
-                                     ID3D12Resource* resource_copy_dst_state)
+D3D12BufferRegion::D3D12BufferRegion(
+    uint64_t offset, uint64_t size_in_bytes,
+    D3D12_RESOURCE_STATES resource_state,
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state,
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state)
     : offset_(offset),
       size_in_bytes_(size_in_bytes),
-      resource_state_(resource_state),
+      resource_state_(std::move(resource_state)),
       resource_(resource),
-      resource_copy_src_state_(resource_copy_src_state),
-      resource_copy_dst_state_(resource_copy_dst_state) {
+      resource_copy_src_state_(std::move(resource_copy_src_state)),
+      resource_copy_dst_state_(std::move(resource_copy_dst_state)) {
   CHECK(resource_ != nullptr);
   CHECK(size_in_bytes_ != 0);
 
@@ -49,15 +50,15 @@ D3D12BufferRegion::D3D12BufferRegion(uint64_t offset, uint64_t size_in_bytes,
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInFixedState() const {
-  return resource_;
+  return resource_.Get();
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInCopySrcState() const {
-  return resource_copy_src_state_;
+  return resource_copy_src_state_.Get();
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInCopyDstState() const {
-  return resource_copy_dst_state_;
+  return resource_copy_dst_state_.Get();
 }
 
 uint64_t D3D12BufferRegion::Offset() const { return resource_ ? offset_ : 0; }
@@ -71,7 +72,7 @@ DML_BUFFER_BINDING D3D12BufferRegion::GetBufferBinding() const {
     return DML_BUFFER_BINDING{};
   }
 
-  return DML_BUFFER_BINDING{resource_, offset_, size_in_bytes_};
+  return DML_BUFFER_BINDING{resource_.Get(), offset_, size_in_bytes_};
 }
 
 }  // namespace tensorflow

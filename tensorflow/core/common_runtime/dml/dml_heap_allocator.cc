@@ -307,9 +307,9 @@ D3D12BufferRegion D3D12HeapAllocator::CreateBufferRegion(
   Allocation* allocation = &it->second;
 
   return D3D12BufferRegion(tagged_ptr.offset, size_in_bytes, initial_state_,
-                           allocation->resource.Get(),
-                           allocation->resource_copy_src_state.Get(),
-                           allocation->resource_copy_dst_state.Get());
+                           allocation->resource,
+                           allocation->resource_copy_src_state,
+                           allocation->resource_copy_dst_state);
 }
 
 absl::optional<uint32_t> D3D12HeapAllocator::TryReserveAllocationID() {
