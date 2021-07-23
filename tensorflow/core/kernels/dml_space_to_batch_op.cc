@@ -45,6 +45,11 @@ class BaseSpaceToBatchInitHelper : public InitializationHelper {
     return internal_paddings_;
   }
 
+  bool IsPaddingRequired() const {
+    return std::any_of(internal_paddings_.begin(), internal_paddings_.end(),
+                       [](int64 i) { return i != 0; });
+  }
+
   TensorShape GetOutputShape() const { return output_shape_; }
   int GetInternalBlockDims() const { return internal_block_dims_; }
 
@@ -340,72 +345,133 @@ class DmlSpaceToBatchKernel : public DmlKernel {
       end_paddings[i + missing_dims + 1] = internal_paddings[i * 2 + 1];
     }
 
-    auto padded = dml::Padding(input, DML_PADDING_MODE_CONSTANT, 0,
-                               start_paddings, end_paddings);
-
-    // Reshape padded into [batch] + [padded_shape[1] / block_shape[0],
-    // block_shape[0], ..., padded_shape[M] / block_shape[M-1],
-    // block_shape[M-1]] + remaining_shape
-    dml::TensorDesc::Dimensions reshaped_padded_sizes;
-    reshaped_padded_sizes.push_back(batch_size);
-
-    for (int i = 0; i < internal_block_dims; ++i) {
-      int padded_dim = internal_input_shape.dim_size(i + 1) +
-                       start_paddings[i + missing_dims + 1] +
-                       end_paddings[i + missing_dims + 1];
-
-      reshaped_padded_sizes.push_back(padded_dim / internal_block_sizes[i]);
-      reshaped_padded_sizes.push_back(internal_block_sizes[i]);
+    dml::Expression padded = input;
+    if (init_helper->IsPaddingRequired()) {
+      padded = dml::Padding(input, DML_PADDING_MODE_CONSTANT, 0, start_paddings,
+                            end_paddings);
     }
 
-    for (int i = internal_block_dims + 1; i < internal_input_shape.dims();
-         ++i) {
-      reshaped_padded_sizes.push_back(internal_input_shape.dim_size(i));
+    dml::Expression permuted_reshaped_padded;
+
+    if (internal_input_shape.dims() == 4) {
+      dml::TensorDesc padded_desc = padded.GetOutputDesc();
+      auto padded_sizes = padded_desc.sizes;
+      
+      dml::TensorStrides padded_strides;
+      if (padded_desc.strides.has_value()) {
+        padded_strides = *padded_desc.strides;
+      } else {
+        padded_strides = ComputePackedStrides(padded_sizes);
+      }
+
+      // Permute input NCHW->WNCH
+      dml::TensorDimensions input_tensor_sizes = {
+          padded_sizes[3], padded_sizes[0], padded_sizes[1], padded_sizes[2]};
+      dml::TensorStrides input_tensor_strides = {
+          padded_strides[3], padded_strides[0], padded_strides[1],
+          padded_strides[2]};
+      padded = dml::Reinterpret(padded, input_tensor_sizes, input_tensor_strides);
+
+      const auto old_policy = graph.GetTensorPolicy();
+      const auto out_policy = dml::TensorPolicy(
+          [](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
+             dml::Span<const uint32_t> sizes) {
+            uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
+            // Permute output sizes WNCH->NCHW in order to calculate strides.
+            dml::TensorDimensions output_tensor_sizes = {sizes[1], sizes[2],
+                                                         sizes[3], sizes[0]};
+
+            // Calculate strides with the permuted sizes
+            dml::TensorStrides strides(dimension_count);
+            uint32_t stride = 1;
+            for (int i = 3; i >= 0; --i) {
+              strides[i] = stride;
+              stride *= output_tensor_sizes[i];
+            }
+
+            // Permute output strides NCHW->WNCH
+            dml::TensorStrides output_tensor_strides = {strides[3], strides[0],
+                                                        strides[1], strides[2]};
+
+            dml::TensorProperties props = {};
+            props.guaranteedBaseOffsetAlignment = 0;
+            props.strides = std::move(output_tensor_strides);
+            props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
+                dataType, dimension_count, sizes.data(), props.strides->data());
+            return props;
+          });
+
+      // We want to have special output striding for this one operator so it can
+      // mimic BatchToSpace
+      graph.SetTensorPolicy(out_policy);
+      permuted_reshaped_padded =
+          dml::SpaceToDepth(padded, internal_block_sizes[0]);
+      graph.SetTensorPolicy(old_policy);
+    } else {
+      // Reshape padded into [batch] + [padded_shape[1] / block_shape[0],
+      // block_shape[0], ..., padded_shape[M] / block_shape[M-1],
+      // block_shape[M-1]] + remaining_shape
+      dml::TensorDesc::Dimensions reshaped_padded_sizes;
+      reshaped_padded_sizes.push_back(batch_size);
+
+      for (int i = 0; i < internal_block_dims; ++i) {
+        int padded_dim = internal_input_shape.dim_size(i + 1) +
+                        start_paddings[i + missing_dims + 1] +
+                        end_paddings[i + missing_dims + 1];
+
+        reshaped_padded_sizes.push_back(padded_dim / internal_block_sizes[i]);
+        reshaped_padded_sizes.push_back(internal_block_sizes[i]);
+      }
+
+      for (int i = internal_block_dims + 1; i < internal_input_shape.dims();
+          ++i) {
+        reshaped_padded_sizes.push_back(internal_input_shape.dim_size(i));
+      }
+
+      // Permute reshaped_padded into block_shape + [batch] + [padded_shape[1] /
+      // block_shape[0], ..., padded_shape[M] / block_shape[M-1]] +
+      // remaining_shape
+      uint32_t stride = 1;
+      dml::TensorDesc::Dimensions reshaped_padded_strides(
+          reshaped_padded_sizes.size());
+
+      for (int i = reshaped_padded_sizes.size() - 1; i >= 0; --i) {
+        reshaped_padded_strides[i] = stride;
+        stride *= reshaped_padded_sizes[i];
+      }
+
+      dml::TensorDesc::Dimensions perm_strides;
+      perm_strides.reserve(reshaped_padded_strides.size());
+
+      dml::TensorDesc::Dimensions perm_sizes;
+      perm_sizes.reserve(reshaped_padded_strides.size());
+
+      for (int i = 0; i < internal_block_dims; ++i) {
+        int index = i * 2 + 2;
+        perm_strides.push_back(reshaped_padded_strides[index]);
+        perm_sizes.push_back(reshaped_padded_sizes[index]);
+      }
+
+      perm_strides.push_back(reshaped_padded_strides.front());
+      perm_sizes.push_back(reshaped_padded_sizes.front());
+
+      for (int i = 0; i < internal_block_dims; ++i) {
+        int index = i * 2 + 1;
+        perm_strides.push_back(reshaped_padded_strides[index]);
+        perm_sizes.push_back(reshaped_padded_sizes[index]);
+      }
+
+      for (int i = internal_block_dims * 2 + 1; i < reshaped_padded_sizes.size();
+          ++i) {
+        perm_strides.push_back(reshaped_padded_strides[i]);
+        perm_sizes.push_back(reshaped_padded_sizes[i]);
+      }
+
+      permuted_reshaped_padded =
+          dml::Reinterpret(padded, perm_sizes, perm_strides);
+
+      permuted_reshaped_padded = dml::Identity(permuted_reshaped_padded);
     }
-
-    // Permute reshaped_padded into block_shape + [batch] + [padded_shape[1] /
-    // block_shape[0], ..., padded_shape[M] / block_shape[M-1]] +
-    // remaining_shape
-    uint32_t stride = 1;
-    dml::TensorDesc::Dimensions reshaped_padded_strides(
-        reshaped_padded_sizes.size());
-
-    for (int i = reshaped_padded_sizes.size() - 1; i >= 0; --i) {
-      reshaped_padded_strides[i] = stride;
-      stride *= reshaped_padded_sizes[i];
-    }
-
-    dml::TensorDesc::Dimensions perm_strides;
-    perm_strides.reserve(reshaped_padded_strides.size());
-
-    dml::TensorDesc::Dimensions perm_sizes;
-    perm_sizes.reserve(reshaped_padded_strides.size());
-
-    for (int i = 0; i < internal_block_dims; ++i) {
-      int index = i * 2 + 2;
-      perm_strides.push_back(reshaped_padded_strides[index]);
-      perm_sizes.push_back(reshaped_padded_sizes[index]);
-    }
-
-    perm_strides.push_back(reshaped_padded_strides.front());
-    perm_sizes.push_back(reshaped_padded_sizes.front());
-
-    for (int i = 0; i < internal_block_dims; ++i) {
-      int index = i * 2 + 1;
-      perm_strides.push_back(reshaped_padded_strides[index]);
-      perm_sizes.push_back(reshaped_padded_sizes[index]);
-    }
-
-    for (int i = internal_block_dims * 2 + 1; i < reshaped_padded_sizes.size();
-         ++i) {
-      perm_strides.push_back(reshaped_padded_strides[i]);
-      perm_sizes.push_back(reshaped_padded_sizes[i]);
-    }
-
-    auto permuted_reshaped_padded =
-        dml::Reinterpret(padded, perm_sizes, perm_strides);
-
-    permuted_reshaped_padded = dml::Identity(permuted_reshaped_padded);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         graph.Compile(DML_EXECUTION_FLAG_NONE, {permuted_reshaped_padded});
