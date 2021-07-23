@@ -55,8 +55,8 @@ static absl::optional<SimplifiedSlice> SimplifySlice(
     const gtl::InlinedVector<int64, 4>& canonical_ends,
     const gtl::InlinedVector<int64, 4>& strides, uint32_t min_output_size = 4,
     uint32_t max_output_size = 8) {
-  assert(input_shape.dims() == begins.size());
-  assert(input_shape.dims() == ends.size());
+  assert(input_shape.dims() == canonical_begins.size());
+  assert(input_shape.dims() == canonical_ends.size());
   assert(input_shape.dims() == strides.size());
   assert(max_output_size > 0);
 
