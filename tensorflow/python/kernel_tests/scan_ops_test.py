@@ -206,7 +206,7 @@ class CumprodTest(test.TestCase):
     with self.cached_session(use_gpu=True):
       tf_out = math_ops.cumprod(x, axis, exclusive, reverse).eval()
 
-    self.assertAllClose(np_out, tf_out)
+    self.assertAllCloseAccordingToType(np_out, tf_out)
 
   def _compareAll(self, x, axis):
     for exclusive in [True, False]:

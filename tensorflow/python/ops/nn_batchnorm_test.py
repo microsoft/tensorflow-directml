@@ -346,7 +346,7 @@ class BatchNormalizationTest(test.TestCase):
 
   def testBatchNormMixedPrecision(self):
     self._testBatchNormArbitraryShapes((3, 3), (1, 3), dtype=dtypes.float16,
-                                       param_dtype=dtypes.float32, atol=0.001)
+                                       param_dtype=dtypes.float32, atol=0.002)
 
 
 class SufficientStatisticsTest(test.TestCase):

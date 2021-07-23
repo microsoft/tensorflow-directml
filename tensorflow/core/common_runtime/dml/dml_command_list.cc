@@ -81,13 +81,13 @@ void DmlCommandList::FillBufferWithPattern(
     uint8_t bytes[16];
   } fillPattern = {};
 
-  assert(ARRAYSIZE(fillPattern.bytes) == 16);
+  assert(sizeof(fillPattern.bytes) == 16);
   assert(value.size() <=
-         ARRAYSIZE(fillPattern.bytes));  // No element is expected larger than
-                                         // 128 bits (e.g. complex128).
+         sizeof(fillPattern.bytes));  // No element is expected larger than
+                                      // 128 bits (e.g. complex128).
 
   if (!value.empty()) {
-    assert(ARRAYSIZE(fillPattern.bytes) % value.size() ==
+    assert(sizeof(fillPattern.bytes) % value.size() ==
            0);  // Should fit evenly into 16 bytes (e.g. uint8, float16, uint32,
                 // float64...).
 

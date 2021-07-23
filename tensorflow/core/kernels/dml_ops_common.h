@@ -181,8 +181,9 @@ class DmlKernel {
  private:
   Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op_;
 
-  DmlBuffer persistent_resource_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> persistent_resource_;
   absl::optional<DML_BUFFER_BINDING> persistent_resource_binding_;
+  
   std::shared_ptr<const InitializationHelper> init_helper_;
 
   // The order and count of these descs match the DML operator, which might be
@@ -310,8 +311,7 @@ Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
 }
 
 // TFDML #24881131
-Expression ConvertInt32ToInt64(Graph& scope, Expression tensor,
-                               uint32_t element_stride = 1);
+Expression ConvertInt32ToInt64(Expression int32_tensor);
 
 template <typename T>
 Expression Sequence(Graph& scope, T start, T step,

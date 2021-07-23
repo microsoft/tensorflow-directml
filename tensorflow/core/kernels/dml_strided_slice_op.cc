@@ -55,8 +55,8 @@ static absl::optional<SimplifiedSlice> SimplifySlice(
     const gtl::InlinedVector<int64, 4>& canonical_ends,
     const gtl::InlinedVector<int64, 4>& strides, uint32_t min_output_size = 4,
     uint32_t max_output_size = 8) {
-  assert(input_shape.dims() == begins.size());
-  assert(input_shape.dims() == ends.size());
+  assert(input_shape.dims() == canonical_begins.size());
+  assert(input_shape.dims() == canonical_ends.size());
   assert(input_shape.dims() == strides.size());
   assert(max_output_size > 0);
 
@@ -380,7 +380,7 @@ class DmlStridedSliceKernel : public DmlKernel {
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -475,7 +475,7 @@ class DmlStridedSliceGradKernel : public DmlKernel {
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -706,7 +706,7 @@ class DmlStridedSliceAssignKernel : public DmlKernel {
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(ctx->GetInputDataType(4))) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =

@@ -58,6 +58,14 @@ def main():
           for dep in json_test_group["pipDeps"]:
             conda_env.install_package(dep)
 
+        if "localPipDeps" in json_test_group:
+          for dep in json_test_group["localPipDeps"]:
+            dep_abs_path = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)),
+                dep)
+
+            conda_env.install_local_package(dep_abs_path)
+
         if os.name == "nt" and "windowsPipDeps" in json_test_group:
           for dep in json_test_group["windowsPipDeps"]:
             conda_env.install_package(dep)

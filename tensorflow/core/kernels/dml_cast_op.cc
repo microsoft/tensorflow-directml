@@ -79,7 +79,7 @@ class DmlCastKernel : public DmlKernel {
 
     // TFDML #24881131
     if (Is64BitSignedIntegerType(output_dtype)) {
-      result = dml::ConvertInt32ToInt64(scope, result);
+      result = dml::ConvertInt32ToInt64(result);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =

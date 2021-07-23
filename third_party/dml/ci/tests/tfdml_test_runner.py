@@ -73,6 +73,7 @@ def _run_test(
 
   env_copy = _get_tf_env(exe_path, test_framework)
 
+
   if log_device_placement:
     env_copy["TF_CPP_LOG_DEVICE_PLACEMENT"] = "1"
 
@@ -80,6 +81,10 @@ def _run_test(
     env_copy["TEST_SRCDIR"] = exe_path + ".runfiles"
 
   if test_framework == "abseil":
+    # Specifying a port server for portpicker is necessary to avoid race
+    # conditions when searching for unused ports. @unittest-portserver is the
+    # sample port server that portpicker provides for test environments.
+    env_copy["PORTSERVER_ADDRESS"] = "@unittest-portserver"
     env_copy["TEST_TOTAL_SHARDS"] = str(total_shard_count)
     env_copy["TEST_SHARD_INDEX"] = str(shard_index)
     xml_output_arg = f"--xml_output_file={xml_path}"
@@ -155,48 +160,39 @@ def _run_test(
 def main():
   args = _parse_args()
   absolute_binaries_path = os.path.join(sys.path[0], args.test_binaries_path)
+  processes_count = min(8, os.cpu_count())
 
-  with concurrent.futures.ThreadPoolExecutor(os.cpu_count()) as executor:
+  with concurrent.futures.ThreadPoolExecutor(processes_count) as executor:
     futures = []
 
+    if os.name == "nt":
+      exe_paths = glob.glob(f"{absolute_binaries_path}/**/*.exe",
+                            recursive=True)
+    else:
+      runfiles = glob.glob(f"{absolute_binaries_path}/**/*.runfiles",
+                            recursive=True)
+      exe_paths = [os.path.splitext(runfile)[0] for runfile in runfiles]
+
+    bin_root = os.path.split(sys.executable)[0]
+    if os.name == "nt":
+      portserver_path = os.path.join(bin_root, "Scripts", "portserver.py")
+    else:
+      portserver_path = os.path.join(bin_root, "portserver.py")
+
     try:
-      if os.name == "nt":
-        exe_paths = glob.glob(f"{absolute_binaries_path}/**/*.exe",
-                              recursive=True)
-      else:
-        runfiles = glob.glob(f"{absolute_binaries_path}/**/*.runfiles",
-                             recursive=True)
-        exe_paths = [os.path.splitext(runfile)[0] for runfile in runfiles]
+      # Launch the portserver daemon
+      portserver_process = subprocess.Popen(["python", portserver_path])
 
       for exe_path in exe_paths:
-        # When GTEST C++ tests crash, they don't produce any XML and we lose all
-        # the results. By running each test case in its own process, we make
-        # sure that all tests are ran and all XML results for non-crashing tests
-        # are being generated.
-        os.chmod(exe_path, 0o777)
+        # Read the json file to know how many shards to split the test into
+        shard_count = 1
+        json_path = os.path.splitext(exe_path)[0] + ".json"
 
-        if args.test_framework == "gtest":
-          shard_count = 0
-
-          exe_test_list = subprocess.run(
-              [exe_path, "--gtest_list_tests"],
-              check=True,
-              env=_get_tf_env(exe_path, args.test_framework),
-              stdout=subprocess.PIPE).stdout
-
-          for line in exe_test_list.decode("utf-8").splitlines():
-            if line.startswith("  "):
-              shard_count += 1
-        else:
-          # Read the json file to know how many shards to split the test into
-          shard_count = 1
-          json_path = os.path.splitext(exe_path)[0] + ".json"
-
-          if os.path.exists(json_path):
-            with open(json_path) as json_file:
-              params = json.load(json_file)
-              if "shard_count" in params:
-                shard_count = params["shard_count"]
+        if os.path.exists(json_path):
+          with open(json_path) as json_file:
+            params = json.load(json_file)
+            if "shard_count" in params:
+              shard_count = params["shard_count"]
 
         for shard_index in range(shard_count):
           # Don't gather device placement data on WSL for now
@@ -215,6 +211,8 @@ def main():
       for future in futures:
         future.result()
     finally:
+      portserver_process.terminate()
+
       for future in futures:
         future.cancel()
 

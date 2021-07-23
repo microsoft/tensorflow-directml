@@ -89,8 +89,8 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
 
     dml_repository(
         name = "dml_redist",
-        package = "Microsoft.AI.DirectML",
-        version = "1.5.1",
+        package = "Microsoft.AI.DirectML.Preview",
+        version = "1.7.0-dev20210625",
         source = "https://api.nuget.org/v3/index.json",
         build_file = "//third_party/dml/redist:BUILD.bazel",
     )
@@ -975,11 +975,11 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     tf_http_archive(
         name = "directml",
         urls = [
-            "https://mirror.bazel.build/github.com/microsoft/DirectML/archive/6f583b25873d5df9d5fff837bbf397aafa43c32a.tar.gz",
-            "https://github.com/microsoft/DirectML/archive/6f583b25873d5df9d5fff837bbf397aafa43c32a.tar.gz",
+            "https://mirror.bazel.build/github.com/microsoft/DirectML/archive/3cc9a99d8846311d98a1add7adf79b8b0238ac09.tar.gz",
+            "https://github.com/microsoft/DirectML/archive/3cc9a99d8846311d98a1add7adf79b8b0238ac09.tar.gz",
         ],
-        sha256 = "4bb00e521b5192d4fd7ac7aa2d05958bb7f51130e8d30d1ee610d6ca427370e9",
-        strip_prefix = "DirectML-6f583b25873d5df9d5fff837bbf397aafa43c32a",
+        sha256 = "f865f49c99c5b147231220469716c63f44980ddc13e8a22826973efa1b4b2898",
+        strip_prefix = "DirectML-3cc9a99d8846311d98a1add7adf79b8b0238ac09",
         build_file = clean_dep("//third_party:directml.BUILD"),
     )
 

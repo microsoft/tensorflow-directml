@@ -67,7 +67,6 @@ py_test(
     srcs_version = "PY2AND3",
     tags = [
         "no_gpu",  # b/127001953
-        "no_dml", # 32193733
     ],
     deps = [
         ":operators",
