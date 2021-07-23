@@ -27,8 +27,8 @@ D3D12BufferRegion::D3D12BufferRegion(
     Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state)
     : offset_(offset),
       size_in_bytes_(size_in_bytes),
-      resource_state_(std::move(resource_state)),
-      resource_(resource),
+      resource_state_(resource_state),
+      resource_(std::move(resource)),
       resource_copy_src_state_(std::move(resource_copy_src_state)),
       resource_copy_dst_state_(std::move(resource_copy_dst_state)) {
   CHECK(resource_ != nullptr);
