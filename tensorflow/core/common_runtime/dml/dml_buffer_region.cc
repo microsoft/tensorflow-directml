@@ -33,10 +33,10 @@ D3D12BufferRegion::D3D12BufferRegion(
   // resource must be provided.
   first_valid_resource_ = resource_uav_state_.Get();
   if (!first_valid_resource_) {
-    first_valid_resource_ = resource_copy_src_state.Get();
+    first_valid_resource_ = resource_copy_src_state_.Get();
   }
   if (!first_valid_resource_) {
-    first_valid_resource_ = resource_copy_dst_state.Get();
+    first_valid_resource_ = resource_copy_dst_state_.Get();
   }
   CHECK(first_valid_resource_ != nullptr);
 
