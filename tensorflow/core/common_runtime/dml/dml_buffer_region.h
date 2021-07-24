@@ -56,7 +56,7 @@ class D3D12BufferRegion {
 
   DML_BUFFER_BINDING GetBufferBinding() const;
 
-  explicit operator bool() const { return first_valid_resource_ != nullptr; }
+  explicit operator bool() const { return resource_uav_state_ != nullptr; }
 
   // Creates a subregion at an offset from the start of this region. If no size
   // is provided the region runs to the end of the current region.
