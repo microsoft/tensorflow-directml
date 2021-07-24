@@ -58,9 +58,13 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
 
   ID3D12Resource* readback_heap = chunk->resource.Get();
 
-  auto readback_resource =
-      D3D12BufferRegion(offset_in_chunk, dst.size(),
-                        D3D12_RESOURCE_STATE_COPY_DEST, chunk->resource.Get());
+  // Allocations from the readback pool are only ever used as copy destinations.
+  auto readback_resource = D3D12BufferRegion(offset_in_chunk,       // offset
+                                             dst.size(),            // size,
+                                             nullptr,               // uav state
+                                             nullptr,               // copy src
+                                             chunk->resource.Get()  // copy dst
+  );
 
   // Copy from the source resource into the readback heap. `gpu_done_event` is
   // the event that will be signaled when the copy to the readback heap

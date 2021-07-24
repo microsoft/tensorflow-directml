@@ -112,35 +112,10 @@ DmlGpuEvent DmlExecutionContext::CopyBufferRegionRaw(
 DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
     const D3D12BufferRegion& dst, const D3D12BufferRegion& src) {
   CHECK(src.SizeInBytes() <= dst.SizeInBytes());
-  CHECK(dst.SizeInBytes() + dst.Offset() <=
-        dst.ResourceInFixedState()->GetDesc().Width);
-  CHECK(src.SizeInBytes() + src.Offset() <=
-        src.ResourceInFixedState()->GetDesc().Width);
-
-  // Most D3D12BufferRegions have the same logical resource in three states:
-  // UAV, COPY_SRC, and COPY_DST. Resources allocated through upload & readback
-  // heaps only use the primary resource in the appropriate non-UAV state.
-
-  ID3D12Resource* dst_resource = dst.ResourceInCopyDstState();
-  if (!dst_resource) {
-    // Must be a buffer allocated from a readback heap.
-    dst_resource = dst.ResourceInFixedState();
-    DCHECK(dst.ResourceState() == D3D12_RESOURCE_STATE_COPY_DEST);
-  } else {
-    DCHECK(dst.ResourceState() == D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-  }
-
-  ID3D12Resource* src_resource = src.ResourceInCopySrcState();
-  if (!src_resource) {
-    // Must be a buffer allocated in an upload heap.
-    src_resource = src.ResourceInFixedState();
-    DCHECK(src.ResourceState() == D3D12_RESOURCE_STATE_GENERIC_READ);
-  } else {
-    DCHECK(src.ResourceState() == D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-  }
 
   return CopyBufferRegionRaw(
-      dst_resource, dst.Offset(), D3D12_RESOURCE_STATE_COPY_DEST, src_resource,
+      dst.ResourceInCopyDstState(), dst.Offset(),
+      D3D12_RESOURCE_STATE_COPY_DEST, src.ResourceInCopySrcState(),
       src.Offset(), D3D12_RESOURCE_STATE_COPY_SOURCE, src.SizeInBytes());
 }
 

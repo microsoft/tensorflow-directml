@@ -93,7 +93,7 @@ D3D12HeapAllocator::TryCreateTiledAllocation(uint64_t size_in_bytes) {
   auto resource_desc =
       CD3DX12_RESOURCE_DESC::Buffer(resource_size_in_bytes, resource_flags_);
 
-  ID3D12Resource** resources[] = {&allocation.resource,
+  ID3D12Resource** resources[] = {&allocation.resource_uav_state,
                                   &allocation.resource_copy_src_state,
                                   &allocation.resource_copy_dst_state};
 
@@ -149,12 +149,12 @@ D3D12HeapAllocator::TryCreateTiledAllocation(uint64_t size_in_bytes) {
 
     constexpr UINT numResourceRegions = 1;
     constexpr UINT numHeapRanges = 1;
-    queue_->UpdateTileMappings(allocation.resource.Get(), numResourceRegions,
-                               &resource_region_start_coordinates,
-                               &resource_region_size, allocation.heaps[i].Get(),
-                               numHeapRanges, &tile_range_flags,
-                               &heap_range_start_offset, &heap_range_tile_count,
-                               D3D12_TILE_MAPPING_FLAG_NONE);
+    queue_->UpdateTileMappings(
+        allocation.resource_uav_state.Get(), numResourceRegions,
+        &resource_region_start_coordinates, &resource_region_size,
+        allocation.heaps[i].Get(), numHeapRanges, &tile_range_flags,
+        &heap_range_start_offset, &heap_range_tile_count,
+        D3D12_TILE_MAPPING_FLAG_NONE);
 
     resource_region_start_coordinates.X += heap_size_in_tiles;
     unmapped_resource_tiles -= heap_size_in_tiles;
@@ -175,7 +175,7 @@ D3D12HeapAllocator::TryCreateTiledAllocation(uint64_t size_in_bytes) {
     queue_->CopyTileMappings(
         allocation.resource_copy_src_state.Get(),  // dstResource
         &resource_start_coordinate,                // dstCoordinate
-        allocation.resource.Get(),                 // srcResource
+        allocation.resource_uav_state.Get(),       // srcResource
         &resource_start_coordinate,                // srcCoordinate
         &resource_region_size,                     // copy size
         D3D12_TILE_MAPPING_FLAG_NONE);
@@ -183,7 +183,7 @@ D3D12HeapAllocator::TryCreateTiledAllocation(uint64_t size_in_bytes) {
     queue_->CopyTileMappings(
         allocation.resource_copy_dst_state.Get(),  // dstResource
         &resource_start_coordinate,                // dstCoordinate
-        allocation.resource.Get(),                 // srcResource
+        allocation.resource_uav_state.Get(),       // srcResource
         &resource_start_coordinate,                // srcCoordinate
         &resource_region_size,                     // copy size
         D3D12_TILE_MAPPING_FLAG_NONE);
@@ -213,7 +213,7 @@ D3D12HeapAllocator::TryCreateUntiledAllocation(uint64_t size_in_bytes) {
   D3D12_RESOURCE_DESC resource_desc =
       CD3DX12_RESOURCE_DESC::Buffer(size_in_bytes, resource_flags_);
 
-  ID3D12Resource** resources[] = {&allocation.resource,
+  ID3D12Resource** resources[] = {&allocation.resource_uav_state,
                                   &allocation.resource_copy_src_state,
                                   &allocation.resource_copy_dst_state};
   D3D12_RESOURCE_STATES states[] = {initial_state_,
@@ -306,10 +306,9 @@ D3D12BufferRegion D3D12HeapAllocator::CreateBufferRegion(
 
   Allocation* allocation = &it->second;
 
-  return D3D12BufferRegion(tagged_ptr.offset, size_in_bytes, initial_state_,
-                           allocation->resource,
-                           allocation->resource_copy_src_state,
-                           allocation->resource_copy_dst_state);
+  return D3D12BufferRegion(
+      tagged_ptr.offset, size_in_bytes, allocation->resource_uav_state,
+      allocation->resource_copy_src_state, allocation->resource_copy_dst_state);
 }
 
 absl::optional<uint32_t> D3D12HeapAllocator::TryReserveAllocationID() {

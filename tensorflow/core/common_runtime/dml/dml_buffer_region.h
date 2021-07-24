@@ -28,13 +28,14 @@ class D3D12BufferRegion {
  public:
   D3D12BufferRegion() = default;
 
-  // References a region of a resource that remains in a fixed state.
+  // References a region of a buffer. The respective ID3D12Resource objects must
+  // be in the appropriate states. Each resource is optional, but if more than
+  // one are provided they must map to the same region of memory.
   D3D12BufferRegion(
       uint64_t offset, uint64_t size_in_bytes,
-      D3D12_RESOURCE_STATES resource_state,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state = nullptr,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state = nullptr);
+      Microsoft::WRL::ComPtr<ID3D12Resource> resource_uav_state,
+      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state,
+      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state);
 
   // Move-only
   D3D12BufferRegion(const D3D12BufferRegion&) = delete;
@@ -42,16 +43,20 @@ class D3D12BufferRegion {
   D3D12BufferRegion(D3D12BufferRegion&&) = default;
   D3D12BufferRegion& operator=(D3D12BufferRegion&&) = default;
 
-  ID3D12Resource* ResourceInFixedState() const;
+  ID3D12Resource* ResourceInUavState() const;
+
+  // NOTE: may be any state that is valid as a copy source (COPY_SRC,
+  // GENERIC_READ, or COMMON).
   ID3D12Resource* ResourceInCopySrcState() const;
+
   ID3D12Resource* ResourceInCopyDstState() const;
+
   uint64_t Offset() const;
   uint64_t SizeInBytes() const;
-  D3D12_RESOURCE_STATES ResourceState() const { return resource_state_; }
 
   DML_BUFFER_BINDING GetBufferBinding() const;
 
-  explicit operator bool() const { return resource_ != nullptr; }
+  explicit operator bool() const { return first_valid_resource_ != nullptr; }
 
   // Creates a subregion at an offset from the start of this region. If no size
   // is provided the region runs to the end of the current region.
@@ -64,18 +69,20 @@ class D3D12BufferRegion {
     // end of subregion must be within current region
     CHECK(size_in_bytes <= size_in_bytes_ - offset);
 
-    return D3D12BufferRegion(offset_ + offset, size_in_bytes, resource_state_,
-                             resource_, resource_copy_src_state_,
+    return D3D12BufferRegion(offset_ + offset, size_in_bytes,
+                             resource_uav_state_, resource_copy_src_state_,
                              resource_copy_dst_state_);
   }
 
  private:
-  Microsoft::WRL::ComPtr<ID3D12Resource> resource_;
+  Microsoft::WRL::ComPtr<ID3D12Resource> resource_uav_state_;
   Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state_;
   Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state_;
   uint64_t offset_ = 0;
   uint64_t size_in_bytes_ = 0;
-  D3D12_RESOURCE_STATES resource_state_ = D3D12_RESOURCE_STATE_COMMON;
+
+  // Pointer to the first resource above that isn't null.
+  ID3D12Resource* first_valid_resource_ = nullptr;
 };
 
 }  // namespace tensorflow

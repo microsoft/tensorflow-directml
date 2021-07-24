@@ -38,7 +38,7 @@ class DmlBuffer {
   DmlBuffer(DmlBuffer&&) = default;
   DmlBuffer& operator=(DmlBuffer&&) = default;
 
-  ID3D12Resource* ResourceInFixedState() const;
+  ID3D12Resource* ResourceInUavState() const;
   ID3D12Resource* ResourceInCopySrcState() const;
   ID3D12Resource* ResourceInCopyDstState() const;
   uint64_t Offset() const;

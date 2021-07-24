@@ -21,24 +21,40 @@ namespace tensorflow {
 
 D3D12BufferRegion::D3D12BufferRegion(
     uint64_t offset, uint64_t size_in_bytes,
-    D3D12_RESOURCE_STATES resource_state,
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource,
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource_uav_state,
     Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state,
     Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state)
     : offset_(offset),
       size_in_bytes_(size_in_bytes),
-      resource_state_(resource_state),
-      resource_(std::move(resource)),
+      resource_uav_state_(std::move(resource_uav_state)),
       resource_copy_src_state_(std::move(resource_copy_src_state)),
       resource_copy_dst_state_(std::move(resource_copy_dst_state)) {
-  CHECK(resource_ != nullptr);
+  // Get a raw pointer to the first non-null resource passed in. At least one
+  // resource must be provided.
+  first_valid_resource_ = resource_uav_state_.Get();
+  if (!first_valid_resource_) {
+    first_valid_resource_ = resource_copy_src_state.Get();
+  }
+  if (!first_valid_resource_) {
+    first_valid_resource_ = resource_copy_dst_state.Get();
+  }
+  CHECK(first_valid_resource_ != nullptr);
+
+  // Regions cannot be empty.
   CHECK(size_in_bytes_ != 0);
 
-  uint64_t buffer_size = resource_->GetDesc().Width;
+  // Regions cannot extend beyond the size of the resource.
+  uint64_t buffer_size = first_valid_resource_->GetDesc().Width;
   CHECK(offset_ < buffer_size);
   CHECK(size_in_bytes_ <= buffer_size - offset);
 
-  assert(resource_->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
+  // All three resources, if provided, must be identical aside from state.
+  assert(first_valid_resource_->GetDesc().Dimension ==
+         D3D12_RESOURCE_DIMENSION_BUFFER);
+  assert(!resource_uav_state ||
+         (resource_uav_state->GetDesc().Dimension ==
+              D3D12_RESOURCE_DIMENSION_BUFFER &&
+          resource_uav_state->GetDesc().Width == buffer_size));
   assert(!resource_copy_src_state_ ||
          (resource_copy_src_state_->GetDesc().Dimension ==
               D3D12_RESOURCE_DIMENSION_BUFFER &&
@@ -49,8 +65,8 @@ D3D12BufferRegion::D3D12BufferRegion(
           resource_copy_dst_state_->GetDesc().Width == buffer_size));
 }
 
-ID3D12Resource* D3D12BufferRegion::ResourceInFixedState() const {
-  return resource_.Get();
+ID3D12Resource* D3D12BufferRegion::ResourceInUavState() const {
+  return resource_uav_state_.Get();
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInCopySrcState() const {
@@ -61,18 +77,20 @@ ID3D12Resource* D3D12BufferRegion::ResourceInCopyDstState() const {
   return resource_copy_dst_state_.Get();
 }
 
-uint64_t D3D12BufferRegion::Offset() const { return resource_ ? offset_ : 0; }
+uint64_t D3D12BufferRegion::Offset() const {
+  return first_valid_resource_ ? offset_ : 0;
+}
 
 uint64_t D3D12BufferRegion::SizeInBytes() const {
-  return resource_ ? size_in_bytes_ : 0;
+  return first_valid_resource_ ? size_in_bytes_ : 0;
 }
 
 DML_BUFFER_BINDING D3D12BufferRegion::GetBufferBinding() const {
-  if (!resource_) {
+  if (!resource_uav_state_) {
     return DML_BUFFER_BINDING{};
   }
 
-  return DML_BUFFER_BINDING{resource_.Get(), offset_, size_in_bytes_};
+  return DML_BUFFER_BINDING{resource_uav_state_.Get(), offset_, size_in_bytes_};
 }
 
 }  // namespace tensorflow

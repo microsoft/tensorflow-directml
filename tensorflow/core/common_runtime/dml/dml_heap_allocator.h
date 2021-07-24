@@ -115,7 +115,7 @@ class D3D12HeapAllocator {
     // resources; all three are wrapped by the buffer regions returned from this
     // allocator, and the appropriate resource will be used automatically when
     // performing buffer copies.
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource_uav_state;
     Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state;
     Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state;
   };

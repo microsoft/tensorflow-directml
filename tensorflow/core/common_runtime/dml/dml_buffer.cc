@@ -42,8 +42,8 @@ DmlBuffer::~DmlBuffer() {
   }
 }
 
-ID3D12Resource* DmlBuffer::ResourceInFixedState() const {
-  return buffer_region_.ResourceInFixedState();
+ID3D12Resource* DmlBuffer::ResourceInUavState() const {
+  return buffer_region_.ResourceInUavState();
 }
 
 ID3D12Resource* DmlBuffer::ResourceInCopySrcState() const {

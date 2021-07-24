@@ -58,9 +58,13 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
          src.size());
   chunk->resource->Unmap(0, nullptr);
 
-  auto upload_resource = D3D12BufferRegion(offset_in_chunk, src.size(),
-                                           D3D12_RESOURCE_STATE_GENERIC_READ,
-                                           chunk->resource.Get());
+  // Allocations from the upload pool are only ever used as copy sources.
+  auto upload_resource = D3D12BufferRegion(offset_in_chunk,        // offset
+                                           src.size(),             // size,
+                                           nullptr,                // uav state
+                                           chunk->resource.Get(),  // copy src
+                                           nullptr                 // copy dst
+  );
 
   // Copy from the upload heap into the destination resource
   DmlGpuEvent done_event =

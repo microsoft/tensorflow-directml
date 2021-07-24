@@ -70,8 +70,7 @@ class DmlExecutionContext {
 
   inline DmlGpuEvent FillBufferWithPattern(const D3D12BufferRegion& dst,
                                            absl::Span<const uint8_t> value) {
-    DCHECK(dst.ResourceState() == D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-    return FillBufferWithPatternRaw(dst.ResourceInFixedState(), dst.Offset(),
+    return FillBufferWithPatternRaw(dst.ResourceInUavState(), dst.Offset(),
                                     dst.SizeInBytes(), value);
   }
 
