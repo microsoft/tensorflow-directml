@@ -65,6 +65,27 @@ D3D12BufferRegion::D3D12BufferRegion(
           resource_copy_dst_state_->GetDesc().Width == buffer_size));
 }
 
+D3D12BufferRegion::D3D12BufferRegion(D3D12BufferRegion&& that)
+{
+  std::swap(this->resource_uav_state_, that.resource_uav_state_);
+  std::swap(this->resource_copy_src_state_, that.resource_copy_src_state_);
+  std::swap(this->resource_copy_dst_state_, that.resource_copy_dst_state_);
+  std::swap(this->offset_, that.offset_);
+  std::swap(this->size_in_bytes_, that.size_in_bytes_);
+  std::swap(this->first_valid_resource_, that.first_valid_resource_);
+}
+
+D3D12BufferRegion& D3D12BufferRegion::operator=(D3D12BufferRegion&& that)
+{
+  std::swap(this->resource_uav_state_, that.resource_uav_state_);
+  std::swap(this->resource_copy_src_state_, that.resource_copy_src_state_);
+  std::swap(this->resource_copy_dst_state_, that.resource_copy_dst_state_);
+  std::swap(this->offset_, that.offset_);
+  std::swap(this->size_in_bytes_, that.size_in_bytes_);
+  std::swap(this->first_valid_resource_, that.first_valid_resource_);
+  return *this;
+}
+
 ID3D12Resource* D3D12BufferRegion::ResourceInUavState() const {
   return resource_uav_state_.Get();
 }

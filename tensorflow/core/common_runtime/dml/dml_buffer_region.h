@@ -40,8 +40,8 @@ class D3D12BufferRegion {
   // Move-only
   D3D12BufferRegion(const D3D12BufferRegion&) = delete;
   D3D12BufferRegion& operator=(const D3D12BufferRegion&) = delete;
-  D3D12BufferRegion(D3D12BufferRegion&&) = default;
-  D3D12BufferRegion& operator=(D3D12BufferRegion&&) = default;
+  D3D12BufferRegion(D3D12BufferRegion&&);
+  D3D12BufferRegion& operator=(D3D12BufferRegion&&);
 
   ID3D12Resource* ResourceInUavState() const;
 
@@ -56,7 +56,7 @@ class D3D12BufferRegion {
 
   DML_BUFFER_BINDING GetBufferBinding() const;
 
-  explicit operator bool() const { return resource_uav_state_ != nullptr; }
+  explicit operator bool() const { return first_valid_resource_ != nullptr; }
 
   // Creates a subregion at an offset from the start of this region. If no size
   // is provided the region runs to the end of the current region.
