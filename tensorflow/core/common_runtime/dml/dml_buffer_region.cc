@@ -19,24 +19,23 @@ limitations under the License.
 
 namespace tensorflow {
 
-D3D12BufferRegion::D3D12BufferRegion(
-    uint64_t offset, uint64_t size_in_bytes,
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource_uav_state,
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state,
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state)
+D3D12BufferRegion::D3D12BufferRegion(uint64_t offset, uint64_t size_in_bytes,
+                                     ID3D12Resource* resource_uav_state,
+                                     ID3D12Resource* resource_copy_src_state,
+                                     ID3D12Resource* resource_copy_dst_state)
     : offset_(offset),
       size_in_bytes_(size_in_bytes),
-      resource_uav_state_(std::move(resource_uav_state)),
-      resource_copy_src_state_(std::move(resource_copy_src_state)),
-      resource_copy_dst_state_(std::move(resource_copy_dst_state)) {
+      resource_uav_state_(resource_uav_state),
+      resource_copy_src_state_(resource_copy_src_state),
+      resource_copy_dst_state_(resource_copy_dst_state) {
   // Get a raw pointer to the first non-null resource passed in. At least one
   // resource must be provided.
-  first_valid_resource_ = resource_uav_state_.Get();
+  first_valid_resource_ = resource_uav_state_;
   if (!first_valid_resource_) {
-    first_valid_resource_ = resource_copy_src_state_.Get();
+    first_valid_resource_ = resource_copy_src_state_;
   }
   if (!first_valid_resource_) {
-    first_valid_resource_ = resource_copy_dst_state_.Get();
+    first_valid_resource_ = resource_copy_dst_state_;
   }
   CHECK(first_valid_resource_ != nullptr);
 
@@ -65,8 +64,7 @@ D3D12BufferRegion::D3D12BufferRegion(
           resource_copy_dst_state_->GetDesc().Width == buffer_size));
 }
 
-D3D12BufferRegion::D3D12BufferRegion(D3D12BufferRegion&& that)
-{
+D3D12BufferRegion::D3D12BufferRegion(D3D12BufferRegion&& that) {
   std::swap(this->resource_uav_state_, that.resource_uav_state_);
   std::swap(this->resource_copy_src_state_, that.resource_copy_src_state_);
   std::swap(this->resource_copy_dst_state_, that.resource_copy_dst_state_);
@@ -75,8 +73,7 @@ D3D12BufferRegion::D3D12BufferRegion(D3D12BufferRegion&& that)
   std::swap(this->first_valid_resource_, that.first_valid_resource_);
 }
 
-D3D12BufferRegion& D3D12BufferRegion::operator=(D3D12BufferRegion&& that)
-{
+D3D12BufferRegion& D3D12BufferRegion::operator=(D3D12BufferRegion&& that) {
   std::swap(this->resource_uav_state_, that.resource_uav_state_);
   std::swap(this->resource_copy_src_state_, that.resource_copy_src_state_);
   std::swap(this->resource_copy_dst_state_, that.resource_copy_dst_state_);
@@ -87,15 +84,15 @@ D3D12BufferRegion& D3D12BufferRegion::operator=(D3D12BufferRegion&& that)
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInUavState() const {
-  return resource_uav_state_.Get();
+  return resource_uav_state_;
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInCopySrcState() const {
-  return resource_copy_src_state_.Get();
+  return resource_copy_src_state_;
 }
 
 ID3D12Resource* D3D12BufferRegion::ResourceInCopyDstState() const {
-  return resource_copy_dst_state_.Get();
+  return resource_copy_dst_state_;
 }
 
 uint64_t D3D12BufferRegion::Offset() const {
@@ -111,7 +108,7 @@ DML_BUFFER_BINDING D3D12BufferRegion::GetBufferBinding() const {
     return DML_BUFFER_BINDING{};
   }
 
-  return DML_BUFFER_BINDING{resource_uav_state_.Get(), offset_, size_in_bytes_};
+  return DML_BUFFER_BINDING{resource_uav_state_, offset_, size_in_bytes_};
 }
 
 }  // namespace tensorflow

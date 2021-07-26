@@ -31,11 +31,10 @@ class D3D12BufferRegion {
   // References a region of a buffer. The respective ID3D12Resource objects must
   // be in the appropriate states. Each resource is optional, but if more than
   // one are provided they must map to the same region of memory.
-  D3D12BufferRegion(
-      uint64_t offset, uint64_t size_in_bytes,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource_uav_state,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state,
-      Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state);
+  D3D12BufferRegion(uint64_t offset, uint64_t size_in_bytes,
+                    ID3D12Resource* resource_uav_state,
+                    ID3D12Resource* resource_copy_src_state,
+                    ID3D12Resource* resource_copy_dst_state);
 
   // Move-only
   D3D12BufferRegion(const D3D12BufferRegion&) = delete;
@@ -75,9 +74,9 @@ class D3D12BufferRegion {
   }
 
  private:
-  Microsoft::WRL::ComPtr<ID3D12Resource> resource_uav_state_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_src_state_;
-  Microsoft::WRL::ComPtr<ID3D12Resource> resource_copy_dst_state_;
+  ID3D12Resource* resource_uav_state_ = nullptr;
+  ID3D12Resource* resource_copy_src_state_ = nullptr;
+  ID3D12Resource* resource_copy_dst_state_ = nullptr;
   uint64_t offset_ = 0;
   uint64_t size_in_bytes_ = 0;
 
