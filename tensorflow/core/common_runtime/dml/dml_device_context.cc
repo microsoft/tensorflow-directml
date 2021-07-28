@@ -221,18 +221,33 @@ D3D12BufferRegion DMLDeviceContext::GetBufferForTensor(
     const Tensor& tensor) const {
   const void* p = tensor.tensor_data().data();
 
-  // Important: we must use AllocatedBytes() here and not TotalBytes() because
-  // AllocatedBytes includes the necessary padding and alignment, whereas
-  // TotalBytes is exactly equal to the number of elements multiplied by the
-  // element size.
-  uint64_t size_in_bytes = tensor.AllocatedBytes();
+  // DML always requires at least 4 byte alignment in all cases, so both the
+  // offset and size must certainly be divisible by 4.
+  constexpr uint64_t dml_alignment = 4;
+
+  // The offset and size of the region must be aligned to DirectML's
+  // requirement. Each tensor has two sizes:
+  //
+  // - TotalBytes: num_elements * sizeof_element. This may be too small if the
+  // tensor has elements smaller than 4 bytes (e.g. 3x float16 is 6 bytes, but
+  // DML needs an 8 byte region).
+  //
+  // - AllocatedBytes: the size of allocation backing the tensor. This is often
+  // larger than TotalBytes since the smallest DML allocation size is 256 bytes.
+  //
+  // While AllocatedBytes is guaranteed to meet DML's requirement, tensor
+  // buffers may be offset within an individual allocation (see Tensor::Slice).
+  // Using AllocatedBytes directly can result in a region that extends beyond
+  // the bounds of the allocation. Instead we round the total bytes up to an
+  // aligned value, which should always fit within the allocated bytes.
+  uint64_t size_in_bytes =
+      dml_alignment + (tensor.TotalBytes() - 1) / dml_alignment;
+  CHECK(size_in_bytes <= tensor.AllocatedBytes());
 
   auto region = allocator_->CreateBufferRegion(p, size_in_bytes);
 
-  // DML always requires at least 4 byte alignment in all cases, so both the
-  // offset and size must certainly be divisible by 4
-  DCHECK(region.Offset() % 4 == 0);
-  DCHECK(region.SizeInBytes() % 4 == 0);
+  DCHECK(region.Offset() % dml_alignment == 0);
+  DCHECK(region.SizeInBytes() % dml_alignment == 0);
 
   return region;
 }
