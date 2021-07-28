@@ -241,7 +241,7 @@ D3D12BufferRegion DMLDeviceContext::GetBufferForTensor(
   // the bounds of the allocation. Instead we round the total bytes up to an
   // aligned value, which should always fit within the allocated bytes.
   uint64_t size_in_bytes =
-      dml_alignment + (tensor.TotalBytes() - 1) / dml_alignment;
+      (1 + (tensor.TotalBytes() - 1) / dml_alignment) * dml_alignment;
   CHECK(size_in_bytes <= tensor.AllocatedBytes());
 
   auto region = allocator_->CreateBufferRegion(p, size_in_bytes);
