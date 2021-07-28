@@ -95,7 +95,6 @@ class DmlDynamicStitchKernel : public OpKernel {
       return;
     }
 
-    DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
     auto* device_context =
         static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
@@ -114,13 +113,13 @@ class DmlDynamicStitchKernel : public OpKernel {
       }
 
       D3D12BufferRegion input_buffer =
-          dml_util::GetBufferForTensor(device, data_tensor);
+          device_context->GetBufferForTensor(data_tensor);
 
       input_buffers.push_back(std::move(input_buffer));
     }
 
     D3D12BufferRegion output_buffer =
-        dml_util::GetBufferForTensor(device, *output_tensor);
+        device_context->GetBufferForTensor(*output_tensor);
 
     DCHECK(indices_inputs.size() == data_inputs.size());
     for (int tensor_idx = 0; tensor_idx < indices_inputs.size(); ++tensor_idx) {
@@ -141,8 +140,6 @@ class DmlDynamicStitchKernel : public OpKernel {
         const uint64_t src_offset = byte_stride * i;
         const uint64_t dst_offset = byte_stride * output_idx;
 
-        auto device_context =
-            static_cast<DMLDeviceContext*>(ctx->op_device_context());
         device_context->CopyBufferToBuffer(
             output_buffer.Subregion(dst_offset),
             input_buffer.Subregion(src_offset, byte_stride));

@@ -65,15 +65,16 @@ class DmlParallelConcatUpdateKernel : public OpKernel {
                 errors::InvalidArgument("update shape doesn't match: ",
                                         update_tensor.shape().DebugString()));
 
-    DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
+    auto* device_context =
+        static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
     // This creates an alias intentionally
     Tensor output_tensor = value_tensor;
 
     D3D12BufferRegion update_buffer =
-        dml_util::GetBufferForTensor(device, update_tensor);
+        device_context->GetBufferForTensor(update_tensor);
     D3D12BufferRegion output_buffer =
-        dml_util::GetBufferForTensor(device, output_tensor);
+        device_context->GetBufferForTensor(output_tensor);
 
     const int64 nrows = output_tensor.dim_size(0);
     const int dtype_size_in_bytes = DataTypeSize(output_tensor.dtype());
@@ -84,9 +85,8 @@ class DmlParallelConcatUpdateKernel : public OpKernel {
     const int64 row_index = (loc_ % nrows + nrows) % nrows;
     const uint64_t dst_offset = row_index * stride;
 
-    device->GetExecutionContext()->CopyBufferRegion(
-        output_buffer.Subregion(dst_offset),
-        update_buffer.Subregion(0, stride));
+    device_context->CopyBufferToBuffer(output_buffer.Subregion(dst_offset),
+                                       update_buffer.Subregion(0, stride));
 
     ctx->set_output(0, output_tensor);
   }

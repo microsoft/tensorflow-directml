@@ -33,20 +33,19 @@ class DmlDeepCopyKernel : public OpKernel {
     Tensor* output = nullptr;
     OP_REQUIRES_OK(ctx, ctx->allocate_output(0, input_shape, &output));
 
-    DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
-    const auto& execution_context = device->GetExecutionContext();
+    auto device_context =
+        static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
-    D3D12BufferRegion input_buffer =
-        dml_util::GetBufferForTensor(device, input);
+    D3D12BufferRegion input_buffer = device_context->GetBufferForTensor(input);
 
     D3D12BufferRegion output_buffer =
-        dml_util::GetBufferForTensor(device, *output);
+        device_context->GetBufferForTensor(*output);
 
     uint64_t copy_size =
         std::min(output_buffer.SizeInBytes(), input_buffer.SizeInBytes());
 
-    execution_context->CopyBufferRegion(output_buffer,
-                                        input_buffer.Subregion(0, copy_size));
+    device_context->CopyBufferToBuffer(output_buffer,
+                                       input_buffer.Subregion(0, copy_size));
   }
 };
 

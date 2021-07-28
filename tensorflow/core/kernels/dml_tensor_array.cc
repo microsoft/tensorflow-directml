@@ -63,22 +63,19 @@ Status DmlAddToTensor(OpKernelContext* ctx, Tensor* sum, const Tensor* current,
 }
 
 void DmlTensorSetZero(OpKernelContext* ctx, Tensor* value) {
-  auto* device = static_cast<DmlDevice*>(ctx->device());
   auto device_context =
       static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
-  D3D12BufferRegion dst = dml_util::GetBufferForTensor(device, *value);
+  D3D12BufferRegion dst = device_context->GetBufferForTensor(*value);
   device_context->ZeroBuffer(dst);
 }
 
 void DmlConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
                       absl::Span<PersistentTensor> values) {
-  auto* device = static_cast<DmlDevice*>(ctx->device());
   auto device_context =
       static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
-  D3D12BufferRegion dst =
-      dml_util::GetBufferForTensor(device, *output_tensor);
+  D3D12BufferRegion dst = device_context->GetBufferForTensor(*output_tensor);
   uint64_t dst_offset = 0;
 
   for (PersistentTensor& value : values) {
@@ -89,8 +86,7 @@ void DmlConcatTensors(OpKernelContext* ctx, Tensor* output_tensor,
     assert(input_tensor.NumElements() <= output_tensor->NumElements());
 
     uint64_t bytes_to_copy = input_tensor.TotalBytes();
-    D3D12BufferRegion src =
-        dml_util::GetBufferForTensor(device, input_tensor);
+    D3D12BufferRegion src = device_context->GetBufferForTensor(input_tensor);
 
     device_context->CopyBufferToBuffer(dst.Subregion(dst_offset),
                                        src.Subregion(0, bytes_to_copy));
@@ -113,12 +109,10 @@ void DmlSplitTensor(OpKernelContext* ctx, Tensor* output_tensor,
   uint64_t bytes_to_copy = element_count * element_byte_size;
   uint64_t src_offset = start_element * element_byte_size;
 
-  auto* device = static_cast<DmlDevice*>(ctx->device());
   auto device_context =
       static_cast<DMLDeviceContext*>(ctx->op_device_context());
-  D3D12BufferRegion dst =
-      dml_util::GetBufferForTensor(device, *output_tensor);
-  D3D12BufferRegion src = dml_util::GetBufferForTensor(device, input_tensor);
+  D3D12BufferRegion dst = device_context->GetBufferForTensor(*output_tensor);
+  D3D12BufferRegion src = device_context->GetBufferForTensor(input_tensor);
 
   device_context->CopyBufferToBuffer(dst,
                                      src.Subregion(src_offset, bytes_to_copy));
