@@ -295,19 +295,22 @@ class DmlTensorScatterBinaryKernel : public DmlKernel {
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
+    auto device_context = ctx->GetDmlDeviceContext();
+
     D3D12BufferRegion input_buffer =
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(0));
+        device_context->GetBufferForTensor(ctx->GetInputTensor(0));
 
     D3D12BufferRegion indices_buffer =
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(1));
+        device_context->GetBufferForTensor(ctx->GetInputTensor(1));
 
     D3D12BufferRegion updates_buffer =
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(2));
+        device_context->GetBufferForTensor(ctx->GetInputTensor(2));
 
     D3D12BufferRegion output_buffer =
-        ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
+        device_context->GetBufferForTensor(*ctx->GetOutputTensor(0));
 
-    DmlBuffer empty_buffer = ctx->AllocateDefaultBuffer(empty_buffer_size_);
+    DmlBuffer empty_buffer =
+        device_context->AllocateDefaultBuffer(empty_buffer_size_);
 
     const absl::optional<DML_BUFFER_BINDING> input_bindings[4] = {
         input_buffer.GetBufferBinding(),
@@ -320,8 +323,7 @@ class DmlTensorScatterBinaryKernel : public DmlKernel {
         output_buffer.GetBufferBinding(),
     };
 
-    ctx->ZeroBuffer(empty_buffer.Resource(), empty_buffer.Offset(),
-                    empty_buffer.SizeInBytes());
+    device_context->ZeroBuffer(empty_buffer.Region());
 
     return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }

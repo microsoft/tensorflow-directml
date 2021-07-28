@@ -319,8 +319,9 @@ class DmlMatrixDiagKernel : public DmlKernel {
       // Fill the buffer with the padding value since we use strides to skip
       // over elements
       Tensor* output = ctx->GetOutputTensor(0);
-      ctx->FillBufferWithValue(ctx->CreateBufferForTensor(*output),
-                               static_cast<float>(padding_value_));
+      ctx->GetDmlDeviceContext()->FillBufferWithValue(
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output),
+          static_cast<float>(padding_value_));
     }
 
     return DmlKernel::Compute(ctx);
@@ -330,20 +331,20 @@ class DmlMatrixDiagKernel : public DmlKernel {
   bool use_fast_path_ = false;
 };
 
-#define REGISTER_DML_KERNEL(type)                                           \
-  REGISTER_KERNEL_BUILDER(Name("MatrixDiagV2")                              \
-                              .Device(DEVICE_DML)                           \
-                              .TypeConstraint<type>("T")                    \
-                              .HostMemory("k")                              \
-                              .HostMemory("num_rows")                       \
-                              .HostMemory("num_cols")                       \
-                              .HostMemory("padding_value"),                 \
-                          DmlKernelWrapper<DmlMatrixDiagKernel<type>,       \
-                                           MatrixDiagShapeHelper<type>>);   \
-  REGISTER_KERNEL_BUILDER(                                                  \
-      Name("MatrixDiag").Device(DEVICE_DML).TypeConstraint<type>("T"),      \
-      DmlKernelWrapper<DmlMatrixDiagKernel<type>,                           \
-                       MatrixDiagShapeHelper<type>>);                       \
+#define REGISTER_DML_KERNEL(type)                                         \
+  REGISTER_KERNEL_BUILDER(Name("MatrixDiagV2")                            \
+                              .Device(DEVICE_DML)                         \
+                              .TypeConstraint<type>("T")                  \
+                              .HostMemory("k")                            \
+                              .HostMemory("num_rows")                     \
+                              .HostMemory("num_cols")                     \
+                              .HostMemory("padding_value"),               \
+                          DmlKernelWrapper<DmlMatrixDiagKernel<type>,     \
+                                           MatrixDiagShapeHelper<type>>); \
+  REGISTER_KERNEL_BUILDER(                                                \
+      Name("MatrixDiag").Device(DEVICE_DML).TypeConstraint<type>("T"),    \
+      DmlKernelWrapper<DmlMatrixDiagKernel<type>,                         \
+                       MatrixDiagShapeHelper<type>>);
 
 TF_CALL_float(REGISTER_DML_KERNEL);
 TF_CALL_half(REGISTER_DML_KERNEL);

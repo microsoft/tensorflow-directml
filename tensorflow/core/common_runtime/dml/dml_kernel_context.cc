@@ -48,53 +48,13 @@ OpKernelContext* DmlKernelConstruction::GetOpKernelContext() const {
   return op_ctx_;
 }
 
+DMLDeviceContext* DmlKernelConstruction::GetDmlDeviceContext() const {
+  return static_cast<DMLDeviceContext*>(op_ctx_->op_device_context());
+}
+
 std::shared_ptr<const InitializationHelper>
 DmlKernelConstruction::GetInitializationHelper() const {
   return init_helper_;
-}
-
-DmlBuffer DmlKernelConstruction::AllocateDefaultBuffer(
-    uint64_t num_bytes) const {
-  return DmlBuffer(device_->GetAllocator(), num_bytes);
-}
-
-D3D12BufferRegion DmlKernelConstruction::CreateBufferForTensor(
-    const Tensor& tensor) const {
-  return dml_util::CreateBufferForTensor(device_, tensor);
-}
-
-DescriptorAllocation DmlKernelConstruction::AllocateDescriptors(
-    size_t size_in_descriptors) const {
-  return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
-}
-
-void DmlKernelConstruction::EnqueueCallbackForGpuEvent(
-    DmlGpuEvent gpu_event, std::function<void()> callback) const {
-  device_->GetEventQueue()->Enqueue(std::move(gpu_event), std::move(callback));
-}
-
-DmlGpuEvent DmlKernelConstruction::BindAndInitializeOperator(
-    IDMLOperatorInitializer* initializer,
-    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
-    ID3D12DescriptorHeap* heap_for_binding_table,
-    _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
-    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding) {
-  // Bind the temporary resource
-  if (temporary_resource_binding) {
-    DML_BINDING_DESC temporary_binding_desc = {DML_BINDING_TYPE_BUFFER,
-                                               temporary_resource_binding};
-    binding_table->BindTemporaryResource(&temporary_binding_desc);
-  }
-
-  // Bind the persistent resource
-  if (persistent_resource_binding) {
-    DML_BINDING_DESC persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
-                                                persistent_resource_binding};
-    binding_table->BindOutputs(1, &persistent_binding_desc);
-  }
-
-  return device_->GetExecutionContext()->InitializeOperator(
-      initializer, std::move(binding_table), heap_for_binding_table);
 }
 
 DataType DmlKernelConstruction::GetInputDataType(uint32_t index) const {
@@ -180,120 +140,8 @@ OpKernelContext* DmlKernelContext::GetOpKernelContext() const {
   return op_ctx_;
 }
 
-DmlBuffer DmlKernelContext::AllocateDefaultBuffer(uint64_t num_bytes) const {
-  return DmlBuffer(device_->GetAllocator(), num_bytes);
-}
-
-D3D12BufferRegion DmlKernelContext::CreateBufferForTensor(
-    const Tensor& tensor) const {
-  return dml_util::CreateBufferForTensor(device_, tensor);
-}
-
-DescriptorAllocation DmlKernelContext::AllocateDescriptors(
-    size_t size_in_descriptors) const {
-  return device_->GetDescriptorAllocator()->Alloc(size_in_descriptors);
-}
-
-void DmlKernelContext::EnqueueCallbackForGpuEvent(
-    DmlGpuEvent gpu_event, std::function<void()> callback) const {
-  device_->GetEventQueue()->Enqueue(std::move(gpu_event), std::move(callback));
-}
-
-DmlGpuEvent DmlKernelContext::BindAndExecuteOperator(
-    IDMLCompiledOperator* op,
-    Microsoft::WRL::ComPtr<IDMLBindingTable>&& binding_table,
-    ID3D12DescriptorHeap* heap_for_binding_table,
-    _In_opt_ const DML_BUFFER_BINDING* temporary_resource_binding,
-    _In_opt_ const DML_BUFFER_BINDING* persistent_resource_binding,
-    absl::Span<const absl::optional<DML_BUFFER_BINDING>> input_bindings,
-    absl::Span<const absl::optional<DML_BUFFER_BINDING>> output_bindings) {
-  // Bind the temporary resource
-  DML_BINDING_DESC temporary_binding_desc = {DML_BINDING_TYPE_NONE, nullptr};
-  if (temporary_resource_binding) {
-    temporary_binding_desc = {DML_BINDING_TYPE_BUFFER,
-                              temporary_resource_binding};
-  }
-  binding_table->BindTemporaryResource(&temporary_binding_desc);
-
-  // Bind the persistent resource
-  DML_BINDING_DESC persistent_binding_desc = {DML_BINDING_TYPE_NONE, nullptr};
-  if (persistent_resource_binding) {
-    persistent_binding_desc = {DML_BINDING_TYPE_BUFFER,
-                               persistent_resource_binding};
-  }
-  binding_table->BindPersistentResource(&persistent_binding_desc);
-
-  // Set up the input bindings
-  absl::InlinedVector<DML_BINDING_DESC, 8> input_binding_descs;
-  for (const auto& binding : input_bindings) {
-    DML_BINDING_DESC desc = {DML_BINDING_TYPE_NONE, nullptr};
-    if (binding) {
-      desc = {DML_BINDING_TYPE_BUFFER, &binding.value()};
-    }
-
-    input_binding_descs.push_back(desc);
-  }
-  binding_table->BindInputs(static_cast<UINT>(input_binding_descs.size()),
-                            input_binding_descs.data());
-
-  // Set up the output bindings
-  absl::InlinedVector<DML_BINDING_DESC, 4> output_binding_descs;
-  for (const auto& binding : output_bindings) {
-    DML_BINDING_DESC desc = {DML_BINDING_TYPE_NONE, nullptr};
-    if (binding) {
-      desc = {DML_BINDING_TYPE_BUFFER, &binding.value()};
-    }
-
-    output_binding_descs.push_back(desc);
-  }
-  binding_table->BindOutputs(static_cast<UINT>(output_binding_descs.size()),
-                             output_binding_descs.data());
-
-  return device_->GetExecutionContext()->ExecuteOperator(
-      op, std::move(binding_table), heap_for_binding_table);
-}
-
-DmlGpuEvent DmlKernelContext::GetCurrentCompletionEvent() const {
-  return device_->GetExecutionContext()->GetCurrentCompletionEvent();
-}
-
-DmlGpuEvent DmlKernelContext::CopyBufferToBuffer(ID3D12Resource* dst,
-                                                 uint64_t dst_offset,
-                                                 ID3D12Resource* src,
-                                                 uint64_t src_offset,
-                                                 uint64 size_in_bytes) const {
-  return device_->GetExecutionContext()->CopyBufferRegion(
-      dst, dst_offset, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, src, src_offset,
-      D3D12_RESOURCE_STATE_UNORDERED_ACCESS, size_in_bytes);
-}
-
-StatusOr<DmlGpuEvent> DmlKernelContext::CopyHostToBuffer(
-    ID3D12Resource* dst, uint64_t dst_offset,
-    absl::Span<const uint8_t> src) const {
-  return device_->GetUploadHeap()->BeginUploadToGpu(
-      dst, dst_offset, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, src);
-}
-
-DmlGpuEvent DmlKernelContext::ZeroBuffer(ID3D12Resource* dst, uint64_t offset,
-                                         uint64_t size_in_bytes) const {
-  uint8_t pattern[] = {0};
-  return device_->GetExecutionContext()->FillBufferWithPattern(
-      dst, offset, size_in_bytes, pattern);
-}
-
-DmlGpuEvent DmlKernelContext::ZeroBuffer(const D3D12BufferRegion& dst) const {
-  return ZeroBuffer(dst.Resource(), dst.Offset(), dst.SizeInBytes());
-}
-
-DmlGpuEvent DmlKernelContext::InsertUavBarrier() const {
-  return device_->GetExecutionContext()->UavBarrier();
-}
-
-DmlGpuEvent DmlKernelContext::FillBufferWithPattern(
-    ID3D12Resource* dst, uint64_t offset, uint64_t size_in_bytes,
-    absl::Span<const uint8_t> pattern) const {
-  return device_->GetExecutionContext()->FillBufferWithPattern(
-      dst, offset, size_in_bytes, pattern);
+DMLDeviceContext* DmlKernelContext::GetDmlDeviceContext() const {
+  return static_cast<DMLDeviceContext*>(op_ctx_->op_device_context());
 }
 
 }  // namespace tensorflow

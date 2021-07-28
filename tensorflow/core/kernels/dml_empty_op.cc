@@ -43,15 +43,13 @@ class DmlEmptyKernel : public OpKernel {
 
     if (init_ && out_shape.num_elements() > 0) {
       DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
+      auto device_context =
+          static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
       D3D12BufferRegion output_buffer =
-          dml_util::CreateBufferForTensor(device, *output_tensor);
+          dml_util::GetBufferForTensor(device, *output_tensor);
 
-      uint8_t pattern[] = {0};
-
-      device->GetExecutionContext()->FillBufferWithPattern(
-          output_buffer.Resource(), output_buffer.Offset(),
-          output_buffer.SizeInBytes(), pattern);
+      device_context->ZeroBuffer(output_buffer);
     }
   }
 

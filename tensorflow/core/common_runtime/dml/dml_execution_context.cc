@@ -93,7 +93,7 @@ DmlExecutionContext::~DmlExecutionContext() {
   execution_thread_.detach();
 }
 
-DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
+DmlGpuEvent DmlExecutionContext::CopyBufferRegionRaw(
     ID3D12Resource* dst_buffer, uint64_t dst_offset,
     D3D12_RESOURCE_STATES dst_state, ID3D12Resource* src_buffer,
     uint64_t src_offset, D3D12_RESOURCE_STATES src_state, uint64_t byte_count) {
@@ -109,7 +109,17 @@ DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
   return batch_state_->next_flush_event;
 }
 
-DmlGpuEvent DmlExecutionContext::FillBufferWithPattern(
+DmlGpuEvent DmlExecutionContext::CopyBufferRegion(
+    const D3D12BufferRegion& dst, const D3D12BufferRegion& src) {
+  CHECK(src.SizeInBytes() <= dst.SizeInBytes());
+
+  return CopyBufferRegionRaw(
+      dst.ResourceInCopyDstState(), dst.Offset(),
+      D3D12_RESOURCE_STATE_COPY_DEST, src.ResourceInCopySrcState(),
+      src.Offset(), D3D12_RESOURCE_STATE_COPY_SOURCE, src.SizeInBytes());
+}
+
+DmlGpuEvent DmlExecutionContext::FillBufferWithPatternRaw(
     ID3D12Resource* dst, uint64_t dst_offset, uint64_t dst_size_in_bytes,
     absl::Span<const uint8_t> value) {
   std::unique_lock<std::mutex> lock(batch_state_->mutex);

@@ -25,8 +25,7 @@ class DmlAllocator;
 // Owns a D3D12 default heap buffer allocated using the DML device's
 // allocator. This is essentially a convenience wrapper over a device memory
 // allocation as well as the buffer region that spans it. When this object is
-// destructed, the device memory is freed to the allocator and the buffer region
-// is released.
+// destructed, the device memory is freed to the allocator.
 class DmlBuffer {
  public:
   DmlBuffer() = default;
@@ -39,9 +38,12 @@ class DmlBuffer {
   DmlBuffer(DmlBuffer&&) = default;
   DmlBuffer& operator=(DmlBuffer&&) = default;
 
-  ID3D12Resource* Resource() const;
+  ID3D12Resource* ResourceInUavState() const;
+  ID3D12Resource* ResourceInCopySrcState() const;
+  ID3D12Resource* ResourceInCopyDstState() const;
   uint64_t Offset() const;
   uint64_t SizeInBytes() const;
+  const D3D12BufferRegion& Region() const { return buffer_region_; }
 
   DML_BUFFER_BINDING GetBufferBinding() const;
 

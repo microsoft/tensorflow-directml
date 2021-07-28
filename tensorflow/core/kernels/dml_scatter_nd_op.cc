@@ -266,16 +266,20 @@ class DmlScatterNdKernel : public DmlKernel {
   }
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
-    DmlBuffer params_buffer = ctx->AllocateDefaultBuffer(input_buffer_size_);
+    DmlBuffer params_buffer =
+        ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(input_buffer_size_);
 
     D3D12BufferRegion indices_buffer =
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(0));
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
+            ctx->GetInputTensor(0));
 
     D3D12BufferRegion updates_buffer =
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(1));
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
+            ctx->GetInputTensor(1));
 
     D3D12BufferRegion output_buffer =
-        ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
+            *ctx->GetOutputTensor(0));
 
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 3> input_bindings;
     input_bindings.push_back(params_buffer.GetBufferBinding());
@@ -285,8 +289,7 @@ class DmlScatterNdKernel : public DmlKernel {
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 1> output_bindings;
     output_bindings.push_back(output_buffer.GetBufferBinding());
 
-    ctx->ZeroBuffer(params_buffer.Resource(), params_buffer.Offset(),
-                    params_buffer.SizeInBytes());
+    ctx->GetDmlDeviceContext()->ZeroBuffer(params_buffer.Region());
 
     return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }

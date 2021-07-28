@@ -249,9 +249,10 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     DmlBuffer input_state_buffer =
-        ctx->AllocateDefaultBuffer(6 * sizeof(uint32_t));
+        ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(6 * sizeof(uint32_t));
     D3D12BufferRegion output_buffer =
-        ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
+            *ctx->GetOutputTensor(0));
 
     if (!input_state_buffer) {
       return errors::ResourceExhausted("OOM when allocating a buffer of ",
@@ -269,8 +270,8 @@ class DmlStatelessRandomUniformKernel : public DmlKernel {
     auto byte_span =
         absl::MakeSpan(byte_ptr, input_state_.size() * sizeof(input_state_[0]));
 
-    ctx->CopyHostToBuffer(input_state_buffer.Resource(),
-                          input_state_buffer.Offset(), byte_span);
+    ctx->GetDmlDeviceContext()->CopyHostToBuffer(input_state_buffer.Region(),
+                                                 byte_span);
 
     return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }
@@ -399,7 +400,8 @@ class DmlRandomUniformKernel : public DmlKernel {
     num_output_elements_ =
         static_cast<uint32_t>(init_helper->GetOutputShape().num_elements());
 
-    state_buffer_ = ctx->AllocateDefaultBuffer(6 * sizeof(uint32_t));
+    state_buffer_ =
+        ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(6 * sizeof(uint32_t));
 
     OP_REQUIRES(ctx->GetOpKernelContext(), state_buffer_,
                 errors::ResourceExhausted("OOM when allocating a buffer of ",
@@ -449,7 +451,8 @@ class DmlRandomUniformKernel : public DmlKernel {
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx,
                                 GuardedPhiloxRandom& generator) const {
     D3D12BufferRegion output_buffer =
-        ctx->CreateBufferForTensor(*ctx->GetOutputTensor(0));
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
+            *ctx->GetOutputTensor(0));
 
     absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 1> input_bindings;
     input_bindings.push_back(state_buffer_->GetBufferBinding());
@@ -474,8 +477,8 @@ class DmlRandomUniformKernel : public DmlKernel {
     auto byte_span =
         absl::MakeSpan(byte_ptr, state_buf.size() * sizeof(state_buf[0]));
 
-    ctx->CopyHostToBuffer(state_buffer_->Resource(), state_buffer_->Offset(),
-                          byte_span);
+    ctx->GetDmlDeviceContext()->CopyHostToBuffer(state_buffer_->Region(),
+                                                 byte_span);
 
     return DmlKernel::Compute(ctx, input_bindings, output_bindings);
   }

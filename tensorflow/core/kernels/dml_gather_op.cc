@@ -295,12 +295,14 @@ class DmlGatherKernel : public DmlKernel {
     auto init_helper = ctx->GetInitializationHelper<InitHelper>();
 
     D3D12BufferRegion input_buffers[] = {
-        ctx->CreateBufferForTensor(
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
             init_helper->GetParamsTensor(ctx->GetOpKernelContext())),
-        ctx->CreateBufferForTensor(ctx->GetInputTensor(1)),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(
+            ctx->GetInputTensor(1)),
     };
 
-    D3D12BufferRegion output_buffers[] = {ctx->CreateBufferForTensor(*output)};
+    D3D12BufferRegion output_buffers[] = {
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(*output)};
 
     // Create bindings
     auto input_bindings = dml_util::GetBufferBindings(input_buffers);

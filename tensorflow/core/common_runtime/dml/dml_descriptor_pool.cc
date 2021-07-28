@@ -21,7 +21,10 @@ DmlDescriptorHeap::DmlDescriptorHeap(ID3D12DescriptorHeap* heap)
     : heap_(heap),
       capacity_(heap->GetDesc().NumDescriptors),
       head_cpu_handle_(heap->GetCPUDescriptorHandleForHeapStart()),
-      head_gpu_handle_(heap->GetGPUDescriptorHandleForHeapStart()),
+      head_gpu_handle_(
+          (heap->GetDesc().Flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE)
+              ? heap->GetGPUDescriptorHandleForHeapStart()
+              : D3D12_GPU_DESCRIPTOR_HANDLE{}),
       heap_flags_(heap->GetDesc().Flags) {
   Microsoft::WRL::ComPtr<ID3D12Device> device;
   DML_CHECK_SUCCEEDED(heap->GetDevice(IID_PPV_ARGS(&device)));
@@ -46,7 +49,9 @@ absl::optional<DmlDescriptorRange> DmlDescriptorHeap::TryAllocDescriptors(
     // allocations have completed; the entire capacity is available to use.
     size_ = 0;
     head_cpu_handle_ = heap_->GetCPUDescriptorHandleForHeapStart();
-    head_gpu_handle_ = heap_->GetGPUDescriptorHandleForHeapStart();
+    if (heap_flags & D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE) {
+      head_gpu_handle_ = heap_->GetGPUDescriptorHandleForHeapStart();
+    }
   }
 
   // The caller will need to create a new heap if there is no space left in this

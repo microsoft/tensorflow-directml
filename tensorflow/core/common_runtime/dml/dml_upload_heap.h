@@ -33,9 +33,7 @@ class DmlUploadHeap : public DmlPooledHeap {
   // resource, and returns a DmlGpuEvent which will become signaled when the
   // copy is complete. The destination resource must be a default or readback
   // buffer.
-  StatusOr<DmlGpuEvent> BeginUploadToGpu(ID3D12Resource* dst,
-                                         uint64_t dst_offset,
-                                         D3D12_RESOURCE_STATES dst_state,
+  StatusOr<DmlGpuEvent> BeginUploadToGpu(const D3D12BufferRegion& dst,
                                          absl::Span<const uint8_t> src);
 
  private:

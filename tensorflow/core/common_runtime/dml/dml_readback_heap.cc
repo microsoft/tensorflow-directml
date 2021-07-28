@@ -37,12 +37,12 @@ DmlReadbackHeap::DmlReadbackHeap(ID3D12Device* device,
 }
 
 StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
-    absl::Span<uint8_t> dst, ID3D12Resource* src, uint64_t src_offset,
-    D3D12_RESOURCE_STATES src_state) {
+    absl::Span<uint8_t> dst, const D3D12BufferRegion& src) {
   std::unique_lock<std::mutex> lock(mutex_);
 
   assert(!dst.empty());
-  assert(src->GetDesc().Dimension == D3D12_RESOURCE_DIMENSION_BUFFER);
+  assert(src.ResourceInFixedState()->GetDesc().Dimension ==
+         D3D12_RESOURCE_DIMENSION_BUFFER);
 
   InvariantChecker checker(this);
 
@@ -58,12 +58,19 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
 
   ID3D12Resource* readback_heap = chunk->resource.Get();
 
+  // Allocations from the readback pool are only ever used as copy destinations.
+  auto readback_resource = D3D12BufferRegion(offset_in_chunk,       // offset
+                                             dst.size(),            // size,
+                                             nullptr,               // uav state
+                                             nullptr,               // copy src
+                                             chunk->resource.Get()  // copy dst
+  );
+
   // Copy from the source resource into the readback heap. `gpu_done_event` is
   // the event that will be signaled when the copy to the readback heap
   // completes on the GPU.
   DmlGpuEvent gpu_done_event = execution_context_->CopyBufferRegion(
-      readback_heap, offset_in_chunk, D3D12_RESOURCE_STATE_COPY_DEST, src,
-      src_offset, src_state, dst.size());
+      readback_resource, src.Subregion(0, dst.size()));
 
   // Get the event which will become signaled once the readback into `dst` has
   // fully completed on the CPU.

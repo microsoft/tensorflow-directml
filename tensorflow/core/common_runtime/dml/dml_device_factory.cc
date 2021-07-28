@@ -160,12 +160,9 @@ class DmlDeviceFactory : public DeviceFactory {
       const auto& adapter = device_cache.GetAdapter(i);
 
       tensorflow::GPUOptions adapter_gpu_options = gpu_options;
-      const bool is_uma_adapter = IsUmaAdapter(adapter);
-      if (is_uma_adapter) {
-        // For adapters with unified memory architecture (UMA), which use system
-        // memory, allocate memory as needed rather than all of it upfront.
-        adapter_gpu_options.set_allow_growth(true);
-      }
+
+      // Allocate memory as needed rather than consuming all of it upfront.
+      adapter_gpu_options.set_allow_growth(true);
 
       if (virtual_devices.empty() ||
           virtual_devices.Get(i).memory_limit_mb_size() == 0) {
@@ -175,7 +172,7 @@ class DmlDeviceFactory : public DeviceFactory {
           // limit as a fraction of TOTAL GPU memory
           uint64_t total_gpu_memory = adapter.GetTotalDedicatedMemory();
 
-          if (is_uma_adapter) {
+          if (IsUmaAdapter(adapter)) {
             // For adapters with unified memory architecture (UMA), add shared
             // memory to the total GPU memory
             total_gpu_memory += adapter.GetTotalSharedMemory();

@@ -96,6 +96,8 @@ class DmlDynamicStitchKernel : public OpKernel {
     }
 
     DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
+    auto* device_context =
+        static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
     const uint64_t data_type_size = DataTypeSize(ctx->expected_output_dtype(0));
 
@@ -105,9 +107,6 @@ class DmlDynamicStitchKernel : public OpKernel {
     std::vector<D3D12BufferRegion> input_buffers;
     input_buffers.reserve(data_inputs.size());
 
-    std::vector<D3D12_RESOURCE_BARRIER> barriers;
-    barriers.reserve(data_inputs.size() + 1);
-
     for (const Tensor& data_tensor : data_inputs) {
       if (data_tensor.NumElements() == 0) {
         input_buffers.push_back({});
@@ -115,23 +114,13 @@ class DmlDynamicStitchKernel : public OpKernel {
       }
 
       D3D12BufferRegion input_buffer =
-          dml_util::CreateBufferForTensor(device, data_tensor);
-
-      barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
-          input_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-          D3D12_RESOURCE_STATE_COPY_SOURCE));
+          dml_util::GetBufferForTensor(device, data_tensor);
 
       input_buffers.push_back(std::move(input_buffer));
     }
 
     D3D12BufferRegion output_buffer =
-        dml_util::CreateBufferForTensor(device, *output_tensor);
-
-    barriers.push_back(CD3DX12_RESOURCE_BARRIER::Transition(
-        output_buffer.Resource(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-        D3D12_RESOURCE_STATE_COPY_DEST));
-
-    device->GetExecutionContext()->ResourceBarrier(barriers);
+        dml_util::GetBufferForTensor(device, *output_tensor);
 
     DCHECK(indices_inputs.size() == data_inputs.size());
     for (int tensor_idx = 0; tensor_idx < indices_inputs.size(); ++tensor_idx) {
@@ -149,22 +138,16 @@ class DmlDynamicStitchKernel : public OpKernel {
       for (int i = 0; i < indices_tensor.NumElements(); ++i) {
         int32 output_idx = indices(i);
 
-        const uint64_t src_offset = input_buffer.Offset() + byte_stride * i;
-        const uint64_t dst_offset =
-            output_buffer.Offset() + byte_stride * output_idx;
+        const uint64_t src_offset = byte_stride * i;
+        const uint64_t dst_offset = byte_stride * output_idx;
 
-        device->GetExecutionContext()->CopyBufferRegion(
-            output_buffer.Resource(), dst_offset,
-            D3D12_RESOURCE_STATE_COPY_DEST, input_buffer.Resource(), src_offset,
-            D3D12_RESOURCE_STATE_COPY_SOURCE, byte_stride);
+        auto device_context =
+            static_cast<DMLDeviceContext*>(ctx->op_device_context());
+        device_context->CopyBufferToBuffer(
+            output_buffer.Subregion(dst_offset),
+            input_buffer.Subregion(src_offset, byte_stride));
       }
     }
-
-    for (auto& barrier : barriers) {
-      std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
-    }
-
-    device->GetExecutionContext()->ResourceBarrier(barriers);
   }
 };
 

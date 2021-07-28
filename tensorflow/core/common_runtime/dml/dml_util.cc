@@ -309,8 +309,8 @@ void CopyTensorInSameDevice(OpKernelContext* op_ctx, Tensor* dst,
       [op_ctx](const Status& s) { OP_REQUIRES_OK(op_ctx, s); });
 }
 
-D3D12BufferRegion CreateBufferForTensor(const DmlDevice* device,
-                                        const Tensor& tensor) {
+D3D12BufferRegion GetBufferForTensor(const DmlDevice* device,
+                                     const Tensor& tensor) {
   DmlAllocator* allocator = device->GetAllocator();
   const void* p = tensor.tensor_data().data();
 

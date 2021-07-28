@@ -71,9 +71,9 @@ class DmlParallelConcatUpdateKernel : public OpKernel {
     Tensor output_tensor = value_tensor;
 
     D3D12BufferRegion update_buffer =
-        dml_util::CreateBufferForTensor(device, update_tensor);
+        dml_util::GetBufferForTensor(device, update_tensor);
     D3D12BufferRegion output_buffer =
-        dml_util::CreateBufferForTensor(device, output_tensor);
+        dml_util::GetBufferForTensor(device, output_tensor);
 
     const int64 nrows = output_tensor.dim_size(0);
     const int dtype_size_in_bytes = DataTypeSize(output_tensor.dtype());
@@ -82,13 +82,11 @@ class DmlParallelConcatUpdateKernel : public OpKernel {
 
     // Guard the row index range
     const int64 row_index = (loc_ % nrows + nrows) % nrows;
-    const uint64_t dst_offset = output_buffer.Offset() + row_index * stride;
-    const uint64_t src_offset = update_buffer.Offset();
+    const uint64_t dst_offset = row_index * stride;
 
     device->GetExecutionContext()->CopyBufferRegion(
-        output_buffer.Resource(), dst_offset, D3D12_RESOURCE_STATE_COPY_DEST,
-        update_buffer.Resource(), src_offset, D3D12_RESOURCE_STATE_COPY_SOURCE,
-        stride);
+        output_buffer.Subregion(dst_offset),
+        update_buffer.Subregion(0, stride));
 
     ctx->set_output(0, output_tensor);
   }

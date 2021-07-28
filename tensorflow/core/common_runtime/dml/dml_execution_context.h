@@ -20,6 +20,7 @@ limitations under the License.
 #include <thread>
 #include <vector>
 
+#include "dml_buffer_region.h"
 #include "dml_command_allocator_ring.h"
 #include "dml_command_list.h"
 #include "dml_command_queue.h"
@@ -48,19 +49,30 @@ class DmlExecutionContext {
 
   // NOTE: the caller is responsible for keeping the dst_buffer/src_buffer
   // resources alive until the returned GPU event has completed.
-  DmlGpuEvent CopyBufferRegion(ID3D12Resource* dst_buffer, uint64_t dst_offset,
-                               D3D12_RESOURCE_STATES dst_state,
-                               ID3D12Resource* src_buffer, uint64_t src_offset,
-                               D3D12_RESOURCE_STATES src_state,
-                               uint64_t byte_count);
+  DmlGpuEvent CopyBufferRegionRaw(ID3D12Resource* dst_buffer,
+                                  uint64_t dst_offset,
+                                  D3D12_RESOURCE_STATES dst_state,
+                                  ID3D12Resource* src_buffer,
+                                  uint64_t src_offset,
+                                  D3D12_RESOURCE_STATES src_state,
+                                  uint64_t byte_count);
+
+  DmlGpuEvent CopyBufferRegion(const D3D12BufferRegion& dst,
+                               const D3D12BufferRegion& src);
 
   // NOTE: the caller is responsible for keeping the dst resource alive until
   // the returned GPU event has completed. A copy of the value span will be
   // made, so the pointed-to value is safe to release immediately after calling
   // this method.
-  DmlGpuEvent FillBufferWithPattern(ID3D12Resource* dst, uint64_t dst_offset,
-                                    uint64_t dst_size_in_bytes,
-                                    absl::Span<const uint8_t> value);
+  DmlGpuEvent FillBufferWithPatternRaw(ID3D12Resource* dst, uint64_t dst_offset,
+                                       uint64_t dst_size_in_bytes,
+                                       absl::Span<const uint8_t> value);
+
+  inline DmlGpuEvent FillBufferWithPattern(const D3D12BufferRegion& dst,
+                                           absl::Span<const uint8_t> value) {
+    return FillBufferWithPatternRaw(dst.ResourceInUavState(), dst.Offset(),
+                                    dst.SizeInBytes(), value);
+  }
 
   // NOTE: the caller is responsible for keeping the initializer and
   // descriptor_heap alive until the returned GPU event has completed. This

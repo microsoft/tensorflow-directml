@@ -1133,9 +1133,10 @@ class DmlBlockLstmOp : public DmlKernel {
       uint32_t num_out = ctx->GetOutputCount();
       for (uint32_t i = 0; i < num_out; ++i) {
         Tensor* output = ctx->GetOutputTensor(i);
-        ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+        ctx->GetDmlDeviceContext()->ZeroBuffer(
+            ctx->GetDmlDeviceContext()->GetBufferForTensor(*output));
       }
-      return ctx->GetCurrentCompletionEvent();
+      return ctx->GetDmlDeviceContext()->GetCurrentCompletionEvent();
     }
     return DmlKernel::Compute(ctx);
   }
@@ -1689,10 +1690,12 @@ class DmlBlockLstmGradOp : public DmlKernel {
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     for (int i = 0; i < ctx->GetOutputCount(); ++i) {
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*ctx->GetOutputTensor(i)));
+      ctx->GetDmlDeviceContext()->ZeroBuffer(
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(
+              *ctx->GetOutputTensor(i)));
     }
     if (skip_) {
-      return ctx->GetCurrentCompletionEvent();
+      return ctx->GetDmlDeviceContext()->GetCurrentCompletionEvent();
     }
     return DmlKernel::Compute(ctx);
   }

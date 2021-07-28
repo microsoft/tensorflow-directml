@@ -115,7 +115,8 @@ namespace tensorflow {
   (void)command_queue->QueryInterface(IID_PPV_ARGS(&sharing_contract));
 
   auto heap_allocator = absl::make_unique<D3D12HeapAllocator>(
-      d3d_device.Get(), CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+      d3d_device.Get(), command_queue.Get(),
+      CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
       D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS,
       D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
       D3D12_RESOURCE_STATE_UNORDERED_ACCESS);

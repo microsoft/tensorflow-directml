@@ -87,8 +87,7 @@ class ReduceInitializationHelper : public InitializationHelper {
                                !reduction_helper_.reduce_first_axis()));
 
     absl::optional<int> return_val;
-    if (is_identity)
-    {
+    if (is_identity) {
       return_val = 0;
     }
 
@@ -443,11 +442,12 @@ class DmlReduceKernel : public DmlKernel {
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
     if (zero_outputs_) {
       Tensor* output = ctx->GetOutputTensor(0);
-      ctx->ZeroBuffer(ctx->CreateBufferForTensor(*output));
+      ctx->GetDmlDeviceContext()->ZeroBuffer(
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output));
     }
 
     if (is_no_op_) {
-      return ctx->GetCurrentCompletionEvent();
+      return ctx->GetDmlDeviceContext()->GetCurrentCompletionEvent();
     }
 
     return DmlKernel::Compute(ctx);

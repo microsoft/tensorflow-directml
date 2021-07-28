@@ -221,29 +221,30 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
             << " persistent resource for kernel "
             << ctx->GetOpKernelContext()->op_kernel().type_string();
 
-   CD3DX12_HEAP_PROPERTIES default_heap_properties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-   CD3DX12_RESOURCE_DESC persistent_resource_desc = CD3DX12_RESOURCE_DESC::Buffer(
-       exec_binding_props.PersistentResourceSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-   
-   HRESULT hr = ctx->GetD3D12Device()->CreateCommittedResource(
-       &default_heap_properties,
-       D3D12_HEAP_FLAG_NONE,
-       &persistent_resource_desc,
-       D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-       nullptr,
-       IID_PPV_ARGS(&persistent_resource_));
+    CD3DX12_HEAP_PROPERTIES default_heap_properties =
+        CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+    CD3DX12_RESOURCE_DESC persistent_resource_desc =
+        CD3DX12_RESOURCE_DESC::Buffer(
+            exec_binding_props.PersistentResourceSize,
+            D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+    HRESULT hr = ctx->GetD3D12Device()->CreateCommittedResource(
+        &default_heap_properties, D3D12_HEAP_FLAG_NONE,
+        &persistent_resource_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+        nullptr, IID_PPV_ARGS(&persistent_resource_));
 
     if (dml_util::HrIsOutOfMemory(hr)) {
       assert(!persistent_resource_);
       OP_REQUIRES(ctx->GetOpKernelContext(), persistent_resource_,
-            errors::ResourceExhausted(
-                "OOM when allocating a persistent resource buffer of ",
-                exec_binding_props.PersistentResourceSize, " bytes"));
+                  errors::ResourceExhausted(
+                      "OOM when allocating a persistent resource buffer of ",
+                      exec_binding_props.PersistentResourceSize, " bytes"));
     }
-  
+
     DML_CHECK_SUCCEEDED(hr);
 
-    persistent_resource_binding_ = {persistent_resource_.Get(), 0, exec_binding_props.PersistentResourceSize};
+    persistent_resource_binding_ = {persistent_resource_.Get(), 0,
+                                    exec_binding_props.PersistentResourceSize};
   }
 
   // Initialize the operator
@@ -260,7 +261,8 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   // Unfortunately we have to use make_shared here to make it copyable, so it
   // can be captured in the lambda below
   auto descriptor_range = std::make_shared<DescriptorAllocation>(
-      ctx->AllocateDescriptors(init_binding_props.RequiredDescriptorCount));
+      ctx->GetDmlDeviceContext()->AllocateDescriptors(
+          init_binding_props.RequiredDescriptorCount));
 
   D3D12DescriptorHandles descriptor_handles =
       descriptor_range->GetDescriptorHandles();
@@ -282,7 +284,8 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   DmlBuffer temp_resource;
   absl::optional<DML_BUFFER_BINDING> temp_resource_binding;
   if (temporary_resource_size > 0) {
-    temp_resource = ctx->AllocateDefaultBuffer(temporary_resource_size);
+    temp_resource = ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(
+        temporary_resource_size);
 
     OP_REQUIRES(ctx->GetOpKernelContext(), temp_resource,
                 errors::ResourceExhausted("OOM when allocating a buffer of ",
@@ -291,7 +294,7 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
     temp_resource_binding = temp_resource.GetBufferBinding();
   }
 
-  auto init_gpu_event = ctx->BindAndInitializeOperator(
+  auto init_gpu_event = ctx->GetDmlDeviceContext()->BindAndInitializeOperator(
       initializer.Get(), std::move(binding_table), descriptor_handles.heap,
       temp_resource_binding ? &*temp_resource_binding : nullptr,
       GetPersistentResourceBinding());
@@ -304,7 +307,8 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
     p = nullptr;
     p2->Reset();
   };
-  ctx->EnqueueCallbackForGpuEvent(init_gpu_event, on_initialize_completed);
+  ctx->GetDmlDeviceContext()->EnqueueCallbackForGpuEvent(
+      init_gpu_event, on_initialize_completed);
 }
 
 StatusOr<DmlGpuEvent> DmlKernel::Compute(DmlKernelContext* ctx) const {
@@ -329,7 +333,8 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
   // Unfortunately we have to use make_shared here to make it copyable, so it
   // can be captured in the lambda below
   auto descriptor_range = std::make_shared<DescriptorAllocation>(
-      ctx->AllocateDescriptors(exec_binding_props.RequiredDescriptorCount));
+      ctx->GetDmlDeviceContext()->AllocateDescriptors(
+          exec_binding_props.RequiredDescriptorCount));
 
   D3D12DescriptorHandles descriptor_handles =
       descriptor_range->GetDescriptorHandles();
@@ -355,7 +360,8 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
     // freeing allows the resource to be shared with other operators, but
     // because the allocator is multi-threaded we need to at least keep a use on
     // it until we're done with it locally to prevent the buffer being reused.
-    temp_resource = ctx->AllocateDefaultBuffer(temporary_resource_size);
+    temp_resource = ctx->GetDmlDeviceContext()->AllocateDefaultBuffer(
+        temporary_resource_size);
     if (!temp_resource) {
       return errors::ResourceExhausted("OOM when allocating a buffer of ",
                                        temporary_resource_size, " bytes");
@@ -364,7 +370,7 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
     temp_resource_binding = temp_resource.GetBufferBinding();
   }
 
-  DmlGpuEvent gpu_event = ctx->BindAndExecuteOperator(
+  DmlGpuEvent gpu_event = ctx->GetDmlDeviceContext()->BindAndExecuteOperator(
       compiled_op_.Get(), std::move(binding_table), descriptor_handles.heap,
       temp_resource_binding ? &*temp_resource_binding : nullptr,
       GetPersistentResourceBinding(), input_bindings, output_bindings);
@@ -373,10 +379,10 @@ StatusOr<DmlGpuEvent> DmlKernel::Compute(
   // be released when the execution completes on the GPU. Note that we don't
   // need to keep the binding table alive - recall that lifetime is tied to the
   // underlying descriptors, not the binding table itself.
-  ctx->EnqueueCallbackForGpuEvent(gpu_event,
-                                  [p = std::move(descriptor_range)]() mutable {
-                                    p->Reset();  // Release the descriptor range
-                                  });
+  ctx->GetDmlDeviceContext()->EnqueueCallbackForGpuEvent(
+      gpu_event, [p = std::move(descriptor_range)]() mutable {
+        p->Reset();  // Release the descriptor range
+      });
 
   return gpu_event;
 }
@@ -390,7 +396,8 @@ absl::InlinedVector<D3D12BufferRegion, 8> DmlKernel::CreateInputBuffers(
       uint32_t kernel_index = input_descs_[i]->kernel_index;
 
       const Tensor& input_tensor = ctx->GetInputTensor(kernel_index);
-      input_buffers[i] = ctx->CreateBufferForTensor(input_tensor);
+      input_buffers[i] =
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(input_tensor);
     }
   }
 
@@ -407,7 +414,8 @@ absl::InlinedVector<D3D12BufferRegion, 4> DmlKernel::CreateOutputBuffers(
       uint32_t kernel_index = output_descs_[i]->kernel_index;
 
       Tensor* output_tensor = ctx->GetOutputTensor(kernel_index);
-      output_buffers[i] = ctx->CreateBufferForTensor(*output_tensor);
+      output_buffers[i] =
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output_tensor);
     }
   }
 
