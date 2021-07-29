@@ -42,12 +42,11 @@ class DmlEmptyKernel : public OpKernel {
     OP_REQUIRES_OK(ctx, ctx->allocate_output(0, out_shape, &output_tensor));
 
     if (init_ && out_shape.num_elements() > 0) {
-      DmlDevice* device = static_cast<DmlDevice*>(ctx->device());
       auto device_context =
           static_cast<DMLDeviceContext*>(ctx->op_device_context());
 
       D3D12BufferRegion output_buffer =
-          dml_util::GetBufferForTensor(device, *output_tensor);
+          device_context->GetBufferForTensor(*output_tensor);
 
       device_context->ZeroBuffer(output_buffer);
     }

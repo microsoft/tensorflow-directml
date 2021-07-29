@@ -309,27 +309,6 @@ void CopyTensorInSameDevice(OpKernelContext* op_ctx, Tensor* dst,
       [op_ctx](const Status& s) { OP_REQUIRES_OK(op_ctx, s); });
 }
 
-D3D12BufferRegion GetBufferForTensor(const DmlDevice* device,
-                                     const Tensor& tensor) {
-  DmlAllocator* allocator = device->GetAllocator();
-  const void* p = tensor.tensor_data().data();
-
-  // Important: we must use AllocatedBytes() here and not TotalBytes() because
-  // AllocatedBytes includes the necessary padding and alignment, whereas
-  // TotalBytes is exactly equal to the number of elements multiplied by the
-  // element size.
-  uint64_t size_in_bytes = tensor.AllocatedBytes();
-
-  auto region = allocator->CreateBufferRegion(p, size_in_bytes);
-
-  // DML always requires at least 4 byte alignment in all cases, so both the
-  // offset and size must certainly be divisible by 4
-  DCHECK(region.Offset() % 4 == 0);
-  DCHECK(region.SizeInBytes() % 4 == 0);
-
-  return region;
-}
-
 absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 8> GetBufferBindings(
     absl::Span<const D3D12BufferRegion> buffers) {
   absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 8> bindings;

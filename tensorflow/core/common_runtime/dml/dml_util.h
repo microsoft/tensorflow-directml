@@ -87,9 +87,6 @@ namespace dml_util {
 void CopyTensorInSameDevice(OpKernelContext* op_ctx, Tensor* dst,
                             const Tensor& src);
 
-D3D12BufferRegion GetBufferForTensor(const DmlDevice* device,
-                                     const Tensor& tensor);
-
 // Calls D3D12BufferRegion::GetBufferBinding on each of the buffers and returns
 // the result.
 absl::InlinedVector<absl::optional<DML_BUFFER_BINDING>, 8> GetBufferBindings(

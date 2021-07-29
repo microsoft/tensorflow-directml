@@ -91,10 +91,12 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
 
         // If the tensor is nonempty, fill it with zero's
         if (output_tensor->NumElements() != 0) {
+          auto* device_context =
+              static_cast<DMLDeviceContext*>(ctx->op_device_context());
+
           D3D12BufferRegion buffer =
-              dml_util::GetBufferForTensor(dml_device, *output_tensor);
-          static_cast<DMLDeviceContext*>(ctx->op_device_context())
-              ->ZeroBuffer(buffer);
+              device_context->GetBufferForTensor(*output_tensor);
+          device_context->ZeroBuffer(buffer);
         }
       }
       return;
