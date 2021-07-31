@@ -41,7 +41,7 @@ StatusOr<DmlGpuEvent> DmlReadbackHeap::ReadbackFromGpu(
   std::unique_lock<std::mutex> lock(mutex_);
 
   assert(!dst.empty());
-  assert(src.ResourceInFixedState()->GetDesc().Dimension ==
+  assert(src.ResourceInUavState()->GetDesc().Dimension ==
          D3D12_RESOURCE_DIMENSION_BUFFER);
 
   InvariantChecker checker(this);

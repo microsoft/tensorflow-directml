@@ -35,7 +35,7 @@ StatusOr<DmlGpuEvent> DmlUploadHeap::BeginUploadToGpu(
   TF_RETURN_IF_ERROR(execution_context_->GetCommandRecorderStatus());
 
   assert(!src.empty());
-  assert(dst.ResourceInFixedState()->GetDesc().Dimension ==
+  assert(dst.ResourceInUavState()->GetDesc().Dimension ==
          D3D12_RESOURCE_DIMENSION_BUFFER);
 
   InvariantChecker checker(this);
