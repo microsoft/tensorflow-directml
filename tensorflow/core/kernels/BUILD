@@ -8190,7 +8190,7 @@ tf_kernel_library(
     ]),
 )
 
-tf_cc_test(
+tf_dml_cc_test(
     name = "dml_ops_test",
     size = "small",
     srcs = [
@@ -8198,6 +8198,7 @@ tf_cc_test(
     ],
     linkstatic = 1,
     deps = [
+        ":dml_ops",
         "//tensorflow/core:test",
         "//tensorflow/core:test_main",
         "//tensorflow/core:testlib",
@@ -8206,4 +8207,9 @@ tf_cc_test(
         "//tensorflow/cc:client_session",
         "//tensorflow/core:tensorflow",
     ],
+    # TODO: TFDML #24658011
+    # TF build for WSL should have configurable linker path for D3D/DXCore/DML
+    linkopts = if_not_windows([
+        "-L/mnt/c/Windows/System32/lxss/lib",
+    ]),
 )
