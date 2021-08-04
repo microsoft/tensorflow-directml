@@ -964,11 +964,11 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     tf_http_archive(
         name = "directx_headers",
         urls = [
-            "https://mirror.bazel.build/github.com/microsoft/DirectX-Headers/archive/v1.0.2.tar.gz",
-            "https://github.com/microsoft/DirectX-Headers/archive/v1.0.2.tar.gz",
+            "https://mirror.bazel.build/github.com/microsoft/DirectX-Headers/archive/53d22f0256832f4a36117386355d54e2331127de.tar.gz",
+            "https://github.com/microsoft/DirectX-Headers/archive/53d22f0256832f4a36117386355d54e2331127de.tar.gz",
         ],
-        sha256 = "afeb932c1a92d7fa22f03565468256ce9cc46f0e7fc163cc34e2666313a7cd15",
-        strip_prefix = "DirectX-Headers-1.0.2",
+        sha256 = "0cc8b6614134ee1ef085e9e73b46d19bfd0f77890e68dd710f230ed48e264952",
+        strip_prefix = "DirectX-Headers-53d22f0256832f4a36117386355d54e2331127de",
         build_file = clean_dep("//third_party:directx_headers.BUILD"),
     )
 
