@@ -16,7 +16,10 @@ limitations under the License.
 
 #include <stdlib.h>
 
+#ifdef TENSORFLOW_USE_DIRECTML
 #include "DirectMLConfig.h"
+#endif
+
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "tensorflow/stream_executor/lib/env.h"
@@ -41,11 +44,6 @@ string GetCudaVersion() { return TF_CUDA_VERSION; }
 string GetCudaLibVersion() { return TF_CUDA_LIB_VERSION; }
 string GetCudnnVersion() { return TF_CUDNN_VERSION; }
 string GetTensorRTVersion() { return TF_TENSORRT_VERSION; }
-
-string GetDirectMLPath() {
-  const char* path = getenv("TF_DIRECTML_PATH");
-  return (path != nullptr ? path : "");
-}
 
 #if _WIN32
 string GetModuleDirectory() {
@@ -191,6 +189,12 @@ port::StatusOr<void*> GetRocrandDsoHandle() {
 
 port::StatusOr<void*> GetHipDsoHandle() { return GetDsoHandle("hip_hcc", ""); }
 
+#ifdef TENSORFLOW_USE_DIRECTML
+string GetDirectMLPath() {
+  const char* path = getenv("TF_DIRECTML_PATH");
+  return (path != nullptr ? path : "");
+}
+
 port::StatusOr<void*> GetDirectMLLibraryHandle(const string& basename) {
   auto path = GetDirectMLPath();
 
@@ -233,6 +237,7 @@ port::StatusOr<void*> GetPixDsoHandle() {
   return port::Status(port::error::UNIMPLEMENTED, "PIX events are not supported in WSL");
 #endif
 }
+#endif  // TENSORFLOW_USE_DIRECTML
 
 port::StatusOr<void*> GetKernel32DsoHandle() {
 #if _WIN32
@@ -315,6 +320,7 @@ port::StatusOr<void*> GetHipDsoHandle() {
   return *result;
 }
 
+#ifdef TENSORFLOW_USE_DIRECTML
 port::StatusOr<void*> GetDirectMLDsoHandle() {
   static auto result = new auto(DsoLoader::GetDirectMLDsoHandle());
   return *result;
@@ -329,6 +335,7 @@ port::StatusOr<void*> GetPixDsoHandle() {
   static auto result = new auto(DsoLoader::GetPixDsoHandle());
   return *result;
 }
+#endif  // TENSORFLOW_USE_DIRECTML
 
 port::StatusOr<void*> GetKernel32DsoHandle() {
   static auto result = new auto(DsoLoader::GetKernel32DsoHandle());

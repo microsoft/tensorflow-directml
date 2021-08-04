@@ -209,7 +209,9 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
     } else {
       return GetLocalGPUInfo(PlatformGpuId(0));
     }
-  } else if (device.type == "DML") {
+  }
+#ifdef TENSORFLOW_USE_DIRECTML
+  else if (device.type == "DML") {
     uint32_t adapter_index = 0;
     if (device.has_id) {
       Status s = DmlDeviceCache::Instance().GetAdapterIndexFromDeviceId(
@@ -221,6 +223,7 @@ DeviceProperties GetDeviceInfo(const DeviceNameUtils::ParsedName& device) {
     }
     return GetLocalDMLInfo(adapter_index);
   }
+#endif
   return unknown;
 }
 

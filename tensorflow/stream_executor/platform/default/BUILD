@@ -4,6 +4,8 @@ package(default_visibility = ["//tensorflow/stream_executor:__subpackages__"])
 
 load("//tensorflow:tensorflow.bzl", "tf_copts", "if_windows")
 
+load("//third_party/dml:build_defs.bzl", "if_dml")
+
 cc_library(
     name = "platform",
     textual_hdrs = [
@@ -28,7 +30,8 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@local_config_cuda//cuda:cuda_headers",
         "@local_config_tensorrt//:tensorrt_headers",
+    ] + if_dml([
         "@dml_redist//:headers",
-    ],
+    ]),
     linkopts = if_windows(["-DEFAULTLIB:pathcch.lib"]) 
 )
