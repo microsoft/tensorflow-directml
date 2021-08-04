@@ -157,12 +157,12 @@ TEST(DmlKernelTests, SimpleExample) {
   inputs.emplace(max, 1.2f);
   TF_CHECK_OK(session.Run(inputs, {result}, &outputs));
 
-  output = outputs[0].matrix<float>();
+  auto output2 = outputs[0].matrix<float>();
   LOG(INFO) << output;
-  EXPECT_FLOAT_EQ(output(0, 0), 0.7f);
-  EXPECT_FLOAT_EQ(output(0, 1), 0.9f);
-  EXPECT_FLOAT_EQ(output(1, 0), 1.1f);
-  EXPECT_FLOAT_EQ(output(1, 1), 1.2f);
+  EXPECT_FLOAT_EQ(output2(0, 0), 0.7f);
+  EXPECT_FLOAT_EQ(output2(0, 1), 0.9f);
+  EXPECT_FLOAT_EQ(output2(1, 0), 1.1f);
+  EXPECT_FLOAT_EQ(output2(1, 1), 1.2f);
 }
 
 TEST(DmlKernelTests, Relu) {
