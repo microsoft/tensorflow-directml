@@ -28,8 +28,9 @@ DmlDescriptorAllocator::DmlDescriptorAllocator(
 DescriptorAllocation DmlDescriptorAllocator::Alloc(size_t size_in_descriptors) {
   if (size_in_descriptors == 0) {
     // An empty allocation is possible and valid (e.g. initializing an op with
-    // no descriptors required), so don't bother calling AllocateRaw. The returned
-    // DescriptorAllocation with is valid for initializers that require zero descriptors.
+    // no descriptors required), so don't bother calling AllocateRaw. The
+    // returned DescriptorAllocation with is valid for initializers that require
+    // zero descriptors.
     return DescriptorAllocation(nullptr, nullptr, 0);
   }
 
