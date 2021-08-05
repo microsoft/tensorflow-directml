@@ -338,7 +338,7 @@ TEST_F(RemapperTest, FuseBatchNormWithAddAndRelu) {
       tensorflow::Scope s = tensorflow::Scope::NewRootScope();
 
 #if !defined(GOOGLE_CUDA) || !(CUDNN_VERSION >= 7402)
-      if (is_training) {
+      if (is_training && device == "/device:GPU:0") {
         LOG(INFO) << "Skip FuseBatchNormWithAddAndRelu"
                   << "[is_training=" << is_training << "] "
                   << "test. It requires CUDNN_VERSION >= 7402.";
@@ -347,7 +347,7 @@ TEST_F(RemapperTest, FuseBatchNormWithAddAndRelu) {
 #endif
 
 #if !defined(GOOGLE_CUDA)
-      if (!is_training) {
+      if (!is_training && device == "/device:GPU:0") {
         LOG(INFO) << "Skip FuseBatchNormWithAddAndRelu"
                   << "[is_training=" << is_training << "]";
         continue;
