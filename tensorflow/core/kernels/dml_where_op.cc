@@ -130,6 +130,9 @@ REGISTER_OP("DmlNonzeroCoordinates")
 TF_CALL_WHERE_DML_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
+// Calculates nonzero coordinates (as UINT32) as well as the number of
+// nonzero values by invoking the DmlNonzeroCoordinates kernel. The caller is
+// responsible for freeing the nonzero_coordinates output.
 static Status ComputeNonzeroCoordinates(OpKernelContext* ctx,
                                         const NodeDef& node_def,
                                         uint32_t& num_nonzero_elements,
@@ -165,6 +168,9 @@ static Status ComputeNonzeroCoordinates(OpKernelContext* ctx,
                               &num_nonzero_elements_tensor_cpu, attr));
 
   TensorValue num_nonzero_elements_tensor = op_ctx.release_output(0);
+
+  // WARNING: caller now takes ownership of nonzero_coordinates and is
+  // responsible for deleting it!
   nonzero_coordinates = op_ctx.release_output(1);
 
   Notification note;
@@ -179,13 +185,20 @@ static Status ComputeNonzeroCoordinates(OpKernelContext* ctx,
   note.WaitForNotification();
   TF_RETURN_IF_ERROR(ctx->status());
 
+  // Safe to delete now that this tensor has been copied to the CPU.
+  delete num_nonzero_elements_tensor.tensor;
+
   num_nonzero_elements = num_nonzero_elements_tensor_cpu.scalar<uint32_t>()();
 
   return Status::OK();
 }
 
+// Converts output of DML_NONZERO_COORDINATES_OPERATOR (UINT32) to INT64 using
+// the cast kernel. The caller is responsible for freeing the
+// nonzero_coordinate_ui64 output.
 static Status ComputeCast(OpKernelContext* ctx, const NodeDef& node_def,
-                          TensorValue& nonzero_coordinates) {
+                          const TensorValue& nonzero_coordinates_ui32,
+                          TensorValue& nonzero_coordinate_ui64) {
   Status s;
   auto op_kernel = CreateOpKernel(DEVICE_DML, ctx->device(),
                                   ctx->get_allocator(AllocatorAttributes()),
@@ -193,7 +206,7 @@ static Status ComputeCast(OpKernelContext* ctx, const NodeDef& node_def,
   TF_RETURN_IF_ERROR(s);
 
   absl::InlinedVector<TensorValue, 4> inputs = {
-      TensorValue(const_cast<Tensor*>(nonzero_coordinates.tensor))};
+      TensorValue(const_cast<Tensor*>(nonzero_coordinates_ui32.tensor))};
 
   AllocatorAttributes output_attrs[] = {AllocatorAttributes()};
 
@@ -207,7 +220,9 @@ static Status ComputeCast(OpKernelContext* ctx, const NodeDef& node_def,
   op_kernel->Compute(&op_ctx);
   TF_RETURN_IF_ERROR(op_ctx.status());
 
-  nonzero_coordinates = op_ctx.release_output(0);
+  // WARNING: caller now takes ownership of nonzero_coordinate_ui64 and is
+  // responsible for deleting it!
+  nonzero_coordinate_ui64 = op_ctx.release_output(0);
 
   return Status::OK();
 }
@@ -235,14 +250,17 @@ class DmlWhereKernel : public OpKernel {
                     input_dims, " dimensions were provided."));
 
     uint32_t num_nonzero_elements;
-    TensorValue nonzero_coordinates;
+    TensorValue nonzero_coordinates_ui32;
+    TensorValue nonzero_coordinates_i64;
 
     OP_REQUIRES_OK(ctx, ComputeNonzeroCoordinates(
                             ctx, nonzero_coordinates_node_def_,
-                            num_nonzero_elements, nonzero_coordinates));
+                            num_nonzero_elements, nonzero_coordinates_ui32));
 
     // Where only supports int64 as an output, but DML outputs uint32
-    OP_REQUIRES_OK(ctx, ComputeCast(ctx, cast_node_def_, nonzero_coordinates));
+    OP_REQUIRES_OK(ctx,
+                   ComputeCast(ctx, cast_node_def_, nonzero_coordinates_ui32,
+                               nonzero_coordinates_i64));
 
     // Now that we know the number of nonzero elements, create the output shape
     // and allocate the output
@@ -254,8 +272,16 @@ class DmlWhereKernel : public OpKernel {
     Device* device = static_cast<Device*>(ctx->device());
 
     device_context->CopyTensorInSameDevice(
-        nonzero_coordinates.tensor, device, output,
-        [ctx](const Status& s) { OP_REQUIRES_OK(ctx, s); });
+        nonzero_coordinates_i64.tensor, device, output,
+        [ctx, nonzero_coordinates_ui32,
+         nonzero_coordinates_i64](const Status& s) {
+          OP_REQUIRES_OK(ctx, s);
+
+          // These tensors were released from their respective kernel contexts
+          // and must be freed manually.
+          delete nonzero_coordinates_ui32.tensor;
+          delete nonzero_coordinates_i64.tensor;
+        });
   }
 
  private:
