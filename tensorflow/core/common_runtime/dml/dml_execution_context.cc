@@ -209,6 +209,10 @@ StatusOr<DmlGpuEvent> DmlExecutionContext::Flush() {
   }
 
   batch_state_->flush_requested = true;
+
+  // Release the lock before notifying.  This is as an optimization, as it can prevent
+  // the scheduling thread from being immediately blocked after waking up.
+  lock.unlock();
   batch_state_->command_added.notify_all();
   return event;
 }
@@ -248,65 +252,64 @@ D3D12_COMMAND_LIST_TYPE DmlExecutionContext::GetCommandListTypeForQueue()
   auto last_flush_time = std::chrono::steady_clock::now();
 
   while (true) {
-    std::chrono::duration<double> elapsed =
-        std::chrono::steady_clock::now() - last_flush_time;
-    auto elapsed_us = elapsed.count() * 1e6;
-
     std::unique_lock<std::mutex> lock(state->mutex);
     if (state->exit_requested) {
       break;
     }
-
+    
     auto& batch = state->WriteBatch();
 
-    if (batch.empty()) {
-      // Wait for new work to be batched.
-      state->command_added.wait(lock);
+    // Gets the maximum time to wait before flushing work
+    auto GetMaxWaitPoint = [&]() {
+        return last_flush_time + std::chrono::duration<double>(batch_flush_time_us / 1e6);
+    };
 
-      // Return to the top in case of spurious wakeup.
-      continue;
+    // Determines whether criteria is met for the heuristic of when to flush
+    auto FlushHeuristicMet = [&]()
+    {
+      auto maxWaitPoint = GetMaxWaitPoint();
+      return batch.size() >= batch_flush_size || std::chrono::steady_clock::now() >= maxWaitPoint;
+    };
+
+    // Wait until either enough time has passed to trigger the flush heuristic, or a new command is queued,
+    // which may potentially trigger the heuristic.  The lock is released during the wait, allowing threads
+    // to take the lock to queue the work.
+    while (batch.empty() || (!FlushHeuristicMet() && !state->flush_requested)){
+      state->command_added.wait_until(lock, GetMaxWaitPoint());
+      if (state->exit_requested) {
+        return;
+      }
     }
 
-    // Check if it's time to swap the write/execute batches and flush work to
-    // the GPU: this occurs if a flush is explicitly requested, the batch has
-    // reached a certain size, or enough time has elapsed since the last flush.
-    // The goal here is to balance feeding the GPU work while the CPU is
-    // processing more commands and avoiding many small packets.
-    bool flush = false;
+
     DmlGpuEvent batch_completion_event = state->next_flush_event;
-    if (state->flush_requested || batch.size() >= batch_flush_size ||
-        elapsed_us >= batch_flush_time_us) {
-      state->write_batch_index = (state->write_batch_index + 1) % 2;
-      flush = true;
-      ++state->next_flush_event.fence_value;
-    }
+    state->write_batch_index = (state->write_batch_index + 1) % 2;
+    ++state->next_flush_event.fence_value;
     state->flush_requested = false;
 
     // Unlock to allow kernels to resume writing to the new write batch.
     lock.unlock();
 
-    if (flush) {
-      DmlTracing::Instance().LogExecutionContextFlush();
-      // Record the commands into the command list.
-      command_list->Open(batch_completion_event);
-      for (auto& command : batch) {
-        command(*command_list);
-      }
-      auto status = command_list->Close();
-
-      if (!status.ok()) {
-        lock.lock();
-        state->status = status;
-        lock.unlock();
-        break;
-      }
-
-      ID3D12CommandList* command_lists[] = {command_list->Get()};
-      command_queue->ExecuteCommandLists(command_lists);
-
-      batch.clear();
-      last_flush_time = std::chrono::steady_clock::now();
+    DmlTracing::Instance().LogExecutionContextFlush();
+    // Record the commands into the command list.
+    command_list->Open(batch_completion_event);
+    for (auto& command : batch) {
+      command(*command_list);
     }
+    auto status = command_list->Close();
+
+    if (!status.ok()) {
+      lock.lock();
+      state->status = status;
+      lock.unlock();
+      break;
+    }
+
+    ID3D12CommandList* command_lists[] = {command_list->Get()};
+    command_queue->ExecuteCommandLists(command_lists);
+
+    batch.clear();
+    last_flush_time = std::chrono::steady_clock::now();
   }
 }
 
