@@ -38,6 +38,12 @@ def _parse_args():
       default=300,
       type=int)
 
+  parser.add_argument(
+      "--portserver",
+      action="store_true",
+      help="whether to use a port server to avoid race conditions in port "
+           "allocations")
+
   return parser.parse_args()
 
 def _get_tf_env(exe_path, test_framework):
@@ -59,7 +65,8 @@ def _run_test(
     shard_index,
     total_shard_count,
     test_framework,
-    test_timeout):
+    test_timeout,
+    use_portserver):
   """Runs a test executable in its own process."""
 
   # Insert the shard index in the name of the xml file
@@ -80,11 +87,13 @@ def _run_test(
   if os.name != "nt":
     env_copy["TEST_SRCDIR"] = exe_path + ".runfiles"
 
-  if test_framework == "abseil":
+  if use_portserver:
     # Specifying a port server for portpicker is necessary to avoid race
     # conditions when searching for unused ports. @unittest-portserver is the
     # sample port server that portpicker provides for test environments.
     env_copy["PORTSERVER_ADDRESS"] = "@unittest-portserver"
+
+  if test_framework == "abseil":
     env_copy["TEST_TOTAL_SHARDS"] = str(total_shard_count)
     env_copy["TEST_SHARD_INDEX"] = str(shard_index)
     xml_output_arg = f"--xml_output_file={xml_path}"
@@ -174,14 +183,16 @@ def main():
       exe_paths = [os.path.splitext(runfile)[0] for runfile in runfiles]
 
     bin_root = os.path.split(sys.executable)[0]
-    if os.name == "nt":
-      portserver_path = os.path.join(bin_root, "Scripts", "portserver.py")
-    else:
-      portserver_path = os.path.join(bin_root, "portserver.py")
 
     try:
-      # Launch the portserver daemon
-      portserver_process = subprocess.Popen(["python", portserver_path])
+      if args.portserver:
+        if os.name == "nt":
+          portserver_path = os.path.join(bin_root, "Scripts", "portserver.py")
+        else:
+          portserver_path = os.path.join(bin_root, "portserver.py")
+
+        # Launch the portserver daemon
+        portserver_process = subprocess.Popen(["python", portserver_path])
 
       for exe_path in exe_paths:
         # Read the json file to know how many shards to split the test into
@@ -206,12 +217,14 @@ def main():
                   shard_index,
                   shard_count,
                   args.test_framework,
-                  args.test_timeout))
+                  args.test_timeout,
+                  args.portserver))
 
       for future in futures:
         future.result()
     finally:
-      portserver_process.terminate()
+      if args.portserver:
+        portserver_process.terminate()
 
       for future in futures:
         future.cancel()
