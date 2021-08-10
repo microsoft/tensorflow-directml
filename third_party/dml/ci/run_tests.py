@@ -76,6 +76,10 @@ def main():
         for arg_name, arg_value in json_test_group["arguments"].items():
           command_line.append(f"{arg_name}={arg_value}")
 
+      if "switches" in json_test_group:
+        for switch_arg in switches:
+          command_line.append(switch_arg)
+
       if "flags" in json_test_group:
         for flag in json_test_group["flags"]:
           command_line.append(flag)

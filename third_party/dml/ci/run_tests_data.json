@@ -6,6 +6,9 @@
         "--test_binaries_path": "test_binaries/python",
         "--test_framework": "abseil"
       },
+      "switches": [
+        "--portserver"
+      ],
       "pipDeps": [
         "numpy==1.18.5",
         "h5py<3.0.0",
