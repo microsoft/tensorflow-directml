@@ -39,6 +39,8 @@ from tensorflow.python.ops.linalg import linalg_impl as linalg
 from tensorflow.python.ops.linalg import linear_operator_util
 from tensorflow.python.platform import test
 
+# Seed the numpy RNG to get reproducible results every time
+np.random.seed(42)
 
 class OperatorShapesInfo(object):
   """Object encoding expected shape for a test.
