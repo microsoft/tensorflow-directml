@@ -352,8 +352,13 @@ class DmlSpaceToBatchKernel : public DmlKernel {
     }
 
     dml::Expression permuted_reshaped_padded;
+    
+    bool use_dml_op =
+        internal_input_shape.dims() == 4 &&
+        std::equal(internal_block_sizes.begin() + 1, internal_block_sizes.end(),
+                   internal_block_sizes.begin());
 
-    if (internal_input_shape.dims() == 4) {
+    if (use_dml_op) {
       dml::TensorDesc padded_desc = padded.GetOutputDesc();
       auto padded_sizes = padded_desc.sizes;
       

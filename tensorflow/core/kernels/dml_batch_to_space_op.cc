@@ -355,8 +355,13 @@ class DmlBatchToSpaceKernel : public DmlKernel {
 
     dml::Expression output_before_slice;
 
-    // For 4d cases we can use the DML Depth to Space operator
-    if (internal_input_shape.dims() == 4) {
+    // For cases we can use the DML Depth to Space operator
+    bool use_dml_op =
+        internal_input_shape.dims() == 4 &&
+        std::equal(internal_block_sizes.begin() + 1, internal_block_sizes.end(),
+                   internal_block_sizes.begin());
+
+    if (use_dml_op) {
       auto input_sizes = input_desc.desc.GetSizes();
       auto input_strides = input_desc.desc.GetStrides();
 
