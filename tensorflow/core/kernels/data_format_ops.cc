@@ -208,7 +208,7 @@ class DataFormatVecPermuteOp : public OpKernel {
                         "Format specifier must contain H and W for 2D case"));
       }
     }
-    ComputeDstIndex(input.dims(), &dst_idx);
+    ComputeDstIndex(src_format_str, dst_format_str, input.dims(), &dst_idx);
 
     functor::DataFormatVecPermute<Device, T>()(context->eigen_device<Device>(),
                                                input.flat<T>(),
@@ -220,10 +220,12 @@ class DataFormatVecPermuteOp : public OpKernel {
   // Example: HWNC --> NHWC
   // 1D: dst = [1, 2, 0, 3],
   // 2D: dst = [2, 3, 4, 5, 0, 1, 6, 7]
-  void ComputeDstIndex(int num_dim, Eigen::DSizes<Eigen::DenseIndex, 10>* dst) {
-    for (int i = 0; i < src_format_.size(); ++i) {
-      for (int j = 0; j < dst_format_.size(); ++j) {
-        if (dst_format_[j] != src_format_[i]) continue;
+  static void ComputeDstIndex(const string& src_format_str,
+                              const string& dst_format_str, int num_dim,
+                              Eigen::DSizes<Eigen::DenseIndex, 10>* dst) {
+    for (int i = 0; i < src_format_str.size(); ++i) {
+      for (int j = 0; j < dst_format_str.size(); ++j) {
+        if (dst_format_str[j] != src_format_str[i]) continue;
         // Found the dst index. Set output based on the number of dims.
         for (int k = 0; k < num_dim; ++k) {
           (*dst)[i * num_dim + k] = j * num_dim + k;
