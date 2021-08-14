@@ -65,7 +65,9 @@ class MemoryOptimizerSwapTest(test.TestCase):
   @test_util.run_v1_only('b/120545219')
   def testSimpleSwap(self):
     """Check that the swap annotations are followed."""
-    with ops.device(test_util.gpu_device_name()):
+    device = test_util.gpu_device_name() or 'cpu'
+
+    with ops.device(device):
       a = variables.VariableV1(10, name='a')
       b = variables.VariableV1(20, name='b')
       c = math_ops.add_n([a, b], name='c')
@@ -88,19 +90,25 @@ class MemoryOptimizerSwapTest(test.TestCase):
               min_graph_nodes=-1))
       graph = tf_optimizer.OptimizeGraph(config, mg)
 
-      self.assertEqual(len(graph.node), graph_size + 2)
+      # The CPU device shouldn't have swap nodes
+      additional_nodes = [] if device == 'cpu' else [
+          'swap_in_d_0', 'swap_out_d_0']
+
+      self.assertEqual(len(graph.node), graph_size + len(additional_nodes))
       self.assertTrue(
           set([node.name for node in graph.node]) > set(
-              ['a', 'b', 'c', 'd', 'swap_in_d_0', 'swap_out_d_0']))
-      for node in graph.node:
-        if node.name == 'swap_in_d_0':
-          self.assertEqual('swap_out_d_0', node.input[0])
-          self.assertEqual('^b/read', node.input[1])
-        elif node.name == 'swap_out_d_0':
-          self.assertEqual('b/read', node.input[0])
-        elif node.name == 'd':
-          self.assertEqual('swap_in_d_0', node.input[0])
-          self.assertEqual('c', node.input[1])
+              ['a', 'b', 'c', 'd'] + additional_nodes))
+
+      if device != 'cpu':
+        for node in graph.node:
+          if node.name == 'swap_in_d_0':
+            self.assertEqual('swap_out_d_0', node.input[0])
+            self.assertEqual('^b/read', node.input[1])
+          elif node.name == 'swap_out_d_0':
+            self.assertEqual('b/read', node.input[0])
+          elif node.name == 'd':
+            self.assertEqual('swap_in_d_0', node.input[0])
+            self.assertEqual('c', node.input[1])
 
 
 class MemoryOptimizerRecomputeTest(test.TestCase):
