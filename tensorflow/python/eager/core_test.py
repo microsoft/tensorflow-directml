@@ -354,7 +354,7 @@ class TFETest(test_util.TensorFlowTestCase):
     self.assertEqual('', ctx.device_name)
     self.assertEqual(ctx.device_name, ctx.device_spec.to_string())
 
-    gpu_type = test_util.gpu_device_type()
+    gpu_type = test_util.gpu_device_type() or 'CPU'
     with ctx.device('%s:0' % gpu_type):
       self.assertEqual('/job:localhost/replica:0/task:0/device:%s:0' % gpu_type,
                        ctx.device_name)
