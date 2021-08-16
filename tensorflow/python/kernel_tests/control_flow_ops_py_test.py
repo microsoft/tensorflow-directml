@@ -317,7 +317,7 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       enter_one = gen_control_flow_ops.enter(one, "foo", True)
       enter_n = gen_control_flow_ops.enter(n, "foo", True)
 
-      with ops.device(test.gpu_device_name()):
+      with ops.device(test_util.gpu_device_name()):
         merge_i = control_flow_ops.merge([enter_i, enter_i])[0]
 
       less_op = math_ops.less(merge_i, enter_n)
@@ -352,7 +352,7 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
 
       add_i = math_ops.add(switch_i[1], enter_one)
 
-      with ops.device(test.gpu_device_name()):
+      with ops.device(test_util.gpu_device_name()):
         next_i = control_flow_ops.next_iteration(add_i)
       merge_i.op._update_input(1, next_i)
 
@@ -505,7 +505,7 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
   @test_util.run_v1_only("b/120545219")
   def testCondWithTensorArrayGrad(self):
     with self.cached_session() as sess:
-      with ops.device(test.gpu_device_name()):
+      with ops.device(test_util.gpu_device_name()):
         pred = array_ops.placeholder(dtypes.bool, [])
         x = constant_op.constant([1.0, 2.0, 3.0])
         y = control_flow_ops.cond(
@@ -988,7 +988,7 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
   def testCondRecvIdentity(self):
     # Make sure the switch identity is not removed by optimization.
     with session.Session(config=opt_cfg()) as sess:
-      with ops.device(test.gpu_device_name()):
+      with ops.device(test_util.gpu_device_name()):
         pred = constant_op.constant(True)
 
       def fn1():
@@ -2784,7 +2784,7 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
       self.assertEqual(45, self.evaluate(rx))
 
   def _testWhileGrad_ColocateGradients(self, colocate):
-    gpu_dev_name = test.gpu_device_name() if test.is_gpu_available(
+    gpu_dev_name = test_util.gpu_device_name() if test.is_gpu_available(
     ) else "/device:CPU:0"
 
     graph = ops.Graph()
@@ -3268,7 +3268,7 @@ class ControlFlowTest(test.TestCase, parameterized.TestCase):
 
   @test_util.run_gpu_only
   def testGpuResourceAccess(self):
-    with ops.device(test.gpu_device_name()):
+    with ops.device(test_util.gpu_device_name()):
       var = resource_variable_ops.ResourceVariable(constant_op.constant(3.0))
 
     @def_function.function
@@ -4798,7 +4798,7 @@ class AssertTest(test.TestCase):
       self.skipTest("b/128646478 fails in opensource")
 
     with self.session(use_gpu=True) as sess:
-      with ops.device(test.gpu_device_name()):
+      with ops.device(test_util.gpu_device_name()):
         value = constant_op.constant(1.0)
       with ops.device("/cpu:0"):
         true = constant_op.constant(True)
@@ -4826,7 +4826,7 @@ class AssertTest(test.TestCase):
       unguarded_memcpy_nodestat_names = [
           n for n in unguarded_nodestat_names if "MEMCPYDtoH" in n
       ]
-      if test.gpu_device_type() in [
+      if test_util.gpu_device_type() in [
           d.device_type for d in device_lib.list_local_devices()]:
         # A copy was performed for the unguarded assert
         self.assertLess(0, len(unguarded_memcpy_nodestat_names),
