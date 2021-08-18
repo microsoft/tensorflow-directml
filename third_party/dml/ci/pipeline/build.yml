@@ -47,6 +47,12 @@ jobs:
             throw "Could not parse build artifact: '${{artifact}}'"
           }
 
+    # Ensure MSYS2 environment has necessary packages installed. This is a no-op if the tools are
+    # already installed and do not need an upgrade.
+    - powershell: |
+        c:/msys64/usr/bin/pacman.exe --sync --needed --noconfirm git patch unzip
+      displayName: Sync MSYS2 Packages
+
     # The built-in checkout task doesn't allow for additional git command-line args such as
     # "--config core.autocrlf", so we have a custom clone step in PS. The most important part here
     # is to ensure we clone with auto-converted line endings on Windows, but retain the original 
