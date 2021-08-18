@@ -128,7 +128,14 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
         const Tensor& input = ctx->input_is_ref(inputIndex)
                                   ? ctx->mutable_input(inputIndex, false)
                                   : ctx->input(inputIndex);
-        ctx->set_output(outputIndex, input);
+
+        Tensor output;
+        // Copies underlying data pointer, but uses the output shape provided.
+        if (!output.CopyFrom(input, output_shapes[outputIndex])) {
+          ctx->SetStatus(errors::Internal("Error during copy."));
+        }
+
+        ctx->set_output(outputIndex, output);
       }
 
       return;

@@ -76,10 +76,6 @@ class ReduceInitializationHelper : public InitializationHelper {
 
     const Tensor& input =
         ctx->input_is_ref(0) ? ctx->mutable_input(0, false) : ctx->input(0);
-    // Make sure the shapes match so we can forward
-    if (input.shape() != output_shapes[outputIndex]) {
-      return {};
-    }
 
     bool is_identity =
         !is_arg_function_ && (reduction_helper_.ndims() == 0 ||
