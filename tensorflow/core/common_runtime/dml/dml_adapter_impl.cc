@@ -15,6 +15,7 @@ limitations under the License.
 
 #include "tensorflow/core/common_runtime/dml/dml_adapter_impl.h"
 
+#include "dml_util.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/strings/numbers.h"
 #include "tensorflow/core/lib/strings/str_util.h"
@@ -115,8 +116,10 @@ std::vector<DmlAdapterImpl> FilterAdapterListFromEnvVar(
 
 DmlAdapterImpl::DmlAdapterImpl(LUID adapter_luid) {
 #if _WIN32
-  ComPtr<IDXGIFactory4> dxgi_factory;
-  DML_CHECK_SUCCEEDED(CreateDXGIFactory(IID_PPV_ARGS(&dxgi_factory)));
+  ComPtr<IDXGIFactory4> dxgi_factory = TryCreateDxgiFactory();
+  if (!dxgi_factory) {
+    LOG(FATAL) << "Could not create DXGI factory.";
+  }
 
   ComPtr<IDXGIAdapter1> adapter;
   DML_CHECK_SUCCEEDED(
@@ -124,9 +127,7 @@ DmlAdapterImpl::DmlAdapterImpl(LUID adapter_luid) {
 
   Initialize(adapter.Get());
 #else
-  ComPtr<IDXCoreAdapterFactory> dxcore_factory;
-  DML_CHECK_SUCCEEDED(
-      DXCoreCreateAdapterFactory(IID_PPV_ARGS(&dxcore_factory)));
+  ComPtr<IDXCoreAdapterFactory> dxcore_factory = CreateDxCoreAdapterFactory();
 
   ComPtr<IDXCoreAdapter> adapter;
   DML_CHECK_SUCCEEDED(
@@ -185,10 +186,8 @@ bool IsSoftwareAdapter(IDXGIAdapter1* adapter) {
 };
 
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
-  ComPtr<IDXGIFactory4> dxgi_factory;
-  HRESULT hr = CreateDXGIFactory(IID_PPV_ARGS(&dxgi_factory));
-  if (FAILED(hr)) {
-    LOG(WARNING) << "CreateDXGIFactory failed with HRESULT " << hr;
+  ComPtr<IDXGIFactory4> dxgi_factory = TryCreateDxgiFactory();
+  if (!dxgi_factory) {
     return {};
   }
 
@@ -212,8 +211,7 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
       if (IsSoftwareAdapter(adapter.Get())) {
         break;
       }
-      if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
-                                      IID_ID3D12Device, nullptr))) {
+      if (TryCreateD3d12Device(adapter.Get(), D3D_FEATURE_LEVEL_11_0)) {
         adapter_infos.emplace_back(adapter.Get());
       }
     }
@@ -230,8 +228,7 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
       if (IsSoftwareAdapter(adapter.Get())) {
         continue;
       }
-      if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
-                                      IID_ID3D12Device, nullptr))) {
+      if (TryCreateD3d12Device(adapter.Get(), D3D_FEATURE_LEVEL_11_0)) {
         adapter_infos.emplace_back(adapter.Get());
       }
     }
@@ -300,9 +297,7 @@ uint64_t DmlAdapterImpl::QueryAvailableLocalMemory() const {
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
   const GUID dxcore_adapter = DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE;
 
-  ComPtr<IDXCoreAdapterFactory> adapter_factory;
-  DML_CHECK_SUCCEEDED(
-      DXCoreCreateAdapterFactory(IID_PPV_ARGS(&adapter_factory)));
+  ComPtr<IDXCoreAdapterFactory> adapter_factory = CreateDxCoreAdapterFactory();
 
   ComPtr<IDXCoreAdapterList> adapter_list;
   DML_CHECK_SUCCEEDED(adapter_factory->CreateAdapterList(
@@ -353,9 +348,7 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
                                           ? D3D_FEATURE_LEVEL_1_0_CORE
                                           : D3D_FEATURE_LEVEL_11_0;
 
-    HRESULT hr = D3D12CreateDevice(adapter.Get(), feature_level,
-                                   IID_ID3D12Device, nullptr);
-    if (SUCCEEDED(hr)) {
+    if (TryCreateD3d12Device(adapter.Get(), feature_level)) {
       adapter_infos.push_back(std::move(adapter_impl));
     }
   }

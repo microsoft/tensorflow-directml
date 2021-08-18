@@ -14,7 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/core/common_runtime/dml/dml_device_cache.h"
-
+#include "tensorflow/core/common_runtime/dml/dml_util.h"
 #include "tensorflow/core/common_runtime/dml/dml_adapter.h"
 #include "tensorflow/core/common_runtime/dml/dml_adapter_impl.h"
 #include "tensorflow/core/common_runtime/dml/dml_device.h"
@@ -99,13 +99,14 @@ static bool CanCompileOperator(IDMLDevice* dml_device) {
 }
 
 static bool SupportsDmlDevice(const DmlAdapter& adapter) {
-  ComPtr<ID3D12Device> d3d12_device;
   D3D_FEATURE_LEVEL feature_level = adapter.IsComputeOnly()
                                         ? D3D_FEATURE_LEVEL_1_0_CORE
                                         : D3D_FEATURE_LEVEL_11_0;
 
-  if (!SUCCEEDED(D3D12CreateDevice(adapter.Impl()->Get(), feature_level,
-                                   IID_PPV_ARGS(&d3d12_device)))) {
+  ComPtr<ID3D12Device> d3d12_device =
+      TryCreateD3d12Device(adapter.Impl()->Get(), feature_level);
+
+  if (!d3d12_device) {
     LOG(WARNING) << "Could not create Direct3D device for adapter: "
                  << adapter.Name();
     return false;

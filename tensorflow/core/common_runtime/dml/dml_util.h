@@ -22,13 +22,79 @@ limitations under the License.
 
 namespace tensorflow {
 
-// Attempts to create an IDMLDevice. Returns an empty ComPtr if unsuccessful.
-Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(
-    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags);
+enum class DxCallErrorHandling { Silent, Warning, Fatal };
 
-// Creates an IDMLDevice. Logs a fatal error and aborts if unsuccessful.
-Microsoft::WRL::ComPtr<IDMLDevice> CreateDmlDevice(
-    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags);
+// Calls D3D12CreateDevice after lazily loading the D3D12 module. Returns an
+// empty ComPtr if unsuccessful. By default this helper will log warnings if the
+// module is not found, and it will log nothing if the
+// call to D3D12CreateDevice itself fails.
+Microsoft::WRL::ComPtr<ID3D12Device> TryCreateD3d12Device(
+    IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level,
+    DxCallErrorHandling call_error_handling = DxCallErrorHandling::Silent,
+    DxCallErrorHandling module_error_handling = DxCallErrorHandling::Warning);
+
+// Calls D3D12CreateDevice after lazily loading the D3D12 module. The call must
+// succeed or a fatal message will be logged and the program will abort.
+inline Microsoft::WRL::ComPtr<ID3D12Device> CreateD3d12Device(
+    IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level) {
+  return TryCreateD3d12Device(adapter, minimum_feature_level,
+                              DxCallErrorHandling::Fatal,
+                              DxCallErrorHandling::Fatal);
+}
+
+#ifdef _WIN32
+// Calls CreateDXGIFactory after lazily loading the DXGI module. Returns an
+// empty ComPtr if unsuccessful. By default this helper will log warnings if the
+// module is not found, and it will log nothing if the
+// call to CreateDXGIFactory itself fails.
+Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory(
+    DxCallErrorHandling call_error_handling = DxCallErrorHandling::Silent,
+    DxCallErrorHandling module_error_handling = DxCallErrorHandling::Warning);
+
+// Calls CreateDXGIFactory after lazily loading the DXGI module. The call must
+// succeed or a fatal message will be logged and the program will abort.
+inline Microsoft::WRL::ComPtr<IDXGIFactory4> CreateDxgiFactory() {
+  return TryCreateDxgiFactory(DxCallErrorHandling::Fatal,
+                              DxCallErrorHandling::Fatal);
+}
+#endif
+
+#ifndef _WIN32
+// Calls DXCoreCreateAdapterFactory after lazily loading the DXCore module.
+// Returns an empty ComPtr if unsuccessful. By default this helper will log
+// warnings if the module is not found, and it will log nothing if the call to
+// DXCoreCreateAdapterFactory itself fails.
+Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> TryCreateDxCoreAdapterFactory(
+    DxCallErrorHandling call_error_handling = DxCallErrorHandling::Silent,
+    DxCallErrorHandling module_error_handling = DxCallErrorHandling::Warning);
+
+// Calls DXCoreCreateAdapterFactory after lazily loading the DXCore module. The
+// call must succeed or a fatal message will be logged and the program will
+// abort.
+inline Microsoft::WRL::ComPtr<IDXCoreAdapterFactory>
+CreateDxCoreAdapterFactory() {
+  return TryCreateDxCoreAdapterFactory(DxCallErrorHandling::Fatal,
+                                       DxCallErrorHandling::Fatal);
+}
+#endif
+
+// Calls DMLCreateDevice after lazily loading the DirectML module. Returns an
+// empty ComPtr if unsuccessful. By default this helper will log warnings if the
+// module is not found, and it will log nothing if the
+// call to DMLCreateDevice itself fails.
+Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(
+    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags,
+    DxCallErrorHandling call_error_handling = DxCallErrorHandling::Silent,
+    DxCallErrorHandling module_error_handling = DxCallErrorHandling::Warning);
+
+// Calls DMLCreateDevice after lazily loading the DirectML module. The
+// call must succeed or a fatal message will be logged and the program will
+// abort.
+inline Microsoft::WRL::ComPtr<IDMLDevice> CreateDmlDevice(
+    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags) {
+  return TryCreateDmlDevice(d3d12_device, dml_flags, DxCallErrorHandling::Fatal,
+                            DxCallErrorHandling::Fatal);
+}
 
 // Converts a DML tensor data type to a TF tensor data type and vice versa.
 DataType GetTfDataTypeFromDmlDataType(DML_TENSOR_DATA_TYPE type);
