@@ -65,9 +65,6 @@ stages:
       enableTests: ${{parameters.enableTests}}
       buildCApi: ${{parameters.buildCApi}}
       artifacts: ${{parameters.buildArtifacts}}
-      # Archive builds of main branches to a network share (if the variable is set)
-      ${{if eq(variables.isMasterOrReleaseBranch, 'True')}}:
-        archiveSharePath: $(archiveSharePath)
 
 - ${{if parameters.enableTests}}:
   - stage: testStage
