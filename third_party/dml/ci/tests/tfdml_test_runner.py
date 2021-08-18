@@ -13,6 +13,7 @@ import tempfile
 import json
 import re
 import glob
+import psutil
 
 def _parse_args():
   """Parses the arguments given to this script."""
@@ -58,6 +59,14 @@ def _get_tf_env(exe_path, test_framework):
     env_copy["LD_LIBRARY_PATH"] = ld_library_path
 
   return env_copy
+
+def _kill_child_processes(parent_pid, exe_path, shard_index):
+  """Recursively kills the child processes spawned by process 'parent_pid'."""
+
+  for child_process in psutil.process_iter():
+    if child_process.ppid() == parent_pid:
+      child_process.kill()
+      _kill_child_processes(child_process.pid, exe_path, shard_index)
 
 def _run_test(
     exe_path,
@@ -109,23 +118,21 @@ def _run_test(
   try:
     with tempfile.TemporaryFile(mode="w+", encoding="iso-8859-1") as stdout, \
          tempfile.TemporaryFile(mode="w+", encoding="iso-8859-1") as stderr:
-      # We only want to let KeyboardInterrupt exceptions propagate. Other
-      # exceptions are test failures that should not make the parent process
-      # crash.
+      test_process = subprocess.Popen(
+          [exe_path, xml_output_arg],
+          stdin=subprocess.DEVNULL,
+          stdout=stdout,
+          stderr=stderr,
+          env=env_copy,
+          universal_newlines=True)
+      test_pid = test_process.pid
+
       try:
-        subprocess.run(
-            [exe_path, xml_output_arg],
-            stdout=stdout,
-            stderr=stderr,
-            env=env_copy,
-            stdin=subprocess.DEVNULL,
-            check=True,
-            universal_newlines=True,
-            timeout=test_timeout)
-      except KeyboardInterrupt: # pylint: disable=try-except-raise
-        raise
-      except Exception: # pylint: disable=broad-except
-        pass
+        test_process.wait(timeout=test_timeout)
+      except subprocess.TimeoutExpired:
+        # When the test stops because it reaches the timeout, it can produce
+        # zombie processes that stay alive
+        _kill_child_processes(test_pid, exe_path, shard_index)
       finally:
         print(f"Running '{exe_path}' with shard {shard_index}...")
         stdout.seek(0)
