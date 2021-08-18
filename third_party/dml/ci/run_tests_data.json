@@ -13,7 +13,8 @@
         "numpy==1.18.5",
         "h5py<3.0.0",
         "scipy",
-        "portpicker==1.5.0b1"
+        "portpicker==1.5.0b1",
+        "psutil"
       ],
       "windowsPipDeps": [
         "windows-curses",
@@ -27,6 +28,9 @@
         "--test_binaries_path": "test_binaries/core",
         "--test_framework": "gtest"
       },
+      "pipDeps": [
+        "psutil"
+      ],
       "isPythonTest": false
     },
     "c": {
@@ -35,6 +39,9 @@
         "--test_binaries_path": "test_binaries/c",
         "--test_framework": "gtest"
       },
+      "pipDeps": [
+        "psutil"
+      ],
       "isPythonTest": false
     }
   }
