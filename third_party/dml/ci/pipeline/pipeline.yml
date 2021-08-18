@@ -53,7 +53,7 @@ parameters:
 stages:
 - stage: buildStage
   displayName: Build
-  pool: DirectML-Build
+  pool: DirectML_BuildPool
   jobs:
   - template: build.yml
     parameters:
