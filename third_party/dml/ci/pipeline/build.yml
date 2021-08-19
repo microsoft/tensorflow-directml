@@ -95,8 +95,8 @@ jobs:
       $Duration = ((Get-Date) - [datetime]$(vars.startTicks)).ToString("c")
       [ordered]@{agentName = $env:AGENT_NAME; status = $env:AGENT_JOBSTATUS; duration = $Duration} | 
         ConvertTo-Json | 
-        Out-File $(Build.StagingDirectory)/info.json
-      cat $(Build.StagingDirectory)/info.json
+        Out-File $(Build.StagingDirectory)/${{parameters.artifact}}.json
+      cat $(Build.StagingDirectory)/${{parameters.artifact}}.json
     displayName: Gather Agent Info
     condition: always()
 
@@ -104,5 +104,5 @@ jobs:
     displayName: Publish Agent Info
     condition: always()
     inputs:
-      PathtoPublish: $(Build.StagingDirectory)/info.json
+      PathtoPublish: $(Build.StagingDirectory)/${{parameters.artifact}}.json
       ArtifactName: build
