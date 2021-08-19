@@ -22,23 +22,14 @@ steps:
 
 - powershell: |
     $Url = 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe'
-    write-host "A"
     $DownloadPath = '$(Build.StagingDirectory)/miniconda.exe'
-    write-host "B"
     (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
-    write-host "C"
-    $InstallDir = '$(Build.StagingDirectory)/miniconda3'
-    write-host "D"
+    $InstallDir = '$(Build.StagingDirectory)\miniconda3'
     Start-Process $DownloadPath -ArgumentList '/NoRegistry=1', '/InstallationType=JustMe', '/RegisterPython=0', '/S', "/D=$InstallDir" -Wait
-    write-host "E"
     & "$InstallDir/shell/condabin/conda-hook.ps1"
-    write-host "F"
     conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
-    write-host "G"
     conda activate build
-    write-host "H"
     echo "##vso[task.prependpath]$CONDA_PREFIX"
-    write-host "I"
     echo "Using python at '$CONDA_PREFIX'"
   displayName: Install Python
   workingDirectory: $(Build.StagingDirectory)

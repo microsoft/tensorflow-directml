@@ -12,7 +12,7 @@ parameters:
 jobs:
 - job:
   displayName: Build ${{parameters.artifact}}
-  timeoutInMinutes: 120
+  timeoutInMinutes: 200
   workspace:
     clean: all
   ${{if contains(parameters.artifact, '-linux-') }}:
