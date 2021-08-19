@@ -14,11 +14,16 @@ parameters:
 - name: archiveSharePath
   type: string
   default: ''
+- name: nugetFeed
+  type: string
+  default: https://pkgs.dev.azure.com/microsoft/WindowsAI/_packaging/WindowsAI/nuget/v3/index.json
 
 jobs:
 - ${{each artifact in parameters.artifacts}}:
 
-  # Linux Build Jobs
+  # -----------------------------------------------------------------------------------------------
+  # Linux Build
+  # -----------------------------------------------------------------------------------------------
   - ${{if contains(artifact, '-linux-') }}:
     - job: build_${{replace(artifact, '-','_')}}
       displayName: Build ${{artifact}}
@@ -29,13 +34,58 @@ jobs:
         vmImage: ubuntu-18.04
       steps:
       - powershell: |
+          # E.g. '36' -> '3.6'
+          $PyVersionMajorDotMinor = '${{parameters.pyVersion}}'[0] + '.' + '${{parameters.pyVersion}}'[1]
+          Write-Host "PyVersionMajorDotMinor = '$PyVersionMajorDotMinor'"
+          Write-Host "##vso[task.setVariable variable=pyVersionMajorDotMinor;isOutput=true]$PyVersionMajorDotMinor"
+        name: vars
+        displayName: Initialize Variables
+
+      - script: |
+          wget https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-installer-linux-x86_64.sh
+          bash bazel-0.24.1-installer-linux-x86_64.sh --bin=$(Build.StagingDirectory)/bazel/0.24.1 --base=$(Build.StagingDirectory)/.bazel
+        displayName: Install Bazel
+        workingDirectory: $(Build.StagingDirectory)
+
+      - script: |
+          miniconda_path="miniconda3"
+          wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+          bash Miniconda3-latest-Linux-x86_64.sh -b -p $miniconda_path
+          eval "$($miniconda_path/bin/conda shell.bash hook)" 
+          conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
+          conda activate build
+          echo "##vso[task.prependpath]$CONDA_PREFIX/bin"
+          echo "Using python at '$CONDA_PREFIX/bin'"
+        displayName: Install Python
+        workingDirectory: $(Build.StagingDirectory)
+
+      - script: |
+          pip install six numpy wheel
+          pip install keras_applications==1.0.6 --no-deps
+          pip install keras_preprocessing==1.0.5 --no-deps
+        displayName: Install Python Packages
+
+      - script: |
           sudo apt update
-          sudo apt install gcc g++ unzip
-        displayName: Install Build Tools
+          sudo apt install gcc g++
+        displayName: Install C++ Tools
 
-      # TODO: NuGet install dx nuget and copy to usr/lib. substitute for not having wsl2 env
+      # Fetch libd3d12.so and libdxcore.so. These are available in WSL2 but not cloud VMs.
+      # Better long-term solution is to load these at runtime to avoid build-time dependency.
+      - task: NuGetAuthenticate@0
+      - task: NuGetToolInstaller@1
+        inputs:
+          versionSpec: '*'
+          checkLatest: true
+      - script: |
+          nuget install DirectML.LinuxDirectxLibs -Source ${{parameters.nugetFeed}}
+          sudo cp DirectML.LinuxDirectxLibs.*/x64/* /usr/lib
+        workingDirectory: $(Build.StagingDirectory)
 
-  # Windows Build Jobs
+
+  # -----------------------------------------------------------------------------------------------
+  # Windows Build
+  # -----------------------------------------------------------------------------------------------
   - ${{if contains(artifact, '-win-') }}:
     - job: build_${{replace(artifact, '-','_')}}
       displayName: Build ${{artifact}}

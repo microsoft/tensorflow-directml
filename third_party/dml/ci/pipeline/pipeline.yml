@@ -23,7 +23,8 @@ parameters:
 - name: buildArtifacts
   displayName: Build Artifacts
   type: object
-  default: [x64-win-release-cp36, x64-win-debug-cp36, x64-linux-release-cp36]
+  # default: [x64-win-release-cp36, x64-win-debug-cp36, x64-linux-release-cp36]
+  default: [x64-linux-release-cp36]
 
 - name: buildCApi
   displayName: Build C API
