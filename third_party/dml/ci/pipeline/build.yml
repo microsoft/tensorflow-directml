@@ -32,12 +32,20 @@ jobs:
         clean: all
       pool:
         vmImage: ubuntu-18.04
+      variables:
+        buildOutPath: $(Build.StagingDirectory)/build_out
+        buildPublishPath: $(Build.StagingDirectory)/build_pub
       steps:
       - powershell: |
           # E.g. '36' -> '3.6'
           $PyVersionMajorDotMinor = '${{parameters.pyVersion}}'[0] + '.' + '${{parameters.pyVersion}}'[1]
           Write-Host "PyVersionMajorDotMinor = '$PyVersionMajorDotMinor'"
           Write-Host "##vso[task.setVariable variable=pyVersionMajorDotMinor;isOutput=true]$PyVersionMajorDotMinor"
+          Write-Host "Configuration = '$Configuration'"
+          Write-Host "##vso[task.setVariable variable=configuration;isOutput=true]$Configuration"
+          $StartTicks = (Get-Date).Ticks
+          Write-Host "Start Time = '$StartTicks' $([datetime]$StartTicks)"
+          Write-Host "##vso[task.setVariable variable=startTicks;isOutput=true]$StartTicks"
         name: vars
         displayName: Initialize Variables
 
@@ -81,6 +89,56 @@ jobs:
           nuget install DirectML.LinuxDirectxLibs -Source ${{parameters.nugetFeed}}
           sudo cp DirectML.LinuxDirectxLibs.*/x64/* /usr/lib
         workingDirectory: $(Build.StagingDirectory)
+
+      - script: |
+          if [ "${{parameters.enableTests}}" == "True" ]; then
+              python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+          else
+              python build.py --clean --package --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+          fi
+
+          if [ "${{parameters.buildCApi}}" == "True" ]; then
+              python build.py --config $2 --build_output $3 --target //tensorflow/tools/lib_package:libtensorflow --telemetry
+          fi
+        displayName: Build
+
+      - ${{if parameters.enableTests}}:
+        - script: |
+            python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(TfArtifactsPathWin) --destination $(TfArtifactsPathWin)\artifacts\tests\test_binaries
+          displayName: Gather Test Binaries
+
+      - script: |
+          mkdir $(buildPublishPath)
+          cp -rT "$(buildOutPath)/python_package" "$(buildPublishPath)"
+          if [ "${{parameters.enableTests}}" == "True" ]; then
+              cp -rT "$(Build.SourcesDirectory)/third_party/dml/ci" "$(buildPublishPath)"
+          fi
+          if [ "${{parameters.enableTests}}" == "True" ]; then
+              cp -rT "$(Build.SourcesDirectory)/bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz" "$(buildPublishPath)"
+          fi
+        displayName: Stage Artifacts
+
+      - task: PublishBuildArtifacts@1
+        displayName: Publish Build Artifacts
+        inputs:
+          PathtoPublish: '$(TfArtifactsPathWin)/artifacts'
+          ArtifactName: ${{artifact}}
+
+      - powershell: |
+          $Duration = ((Get-Date) - [datetime]$(vars.startTicks)).ToString("c")
+          [ordered]@{agentName = $env:AGENT_NAME; status = $env:AGENT_JOBSTATUS; duration = $Duration} | 
+            ConvertTo-Json | 
+            Out-File $(Build.StagingDirectory)/info.json
+          cat $(Build.StagingDirectory)/info.json
+        displayName: Gather Agent Info
+        condition: always()
+
+      - task: PublishBuildArtifacts@1
+        displayName: Publish Agent Info
+        condition: always()
+        inputs:
+          PathtoPublish: $(Build.StagingDirectory)/info.json
+          ArtifactName: build
 
 
   # -----------------------------------------------------------------------------------------------
