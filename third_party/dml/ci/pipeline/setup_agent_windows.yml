@@ -25,7 +25,7 @@ steps:
     $DownloadPath = '$(Build.StagingDirectory)/miniconda.exe'
     (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
     $InstallDir = '$(Build.StagingDirectory)/miniconda3'
-    Start-Process $DownloadPath -ArgumentList '/NoRegistry=1', '/InstallationType=JustMe', '/RegisterPython=0', '/S', "/D=$InstallDir' -Wait
+    Start-Process $DownloadPath -ArgumentList '/NoRegistry=1', '/InstallationType=JustMe', '/RegisterPython=0', '/S', "/D=$InstallDir" -Wait
     & "$InstallDir/shell/condabin/conda-hook.ps1"
     conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
     conda activate build
