@@ -49,7 +49,7 @@ jobs:
               Write-Host "PyVersion = '$PyVersion'"
               Write-Host "##vso[task.setVariable variable=pyVersion;isOutput=true]$PyVersion"
               
-              $PyVersionMajorDotMinor = $PyVersion[0] + '.' + $PyVersion[1]
+              $PyVersionMajorDotMinor = $PyVersion[2] + '.' + $PyVersion[3]
               Write-Host "PyVersionMajorDotMinor = '$PyVersionMajorDotMinor'"
 
               $StartTicks = (Get-Date).Ticks
