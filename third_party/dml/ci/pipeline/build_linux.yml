@@ -1,0 +1,135 @@
+parameters:
+- name: artifact
+  type: string
+  default: ''
+
+jobs:
+- job:
+  displayName: Build ${{parameters.artifact}}
+  timeoutInMinutes: 120
+  workspace:
+    clean: all
+  pool:
+    vmImage: ubuntu-18.04
+  variables:
+    buildOutPath: $(Build.StagingDirectory)/build_out
+    buildPublishPath: $(Build.StagingDirectory)/build_pub
+  steps:
+  - powershell: |
+      if ('${{parameters.artifact}}' -match '(x64-win|x64-linux)-(release|debug)-(cp\d\d)')
+      {
+          $Architecture, $Configuration, $PyVersion = $Matches[1..3]
+          Write-Host "Architecture = '$Architecture'"
+          Write-Host "##vso[task.setVariable variable=architecture;isOutput=true]$Architecture"
+
+          Write-Host "Configuration = '$Configuration'"
+          Write-Host "##vso[task.setVariable variable=configuration;isOutput=true]$Configuration"
+          
+          Write-Host "PyVersion = '$PyVersion'"
+          Write-Host "##vso[task.setVariable variable=pyVersion;isOutput=true]$PyVersion"
+          
+          $PyVersionMajorDotMinor = $PyVersion[2] + '.' + $PyVersion[3]
+          Write-Host "PyVersionMajorDotMinor = '$PyVersionMajorDotMinor'"
+
+          $StartTicks = (Get-Date).Ticks
+          Write-Host "Start Time = '$StartTicks' $([datetime]$StartTicks)"
+          Write-Host "##vso[task.setVariable variable=startTicks;isOutput=true]$StartTicks"
+      }
+      else
+      {
+          throw "Could not parse build artifact: '${{parameters.artifact}}'"
+      }
+    name: vars
+    displayName: Initialize Variables
+
+  - script: |
+      wget https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-installer-linux-x86_64.sh
+      bash bazel-0.24.1-installer-linux-x86_64.sh --bin=$(Build.StagingDirectory)/bazel/0.24.1 --base=$(Build.StagingDirectory)/.bazel
+    displayName: Install Bazel
+    workingDirectory: $(Build.StagingDirectory)
+
+  - script: |
+      miniconda_path="miniconda3"
+      wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      bash Miniconda3-latest-Linux-x86_64.sh -b -p $miniconda_path
+      eval "$($miniconda_path/bin/conda shell.bash hook)" 
+      conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
+      conda activate build
+      echo "##vso[task.prependpath]$CONDA_PREFIX/bin"
+      echo "Using python at '$CONDA_PREFIX/bin'"
+    displayName: Install Python
+    workingDirectory: $(Build.StagingDirectory)
+
+  - script: |
+      pip install six numpy wheel
+      pip install keras_applications==1.0.6 --no-deps
+      pip install keras_preprocessing==1.0.5 --no-deps
+    displayName: Install Python Packages
+
+  - script: |
+      sudo apt update
+      sudo apt install gcc g++
+    displayName: Install C++ Tools
+
+  # Fetch libd3d12.so and libdxcore.so. These are available in WSL2 but not cloud VMs.
+  # Better long-term solution is to load these at runtime to avoid build-time dependency.
+  - task: NuGetAuthenticate@0
+  - task: NuGetToolInstaller@1
+    inputs:
+      versionSpec: '*'
+      checkLatest: true
+  - script: |
+      nuget install DirectML.LinuxDirectxLibs -Source ${{parameters.nugetFeed}}
+      sudo cp DirectML.LinuxDirectxLibs.*/x64/* /usr/lib
+    workingDirectory: $(Build.StagingDirectory)
+    displayName: Install DX Libraries
+
+  - script: |
+      if [ "${{parameters.enableTests}}" == "True" ]; then
+          python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+      else
+          python build.py --clean --package --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+      fi
+
+      if [ "${{parameters.buildCApi}}" == "True" ]; then
+          python build.py --config $2 --build_output $3 --target //tensorflow/tools/lib_package:libtensorflow --telemetry
+      fi
+    displayName: Build
+
+  - ${{if parameters.enableTests}}:
+    - script: |
+        python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(buildOutPath) --destination $(Build.StagingDirectory)/artifacts/tests/test_binaries
+      displayName: Gather Test Binaries
+
+  - script: |
+      mkdir $(buildPublishPath)
+      cp -rT "$(buildOutPath)/python_package" "$(buildPublishPath)"
+      if [ "${{parameters.enableTests}}" == "True" ]; then
+          cp -rT "$(Build.SourcesDirectory)/third_party/dml/ci" "$(buildPublishPath)"
+      fi
+      if [ "${{parameters.enableTests}}" == "True" ]; then
+          cp -rT "$(Build.SourcesDirectory)/bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz" "$(buildPublishPath)"
+      fi
+    displayName: Stage Artifacts
+
+  - task: PublishBuildArtifacts@1
+    displayName: Publish Build Artifacts
+    inputs:
+      PathtoPublish: '$(TfArtifactsPathWin)/artifacts'
+      ArtifactName: ${{parameters.artifact}}
+
+  - powershell: |
+      $Duration = ((Get-Date) - [datetime]$(vars.startTicks)).ToString("c")
+      [ordered]@{agentName = $env:AGENT_NAME; status = $env:AGENT_JOBSTATUS; duration = $Duration} | 
+        ConvertTo-Json | 
+        Out-File $(Build.StagingDirectory)/info.json
+      cat $(Build.StagingDirectory)/info.json
+    displayName: Gather Agent Info
+    condition: always()
+
+  - task: PublishBuildArtifacts@1
+    displayName: Publish Agent Info
+    condition: always()
+    inputs:
+      PathtoPublish: $(Build.StagingDirectory)/info.json
+      ArtifactName: build
