@@ -15,7 +15,7 @@ def _directml_nuget_repository_impl(repository_ctx):
     output = nuget_path,
     executable = True,
   )
-  repository_ctx.extract(archive = nuget_path)
+  repository_ctx.extract(archive = nuget_path, output = "directml/")
 
   # Overlay bazel BUILD file on top of the extracted DirectML NuGet.
   build_file_path = repository_ctx.path(repository_ctx.attr.build_file)
