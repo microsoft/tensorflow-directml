@@ -4,8 +4,8 @@ steps:
     $DownloadPath = '$(Build.StagingDirectory)/msys2.exe'
     (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
     $InstallDir = '$(Build.StagingDirectory)'
-    & $DownloadPath -y -o$InstallDir
-    $InstallDir/msys64/usr/bin/pacman.exe --sync --needed --noconfirm git patch unzip
+    & "$DownloadPath" -y -o$InstallDir
+    & "$InstallDir/msys64/usr/bin/pacman.exe" --sync --needed --noconfirm git patch unzip
     echo "##vso[task.prependpath]$InstallDir/msys64/usr/bin"
   displayName: Install MSYS2
   workingDirectory: $(Build.StagingDirectory)

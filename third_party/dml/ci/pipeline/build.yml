@@ -59,13 +59,13 @@ jobs:
 
   - powershell: |
       if ("${{parameters.enableTests}}" -eq "True") {
-          python build.py --clean --package --tests --config $(vars.Configuration) --build_output $(TfArtifactsPathWin) --telemetry
+          python build.py --clean --package --tests --config $(vars.Configuration) --build_output $(buildOutPath) --telemetry
       } else {
-          python build.py --clean --package --config $(vars.Configuration) --build_output $(TfArtifactsPathWin) --telemetry
+          python build.py --clean --package --config $(vars.Configuration) --build_output $(buildOutPath) --telemetry
       }
 
       if ("${{parameters.buildCApi}}" -eq "True") {
-          python build.py --config $(vars.Configuration) --build_output $(TfArtifactsPathWin) --target //tensorflow/tools/lib_package:libtensorflow --telemetry
+          python build.py --config $(vars.Configuration) --build_output $(buildOutPath) --target //tensorflow/tools/lib_package:libtensorflow --telemetry
       }
     displayName: Build
 
@@ -81,7 +81,7 @@ jobs:
           Copy-Item -Recurse "$(Build.SourcesDirectory)/third_party/dml/ci" "$(buildPubPath)"
       }
       if ("${{parameters.buildCApi}}" -eq "True") {
-          Copy-Item -Recurse "$(TfSourcePathWin)/bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz" "$(buildPubPath)" -Verbose
+          Copy-Item -Recurse "$(Build.SourcesDirectory)/bazel-bin/tensorflow/tools/lib_package/libtensorflow.tar.gz" "$(buildPubPath)" -Verbose
       }
     displayName: Stage Artifacts
 
