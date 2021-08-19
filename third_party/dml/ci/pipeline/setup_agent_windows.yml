@@ -1,0 +1,41 @@
+steps:
+- powershell: |
+    $Url = 'https://github.com/msys2/msys2-installer/releases/download/nightly-x86_64/msys2-base-x86_64-latest.sfx.exe'
+    $DownloadPath = '$(Build.StagingDirectory)/msys2.exe'
+    (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
+    $InstallDir = '$(Build.StagingDirectory)'
+    & $DownloadPath -y -o$InstallDir
+    $InstallDir/msys64/usr/bin/pacman.exe --sync --needed --noconfirm git patch unzip
+    echo "##vso[task.prependpath]$InstallDir/msys64/usr/bin"
+  displayName: Install MSYS2
+  workingDirectory: $(Build.StagingDirectory)
+
+- powershell: |
+    $Url = 'https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-windows-x86_64.exe'
+    $DownloadPath = '$(Build.StagingDirectory)/bin/bazel.exe'
+    $InstallDir = Split-Path $DownloadPath -Parent
+    New-Item -Force -ItemType Directory $InstallDir
+    (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
+    echo "##vso[task.prependpath]$InstallDir"
+  displayName: Install Bazel
+  workingDirectory: $(Build.StagingDirectory)
+
+- powershell: |
+    $Url = 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe'
+    $DownloadPath = '$(Build.StagingDirectory)/miniconda.exe'
+    (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
+    $InstallDir = '$(Build.StagingDirectory)/miniconda3'
+    Start-Process $DownloadPath -ArgumentList '/NoRegistry=1', '/InstallationType=JustMe', '/RegisterPython=0', '/S', "/D=$InstallDir' -Wait
+    & "$InstallDir/shell/condabin/conda-hook.ps1"
+    conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
+    conda activate build
+    echo "##vso[task.prependpath]$CONDA_PREFIX"
+    echo "Using python at '$CONDA_PREFIX'"
+  displayName: Install Python
+  workingDirectory: $(Build.StagingDirectory)
+
+- script: |
+    pip install six numpy wheel
+    pip install keras_applications==1.0.6 --no-deps
+    pip install keras_preprocessing==1.0.5 --no-deps
+  displayName: Install Python Packages

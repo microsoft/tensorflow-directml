@@ -24,7 +24,7 @@ parameters:
   displayName: Build Artifacts
   type: object
   # default: [x64-win-release-cp36, x64-win-debug-cp36, x64-linux-release-cp36]
-  default: [x64-linux-release-cp36]
+  default: [x64-win-release-cp36, x64-linux-release-cp36]
 
 - name: buildCApi
   displayName: Build C API
@@ -56,11 +56,12 @@ stages:
   displayName: Build
   pool: DirectML_BuildPool
   jobs:
-  - template: build.yml
-    parameters:
-      enableTests: ${{parameters.enableTests}}
-      buildCApi: ${{parameters.buildCApi}}
-      artifacts: ${{parameters.buildArtifacts}}
+  - ${{each artifact in parameters.buildArtifacts}}:
+    - template: build.yml
+      parameters:
+        artifact: ${{artifact}}
+        enableTests: ${{parameters.enableTests}}
+        buildCApi: ${{parameters.buildCApi}}
 
 - ${{if parameters.enableTests}}:
   - stage: testStage
