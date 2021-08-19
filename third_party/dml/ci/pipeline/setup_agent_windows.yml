@@ -3,10 +3,10 @@ steps:
     $Url = 'https://github.com/msys2/msys2-installer/releases/download/nightly-x86_64/msys2-base-x86_64-latest.sfx.exe'
     $DownloadPath = '$(Build.StagingDirectory)/msys2.exe'
     (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
-    $InstallDir = '$(Build.StagingDirectory)'
-    & "$DownloadPath" -y -o$InstallDir
-    & "$InstallDir/msys64/usr/bin/pacman.exe" --sync --needed --noconfirm git patch unzip
-    echo "##vso[task.prependpath]$InstallDir/msys64/usr/bin"
+    & "$DownloadPath" -y
+    ls
+    & "msys64/usr/bin/pacman.exe" --sync --needed --noconfirm git patch unzip
+    echo "##vso[task.prependpath]$(Build.StagingDirectory)/msys64/usr/bin"
   displayName: Install MSYS2
   workingDirectory: $(Build.StagingDirectory)
 
