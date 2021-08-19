@@ -29,8 +29,8 @@ steps:
     & "$InstallDir/shell/condabin/conda-hook.ps1"
     conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
     conda activate build
-    echo "##vso[task.prependpath]$CONDA_PREFIX"
-    echo "Using python at '$CONDA_PREFIX'"
+    echo "##vso[task.prependpath]${env:CONDA_PREFIX}"
+    echo "Using python at '$env:CONDA_PREFIX'"
   displayName: Install Python
   workingDirectory: $(Build.StagingDirectory)
 
