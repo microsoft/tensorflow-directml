@@ -103,6 +103,7 @@ jobs:
           nuget install DirectML.LinuxDirectxLibs -Source ${{parameters.nugetFeed}}
           sudo cp DirectML.LinuxDirectxLibs.*/x64/* /usr/lib
         workingDirectory: $(Build.StagingDirectory)
+        displayName: Install DX Libraries
 
       - script: |
           if [ "${{parameters.enableTests}}" == "True" ]; then
