@@ -37,15 +37,29 @@ jobs:
         buildPublishPath: $(Build.StagingDirectory)/build_pub
       steps:
       - powershell: |
-          # E.g. '36' -> '3.6'
-          $PyVersionMajorDotMinor = '${{parameters.pyVersion}}'[0] + '.' + '${{parameters.pyVersion}}'[1]
-          Write-Host "PyVersionMajorDotMinor = '$PyVersionMajorDotMinor'"
-          Write-Host "##vso[task.setVariable variable=pyVersionMajorDotMinor;isOutput=true]$PyVersionMajorDotMinor"
-          Write-Host "Configuration = '$Configuration'"
-          Write-Host "##vso[task.setVariable variable=configuration;isOutput=true]$Configuration"
-          $StartTicks = (Get-Date).Ticks
-          Write-Host "Start Time = '$StartTicks' $([datetime]$StartTicks)"
-          Write-Host "##vso[task.setVariable variable=startTicks;isOutput=true]$StartTicks"
+          if ('${{artifact}}' -match '(x64-win|x64-linux)-(release|debug)-(cp\d\d)')
+          {
+              $Architecture, $Configuration, $PyVersion = $Matches[1..3]
+              Write-Host "Architecture = '$Architecture'"
+              Write-Host "##vso[task.setVariable variable=architecture;isOutput=true]$Architecture"
+
+              Write-Host "Configuration = '$Configuration'"
+              Write-Host "##vso[task.setVariable variable=configuration;isOutput=true]$Configuration"
+              
+              Write-Host "PyVersion = '$PyVersion'"
+              Write-Host "##vso[task.setVariable variable=pyVersion;isOutput=true]$PyVersion"
+              
+              $PyVersionMajorDotMinor = $PyVersion[0] + '.' + $PyVersion[1]
+              Write-Host "PyVersionMajorDotMinor = '$PyVersionMajorDotMinor'"
+
+              $StartTicks = (Get-Date).Ticks
+              Write-Host "Start Time = '$StartTicks' $([datetime]$StartTicks)"
+              Write-Host "##vso[task.setVariable variable=startTicks;isOutput=true]$StartTicks"
+          }
+          else
+          {
+              throw "Could not parse build artifact: '${{artifact}}'"
+          }
         name: vars
         displayName: Initialize Variables
 
