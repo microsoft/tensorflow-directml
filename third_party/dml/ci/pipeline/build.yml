@@ -15,10 +15,12 @@ jobs:
   timeoutInMinutes: 200
   workspace:
     clean: all
-  ${{if contains(parameters.artifact, '-linux-') }}:
-    pool: DirectML_LinuxPool
-  ${{if contains(parameters.artifact, '-win-') }}:
-    pool: DirectML_BuildPool
+    pool: 
+      name: DirectML_TensorFlow_Pool
+      ${{if contains(parameters.artifact, '-linux-') }}:
+        demands: agent.os -equals Linux
+      ${{if contains(parameters.artifact, '-win-') }}:
+        demands: agent.os -equals Windows_NT
   variables:
     buildOutPath: $(Build.StagingDirectory)/build_out
     buildPubPath: $(Build.StagingDirectory)/build_pub
@@ -62,13 +64,13 @@ jobs:
       pip freeze
       python --version
       if ("${{parameters.enableTests}}" -eq "True") {
-          python build.py --clean --package --tests --config $(vars.Configuration) --build_output $(buildOutPath) --telemetry
+          python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
       } else {
-          python build.py --clean --package --config $(vars.Configuration) --build_output $(buildOutPath) --telemetry
+          python build.py --clean --package --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
       }
 
       if ("${{parameters.buildCApi}}" -eq "True") {
-          python build.py --config $(vars.Configuration) --build_output $(buildOutPath) --target //tensorflow/tools/lib_package:libtensorflow --telemetry
+          python build.py --config $(vars.configuration) --build_output $(buildOutPath) --target //tensorflow/tools/lib_package:libtensorflow --telemetry
       }
     displayName: Build
 
