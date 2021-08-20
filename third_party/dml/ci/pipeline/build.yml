@@ -57,10 +57,14 @@ jobs:
     - template: setup_agent_windows.yml
 
   - powershell: |
-      (get-command python).source
-      (get-command pip).source
-      pip freeze
-      python --version
+      Invoke-Expression '$(miniconda.activateCommand)'
+      pip install six numpy wheel
+      pip install keras_applications==1.0.6 --no-deps
+      pip install keras_preprocessing==1.0.5 --no-deps
+    displayName: Install Python Packages
+
+  - powershell: |
+      Invoke-Expression '$(miniconda.activateCommand)'
       if ("${{parameters.enableTests}}" -eq "True") {
           python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
       } else {
@@ -73,7 +77,8 @@ jobs:
     displayName: Build
 
   - ${{if parameters.enableTests}}:
-    - script: |
+    - powershell: |
+        Invoke-Expression '$(miniconda.activateCommand)'
         python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(buildOutPath) --destination $(Build.StagingDirectory)/artifacts/tests/test_binaries
       displayName: Gather Test Binaries
 

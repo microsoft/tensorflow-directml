@@ -11,13 +11,12 @@ steps:
   workingDirectory: $(Build.StagingDirectory)
 
 - powershell: |
-    $Url = 'https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-windows-x86_64.exe'
+    $Url = 'https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-windows-x86_64.exe'
     $DownloadPath = '$(Build.StagingDirectory)/bin/bazel.exe'
     $InstallDir = Split-Path $DownloadPath -Parent
     New-Item -Force -ItemType Directory $InstallDir
     (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
     Write-Host "##vso[task.prependpath]$InstallDir"
-    Write-Host "##vso[task.setVariable variable=architecture;isOutput=true]$Architecture"
     Write-Host "##vso[task.setVariable variable=vs;isOutput=true]C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise"
   displayName: Install Bazel
   name: bazel # sets the prefix for variables: the 'vs' variable maps to 'BAZEL_VS' environment variable for future tasks
@@ -31,14 +30,8 @@ steps:
     Start-Process $DownloadPath -ArgumentList '/NoRegistry=1', '/InstallationType=JustMe', '/RegisterPython=0', '/S', "/D=$InstallDir" -Wait
     & "$InstallDir/shell/condabin/conda-hook.ps1"
     conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
-    conda activate build
-    Write-Host "##vso[task.prependpath]${env:CONDA_PREFIX}"
-    Write-Host "Using python at '$env:CONDA_PREFIX'"
-  displayName: Install Python
+    $ActivateCmd = "$InstallDir/shell/condabin/conda-hook.ps1; conda activate build"
+    Write-Host "##vso[task.setVariable variable=activateCommand;isOutput=true]$ActivateCmd"
+  displayName: Install Miniconda
+  name: miniconda
   workingDirectory: $(Build.StagingDirectory)
-
-- powershell: |
-    python -m pip install six numpy wheel
-    python -m pip install keras_applications==1.0.6 --no-deps
-    python -m pip install keras_preprocessing==1.0.5 --no-deps
-  displayName: Install Python Packages
