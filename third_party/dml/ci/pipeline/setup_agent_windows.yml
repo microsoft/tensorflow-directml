@@ -18,8 +18,9 @@ steps:
     (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
     Write-Host "##vso[task.prependpath]$InstallDir"
     Write-Host "##vso[task.setVariable variable=architecture;isOutput=true]$Architecture"
-    ls 'C:/Program Files (x86)/Microsoft Visual Studio'
+    Write-Host "##vso[task.setVariable variable=vs;isOutput=true]C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise"
   displayName: Install Bazel
+  name: bazel # sets the prefix for variables: the 'vs' variable maps to 'BAZEL_VS' environment variable for future tasks
   workingDirectory: $(Build.StagingDirectory)
 
 - powershell: |
