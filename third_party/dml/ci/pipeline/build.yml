@@ -15,12 +15,10 @@ jobs:
   timeoutInMinutes: 200
   workspace:
     clean: all
-  pool: 
-    name: DirectML_TensorFlow_Pool
-    ${{if contains(parameters.artifact, '-linux-') }}:
-      demands: agent.os -equals Linux
-    ${{if contains(parameters.artifact, '-win-') }}:
-      demands: agent.os -equals Windows_NT
+  ${{if contains(parameters.artifact, '-linux-') }}:
+    pool: DirectML_TFLinux_Pool
+  ${{if contains(parameters.artifact, '-win-') }}:
+    pool: DirectML_TFWindows_Pool
   variables:
     buildOutPath: $(Build.StagingDirectory)/build_out
     buildPubPath: $(Build.StagingDirectory)/build_pub
