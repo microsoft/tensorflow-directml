@@ -16,8 +16,7 @@ jobs:
   workspace:
     clean: all
   ${{if contains(parameters.artifact, '-linux-') }}:
-    pool:
-      vmImage: ubuntu-18.04
+    pool: DirectML_LinuxPool
   ${{if contains(parameters.artifact, '-win-') }}:
     pool: DirectML_BuildPool
   variables:
