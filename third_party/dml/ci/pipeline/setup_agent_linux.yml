@@ -28,11 +28,6 @@ steps:
     pip install keras_preprocessing==1.0.5 --no-deps
   displayName: Install Python Packages
 
-- script: |
-    sudo apt update
-    sudo apt install gcc g++
-  displayName: Install C++ Tools
-
 # Fetch libd3d12.so and libdxcore.so. These are available in WSL2 but not cloud VMs.
 # Better long-term solution is to load these at runtime to avoid build-time dependency.
 - task: NuGetAuthenticate@0
