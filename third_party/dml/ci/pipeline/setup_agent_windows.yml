@@ -6,7 +6,7 @@ steps:
     & "$DownloadPath" -y
     & "msys64/usr/bin/bash" -lc ' '
     & "msys64/usr/bin/pacman.exe" --sync --needed --noconfirm git patch unzip
-    echo "##vso[task.prependpath]$(Build.StagingDirectory)/msys64/usr/bin"
+    Write-Host "##vso[task.prependpath]$(Build.StagingDirectory)/msys64/usr/bin"
   displayName: Install MSYS2
   workingDirectory: $(Build.StagingDirectory)
 
@@ -16,8 +16,11 @@ steps:
     $InstallDir = Split-Path $DownloadPath -Parent
     New-Item -Force -ItemType Directory $InstallDir
     (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
-    echo "##vso[task.prependpath]$InstallDir"
+    Write-Host "##vso[task.prependpath]$InstallDir"
+    Write-Host "##vso[task.setVariable variable=architecture;isOutput=true]$Architecture"
+    Write-Host "##vso[task.setVariable variable=vs;isOutput=true]C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise"
   displayName: Install Bazel
+  name: bazel # sets the prefix for variables: the 'vs' variable maps to 'BAZEL_VS' environment variable for future tasks
   workingDirectory: $(Build.StagingDirectory)
 
 - powershell: |
@@ -29,8 +32,8 @@ steps:
     & "$InstallDir/shell/condabin/conda-hook.ps1"
     conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
     conda activate build
-    echo "##vso[task.prependpath]${env:CONDA_PREFIX}"
-    echo "Using python at '$env:CONDA_PREFIX'"
+    Write-Host "##vso[task.prependpath]${env:CONDA_PREFIX}"
+    Write-Host "Using python at '$env:CONDA_PREFIX'"
   displayName: Install Python
   workingDirectory: $(Build.StagingDirectory)
 
