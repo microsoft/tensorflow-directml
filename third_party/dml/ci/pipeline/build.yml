@@ -58,6 +58,10 @@ jobs:
     - template: setup_agent_windows.yml
 
   - powershell: |
+      (get-command python).source
+      (get-command pip).source
+      pip freeze
+      python --version
       if ("${{parameters.enableTests}}" -eq "True") {
           python build.py --clean --package --tests --config $(vars.Configuration) --build_output $(buildOutPath) --telemetry
       } else {
