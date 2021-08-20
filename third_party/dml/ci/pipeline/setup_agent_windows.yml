@@ -41,9 +41,4 @@ steps:
     python -m pip install six numpy wheel
     python -m pip install keras_applications==1.0.6 --no-deps
     python -m pip install keras_preprocessing==1.0.5 --no-deps
-
-    (get-command python).source
-    (get-command pip).source
-    pip freeze
-    python --version
   displayName: Install Python Packages

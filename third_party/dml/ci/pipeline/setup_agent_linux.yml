@@ -7,6 +7,7 @@ steps:
 - script: |
     wget https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-installer-linux-x86_64.sh
     bash bazel-0.26.1-installer-linux-x86_64.sh --bin=$(Build.StagingDirectory)/bazel/0.26.1 --base=$(Build.StagingDirectory)/.bazel
+    echo "##vso[task.prependpath]$(Build.StagingDirectory)/bazel/0.26.1"
   displayName: Install Bazel
   workingDirectory: $(Build.StagingDirectory)
 
@@ -23,9 +24,9 @@ steps:
   workingDirectory: $(Build.StagingDirectory)
 
 - script: |
-    pip install six numpy wheel
-    pip install keras_applications==1.0.6 --no-deps
-    pip install keras_preprocessing==1.0.5 --no-deps
+    python -m pip install six numpy wheel
+    python -m pip install keras_applications==1.0.6 --no-deps
+    python -m pip install keras_preprocessing==1.0.5 --no-deps
   displayName: Install Python Packages
 
 # Fetch libd3d12.so and libdxcore.so. These are available in WSL2 but not cloud VMs.
