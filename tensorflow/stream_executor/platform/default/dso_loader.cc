@@ -230,11 +230,27 @@ port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
   return GetDirectMLLibraryHandle("directml.debug");
 }
 
+port::StatusOr<void*> GetD3d12DsoHandle() { return GetDsoHandle("d3d12", ""); }
+
+port::StatusOr<void*> GetDxgiDsoHandle() {
+#if _WIN32
+  return GetDsoHandle("dxgi", "");
+#else
+  return port::Status(port::error::UNIMPLEMENTED,
+                      "DXGI is not supported in WSL");
+#endif
+}
+
+port::StatusOr<void*> GetDxcoreDsoHandle() {
+  return GetDsoHandle("dxcore", "");
+}
+
 port::StatusOr<void*> GetPixDsoHandle() {
 #if _WIN32
   return GetDsoHandle("WinPixEventRuntime", "", GetModuleDirectory());
 #else
-  return port::Status(port::error::UNIMPLEMENTED, "PIX events are not supported in WSL");
+  return port::Status(port::error::UNIMPLEMENTED,
+                      "PIX events are not supported in WSL");
 #endif
 }
 #endif  // TENSORFLOW_USE_DIRECTML
@@ -243,7 +259,8 @@ port::StatusOr<void*> GetKernel32DsoHandle() {
 #if _WIN32
   return GetDsoHandle("Kernel32", "");
 #else
-  return port::Status(port::error::UNIMPLEMENTED, "Kernel32.dll is only available on Windows");
+  return port::Status(port::error::UNIMPLEMENTED,
+                      "Kernel32.dll is only available on Windows");
 #endif
 }
 
@@ -328,6 +345,21 @@ port::StatusOr<void*> GetDirectMLDsoHandle() {
 
 port::StatusOr<void*> GetDirectMLDebugDsoHandle() {
   static auto result = new auto(DsoLoader::GetDirectMLDebugDsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetD3d12DsoHandle() {
+  static auto result = new auto(DsoLoader::GetD3d12DsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetDxgiDsoHandle() {
+  static auto result = new auto(DsoLoader::GetDxgiDsoHandle());
+  return *result;
+}
+
+port::StatusOr<void*> GetDxcoreDsoHandle() {
+  static auto result = new auto(DsoLoader::GetDxcoreDsoHandle());
   return *result;
 }
 
