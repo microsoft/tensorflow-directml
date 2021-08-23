@@ -8,6 +8,9 @@ parameters:
 - name: buildCApi
   type: boolean
   default: false
+- name: releaseBuild
+  type: boolean
+  default: false
 
 jobs:
 - job:
@@ -62,6 +65,21 @@ jobs:
       pip install keras_applications==1.0.6 --no-deps
       pip install keras_preprocessing==1.0.5 --no-deps
     displayName: Install Python Packages
+
+  # Appends ".dev<DATE>" to the _VERSION variable in setup.py. For example, if the pipeline version
+  # is 200610-2233.1.master, and _VERSION is currently 1.15.2, then the updated version will be
+  # 1.15.2.dev200610. If the "Release Build" parameter is set then the .dev suffix is removed entirely.
+  - powershell: |
+      $SetupPyPath = "$SourcePathWin/tensorflow/tools/pip_package/setup.py"
+      if ("${{parameters.releaseBuild}}" -eq "True") {
+          $SubstituteVersion = "_VERSION = '`$1'"
+      } else {
+          $DevVersion = "$(Build.BuildNumber)" -replace '(\d{6}).*','$1'
+          $SubstituteVersion = "_VERSION = '`$1.dev$DevVersion'"
+      }
+      $SetupPy = (Get-Content $SetupPyPath -Raw) -replace "_VERSION = '(\d+\.\d+\.\d+).*'", $SubstituteVersion
+      Set-Content $SetupPyPath $SetupPy -Encoding ascii
+    displayName: Set Build Version
 
   - powershell: |
       Invoke-Expression '$(miniconda.activateCommand)'

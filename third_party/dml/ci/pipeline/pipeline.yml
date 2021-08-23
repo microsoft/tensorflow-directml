@@ -20,6 +20,11 @@ schedules:
   always: false
 
 parameters:
+- name: releaseBuild
+  displayName: Release Build
+  type: boolean
+  default: false
+
 - name: buildArtifacts
   displayName: Build Artifacts
   type: object
@@ -62,6 +67,7 @@ stages:
         artifact: ${{artifact}}
         enableTests: ${{parameters.enableTests}}
         buildCApi: ${{parameters.buildCApi}}
+        releaseBuild: ${{parameters.releaseBuild}}
 
 - ${{if parameters.enableTests}}:
   - stage: testStage
