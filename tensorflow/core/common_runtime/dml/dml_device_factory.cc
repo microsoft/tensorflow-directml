@@ -76,8 +76,8 @@ static bool IsUmaAdapter(const DmlAdapter& adapter) {
   }
 
   D3D12_FEATURE_DATA_ARCHITECTURE feature_data = {};
-  HRESULT hr = d3d12_device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE,
-                                         &feature_data, sizeof(feature_data));
+  HRESULT hr = d3d12_device->CheckFeatureSupport(
+      D3D12_FEATURE_ARCHITECTURE, &feature_data, sizeof(feature_data));
 
   if (FAILED(hr)) {
     return false;
