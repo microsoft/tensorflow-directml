@@ -110,7 +110,7 @@ Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory(
 #endif  // _WIN32
 
 #ifndef _WIN32
-Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> CreateDxCoreAdapterFactory(
+Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> TryCreateDxCoreAdapterFactory(
     DxCallErrorHandling call_error_handling,
     DxCallErrorHandling module_error_handling) {
   // DXCoreCreateAdapterFactory has a C++ overload so we must be explicit in the
