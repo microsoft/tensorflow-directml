@@ -87,11 +87,11 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     # TODO: Remove def file filter when TensorFlow can export symbols properly on Windows.
     def_file_filter_configure(name = "local_config_def_file_filter")
 
+    # URL must point at the DirectML redistributable NuGet package.
     dml_repository(
         name = "dml_redist",
-        package = "Microsoft.AI.DirectML.Preview",
-        version = "1.7.0-dev20210806",
-        source = "https://api.nuget.org/v3/index.json",
+        url = "https://www.nuget.org/api/v2/package/Microsoft.AI.DirectML.Preview/1.7.0-dev20210806",
+        sha256 = "1babff4486e0465cd3c652aaeedfb6a320b320db95dc188535ac04ba33141b9c",
         build_file = "//third_party/dml/redist:BUILD.bazel",
     )
 
