@@ -34,8 +34,10 @@ Microsoft::WRL::ComPtr<ID3D12Device> CreateD3d12Device(
 // Attempts to create an IDXGIFactory4. Returns an empty ComPtr if unsuccessful.
 Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory();
 
-// Attempts to create an IDXGIFactory4. Returns an empty ComPtr if unsuccessful.
-Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory();
+#ifndef _WIN32
+// Attempts to create an IDXCoreAdapterFactory. Logs a fatal error and aborts if unsuccessful.
+Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> CreateDxCoreAdapterFactory();
+#endif
 
 // Attempts to create an IDMLDevice. Returns an empty ComPtr if unsuccessful.
 Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(

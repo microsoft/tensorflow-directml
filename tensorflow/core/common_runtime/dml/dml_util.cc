@@ -95,6 +95,39 @@ Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory() {
   return dxgi_factory;
 }
 
+#ifndef _WIN32
+Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> CreateDxCoreAdapterFactory() {
+  auto dxcore_handle_or =
+      stream_executor::internal::CachedDsoLoader::GetDxCoreDsoHandle();
+  if (!dxcore_handle_or.ok()) {
+    LOG(FATAL) << "Could not load DXCore.";
+    return nullptr;
+  }
+
+  using DXCoreCreateAdapterFactoryFn = decltype(DXCoreCreateAdapterFactory);
+
+  DXCoreCreateAdapterFactoryFn* createDxCoreAdapterFactory;
+  auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
+      dxcore_handle_or.ValueOrDie(), "DXCoreCreateAdapterFactory",
+      (void**)&createDxCoreAdapterFactory);
+  if (!get_symbol_status.ok()) {
+    LOG(FATAL) << "Could not find symbol DXCoreCreateAdapterFactory. ";
+    return nullptr;
+  }
+
+  Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> dxcore_factory;
+  HRESULT create_factory_hr =
+      createDxCoreAdapterFactory(IID_PPV_ARGS(&dxcore_factory));
+  if (FAILED(create_factory_hr)) {
+    LOG(FATAL) << "DXCoreCreateAdapterFactory failed with HRESULT "
+               << create_factory_hr;
+    return nullptr;
+  }
+
+  return dxcore_factory;
+}
+#endif // !_WIN32
+
 Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(
     ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags) {
   auto dml_handle_or =

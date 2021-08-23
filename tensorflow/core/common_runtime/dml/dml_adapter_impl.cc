@@ -14,8 +14,8 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/core/common_runtime/dml/dml_adapter_impl.h"
-#include "dml_util.h"
 
+#include "dml_util.h"
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/strings/numbers.h"
 #include "tensorflow/core/lib/strings/str_util.h"
@@ -127,9 +127,7 @@ DmlAdapterImpl::DmlAdapterImpl(LUID adapter_luid) {
 
   Initialize(adapter.Get());
 #else
-  ComPtr<IDXCoreAdapterFactory> dxcore_factory;
-  DML_CHECK_SUCCEEDED(
-      DXCoreCreateAdapterFactory(IID_PPV_ARGS(&dxcore_factory)));
+  ComPtr<IDXCoreAdapterFactory> dxcore_factory = CreateDxCoreAdapterFactory();
 
   ComPtr<IDXCoreAdapter> adapter;
   DML_CHECK_SUCCEEDED(
@@ -299,9 +297,7 @@ uint64_t DmlAdapterImpl::QueryAvailableLocalMemory() const {
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
   const GUID dxcore_adapter = DXCORE_ADAPTER_ATTRIBUTE_D3D12_CORE_COMPUTE;
 
-  ComPtr<IDXCoreAdapterFactory> adapter_factory;
-  DML_CHECK_SUCCEEDED(
-      DXCoreCreateAdapterFactory(IID_PPV_ARGS(&adapter_factory)));
+  ComPtr<IDXCoreAdapterFactory> adapter_factory = CreateDxCoreAdapterFactory();
 
   ComPtr<IDXCoreAdapterList> adapter_list;
   DML_CHECK_SUCCEEDED(adapter_factory->CreateAdapterList(

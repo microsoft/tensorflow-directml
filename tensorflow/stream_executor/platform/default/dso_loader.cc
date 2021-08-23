@@ -241,7 +241,7 @@ port::StatusOr<void*> GetDxgiDsoHandle() {
 #endif
 }
 
-port::StatusOr<void*> GetDxcoreDsoHandle() {
+port::StatusOr<void*> GetDxCoreDsoHandle() {
   return GetDsoHandle("dxcore", "");
 }
 
@@ -358,8 +358,8 @@ port::StatusOr<void*> GetDxgiDsoHandle() {
   return *result;
 }
 
-port::StatusOr<void*> GetDxcoreDsoHandle() {
-  static auto result = new auto(DsoLoader::GetDxcoreDsoHandle());
+port::StatusOr<void*> GetDxCoreDsoHandle() {
+  static auto result = new auto(DsoLoader::GetDxCoreDsoHandle());
   return *result;
 }
 

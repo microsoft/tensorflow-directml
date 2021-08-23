@@ -55,7 +55,7 @@ port::StatusOr<void*> GetDirectMLDsoHandle();
 port::StatusOr<void*> GetDirectMLDebugDsoHandle();
 port::StatusOr<void*> GetD3d12DsoHandle();
 port::StatusOr<void*> GetDxgiDsoHandle();
-port::StatusOr<void*> GetDxcoreDsoHandle();
+port::StatusOr<void*> GetDxCoreDsoHandle();
 port::StatusOr<void*> GetPixDsoHandle();
 port::StatusOr<void*> GetKernel32DsoHandle();
 
@@ -94,7 +94,7 @@ port::StatusOr<void*> GetDirectMLDsoHandle();
 port::StatusOr<void*> GetDirectMLDebugDsoHandle();
 port::StatusOr<void*> GetD3d12DsoHandle();
 port::StatusOr<void*> GetDxgiDsoHandle();
-port::StatusOr<void*> GetDxcoreDsoHandle();
+port::StatusOr<void*> GetDxCoreDsoHandle();
 port::StatusOr<void*> GetPixDsoHandle();
 port::StatusOr<void*> GetKernel32DsoHandle();
 }  // namespace CachedDsoLoader
