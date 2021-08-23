@@ -45,8 +45,7 @@ namespace tensorflow {
                                         : D3D_FEATURE_LEVEL_11_0;
 
   ComPtr<ID3D12Device> d3d_device =
-      TryCreateD3d12Device(adapter.Impl()->Get(), feature_level);
-  CHECK(d3d_device != nullptr);
+      CreateD3d12Device(adapter.Impl()->Get(), feature_level);
 
   DML_CREATE_DEVICE_FLAGS dml_flags = DML_CREATE_DEVICE_FLAG_NONE;
 

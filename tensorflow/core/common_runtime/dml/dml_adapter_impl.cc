@@ -116,10 +116,7 @@ std::vector<DmlAdapterImpl> FilterAdapterListFromEnvVar(
 
 DmlAdapterImpl::DmlAdapterImpl(LUID adapter_luid) {
 #if _WIN32
-  ComPtr<IDXGIFactory4> dxgi_factory = TryCreateDxgiFactory();
-  if (!dxgi_factory) {
-    LOG(FATAL) << "Could not create DXGI factory.";
-  }
+  ComPtr<IDXGIFactory4> dxgi_factory = CreateDxgiFactory();
 
   ComPtr<IDXGIAdapter1> adapter;
   DML_CHECK_SUCCEEDED(
@@ -186,7 +183,7 @@ bool IsSoftwareAdapter(IDXGIAdapter1* adapter) {
 };
 
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
-  ComPtr<IDXGIFactory4> dxgi_factory = TryCreateDxgiFactory();
+  ComPtr<IDXGIFactory4> dxgi_factory = TryCreateDxgiFactory(DxCallErrorHandling::Warning);
   if (!dxgi_factory) {
     return {};
   }
