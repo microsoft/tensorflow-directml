@@ -98,6 +98,12 @@ Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory() {
 #endif // _WIN32
 
 #ifndef _WIN32
+
+// DXCoreCreateAdapterFactory has a C++ template function overload, so this helper exists
+// to disambiguate when resolving the symbol.
+template<typename... Ts>
+using DXCoreCreateAdapterFactoryFnType = auto(Ts...) -> decltype(DXCoreCreateAdapterFactory(std::declval<Ts>()...));
+
 Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> CreateDxCoreAdapterFactory() {
   auto dxcore_handle_or =
       stream_executor::internal::CachedDsoLoader::GetDxCoreDsoHandle();
@@ -106,7 +112,7 @@ Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> CreateDxCoreAdapterFactory() {
     return nullptr;
   }
 
-  using DXCoreCreateAdapterFactoryFn = decltype(DXCoreCreateAdapterFactory);
+  using DXCoreCreateAdapterFactoryFn = DXCoreCreateAdapterFactoryFnType<REFIID,void**>;
 
   DXCoreCreateAdapterFactoryFn* createDxCoreAdapterFactory;
   auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
