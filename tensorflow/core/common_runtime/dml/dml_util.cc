@@ -65,6 +65,36 @@ Microsoft::WRL::ComPtr<ID3D12Device> CreateD3d12Device(
   return d3d_device;
 }
 
+Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory() {
+  auto dxgi_handle_or =
+      stream_executor::internal::CachedDsoLoader::GetDxgiDsoHandle();
+  if (!dxgi_handle_or.ok()) {
+    LOG(WARNING) << "Could not load DXGI.";
+    return nullptr;
+  }
+
+  using CreateDXGIFactoryFn = decltype(CreateDXGIFactory);
+
+  CreateDXGIFactoryFn* createDxgiFactory;
+  auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
+      dxgi_handle_or.ValueOrDie(), "CreateDXGIFactory",
+      (void**)&createDxgiFactory);
+  if (!get_symbol_status.ok()) {
+    LOG(WARNING) << "Could not find symbol CreateDXGIFactory. ";
+    return nullptr;
+  }
+
+  Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory;
+  HRESULT create_factory_hr = createDxgiFactory(IID_PPV_ARGS(&dxgi_factory));
+  if (FAILED(create_factory_hr)) {
+    LOG(WARNING) << "CreateDXGIFactory failed with HRESULT "
+                 << create_factory_hr;
+    return nullptr;
+  }
+
+  return dxgi_factory;
+}
+
 Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(
     ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags) {
   auto dml_handle_or =
