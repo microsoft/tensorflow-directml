@@ -14,6 +14,7 @@ limitations under the License.
 ==============================================================================*/
 
 #include "tensorflow/core/common_runtime/dml/dml_adapter_impl.h"
+#include "dml_util.h"
 
 #include "tensorflow/core/lib/core/errors.h"
 #include "tensorflow/core/lib/strings/numbers.h"
@@ -212,8 +213,7 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
       if (IsSoftwareAdapter(adapter.Get())) {
         break;
       }
-      if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
-                                      IID_ID3D12Device, nullptr))) {
+      if (TryCreateD3d12Device(adapter.Get(), D3D_FEATURE_LEVEL_11_0)) {
         adapter_infos.emplace_back(adapter.Get());
       }
     }
@@ -230,8 +230,7 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
       if (IsSoftwareAdapter(adapter.Get())) {
         continue;
       }
-      if (SUCCEEDED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0,
-                                      IID_ID3D12Device, nullptr))) {
+      if (TryCreateD3d12Device(adapter.Get(), D3D_FEATURE_LEVEL_11_0)) {
         adapter_infos.emplace_back(adapter.Get());
       }
     }
@@ -353,9 +352,7 @@ std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
                                           ? D3D_FEATURE_LEVEL_1_0_CORE
                                           : D3D_FEATURE_LEVEL_11_0;
 
-    HRESULT hr = D3D12CreateDevice(adapter.Get(), feature_level,
-                                   IID_ID3D12Device, nullptr);
-    if (SUCCEEDED(hr)) {
+    if (TryCreateD3d12Device(adapter.Get(), feature_level)) {
       adapter_infos.push_back(std::move(adapter_impl));
     }
   }

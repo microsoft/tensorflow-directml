@@ -21,41 +21,48 @@ limitations under the License.
 
 namespace tensorflow {
 
-Microsoft::WRL::ComPtr<IDMLDevice> TryCreateD3dDevice(
-    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags) {
-  auto dml_handle_or =
-      stream_executor::internal::CachedDsoLoader::GetDirectMLDsoHandle();
-  if (!dml_handle_or.ok()) {
-    auto path = getenv("TF_DIRECTML_PATH");
-    if (path) {
-      LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
-                   << path;
-    } else {
-      LOG(WARNING) << "Could not load DirectML.";
-    }
-
+Microsoft::WRL::ComPtr<ID3D12Device> TryCreateD3d12Device(
+    IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level,
+    bool log_failures) {
+  auto d3d12_handle_or =
+      stream_executor::internal::CachedDsoLoader::GetD3d12DsoHandle();
+  if (!d3d12_handle_or.ok()) {
+    LOG(WARNING) << "Could not load D3D12.";
     return nullptr;
   }
 
-  using DMLCreateDeviceFn = decltype(DMLCreateDevice);
+  using D3D12CreateDeviceFn = decltype(D3D12CreateDevice);
 
-  DMLCreateDeviceFn* dmlCreateDevice;
+  D3D12CreateDeviceFn* d3d12CreateDevice;
   auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
-      dml_handle_or.ValueOrDie(), "DMLCreateDevice", (void**)&dmlCreateDevice);
+      dml_handle_or.ValueOrDie(), "D3D12CreateDevice",
+      (void**)&d3d12CreateDevice);
   if (!get_symbol_status.ok()) {
-    LOG(WARNING) << "Could not find symbol DMLCreateDevice. ";
+    LOG(WARNING) << "Could not find symbol D3D12CreateDevice. ";
     return nullptr;
   }
 
-  Microsoft::WRL::ComPtr<IDMLDevice> dml_device;
-  HRESULT create_device_hr =
-      dmlCreateDevice(d3d12_device, dml_flags, IID_PPV_ARGS(&dml_device));
+  Microsoft::WRL::ComPtr<ID3D12Device> d3d12_device;
+  HRESULT create_device_hr = d3d12CreateDevice(adapter, minimum_feature_level,
+                                               IID_PPV_ARGS(&d3d12_device));
   if (FAILED(create_device_hr)) {
-    LOG(WARNING) << "DMLCreateDevice failed with HRESULT " << create_device_hr;
-    return {};
+    if (log_failures) {
+      LOG(WARNING) << "D3D12CreateDevice failed with HRESULT "
+                   << create_device_hr;
+    }
+    return nullptr;
   }
 
-  return dml_device;
+  return d3d12_device;
+}
+
+Microsoft::WRL::ComPtr<ID3D12Device> CreateD3d12Device(
+    IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level) {
+  auto d3d_device = TryCreateD3d12Device(adapter, minimum_feature_level, true);
+  if (!d3d_device) {
+    LOG(FATAL) << "Could not load D3D12.";
+  }
+  return d3d_device;
 }
 
 Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(

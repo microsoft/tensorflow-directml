@@ -223,8 +223,7 @@ TEST_F(DmlKernelManagerTest, QueueReference) {
   ComPtr<ID3D12Device> device;
 
 #ifdef DML_BUILD_WINDOWS
-  DML_CHECK_SUCCEEDED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_11_0,
-                                        IID_PPV_ARGS(&device)));
+  device = CreateD3d12Device(nullptr, D3D_FEATURE_LEVEL_11_0);
 #else
   auto adapters = EnumerateAdapters();
   EXPECT_FALSE(adapters.empty());
@@ -233,8 +232,7 @@ TEST_F(DmlKernelManagerTest, QueueReference) {
                                                ? D3D_FEATURE_LEVEL_1_0_CORE
                                                : D3D_FEATURE_LEVEL_11_0;
 
-  DML_CHECK_SUCCEEDED(D3D12CreateDevice(
-      adapters[0].Impl()->Get(), dxcore_feature_level, IID_PPV_ARGS(&device)));
+  device = CreateD3d12Device(adapters[0].Impl()->Get(), dxcore_feature_level);
 #endif
 
   ComPtr<ID3D12Fence> fence;
