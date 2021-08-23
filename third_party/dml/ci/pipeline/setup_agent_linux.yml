@@ -11,19 +11,6 @@ steps:
   displayName: Install Bazel
   workingDirectory: $(Build.StagingDirectory)
 
-# Fetch libd3d12.so and libdxcore.so. These are available in WSL2 but not cloud VMs.
-# Better long-term solution is to load these at runtime to avoid build-time dependency.
-- task: NuGetAuthenticate@0
-- task: NuGetToolInstaller@1
-  inputs:
-    versionSpec: '*'
-    checkLatest: true
-- script: |
-    nuget install DirectML.LinuxDirectxLibs -Source ${{parameters.linuxLibNugetFeed}}
-    sudo cp DirectML.LinuxDirectxLibs.*/x64/* /usr/lib
-  workingDirectory: $(Build.StagingDirectory)
-  displayName: Install DX Libraries
-
 - script: |
     miniconda_path="miniconda3"
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
