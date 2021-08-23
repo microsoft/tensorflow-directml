@@ -70,7 +70,7 @@ jobs:
   # is 200610-2233.1.master, and _VERSION is currently 1.15.2, then the updated version will be
   # 1.15.2.dev200610. If the "Release Build" parameter is set then the .dev suffix is removed entirely.
   - powershell: |
-      $SetupPyPath = "$SourcePathWin/tensorflow/tools/pip_package/setup.py"
+      $SetupPyPath = "$(Build.SourcesDirectory)/tensorflow/tools/pip_package/setup.py"
       if ("${{parameters.releaseBuild}}" -eq "True") {
           $SubstituteVersion = "_VERSION = '`$1'"
       } else {
