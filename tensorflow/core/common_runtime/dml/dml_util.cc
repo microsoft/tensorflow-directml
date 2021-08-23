@@ -35,7 +35,7 @@ Microsoft::WRL::ComPtr<ID3D12Device> TryCreateD3d12Device(
 
   D3D12CreateDeviceFn* d3d12CreateDevice;
   auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
-      dml_handle_or.ValueOrDie(), "D3D12CreateDevice",
+      d3d12_handle_or.ValueOrDie(), "D3D12CreateDevice",
       (void**)&d3d12CreateDevice);
   if (!get_symbol_status.ok()) {
     LOG(WARNING) << "Could not find symbol D3D12CreateDevice. ";

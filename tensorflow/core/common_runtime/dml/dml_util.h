@@ -23,12 +23,12 @@ limitations under the License.
 namespace tensorflow {
 
 // Attempts to create an ID3D12Device. Returns an empty ComPtr if unsuccessful.
-Microsoft::WRL::ComPtr<IDMLDevice> TryCreateD3d12Device(
+Microsoft::WRL::ComPtr<ID3D12Device> TryCreateD3d12Device(
     IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level,
     bool log_failures = false);
 
 // Creates an ID3D12Device. Logs a fatal error and aborts if unsuccessful.
-Microsoft::WRL::ComPtr<IDMLDevice> CreateD3d12Device(
+Microsoft::WRL::ComPtr<ID3D12Device> CreateD3d12Device(
     IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level);
 
 // Attempts to create an IDMLDevice. Returns an empty ComPtr if unsuccessful.
