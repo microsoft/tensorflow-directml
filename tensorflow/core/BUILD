@@ -3805,13 +3805,9 @@ cc_library(
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
     ]),
     linkopts = if_windows([
-        "d3d12.lib", 
-        "dxgi.lib", 
         "pathcch.lib",
         "advapi32.lib",
     ]) + if_not_windows([
-        "-ld3d12",
-        "-ldxcore",
         "-Wl,-rpath,$$ORIGIN"
     ]),
 )
