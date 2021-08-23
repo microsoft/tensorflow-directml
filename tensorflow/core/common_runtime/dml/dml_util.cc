@@ -65,6 +65,7 @@ Microsoft::WRL::ComPtr<ID3D12Device> CreateD3d12Device(
   return d3d_device;
 }
 
+#ifdef _WIN32
 Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory() {
   auto dxgi_handle_or =
       stream_executor::internal::CachedDsoLoader::GetDxgiDsoHandle();
@@ -94,6 +95,7 @@ Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory() {
 
   return dxgi_factory;
 }
+#endif // _WIN32
 
 #ifndef _WIN32
 Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> CreateDxCoreAdapterFactory() {
