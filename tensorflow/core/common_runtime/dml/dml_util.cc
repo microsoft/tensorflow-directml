@@ -21,173 +21,130 @@ limitations under the License.
 
 namespace tensorflow {
 
-Microsoft::WRL::ComPtr<ID3D12Device> TryCreateD3d12Device(
-    IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level,
-    bool log_failures) {
-  auto d3d12_handle_or =
-      stream_executor::internal::CachedDsoLoader::GetD3d12DsoHandle();
-  if (!d3d12_handle_or.ok()) {
-    LOG(WARNING) << "Could not load D3D12.";
-    return nullptr;
-  }
-
-  using D3D12CreateDeviceFn = decltype(D3D12CreateDevice);
-
-  D3D12CreateDeviceFn* d3d12CreateDevice;
-  auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
-      d3d12_handle_or.ValueOrDie(), "D3D12CreateDevice",
-      (void**)&d3d12CreateDevice);
-  if (!get_symbol_status.ok()) {
-    LOG(WARNING) << "Could not find symbol D3D12CreateDevice. ";
-    return nullptr;
-  }
-
-  Microsoft::WRL::ComPtr<ID3D12Device> d3d12_device;
-  HRESULT create_device_hr = d3d12CreateDevice(adapter, minimum_feature_level,
-                                               IID_PPV_ARGS(&d3d12_device));
-  if (FAILED(create_device_hr)) {
-    if (log_failures) {
-      LOG(WARNING) << "D3D12CreateDevice failed with HRESULT "
-                   << create_device_hr;
+// Helper to call a DX-style Create* function from a module that is loaded at
+// runtime. Assumes the function returns an HRESULT and its last two parameters
+// are an IID and void** (e.g. D3D12CreateDevice, DMLCreateDevice, etc.).
+template <typename TDeviceOrFactory, typename F, typename... Args>
+Microsoft::WRL::ComPtr<TDeviceOrFactory> DxExportHelper(
+    StatusOr<void*> module_handle, const char* module_name,
+    const char* function_name, DxCallErrorHandling call_error_handling,
+    DxCallErrorHandling module_error_handling, Args&&... args) {
+  // Lazily load the module.
+  if (!module_handle.ok()) {
+    switch (module_error_handling) {
+      case DxCallErrorHandling::Warning:
+        LOG(WARNING) << "Could not load '" << module_name << "' module.";
+        break;
+      case DxCallErrorHandling::Fatal:
+        LOG(FATAL) << "Could not load '" << module_name << "' module.";
+        break;
     }
     return nullptr;
   }
 
-  return d3d12_device;
+  // Load the function.
+  using D3D12CreateDeviceFn = decltype(D3D12CreateDevice);
+  F* create_function;
+  auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
+      module_handle.ValueOrDie(), function_name, (void**)&create_function);
+  if (!get_symbol_status.ok()) {
+    switch (module_error_handling) {
+      case DxCallErrorHandling::Warning:
+        LOG(WARNING) << "Could not find symbol '" << function_name << "' in '"
+                     << module_name << "' module.";
+        break;
+      case DxCallErrorHandling::Fatal:
+        LOG(FATAL) << "Could not find symbol '" << function_name << "' in '"
+                   << module_name << "' module.";
+        break;
+    }
+    return nullptr;
+  }
+
+  // Call the function.
+  Microsoft::WRL::ComPtr<TDeviceOrFactory> device_or_factory;
+  HRESULT hr = create_function(std::forward<Args>(args)...,
+                               IID_PPV_ARGS(&device_or_factory));
+  if (FAILED(hr)) {
+    switch (call_error_handling) {
+      case DxCallErrorHandling::Warning:
+        LOG(WARNING) << "'" << function_name << "' failed with HRESULT " << hr;
+        break;
+      case DxCallErrorHandling::Fatal:
+        LOG(FATAL) << "'" << function_name << "' failed with HRESULT " << hr;
+        break;
+    }
+    return nullptr;
+  }
+
+  return device_or_factory;
 }
 
-Microsoft::WRL::ComPtr<ID3D12Device> CreateD3d12Device(
-    IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level) {
-  auto d3d_device = TryCreateD3d12Device(adapter, minimum_feature_level, true);
-  if (!d3d_device) {
-    LOG(FATAL) << "Could not load D3D12.";
-  }
-  return d3d_device;
+Microsoft::WRL::ComPtr<ID3D12Device> TryCreateD3d12Device(
+    IUnknown* adapter, D3D_FEATURE_LEVEL minimum_feature_level,
+    DxCallErrorHandling call_error_handling,
+    DxCallErrorHandling module_error_handling) {
+  return DxExportHelper<ID3D12Device, decltype(D3D12CreateDevice)>(
+      stream_executor::internal::CachedDsoLoader::GetD3d12DsoHandle(),
+      "D3D12",                // module name (for logging messages only)
+      "D3D12CreateDevice",    // function name
+      call_error_handling,    // error handling when function call fails
+      module_error_handling,  // error handling when module load fails
+      adapter,                // D3D12CreateDevice arguments
+      minimum_feature_level   // D3D12CreateDevice arguments
+  );
 }
 
 #ifdef _WIN32
-Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory() {
-  auto dxgi_handle_or =
-      stream_executor::internal::CachedDsoLoader::GetDxgiDsoHandle();
-  if (!dxgi_handle_or.ok()) {
-    LOG(WARNING) << "Could not load DXGI.";
-    return nullptr;
-  }
-
-  using CreateDXGIFactoryFn = decltype(CreateDXGIFactory);
-
-  CreateDXGIFactoryFn* createDxgiFactory;
-  auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
-      dxgi_handle_or.ValueOrDie(), "CreateDXGIFactory",
-      (void**)&createDxgiFactory);
-  if (!get_symbol_status.ok()) {
-    LOG(WARNING) << "Could not find symbol CreateDXGIFactory. ";
-    return nullptr;
-  }
-
-  Microsoft::WRL::ComPtr<IDXGIFactory4> dxgi_factory;
-  HRESULT create_factory_hr = createDxgiFactory(IID_PPV_ARGS(&dxgi_factory));
-  if (FAILED(create_factory_hr)) {
-    LOG(WARNING) << "CreateDXGIFactory failed with HRESULT "
-                 << create_factory_hr;
-    return nullptr;
-  }
-
-  return dxgi_factory;
+Microsoft::WRL::ComPtr<IDXGIFactory4> TryCreateDxgiFactory(
+    DxCallErrorHandling call_error_handling,
+    DxCallErrorHandling module_error_handling) {
+  return DxExportHelper<IDXGIFactory4, decltype(CreateDXGIFactory)>(
+      stream_executor::internal::CachedDsoLoader::GetDxgiDsoHandle(),
+      "DXGI",                // module name (for logging messages only)
+      "CreateDXGIFactory",   // function name
+      call_error_handling,   // error handling when function call fails
+      module_error_handling  // error handling when module load fails
+  );
 }
-#endif // _WIN32
+#endif  // _WIN32
 
 #ifndef _WIN32
-
-// DXCoreCreateAdapterFactory has a C++ template function overload, so this helper exists
-// to disambiguate when resolving the symbol.
-template<typename... Ts>
-using DXCoreCreateAdapterFactoryFnType = auto(Ts...) -> decltype(DXCoreCreateAdapterFactory(std::declval<Ts>()...));
-
-Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> CreateDxCoreAdapterFactory() {
-  auto dxcore_handle_or =
-      stream_executor::internal::CachedDsoLoader::GetDxCoreDsoHandle();
-  if (!dxcore_handle_or.ok()) {
-    LOG(FATAL) << "Could not load DXCore.";
-    return nullptr;
-  }
-
-  using DXCoreCreateAdapterFactoryFn = DXCoreCreateAdapterFactoryFnType<REFIID,void**>;
-
-  DXCoreCreateAdapterFactoryFn* createDxCoreAdapterFactory;
-  auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
-      dxcore_handle_or.ValueOrDie(), "DXCoreCreateAdapterFactory",
-      (void**)&createDxCoreAdapterFactory);
-  if (!get_symbol_status.ok()) {
-    LOG(FATAL) << "Could not find symbol DXCoreCreateAdapterFactory. ";
-    return nullptr;
-  }
-
-  Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> dxcore_factory;
-  HRESULT create_factory_hr =
-      createDxCoreAdapterFactory(IID_PPV_ARGS(&dxcore_factory));
-  if (FAILED(create_factory_hr)) {
-    LOG(FATAL) << "DXCoreCreateAdapterFactory failed with HRESULT "
-               << create_factory_hr;
-    return nullptr;
-  }
-
-  return dxcore_factory;
+Microsoft::WRL::ComPtr<IDXCoreAdapterFactory> CreateDxCoreAdapterFactory(
+    DxCallErrorHandling call_error_handling,
+    DxCallErrorHandling module_error_handling) {
+  // DXCoreCreateAdapterFactory has a C++ overload so we must be explicit in the
+  // function signature.
+  using FuncType = HRESULT __stdcall(REFIID, void**);
+  return DxExportHelper<IDXCoreAdapterFactory, FuncType>(
+      stream_executor::internal::CachedDsoLoader::GetDxCoreDsoHandle(),
+      "DXCore",                      // module name (for logging messages only)
+      "DXCoreCreateAdapterFactory",  // function name
+      call_error_handling,           // error handling when function call fails
+      module_error_handling          // error handling when module load fails
+  );
 }
-#endif // !_WIN32
+#endif  // !_WIN32
 
 Microsoft::WRL::ComPtr<IDMLDevice> TryCreateDmlDevice(
-    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags) {
-  auto dml_handle_or =
+    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags,
+    DxCallErrorHandling call_error_handling,
+    DxCallErrorHandling module_error_handling) {
+  auto module_handle =
       stream_executor::internal::CachedDsoLoader::GetDirectMLDsoHandle();
-  if (!dml_handle_or.ok()) {
-    auto path = getenv("TF_DIRECTML_PATH");
-    if (path) {
-      LOG(WARNING) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
-                   << path;
-    } else {
-      LOG(WARNING) << "Could not load DirectML.";
-    }
-
-    return nullptr;
+  if (!module_handle.ok() && getenv("TF_DIRECTML_PATH")) {
+    LOG(WARNING) << "Could not find DirectML with TF_DIRECTML_PATH set.";
   }
 
-  using DMLCreateDeviceFn = decltype(DMLCreateDevice);
-
-  DMLCreateDeviceFn* dmlCreateDevice;
-  auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
-      dml_handle_or.ValueOrDie(), "DMLCreateDevice", (void**)&dmlCreateDevice);
-  if (!get_symbol_status.ok()) {
-    LOG(WARNING) << "Could not find symbol DMLCreateDevice. ";
-    return nullptr;
-  }
-
-  Microsoft::WRL::ComPtr<IDMLDevice> dml_device;
-  HRESULT create_device_hr =
-      dmlCreateDevice(d3d12_device, dml_flags, IID_PPV_ARGS(&dml_device));
-  if (FAILED(create_device_hr)) {
-    LOG(WARNING) << "DMLCreateDevice failed with HRESULT " << create_device_hr;
-    return {};
-  }
-
-  return dml_device;
-}
-
-Microsoft::WRL::ComPtr<IDMLDevice> CreateDmlDevice(
-    ID3D12Device* d3d12_device, DML_CREATE_DEVICE_FLAGS dml_flags) {
-  auto dml_device = TryCreateDmlDevice(d3d12_device, dml_flags);
-
-  if (!dml_device) {
-    auto path = getenv("TF_DIRECTML_PATH");
-    if (path) {
-      LOG(FATAL) << "Could not load DirectML. TF_DIRECTML_PATH is set: "
-                 << path;
-    } else {
-      LOG(FATAL) << "Could not load DirectML.";
-    }
-  }
-
-  return dml_device;
+  return DxExportHelper<IDMLDevice, decltype(DMLCreateDevice)>(
+      module_handle,
+      "DirectML",             // module name (for logging messages only)
+      "DMLCreateDevice",      // function name
+      call_error_handling,    // error handling when function call fails
+      module_error_handling,  // error handling when module load fails
+      d3d12_device,           // DMLCreateDevice arguments
+      dml_flags               // DMLCreateDevice arguments
+  );
 }
 
 DataType GetTfDataTypeFromDmlDataType(DML_TENSOR_DATA_TYPE type) {
