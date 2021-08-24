@@ -275,9 +275,10 @@ def create_c_package(args):
     "bazel-bin",
     "tensorflow")
 
+  source_dir = os.path.split(os.path.dirname(os.path.realpath(__file__)))[-1]
   dml_redist_dir = os.path.join(
     os.path.dirname(os.path.realpath(__file__)),
-    "bazel-tensorflow-directml",
+    ("bazel-%s" % source_dir),
     "external",
     "dml_redist",
     "directml")
