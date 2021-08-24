@@ -18,6 +18,8 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/gpu/gpu_mem_allocator.h"
 #include "tensorflow/core/lib/strings/strcat.h"
 
+#pragma optimize( "", off )//hack:::
+
 namespace tensorflow {
 
 bool GPUBFCAllocator::GetAllowGrowthValue(const GPUOptions& gpu_options) {

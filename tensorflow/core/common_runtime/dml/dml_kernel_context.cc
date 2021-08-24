@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#pragma optimize( "", off )//hack:::
 #include "tensorflow/core/common_runtime/dml/dml_kernel_context.h"
 
 #include "tensorflow/core/common_runtime/dml/dml_device.h"

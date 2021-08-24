@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#pragma optimize( "", off )//hack:::
 #include "tensorflow/core/kernels/dml_kernel_wrapper.h"
 
 #include "tensorflow/core/common_runtime/dml/dml_operator_helper.h"
 #include "tensorflow/core/common_runtime/dml/dml_tracing.h"
 #include "tensorflow/core/common_runtime/dml/dml_util.h"
+#pragma optimize( "", off )//hack:::
 
 namespace tensorflow {
 

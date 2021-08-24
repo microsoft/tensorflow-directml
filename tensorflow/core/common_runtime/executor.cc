@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#pragma optimize( "", off )//hack:::
 #include "tensorflow/core/common_runtime/executor.h"
 
 #include <atomic>
@@ -71,6 +72,8 @@ limitations under the License.
 #include "tensorflow/core/profiler/internal/traceme_recorder.h"
 #include "tensorflow/core/profiler/lib/traceme.h"
 #include "tensorflow/core/util/tensor_slice_reader_cache.h"
+
+#pragma optimize( "", off )//hack:::
 
 namespace tensorflow {
 namespace {

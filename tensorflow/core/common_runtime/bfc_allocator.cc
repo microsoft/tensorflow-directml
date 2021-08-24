@@ -13,6 +13,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#pragma optimize( "", off )//hack:::
+
 #include "tensorflow/core/common_runtime/bfc_allocator.h"
 
 #include <atomic>
@@ -26,6 +28,8 @@ limitations under the License.
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/platform/mutex.h"
 #include "tensorflow/core/platform/types.h"
+
+#pragma optimize( "", off )//hack:::
 
 namespace tensorflow {
 
@@ -276,7 +280,13 @@ size_t BFCAllocator::RoundedBytes(size_t bytes) {
 }
 
 bool BFCAllocator::DeallocateFreeRegions(size_t rounded_bytes)
-    EXCLUSIVE_LOCKS_REQUIRED(lock_) {
+    EXCLUSIVE_LOCKS_REQUIRED(lock_)
+{
+  // hack:::
+  printf("BFCAllocator::DeallocateFreeRegions...\n");
+  //Sleep(5 * 1000);
+  printf("...BFCAllocator::DeallocateFreeRegions\n");
+
   // Do nothing if garbage collection is off.
   if (!garbage_collection_) {
     return false;

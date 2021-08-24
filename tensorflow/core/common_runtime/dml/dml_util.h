@@ -20,6 +20,8 @@ limitations under the License.
 #include "tensorflow/core/common_runtime/dml/dml_device.h"
 #include "tensorflow/core/framework/op_kernel.h"
 
+#pragma optimize( "", off )//hack:::
+
 namespace tensorflow {
 
 // Attempts to create an IDMLDevice. Returns an empty ComPtr if unsuccessful.

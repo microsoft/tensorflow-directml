@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#pragma optimize( "", off )//hack:::
 #include "dml_heap_allocator.h"
 
 #include "dml_util.h"
