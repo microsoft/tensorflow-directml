@@ -43,7 +43,6 @@ Microsoft::WRL::ComPtr<TDeviceOrFactory> DxExportHelper(
   }
 
   // Load the function.
-  using D3D12CreateDeviceFn = decltype(D3D12CreateDevice);
   F* create_function;
   auto get_symbol_status = Env::Default()->GetSymbolFromLibrary(
       module_handle.ValueOrDie(), function_name, (void**)&create_function);
