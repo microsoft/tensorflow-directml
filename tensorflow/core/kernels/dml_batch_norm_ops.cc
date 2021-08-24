@@ -240,6 +240,23 @@ static dml::Expression CreateBatchNormNode(
                                  epsilon, fused_activation);
 }
 
+static dml::BatchNormalizationTrainingOutputs CreateBatchNormTrainingNode(
+    dml::Expression x, dml::Expression scale, dml::Expression offset, 
+    absl::optional<dml::Expression> fused_add, float epsilon,
+    functor::FusedBatchNormActivationMode activation_mode) {
+  // This should already have been validated in the init helper
+  DCHECK(activation_mode == functor::FusedBatchNormActivationMode::kIdentity ||
+         activation_mode == functor::FusedBatchNormActivationMode::kRelu);
+
+  auto fused_activation =
+      activation_mode == functor::FusedBatchNormActivationMode::kIdentity
+          ? dml::FusedActivation::None()
+          : dml::FusedActivation::Relu();
+
+  return dml::BatchNormalizationTraining(x, scale, offset, fused_add,
+                                 epsilon, fused_activation);
+}
+
 class DmlFusedBatchNormKernel : public DmlKernel {
   enum InputIndex {
     kX,
@@ -288,11 +305,11 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     // The mean/variance tensors are empty when is_training is set; we need to
     // compute them ourselves
     params.kernel_input_indices = {kX, kScale, kOffset};
-
+    
     if (add_side_input) {
       params.kernel_input_indices.push_back(kSideInput);
     }
-
+    
     // Normalized output, computed mean, computed variance, saved mean, saved
     // variance
     params.kernel_output_indices = {0, 1, 2, 3, 4};
@@ -316,10 +333,6 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
     auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
-    // Unfortunately we need to compute the mean/variance ourselves. We can't
-    // use DML's built-in MeanVarianceNormalization because we need to return
-    // the mean/variance tensors back to TF.
-
     auto scope =
         dml::Graph(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
     auto x = dml::InputTensor(scope, 0, input_descs[0]);
@@ -327,7 +340,6 @@ class DmlFusedBatchNormKernel : public DmlKernel {
     auto offset = dml::InputTensor(scope, 2, input_descs[2]);
 
     DML_TENSOR_DATA_TYPE input_type = x.GetOutputDesc().dataType;
-    auto input_sizes = x.GetOutputDesc().sizes;
 
     // scale and offset are always float32, but the input data type might not
     // be. If that's the case, we need to insert a cast.
@@ -337,73 +349,39 @@ class DmlFusedBatchNormKernel : public DmlKernel {
       offset = dml::Cast(offset, input_type);
     }
 
-    // We normalize the input for each channel, so the number of elements per
-    // normalization is N * H * W
-    uint32_t norm_elem_count = input_sizes[0] * input_sizes[2] * input_sizes[3];
+    absl::optional<dml::Expression> side_input;
+    if (add_side_input) {
+      side_input = dml::InputTensor(scope, 3, input_descs[3]);
+    }
 
-    // Compute the mean of the input for each channel. We do this with an
-    // AVERAGE reduction across all axes except C.
-    auto mean = dml::Reduce(x, DML_REDUCE_FUNCTION_AVERAGE, {0, 2, 3});
-
-    // The strides we need to set to broadcast C across an entire tensor
-    dml::TensorDesc::Dimensions broadcast_c_strides = {/*N*/ 0,
-                                                       /*C*/ 1,
-                                                       /*H*/ 0,
-                                                       /*W*/ 0};
-
-    // Broadcasts the C dimension across the entire input tensor
-    auto broadcasted_mean =
-        dml::Reinterpret(mean, input_sizes, broadcast_c_strides);
-
-    // Compute the variance of the input for each channel.
-    auto x_centered = x - broadcasted_mean;
-    auto variance =
-        dml::Reduce(x_centered, DML_REDUCE_FUNCTION_SUM_SQUARE, {0, 2, 3});
-    variance /= norm_elem_count;
+    dml::BatchNormalizationTrainingOutputs dml_outputs = CreateBatchNormTrainingNode(
+        x, scale, offset, side_input, epsilon, activation_mode);
 
     // Apply Bessel's correction to the variance
+    auto input_sizes = x.GetOutputDesc().sizes;
+    uint32_t norm_elem_count = input_sizes[0] * input_sizes[2] * input_sizes[3];
     float bessel_correction_factor = 1.0f;
     if (norm_elem_count > 1) {  // Prevent division by 0
       bessel_correction_factor = (float)norm_elem_count / (norm_elem_count - 1);
     }
 
-    auto corrected_variance = variance * bessel_correction_factor;
-
-    // If we need to add a side input, we cannot fuse the activation with
-    // BatchNorm since the side input needs to be added before the activation
-    auto normalized_output = CreateBatchNormNode(
-        x, mean, variance, scale, offset, epsilon,
-        add_side_input ? functor::FusedBatchNormActivationMode::kIdentity
-                       : activation_mode);
-
-    // FusedBatchNormEx can provide a side input that we need to add before
-    // activation
-    if (add_side_input) {
-      auto side_input = dml::InputTensor(scope, 3, input_descs[3]);
-      normalized_output += side_input;
-
-      if (activation_mode != functor::FusedBatchNormActivationMode::kIdentity) {
-        // Only Relu is supported
-        DCHECK(activation_mode == functor::FusedBatchNormActivationMode::kRelu);
-        normalized_output = dml::ActivationRelu(normalized_output);
-      }
-    }
+    auto corrected_variance = dml_outputs.variance * bessel_correction_factor;
 
     if (is_cast_required) {
       // These output tensors are defined to always be float32, so insert a cast
       // if necessary
-      mean = dml::Cast(mean, DML_TENSOR_DATA_TYPE_FLOAT32);
+      dml_outputs.mean = dml::Cast(dml_outputs.mean, DML_TENSOR_DATA_TYPE_FLOAT32);
       corrected_variance =
           dml::Cast(corrected_variance, DML_TENSOR_DATA_TYPE_FLOAT32);
-      variance = dml::Cast(variance, DML_TENSOR_DATA_TYPE_FLOAT32);
+      dml_outputs.variance = dml::Cast(dml_outputs.variance, DML_TENSOR_DATA_TYPE_FLOAT32);
     }
 
     auto outputs = {
-        normalized_output,
-        mean,                // batch_mean
-        corrected_variance,  // batch_variance
-        mean,                // saved_mean (same as batch_mean)
-        variance             // saved_variance
+        dml_outputs.output,
+        dml_outputs.mean,      // batch_mean
+        corrected_variance,    // batch_variance
+        dml_outputs.mean,      // saved_mean (same as batch_mean)
+        dml_outputs.variance   // saved_variance
     };
 
     auto compiled_op = scope.Compile(DML_EXECUTION_FLAG_NONE, outputs);
@@ -681,7 +659,6 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
         CreateTensorDescFromOutput(ctx, kOffsetBackprop, layout_1D);
 
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
-    auto output_descs = GetDmlTensorDescs(tensors.outputs);
 
     auto scope =
         dml::Graph(ctx->GetDmlDevice(), GetDmlXTensorPolicy(tensor_format));
@@ -696,7 +673,6 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
         dml::InputTensor(scope, kReserveSpace2, input_descs[kReserveSpace2]);
 
     DML_TENSOR_DATA_TYPE input_type = y_backprop.GetOutputDesc().dataType;
-    auto input_sizes = y_backprop.GetOutputDesc().sizes;
 
     // y_backprop, x, and x_backprop may be float16 or float32, but everything
     // else is always float32. If the types don't match, we need to insert
@@ -713,97 +689,18 @@ class DmlFusedBatchNormGradKernel : public DmlKernel {
     dml::Expression offset_backprop;
     dml::Expression x_backprop;
 
+    dml::BatchNormalizationGradOutputs batch_norm_grad_op_outputs;
     if (is_training) {
-      // The strides we need to set to broadcast C across an entire tensor
-      dml::TensorDesc::Dimensions broadcast_c_strides = {/*N*/ 0,
-                                                         /*C*/ 1,
-                                                         /*H*/ 0,
-                                                         /*W*/ 0};
-
-      //
-      // Formulae copied from tensorflow/core/kernels/fused_batch_norm_op.cc:
-      //
-      // x_backprop (training) = scale * rsqrt(variance + epsilon) *
-      //              [y_backprop - mean(y_backprop) - (x - mean(x)) *
-      //              mean(y_backprop * (x - mean(x))) / (variance + epsilon)]
-      //
-      // x_backprop (inference) = y_backprop * (scale * rsqrt(pop_var +
-      // epsilon))
-      //
-      // scale_backprop = sum(y_backprop *
-      //                  (x - mean(x)) * rsqrt(variance + epsilon))
-      // offset_backprop = sum(y_backprop)
-      //
-
-      auto variance_e = variance + epsilon;
-      auto sqrt_variance_e = dml::Sqrt(variance_e);
-      auto coef0 = 1.0f / sqrt_variance_e;  // rsqrt(variance + epsilon)
-      auto scaled_coef0 =
-          scale / sqrt_variance_e;  // scale * rsqrt(variance + epsilon)
-
-      auto scaled_coef0_bcast =
-          dml::Reinterpret(scaled_coef0, input_sizes, broadcast_c_strides);
-
-      // Unlike y_backprop we don't need to recompute the mean of x; it's
-      // provided to us as an input. We do, however, need to broadcast it to
-      // cover the entire tensor
-      auto x_mean = dml::Reinterpret(mean, input_sizes, broadcast_c_strides);
-
-      auto x_centered = x - x_mean;
-      auto coef1 = y_backprop * x_centered;  // y_backprop * (x - mean(x))
-
-      // Compute x_backprop:
-      // x_backprop = scale * rsqrt(variance + epsilon) *
-      //              [y_backprop - mean(y_backprop) - (x - mean(x)) *
-      //              mean(y_backprop * (x - mean(x))) / (variance + epsilon)]
-      //
-      // let coef0 = rsqrt(variance + epsilon)
-      //     coef1 = y_backprop * (x - mean(x))
-      //
-      // => x_backprop = scale * coef0 * (y_backprop_centered - x_centered *
-      //                                  mean(coef1) / (variance + epsilon))
-
-      // Compute the mean of y_backprop for each C, and broadcast the mean
-      // across the entire channel
-      auto y_backprop_mean =
-          dml::Reduce(y_backprop, DML_REDUCE_FUNCTION_AVERAGE, {0, 2, 3});
-      y_backprop_mean =
-          dml::Reinterpret(y_backprop_mean, input_sizes, broadcast_c_strides);
-
-      auto variance_e_bcast =
-          dml::Reinterpret(variance_e, input_sizes, broadcast_c_strides);
-
-      auto y_backprop_centered = y_backprop - y_backprop_mean;
-
-      auto coef1_mean =
-          dml::Reduce(coef1, DML_REDUCE_FUNCTION_AVERAGE, {0, 2, 3});
-      coef1_mean =
-          dml::Reinterpret(coef1_mean, input_sizes, broadcast_c_strides);
-
-      x_backprop =
-          scaled_coef0_bcast *
-          (y_backprop_centered - x_centered * coef1_mean / variance_e_bcast);
-
-      // scale_backprop = sum(y_backprop *
-      //                  (x - mean(x)) * rsqrt(variance + epsilon))
-      //
-      // let coef0 = rsqrt(variance + epsilon)
-      //     coef1 = y_backprop * (x - mean(x))
-      //
-      // => scale_backprop = sum(coef1 * coef0) = sum(coef1) * coef0
-      scale_backprop =
-          dml::Reduce(coef1, DML_REDUCE_FUNCTION_SUM, {0, 2, 3}) * coef0;
-
-      // offset_backprop = sum(y_backprop)
-      offset_backprop =
-          dml::Reduce(y_backprop, DML_REDUCE_FUNCTION_SUM, {0, 2, 3});
-    } else {
-      auto outputs = dml::BatchNormalizationGrad(x, y_backprop, mean, variance,
+      batch_norm_grad_op_outputs = dml::BatchNormalizationTrainingGrad(x, y_backprop, mean, variance,
                                                  scale, epsilon);
-      x_backprop = outputs.gradient;
-      scale_backprop = outputs.scaleGradient;
-      offset_backprop = outputs.biasGradient;
+    } else {
+      batch_norm_grad_op_outputs = dml::BatchNormalizationGrad(x, y_backprop, mean, variance,
+                                                 scale, epsilon);
     }
+
+    x_backprop = batch_norm_grad_op_outputs.gradient;
+    scale_backprop = batch_norm_grad_op_outputs.scaleGradient;
+    offset_backprop = batch_norm_grad_op_outputs.biasGradient;
 
     // If necessary, cast outputs to their required types
     if (is_cast_required) {
