@@ -102,12 +102,12 @@ jobs:
 
   - powershell: |
       New-Item -Force -ItemType Directory "$(buildPubPath)"
-      Copy-Item -Recurse "$(buildOutPath)/python_package" "$(buildPubPath)"
+      Copy-Item -Recurse "$(buildOutPath)/python_package/*" "$(buildPubPath)"
       if ("${{parameters.enableTests}}" -eq "True") {
-          Copy-Item -Recurse "$(Build.SourcesDirectory)/third_party/dml/ci" "$(buildPubPath)" -Verbose
+          Copy-Item -Recurse "$(Build.SourcesDirectory)/third_party/dml/ci/*" "$(buildPubPath)" -Verbose
       }
       if ("${{parameters.buildCApi}}" -eq "True") {
-          Copy-Item -Recurse "$(buildOutPath)/c_package" "$(buildPubPath)" -Verbose
+          Copy-Item -Recurse "$(buildOutPath)/c_package/*" "$(buildPubPath)" -Verbose
       }
     displayName: Stage Artifacts
 
