@@ -24,6 +24,10 @@ import subprocess
 import shutil
 import configure as tf_configure
 from pathlib import Path
+import tarfile
+import tempfile
+import stat
+import re
 
 # Returns the path to .tf_configure.bazelrc, which is generated using configure.py.
 def tf_configure_path():
@@ -257,6 +261,92 @@ def create_package(args):
       shell=True,
       check=True)
 
+def create_c_package(args):
+  tarball_path = os.path.join(
+      os.path.dirname(os.path.realpath(__file__)),
+      "bazel-bin",
+      "tensorflow",
+      "tools",
+      "lib_package",
+      "libtensorflow.tar.gz")
+
+  bazel_bin_dir = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    "bazel-bin",
+    "tensorflow")
+
+  source_dir = os.path.split(os.path.dirname(os.path.realpath(__file__)))[-1]
+  dml_redist_dir = os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    ("bazel-%s" % source_dir),
+    "external",
+    "dml_redist",
+    "directml")
+
+  with tarfile.open(tarball_path) as tarball:
+      with tempfile.TemporaryDirectory() as temp_dir:
+          # Determine source version of DirectML module
+          dml_commit = None
+          with open(Path(dml_redist_dir)/'include'/'DirectMLConfig.h', 'r', encoding='utf-8-sig') as dml_config_header:
+              for line in dml_config_header:
+                  m = re.match('#define DIRECTML_SOURCE_VERSION "(.*)"', line)
+                  if m:
+                      dml_commit = m.group(1)
+                      break
+          if not dml_commit:
+              raise "Could not determine DirectML module version"
+
+          # Extract tarball produced by the built-in Bazel target.
+          tarball.extractall(temp_dir)
+          
+          if sys.platform == "win32":
+              package_name = 'libtensorflow-win-x64'
+
+              shutil.copy(Path(bazel_bin_dir)/'tensorflow.dll.if.lib', Path(temp_dir)/'lib'/'tensorflow.lib')
+
+              # Bazel target produces read-only files in the tarball.
+              for root, _, files in os.walk(temp_dir):
+                  for filename in files:
+                      full_path = os.path.join(root, filename)
+                      os.chmod(full_path, stat.S_IWRITE)
+
+              # Remove unnecessary symlink files.
+              for p in (Path(temp_dir)/"lib").glob("libtensorflow*"):
+                  p.unlink()
+
+              # The DirectML module in the redist package may have the commit baked into it already (preview redist);
+              # otherwise, the module is a release build of DirectML.
+              dml_preview_path = Path(dml_redist_dir)/'bin'/'x64-win'/('DirectML.%s.dll' % dml_commit)
+              dml_release_path = Path(dml_redist_dir)/'bin'/'x64-win'/'DirectML.dll'
+              dml_target_path = Path(temp_dir)/'lib'/('DirectML.%s.dll' % dml_commit)
+              
+              if os.path.exists(dml_preview_path):
+                  shutil.copy(dml_preview_path, dml_target_path)
+              elif os.path.exists(dml_release_path):
+                  shutil.copy(dml_release_path, dml_target_path)
+              else:
+                  raise "Could not locate DirectML module in redist package"
+          else:
+              package_name = 'libtensorflow-linux-x64'
+
+              # The DirectML module in the redist package may have the commit baked into it already (preview redist);
+              # otherwise, the module is a release build of DirectML.
+              dml_preview_path = Path(dml_redist_dir)/'bin'/'x64-linux'/('libdirectml.%s.so' % dml_commit)
+              dml_release_path = Path(dml_redist_dir)/'bin'/'x64-linux'/'libdirectml.so'
+              dml_target_path = Path(temp_dir)/'lib'/('libdirectml.%s.so' % dml_commit)
+              
+              if os.path.exists(dml_preview_path):
+                  shutil.copy(dml_preview_path, dml_target_path)
+              elif os.path.exists(dml_release_path):
+                  shutil.copy(dml_release_path, dml_target_path)
+              else:
+                  raise "Could not locate DirectML module in redist package"
+
+          # Copy license files.
+          shutil.copy(Path(dml_redist_dir)/'LICENSE.txt', Path(temp_dir)/'DirectML_LICENSE.txt')
+          shutil.copy(Path(dml_redist_dir)/'ThirdPartyNotices.txt', Path(temp_dir)/'DirectML_ThirdPartyNotices.txt')
+
+          shutil.make_archive(Path(args.build_output)/'c_package'/package_name, 'zip', temp_dir)
 
 def install_package(args):
   """Installs the generated TensorFlow Python package."""
@@ -297,6 +387,11 @@ def main():
       "--package", "-p",
       action="store_true",
       help="Create Python package.")
+
+  parser.add_argument(
+      "--c_package",
+      action="store_true",
+      help="Create C API package.")
 
   parser.add_argument(
       "--tests",
@@ -362,6 +457,10 @@ def main():
     create_package(args)
     if args.install:
       install_package(args)
+
+  # Create C API package
+  if args.c_package:
+    create_c_package(args)
 
   # Build the tests
   if args.tests:

@@ -20,6 +20,11 @@ schedules:
   always: false
 
 parameters:
+- name: releaseBuild
+  displayName: Release Build
+  type: boolean
+  default: false
+
 - name: buildArtifacts
   displayName: Build Artifacts
   type: object
@@ -50,24 +55,23 @@ parameters:
   type: string
   default: $(emailTo) # the default is stored in the pipeline as a variable
 
-variables:
-  isMasterBranch: ${{eq(variables['Build.SourceBranch'], 'refs/heads/directml')}}
-  isReleaseBranch: ${{startsWith(variables['Build.SourceBranch'], 'refs/heads/release/')}}
-  isMasterOrReleaseBranch: ${{or(eq(variables.isMasterBranch, 'True'), eq(variables.isReleaseBranch, 'True'))}}
+# For building manylinux2010-compliant Linux wheels:
+resources:
+  containers:
+  - container: manylinux
+    image: tensorflow/tensorflow:custom-op-ubuntu16
 
 stages:
 - stage: buildStage
   displayName: Build
-  pool: DirectML-Build
   jobs:
-  - template: build.yml
-    parameters:
-      enableTests: ${{parameters.enableTests}}
-      buildCApi: ${{parameters.buildCApi}}
-      artifacts: ${{parameters.buildArtifacts}}
-      # Archive builds of main branches to a network share (if the variable is set)
-      ${{if eq(variables.isMasterOrReleaseBranch, 'True')}}:
-        archiveSharePath: $(archiveSharePath)
+  - ${{each artifact in parameters.buildArtifacts}}:
+    - template: build.yml
+      parameters:
+        artifact: ${{artifact}}
+        enableTests: ${{parameters.enableTests}}
+        buildCApi: ${{parameters.buildCApi}}
+        releaseBuild: ${{parameters.releaseBuild}}
 
 - ${{if parameters.enableTests}}:
   - stage: testStage
