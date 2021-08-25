@@ -56,14 +56,13 @@ jobs:
 
   - ${{if contains(parameters.artifact, '-linux-') }}:
     - script: |
-        yum install wget -y
-      displayName: Install wget
-      target: manylinux
-    - script: |
         wget https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-installer-linux-x86_64.sh
         bash bazel-0.24.1-installer-linux-x86_64.sh --bin=$(Build.StagingDirectory)/bazel/0.24.1 --base=$(Build.StagingDirectory)/.bazel
-        echo "##vso[task.prependpath]$(Build.StagingDirectory)/bazel/0.24.1"
       displayName: Install Bazel
+      workingDirectory: $(Build.StagingDirectory)
+    - script: |
+        echo "##vso[task.prependpath]$(Build.StagingDirectory)/bazel/0.24.1"
+      displayName: Set Bazel Path
       workingDirectory: $(Build.StagingDirectory)
       target: manylinux
     - script: |
