@@ -3666,6 +3666,10 @@ cc_library(
 cc_library(
     name = "dml_runtime_impl",
     srcs = [
+        "common_runtime/dml/dml_adapter.cc",
+        "common_runtime/dml/dml_adapter_impl.cc",
+        "common_runtime/dml/dml_error_handling.cc",
+        "common_runtime/dml/dml_guids.cc",
         "common_runtime/dml/dml_device_cache.cc",
         "common_runtime/dml/dml_bfc_allocator.cc",
         "common_runtime/dml/dml_buffer.cc",
@@ -3693,6 +3697,12 @@ cc_library(
         "common_runtime/dml/dml_tracing.cc",
     ],
     hdrs = [
+        "common_runtime/dml/dml_common.h",
+        "common_runtime/dml/dml_error_handling.h",
+        "common_runtime/dml/dml_adapter.h",
+        "common_runtime/dml/dml_adapter_impl.h",
+        "common_runtime/dml/dml_adapter_heuristics.h",
+        "common_runtime/dml/dml_guids.h",
         "common_runtime/dml/dml_device_cache.h",
         "common_runtime/dml/dml_bfc_allocator.h",
         "common_runtime/dml/dml_buffer.h",
@@ -3735,7 +3745,13 @@ cc_library(
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
     ]),
     deps = [
-        ":dml_core",
+        ":lib",
+        ":lib_internal",
+        "@dml_redist//:headers",
+        "@directml//:directmlx",
+        "@directx_headers//:directx_headers",
+        "@directx_headers//:directx_guids",
+        "@directx_headers//:directx_winadapter",
         ":framework",
         ":framework_internal",
         ":gpu_bfc_allocator",
@@ -3743,6 +3759,12 @@ cc_library(
         ":stream_executor",
         "//tensorflow/stream_executor/platform:dso_loader",
     ] + if_windows(["@pix//:headers"]),
+    linkopts = if_windows([
+        "pathcch.lib",
+        "advapi32.lib",
+    ]) + if_not_windows([
+        "-Wl,-rpath,$$ORIGIN"
+    ]),
 )
 
 cc_library(
@@ -3769,50 +3791,6 @@ cc_library(
     copts = tf_copts() + if_windows([
         "-DDML_BUILD_WINDOWS",
         "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
-    ]),
-)
-
-cc_library(
-    name = "dml_core",
-    srcs = [
-        "common_runtime/dml/dml_adapter.cc",
-        "common_runtime/dml/dml_adapter_impl.cc",
-        "common_runtime/dml/dml_error_handling.cc",
-        "common_runtime/dml/dml_guids.cc",
-    ],
-    hdrs = [
-        "common_runtime/dml/dml_common.h",
-        "common_runtime/dml/dml_error_handling.h",
-        "common_runtime/dml/dml_adapter.h",
-        "common_runtime/dml/dml_adapter_impl.h",
-        "common_runtime/dml/dml_adapter_heuristics.h",
-        "common_runtime/dml/dml_guids.h",
-    ],
-    linkstatic = 1,
-    deps = [
-        ":lib",
-        ":lib_internal",
-        "@dml_redist//:headers",
-        "@directml//:directmlx",
-        "@directx_headers//:directx_headers",
-        "@directx_headers//:directx_guids",
-        "@directx_headers//:directx_winadapter",
-    ],
-    alwayslink = 1,
-    visibility = ["//visibility:public"],
-    copts = tf_copts() + if_windows([
-        "-DDML_BUILD_WINDOWS",
-        "-D_WIN32_WINNT=_WIN32_WINNT_WIN10"
-    ]),
-    linkopts = if_windows([
-        "d3d12.lib", 
-        "dxgi.lib", 
-        "pathcch.lib",
-        "advapi32.lib",
-    ]) + if_not_windows([
-        "-ld3d12",
-        "-ldxcore",
-        "-Wl,-rpath,$$ORIGIN"
     ]),
 )
 

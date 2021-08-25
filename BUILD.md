@@ -36,9 +36,7 @@ Developer mode is, as the name indicates, only intended to be used for developme
 
 The development headers and libraries used to build DirectX-based applications are included in the Windows SDK; however, this SDK is not available when building for Linux, and some of required APIs may not yet exist in public versions of the SDK. For these reasons, the DirectX development files are integrated a little differently in this project.
 
-The header files for Direct3D, DXCore, and DirectML are downloaded automatically. This project does not use any DirectX headers included in the Windows 10 SDK *except* for dxgi1_6.h, which is part of Windows 10 SDK 10.0.17763.0 or newer. Windows builds also require import libraries for D3D12 and DXGI, which are included in Windows 10 SDK 10.0.17763.0 or newer.
-
-Linux builds do not require the Windows 10 SDK at all (no such SDK exists for Linux), but your build machine must have WSL installed with the DirectX shared libraries available under `/usr/lib/wsl/lib`.
+The header files for Direct3D, DXCore, and DirectML are downloaded automatically. This project does not use any DirectX headers included in the Windows 10 SDK *except* for dxgi1_6.h, which is part of Windows 10 SDK 10.0.17763.0 or newer.
 
 The use of the redistributable DirectML library is governed by a separate license that is found as part of the package (found in `tensorflow_core/python/DirectML_LICENSE.txt` when extracted).
 
@@ -49,15 +47,24 @@ We've tested the following build environments, and we recommend using a Python e
 - **Windows**
   - Visual Studio 2017 (15.x)
   - Windows 10 SDK 10.0.17763.0 or newer
-  - MSYS2 20190524 or newer
+  - MSYS2 20190524 or newer with the *git*, *unzip*, and *patch* packages installed
   - Bazel 0.24.1
+  - Python 3.5, 3.6, or 3.7 environment with the following packages installed:
+    - six
+    - numpy
+    - wheel
+    - keras_applications==1.0.6
+    - keras_preprocessing==1.0.5
 
-- **WSL**
-  - Windows 10 Insider Build with WSL feature enabled (you must have libd3d12.so and libdxcore.so in `C:\Windows\System32\lxss\lib`)
-  - Ubuntu 18.04 or 20.04 with g++ package
+- **Linux**
+  - Any glibc-based distro (we've tested Ubuntu 18.04+) with gcc/g++ packages
   - Bazel 0.24.1
-
-**NOTE**: currently, it's only possible to build the Linux version of tensorflow-directml from a WSL environment. The D3D/DXCore libraries are needed for linking and are not yet available through another distribution channel. The DirectML redistributable package requires nuget.exe (a PE executable) to download, which also requires WSL/Windows interop. We hope to remove these restrictions in the near future.
+  - Python 3.5, 3.6, or 3.7 environment with the following packages installed:
+    - six
+    - numpy
+    - wheel
+    - keras_applications==1.0.6
+    - keras_preprocessing==1.0.5
 
 ## Build Script
 
@@ -119,7 +126,7 @@ Next, activate the environment. Activating an environment will set up the `PATH`
 Within the activated environment, install the following Python packages required for TensorFlow:
 
 ```
-(tfdml) PS> pip install six numpy==1.18.5 wheel
+(tfdml) PS> pip install six numpy wheel
 (tfdml) PS> pip install keras_applications==1.0.6 --no-deps
 (tfdml) PS> pip install keras_preprocessing==1.0.5 --no-deps
 ```
