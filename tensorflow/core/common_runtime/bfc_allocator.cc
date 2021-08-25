@@ -163,7 +163,8 @@ bool BFCAllocator::Extend(size_t alignment, size_t rounded_bytes) {
 
   VLOG(1) << "Allocated memory at " << mem_addr << " to "
           << static_cast<void*>(static_cast<char*>(mem_addr) + bytes);
-  region_manager_.AddAllocationRegion(mem_addr, bytes, min_alloc_size_exponent_);
+  region_manager_.AddAllocationRegion(mem_addr, bytes,
+                                      min_alloc_size_exponent_);
 
   // Create one large chunk for the whole memory space that will
   // be chunked later.
