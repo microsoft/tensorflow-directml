@@ -12,6 +12,11 @@ parameters:
   type: boolean
   default: false
 
+resources:
+  containers:
+  - container: manylinux
+    image: quay.io/pypa/manylinux2010_x86_64:latest
+
 jobs:
 - job:
   displayName: Build ${{parameters.artifact}}
@@ -55,16 +60,67 @@ jobs:
     displayName: Initialize Variables
 
   - ${{if contains(parameters.artifact, '-linux-') }}:
-    - template: setup_agent_linux.yml
+    - script: |
+        yum install wget -y
+      displayName: Install wget
+      target: manylinux
+    - script: |
+        wget https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-installer-linux-x86_64.sh
+        bash bazel-0.24.1-installer-linux-x86_64.sh --bin=$(Build.StagingDirectory)/bazel/0.24.1 --base=$(Build.StagingDirectory)/.bazel
+        echo "##vso[task.prependpath]$(Build.StagingDirectory)/bazel/0.24.1"
+      displayName: Install Bazel
+      workingDirectory: $(Build.StagingDirectory)
+      target: manylinux
+    - script: |
+        alias pip=/opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python
+        pip install six numpy wheel
+        pip install keras_applications==1.0.6 --no-deps
+        pip install keras_preprocessing==1.0.5 --no-deps
+      displayName: Install Python Packages
+      workingDirectory: $(Build.StagingDirectory)
+      target: manylinux
+  
   - ${{if contains(parameters.artifact, '-win-') }}:
-    - template: setup_agent_windows.yml
-
-  - powershell: |
-      Invoke-Expression '$(miniconda.activateCommand)'
-      pip install six numpy wheel
-      pip install keras_applications==1.0.6 --no-deps
-      pip install keras_preprocessing==1.0.5 --no-deps
-    displayName: Install Python Packages
+    - powershell: |
+        $Url = 'https://github.com/msys2/msys2-installer/releases/download/nightly-x86_64/msys2-base-x86_64-latest.sfx.exe'
+        $DownloadPath = '$(Build.StagingDirectory)/msys2.exe'
+        (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
+        & "$DownloadPath" -y
+        & "msys64/usr/bin/bash" -lc ' '
+        & "msys64/usr/bin/pacman.exe" --sync --needed --noconfirm git patch unzip
+        Write-Host "##vso[task.prependpath]$(Build.StagingDirectory)/msys64/usr/bin"
+      displayName: Install MSYS2
+      workingDirectory: $(Build.StagingDirectory)
+    - powershell: |
+        $Url = 'https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-windows-x86_64.exe'
+        $DownloadPath = '$(Build.StagingDirectory)/bin/bazel.exe'
+        $InstallDir = Split-Path $DownloadPath -Parent
+        New-Item -Force -ItemType Directory $InstallDir
+        (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
+        Write-Host "##vso[task.prependpath]$InstallDir"
+        Write-Host "##vso[task.setVariable variable=vs;isOutput=true]C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise"
+      displayName: Install Bazel
+      name: bazel # sets the prefix for variables: the 'vs' variable maps to 'BAZEL_VS' environment variable for future tasks
+      workingDirectory: $(Build.StagingDirectory)
+    - powershell: |
+        $Url = 'https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe'
+        $DownloadPath = '$(Build.StagingDirectory)/miniconda.exe'
+        (New-Object System.Net.WebClient).DownloadFile($Url, $DownloadPath)
+        $InstallDir = '$(Build.StagingDirectory)\miniconda3'
+        Start-Process $DownloadPath -ArgumentList '/NoRegistry=1', '/InstallationType=JustMe', '/RegisterPython=0', '/S', "/D=$InstallDir" -Wait
+        & "$InstallDir/shell/condabin/conda-hook.ps1"
+        conda create --name build python=$(vars.pyVersionMajorDotMinor) -y
+        $ActivateCmd = "$InstallDir/shell/condabin/conda-hook.ps1; conda activate build"
+        Write-Host "##vso[task.setVariable variable=activateCommand;isOutput=true]$ActivateCmd"
+      displayName: Install Miniconda
+      name: miniconda
+      workingDirectory: $(Build.StagingDirectory)
+    - powershell: |
+        Invoke-Expression '$(miniconda.activateCommand)'
+        pip install six numpy wheel
+        pip install keras_applications==1.0.6 --no-deps
+        pip install keras_preprocessing==1.0.5 --no-deps
+      displayName: Install Python Packages
 
   # Appends ".dev<DATE>" to the _VERSION variable in setup.py. For example, if the pipeline version
   # is 200610-2233.1.master, and _VERSION is currently 1.15.2, then the updated version will be
@@ -81,24 +137,35 @@ jobs:
       Set-Content $SetupPyPath $SetupPy -Encoding ascii
     displayName: Set Build Version
 
-  - powershell: |
-      Invoke-Expression '$(miniconda.activateCommand)'
-      if ("${{parameters.enableTests}}" -eq "True") {
-          python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
-      } else {
-          python build.py --clean --package --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
-      }
+  - ${{if contains(parameters.artifact, '-linux-') }}:
+    - script: |
+        alias python=/opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python
+        if [ "${{parameters.enableTests}}" == "True" ]; then
+            python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+            python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(buildOutPath) --destination $(buildPubPath)/tests/test_binaries
+        else
+            python build.py --clean --package --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+        fi
 
-      if ("${{parameters.buildCApi}}" -eq "True") {
-          python build.py --config $(vars.configuration) --build_output $(buildOutPath) --target //tensorflow/tools/lib_package:libtensorflow --c_package --telemetry
-      }
-    displayName: Build
-
-  - ${{if parameters.enableTests}}:
+        if [ "${{parameters.buildCApi}}" == "True"]; then
+            python build.py --config $(vars.configuration) --build_output $(buildOutPath) --target //tensorflow/tools/lib_package:libtensorflow --c_package --telemetry
+        fi
+      displayName: Build
+      target: manylinux
+  - ${{if contains(parameters.artifact, '-win-') }}:
     - powershell: |
         Invoke-Expression '$(miniconda.activateCommand)'
-        python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(buildOutPath) --destination $(buildPubPath)/tests/test_binaries
-      displayName: Gather Test Binaries
+        if ("${{parameters.enableTests}}" -eq "True") {
+            python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+            python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(buildOutPath) --destination $(buildPubPath)/tests/test_binaries
+        } else {
+            python build.py --clean --package --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+        }
+
+        if ("${{parameters.buildCApi}}" -eq "True") {
+            python build.py --config $(vars.configuration) --build_output $(buildOutPath) --target //tensorflow/tools/lib_package:libtensorflow --c_package --telemetry
+        }
+      displayName: Build
 
   - powershell: |
       New-Item -Force -ItemType Directory "$(buildPubPath)"
