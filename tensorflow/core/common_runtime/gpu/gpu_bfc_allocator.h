@@ -44,7 +44,8 @@ class GPUBFCAllocator : public BFCAllocator {
 
  private:
   static bool GetAllowGrowthValue(const GPUOptions& gpu_options);
-  static bool GetGarbageCollectionValue(bool default_garbage_collection_value = true);
+  static bool GetGarbageCollectionValue(
+      bool default_garbage_collection_value = true);
 };
 
 }  // namespace tensorflow
