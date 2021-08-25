@@ -154,7 +154,7 @@ $env:PATH = "C:\bazel\0.24.1;$env:PATH"
 $env:PATH = "C:\msys64\usr\bin;$env:PATH"
 ```
 
-Set the contents of the deactivation script (`%CONDA_PREFIX%\etc\conda\activate.d\path.ps1`):
+Set the contents of the deactivation script (`%CONDA_PREFIX%\etc\conda\deactivate.d\path.ps1`):
 
 ```PowerShell
 $env:PATH = $env:TFDML_PATH_RESTORE
