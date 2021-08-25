@@ -12,11 +12,6 @@ parameters:
   type: boolean
   default: false
 
-resources:
-  containers:
-  - container: manylinux
-    image: quay.io/pypa/manylinux2010_x86_64:latest
-
 jobs:
 - job:
   displayName: Build ${{parameters.artifact}}

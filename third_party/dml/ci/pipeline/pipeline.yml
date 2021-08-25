@@ -19,6 +19,11 @@ schedules:
     - release/*
   always: false
 
+resources:
+  containers:
+  - container: manylinux
+    image: quay.io/pypa/manylinux2010_x86_64:latest
+
 parameters:
 - name: releaseBuild
   displayName: Release Build
