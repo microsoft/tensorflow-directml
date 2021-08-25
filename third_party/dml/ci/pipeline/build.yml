@@ -133,14 +133,14 @@ jobs:
   - ${{if contains(parameters.artifact, '-linux-') }}:
     - script: |
         if [ "${{parameters.enableTests}}" == "True" ]; then
-            python=/opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
-            python=/opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(buildOutPath) --destination $(buildPubPath)/tests/test_binaries
+            /opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python build.py --clean --package --tests --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+            /opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python third_party/dml/ci/gather_test_binaries.py --source_root . --build_output $(buildOutPath) --destination $(buildPubPath)/tests/test_binaries
         else
-            python=/opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python build.py --clean --package --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
+            /opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python build.py --clean --package --config $(vars.configuration) --build_output $(buildOutPath) --telemetry
         fi
 
         if [ "${{parameters.buildCApi}}" == "True"]; then
-            python=/opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python build.py --config $(vars.configuration) --build_output $(buildOutPath) --target //tensorflow/tools/lib_package:libtensorflow --c_package --telemetry
+            /opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python build.py --config $(vars.configuration) --build_output $(buildOutPath) --target //tensorflow/tools/lib_package:libtensorflow --c_package --telemetry
         fi
       displayName: Build
       target: manylinux
