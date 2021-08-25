@@ -53,17 +53,15 @@ bool GPUBFCAllocator::GetAllowGrowthValue(const GPUOptions& gpu_options) {
   return gpu_options.allow_growth();
 }
 
-bool GPUBFCAllocator::GetGarbageCollectionValue() {
+bool GPUBFCAllocator::GetGarbageCollectionValue(
+    bool default_garbage_collection_value) {
   const char* enable_gpu_garbage_collection =
       std::getenv("TF_ENABLE_GPU_GARBAGE_COLLECTION");
   if (enable_gpu_garbage_collection == nullptr) {
-    // By default, turn off the memory garbage collection.
-    //
-    // The mainline TF branch sets this to true. This modification for the
-    // DirectML fork is false so the garbage collector doesn't attempt to
-    // free allocations in the middle of GPU processing, which would result
-    // in a DXGI device removed error and process death.
-    return false;
+    // Use the default value from the caller if no environment variable exists,
+    // as some subclasses of the BFC allocator may default to disabling garbage
+    // collection to avoid freeing allocations in the middle of GPU processing.
+    return default_garbage_collection_value;
   }
   if (strcmp("false", enable_gpu_garbage_collection) == 0) {
     return false;
@@ -88,10 +86,11 @@ GPUBFCAllocator::GPUBFCAllocator(SubAllocator* sub_allocator,
 GPUBFCAllocator::GPUBFCAllocator(SubAllocator* sub_allocator,
                                  size_t total_memory,
                                  const GPUOptions& gpu_options,
-                                 const string& name, size_t max_allocation_size)
+                                 const string& name, size_t max_allocation_size,
+                                 bool default_garbage_collection_value)
     : BFCAllocator(sub_allocator, total_memory,
                    GPUBFCAllocator::GetAllowGrowthValue(gpu_options), name,
-                   GPUBFCAllocator::GetGarbageCollectionValue(), 8,
+                   GPUBFCAllocator::GetGarbageCollectionValue(default_garbage_collection_value), 8,
                    max_allocation_size) {}
 
 }  // namespace tensorflow
