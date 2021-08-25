@@ -59,10 +59,10 @@ bool GPUBFCAllocator::GetGarbageCollectionValue() {
   if (enable_gpu_garbage_collection == nullptr) {
     // By default, turn off the memory garbage collection.
     //
-    // The mainline TF branch sets this to true. This modification
-    // for the DirectML fork is so the garbage collector doesn't
-    // attempt to free chunks in the middle of GPU processing, which
-    // would result in a DXGI device removed error and process death.
+    // The mainline TF branch sets this to true. This modification for the
+    // DirectML fork is false so the garbage collector doesn't attempt to
+    // free allocations in the middle of GPU processing, which would result
+    // in a DXGI device removed error and process death.
     return false;
   }
   if (strcmp("false", enable_gpu_garbage_collection) == 0) {
