@@ -66,8 +66,8 @@ jobs:
       workingDirectory: $(Build.StagingDirectory)
       target: manylinux
     - script: |
-        ls /opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python
-        alias pip=/opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/python
+        ls /opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/pip
+        alias pip=/opt/python/$(vars.pyVersion)-$(vars.pyVersion)m/bin/pip
         which pip
         pip install six numpy wheel
         pip install keras_applications==1.0.6 --no-deps
