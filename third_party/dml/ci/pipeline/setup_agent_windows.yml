@@ -11,7 +11,7 @@ steps:
   workingDirectory: $(Build.StagingDirectory)
 
 - powershell: |
-    $Url = 'https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-windows-x86_64.exe'
+    $Url = 'https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-windows-x86_64.exe'
     $DownloadPath = '$(Build.StagingDirectory)/bin/bazel.exe'
     $InstallDir = Split-Path $DownloadPath -Parent
     New-Item -Force -ItemType Directory $InstallDir
