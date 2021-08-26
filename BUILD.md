@@ -5,7 +5,7 @@ This document contains instructions for producing private builds of tensorflow-d
 - [DirectML Branch](#directml-branch)
 - [Developer Mode](#developer-mode)
 - [DirectX Development Files](#directx-development-files)
-- [Build Environment](#build-environment)
+- [Recommended Build Environment](#recommended-build-environment)
 - [Build Script](#build-script)
 - [CI/PyPI Builds](#cipypi-builds)
 - [Linux Wheels (Manylinux) and DirectX Libraries](#linux-wheels-manylinux-and-directx-libraries)
@@ -63,16 +63,16 @@ The header files for Direct3D, DXCore, and DirectML are downloaded automatically
 
 The use of the redistributable DirectML library is governed by a separate license that is found as part of the package (found in `tensorflow_core/python/DirectML_LICENSE.txt` when extracted).
 
-# Build Environment
+# Recommended Build Environment
 
-We've tested the following build environments, and we recommend using a Python environment manager like [Miniconda](https://docs.conda.io/en/latest/miniconda.html) to sandbox your builds.
+We've tested the following build environments, and we recommend using a Python environment manager like [Miniconda](https://docs.conda.io/en/latest/miniconda.html) to sandbox your builds. It may be possible to build in other environments that we have not tested.
 
 - **Windows**
   - Visual Studio 2017 (15.x)
   - Windows 10 SDK 10.0.17763.0 or newer
   - MSYS2 20190524 or newer with the *git*, *unzip*, and *patch* packages installed
-  - Bazel 0.24.1
-  - Python 3.5, 3.6, or 3.7 environment with the following packages installed:
+  - Bazel 0.26.1
+  - Python 3.6, or 3.7 environment with the following packages installed:
     - six
     - numpy
     - wheel
@@ -81,8 +81,8 @@ We've tested the following build environments, and we recommend using a Python e
 
 - **Linux**
   - Any glibc-based distro (we've tested Ubuntu 18.04+) with gcc/g++ packages
-  - Bazel 0.24.1
-  - Python 3.5, 3.6, or 3.7 environment with the following packages installed:
+  - Bazel 0.26.1
+  - Python 3.6, or 3.7 environment with the following packages installed:
     - six
     - numpy
     - wheel
@@ -93,15 +93,13 @@ We've tested the following build environments, and we recommend using a Python e
 
 A helper script, build.py, can be used to build this repository with support for DirectML. This script is a thin wrapper around the bazel commands for configuring and build TensorFlow; you may use bazel directly if you prefer, but make sure to include `--config=dml`. Run `build.py --help` for a full list of options, or inspect this file to get a full list of the bazel commands it executes. 
 
-For example, to build the repository and produce a Python wheel use `build.py --package` in a Python 3.5-3.8 environment with `bazel` on the PATH.
-
 # CI/PyPI Builds
 
 The wheels published to [tensorflow-directml PyPI](https://pypi.org/project/tensorflow-directml/) are produced using the Azure Pipelines scripts found under [third_party/dml/ci/pipeline](third_party/dml/ci/pipeline).
 
 # Linux Wheels (Manylinux) and DirectX Libraries
 
-Building *portable* Linux binaries is tricky in comparison to Windows or MacOS. The [Manylinux](https://github.com/pypa/manylinux) project attempts to wrangle some of this complexity by providing standards for build environments to produce binaries that widely usable across GLIBC-based Linux distros. Manylinux also provides container images that implement the various manylinux standards. 
+Building *portable* Linux binaries is tricky in comparison to Windows or MacOS. The [Manylinux](https://github.com/pypa/manylinux) project attempts to wrangle some of this complexity by providing standards for build environments to produce binaries that are widely usable across GLIBC-based Linux distros. Manylinux also provides container images that implement the various manylinux standards. 
 
 Unfortunately, the official manylinux2010 image does not support pre-built versions of bazel (the build tool for TensorFlow); it's necessary to build bazel from source or set up a manylinux2010-compliant toolchain on a different host OS. The official TensorFlow CI builds use Ubuntu 16.04 as the base OS for its container-based builds, and TFDML CI builds take a similar approach by leveraging Google's [custom-op-ubuntu16](https://hub.docker.com/layers/tensorflow/tensorflow/custom-op-ubuntu16/images/sha256-f0676af86cb61665ae20c7935340b4073e325ccbad1f2bc7b904577dd6d511c0?context=explore) image.
 
@@ -133,8 +131,8 @@ PS> C:\msys64\usr\bin\pacman.exe -S git patch unzip
 
 [Bazel](https://bazel.build/) is the build tool for TensorFlow. Bazel is distributed as an executable and there is no installer step.
 
-1. Download [Bazel 0.24.1](https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-windows-x86_64.exe).
-2. Copy/rename `bazel-0.24.1-windows-x86_64.exe` to a versioned path, such as `C:\bazel\0.24.1\bazel.exe`. TensorFlow will expect bazel.exe on the `%PATH%`, so renaming the executable while retaining the version within the path is useful.
+1. Download [Bazel 0.26.1](https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-windows-x86_64.exe).
+2. Copy/rename `bazel-0.26.1-windows-x86_64.exe` to a versioned path, such as `C:\bazel\0.26.1\bazel.exe`. TensorFlow will expect bazel.exe on the `%PATH%`, so renaming the executable while retaining the version within the path is useful.
 
 ## Install Miniconda
 
@@ -148,7 +146,7 @@ Launch a Miniconda prompt (appears as "Anaconda PowerShell Prompt (Miniconda3)" 
 
 After launching the prompt, create a new environment. The examples here use the name `tfdml`, but you can choose any name you like. The idea is to sandbox any packages and dependencies in this environment. This will create a separate copy of Python and its packages in a directory `C:\miniconda3\envs\tfdml`.
 
-**IMPORTANT**: make sure to use Python 3.7, 3.6, or 3.5. TensorFlow 1.15 is not supported on newer versions of Python.
+**IMPORTANT**: make sure to use Python 3.7 or 3.6. TensorFlow 1.15 is not supported on newer versions of Python.
 
 ```
 (base) PS> conda create --name tfdml python=3.7
@@ -187,7 +185,7 @@ Set the contents of the activation script (`%CONDA_PREFIX%\etc\conda\activate.d\
 
 ```PowerShell
 $env:TFDML_PATH_RESTORE = $env:PATH
-$env:PATH = "C:\bazel\0.24.1;$env:PATH"
+$env:PATH = "C:\bazel\0.26.1;$env:PATH"
 $env:PATH = "C:\msys64\usr\bin;$env:PATH"
 ```
 
@@ -204,7 +202,7 @@ Restart your conda environment (launch the Miniconda prompt again and activate `
 
 CommandType     Name          Version    Source
 -----------     ----          -------    ------
-Application     bazel.exe     0.0.0.0    C:\bazel\0.24.1\bazel.exe
+Application     bazel.exe     0.0.0.0    C:\bazel\0.26.1\bazel.exe
 
 
 (tfdev) PS> get-command git
@@ -238,7 +236,7 @@ To produce the Python package run the following:
 (tfdev) PS> python build.py -p -c release
 ```
 
-After the package is built you will find a wheel package under `<PATH_TO_CLONE>\..\dml_build\python_package` (e.g. `C:\src\dml_build\python_package` in these examples). You can run `pip install` on the output .whl file to install your locally built copy of TensorFlow-DirectML.
+After the package is built you will find a wheel package under `<PATH_TO_CLONE>\..\tfdml_build\python_package` (e.g. `C:\src\tfdml_build\python_package` in these examples). You can run `pip install` on the output .whl file to install your locally built copy of TensorFlow-DirectML.
 
 The build script has additional options you can experiment with. To see more details:
 
@@ -261,8 +259,8 @@ sudo apt install unzip gcc g++
 ## Install Bazel
 
 ```bash
-wget https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-installer-linux-x86_64.sh
-bash bazel-0.24.1-installer-linux-x86_64.sh --bin=$HOME/bin/bazel/0.24.1 --base=$HOME/.bazel
+wget https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-installer-linux-x86_64.sh
+bash bazel-0.26.1-installer-linux-x86_64.sh --bin=$HOME/bin/bazel/0.26.1 --base=$HOME/.bazel
 ```
 
 ## Install Miniconda
@@ -284,7 +282,7 @@ eval "$($HOME/miniconda3/bin/conda shell.bash hook)"
 
 After launching the prompt, create a new environment. The examples here use the name `tfdml`, but you can choose any name you like. The idea is to sandbox any packages and dependencies in this environment. This will create a separate copy of Python and its packages.
 
-**IMPORTANT**: make sure to use Python 3.7, 3.6, or 3.5. TensorFlow 1.15 is not supported on newer versions of Python.
+**IMPORTANT**: make sure to use Python 3.7 or 3.6. TensorFlow 1.15 is not supported on newer versions of Python.
 
 ```
 (base) ~$ conda create --name tfdml python=3.7
@@ -313,14 +311,14 @@ Finally, we need to augment the `PATH` of the conda environment to include Bazel
 (tfdml) :~$ touch $CONDA_PREFIX/etc/conda/deactivate.d/path.she
 ```
 
-Set the contents of the activation script (`%CONDA_PREFIX%\etc\conda\activate.d\path.ps1`). Make sure to use the correct paths where you installed Bazel and MSYS2:
+Set the contents of the activation script (`%CONDA_PREFIX%/etc/conda/activate.d/path.sh`). Make sure to use the correct paths where you installed Bazel:
 
 ```bash
 export TFDML_PATH_RESTORE=$PATH
-export PATH=$HOME/bin/bazel/0.24.1:$PATH
+export PATH=$HOME/bin/bazel/0.26.1:$PATH
 ```
 
-Set the contents of the deactivation script (`%CONDA_PREFIX%\etc\conda\deactivate.d\path.ps1`):
+Set the contents of the deactivation script (`%CONDA_PREFIX%/etc/conda/deactivate.d/path.sh`):
 
 ```bash
 export PATH=$TFDML_PATH_RESTORE
@@ -345,7 +343,7 @@ Remember to activate your build environment whenever you need to build. To produ
 (tfdml) :~$ python build.py -p -c release
 ```
 
-After the package is built you will find a wheel package under `~/dml_build/python_package`. You can run `pip install` on the output .whl file to install your locally built copy of TensorFlow-DirectML.
+After the package is built you will find a wheel package under `~/tfdml_build/python_package`. You can run `pip install` on the output .whl file to install your locally built copy of TensorFlow-DirectML.
 
 The build script has additional options you can experiment with. To see more details:
 

@@ -28,7 +28,14 @@ parameters:
 - name: buildArtifacts
   displayName: Build Artifacts
   type: object
-  default: [x64-win-release-cp36, x64-win-debug-cp36, x64-linux-release-cp36]
+  default:
+  # Debug configs only for the latest python version (to save on build resources)
+  - x64-win-release-cp36
+  - x64-win-release-cp37
+  - x64-win-debug-cp37
+  - x64-linux-release-cp36
+  - x64-linux-release-cp37
+  - x64-linux-debug-cp37
 
 - name: buildCApi
   displayName: Build C API
