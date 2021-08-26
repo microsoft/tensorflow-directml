@@ -311,14 +311,14 @@ Finally, we need to augment the `PATH` of the conda environment to include Bazel
 (tfdml) :~$ touch $CONDA_PREFIX/etc/conda/deactivate.d/path.she
 ```
 
-Set the contents of the activation script (`%CONDA_PREFIX%/etc/conda/activate.d/path.sh`). Make sure to use the correct paths where you installed Bazel:
+Set the contents of the activation script (`$CONDA_PREFIX/etc/conda/activate.d/path.sh`). Make sure to use the correct paths where you installed Bazel:
 
 ```bash
 export TFDML_PATH_RESTORE=$PATH
 export PATH=$HOME/bin/bazel/0.26.1:$PATH
 ```
 
-Set the contents of the deactivation script (`%CONDA_PREFIX%/etc/conda/deactivate.d/path.sh`):
+Set the contents of the deactivation script (`$CONDA_PREFIX/etc/conda/deactivate.d/path.sh`):
 
 ```bash
 export PATH=$TFDML_PATH_RESTORE
