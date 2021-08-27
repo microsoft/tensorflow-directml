@@ -176,7 +176,7 @@ def _run_test(
 def main():
   args = _parse_args()
   absolute_binaries_path = os.path.join(sys.path[0], args.test_binaries_path)
-  processes_count = min(8, os.cpu_count())
+  processes_count = min(1, os.cpu_count())
 
   with concurrent.futures.ThreadPoolExecutor(processes_count) as executor:
     futures = []
