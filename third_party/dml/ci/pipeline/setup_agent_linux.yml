@@ -22,7 +22,7 @@ steps:
 
 - script: |
     $(miniconda.activateCommand)
-    pip install six numpy wheel
+    pip install six numpy==1.18.5 wheel
     pip install keras_applications==1.0.6 --no-deps
     pip install keras_preprocessing==1.0.5 --no-deps
   displayName: Install Python Packages
