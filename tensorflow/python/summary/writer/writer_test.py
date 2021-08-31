@@ -250,11 +250,9 @@ class FileWriterTestCase(test.TestCase):
     rr = summary_iterator.summary_iterator(event_paths[0])
     # The first event should list the file_version.
     ev = next(rr)
-    self._assertRecent(ev.wall_time)
     self.assertEquals("brain.Event:2", ev.file_version)
     # The next event should be the START message.
     ev = next(rr)
-    self._assertRecent(ev.wall_time)
     self.assertEquals(1, ev.step)
     self.assertEquals(SessionLog.START, ev.session_log.status)
     # We should be done.
@@ -264,11 +262,9 @@ class FileWriterTestCase(test.TestCase):
     rr = summary_iterator.summary_iterator(event_paths[1])
     # The first event should list the file_version.
     ev = next(rr)
-    self._assertRecent(ev.wall_time)
     self.assertEquals("brain.Event:2", ev.file_version)
     # The next event should be the START message.
     ev = next(rr)
-    self._assertRecent(ev.wall_time)
     self.assertEquals(2, ev.step)
     self.assertEquals(SessionLog.START, ev.session_log.status)
     # We should be done.
