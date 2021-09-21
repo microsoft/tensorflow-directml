@@ -195,17 +195,17 @@ Set the contents of the deactivation script (`%CONDA_PREFIX%\etc\conda\deactivat
 $env:PATH = $env:TFDML_PATH_RESTORE
 ```
 
-Restart your conda environment (launch the Miniconda prompt again and activate `tfdev`). You should see both Bazel and MSYS2 tools on the PATH when running the `tfdev` environment:
+Restart your conda environment (launch the Miniconda prompt again and activate `tfdml`). You should see both Bazel and MSYS2 tools on the PATH when running the `tfdml environment:
 
 ```
-(tfdev) PS> get-command bazel
+(tfdml) PS> get-command bazel
 
 CommandType     Name          Version    Source
 -----------     ----          -------    ------
 Application     bazel.exe     0.0.0.0    C:\bazel\0.26.1\bazel.exe
 
 
-(tfdev) PS> get-command git
+(tfdml) PS> get-command git
 
 CommandType     Name          Version    Source
 -----------     ----          -------    ------
@@ -233,7 +233,7 @@ Remember to activate your build environment whenever you need to build. Change y
 To produce the Python package run the following:
 
 ```
-(tfdev) PS> python build.py -p -c release
+(tfdml) PS> python build.py -p -c release
 ```
 
 After the package is built you will find a wheel package under `<PATH_TO_CLONE>\..\tfdml_build\python_package` (e.g. `C:\src\tfdml_build\python_package` in these examples). You can run `pip install` on the output .whl file to install your locally built copy of TensorFlow-DirectML.
@@ -241,7 +241,7 @@ After the package is built you will find a wheel package under `<PATH_TO_CLONE>\
 The build script has additional options you can experiment with. To see more details:
 
 ```
-(tfdev) PS> python build.py --help
+(tfdml) PS> python build.py --help
 ```
 
 Note that the `config` parameter accepts debug or release as an argument, but these are largely the same: debug builds are effectively just "release with debug symbols" since the output PDBs for TensorFlow without optimizations are prohibitively large.
