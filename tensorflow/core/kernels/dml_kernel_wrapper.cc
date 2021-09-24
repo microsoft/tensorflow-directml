@@ -131,9 +131,7 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
 
         Tensor output;
         // Copies underlying data pointer, but uses the output shape provided.
-        if (!output.CopyFrom(input, output_shapes[outputIndex])) {
-          ctx->SetStatus(errors::Internal("Error during copy."));
-        }
+        OP_REQUIRES(ctx, output.CopyFrom(input, output_shapes[outputIndex]));
 
         ctx->set_output(outputIndex, output);
       }
