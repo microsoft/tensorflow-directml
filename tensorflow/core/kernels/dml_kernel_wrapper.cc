@@ -108,10 +108,19 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
     for (int i = 0; i < ctx->num_outputs(); ++i) {
       absl::optional<int> inputIndexToForward =
           shared_helper->GetForwardableInputIndex(ctx, output_shapes, i);
-      // If the input is considered forwardable for the op, and the shapes match
+      // If the input is considered forwardable for the op
       if (inputIndexToForward) {
-        forwardIndices.emplace_back(
-            std::make_pair(inputIndexToForward.value(), i));
+        int inputIndex = inputIndexToForward.value();
+        // Check if the amount of elements is the same.
+        // This ensures output.CopyFrom(input) will never fail.
+        const Tensor& input = ctx->input_is_ref(inputIndex)
+                                  ? ctx->mutable_input(inputIndex, false)
+                                  : ctx->input(inputIndex);
+
+        if (input.NumElements() == output_shapes[i].num_elements()) {
+          forwardIndices.emplace_back(
+              std::make_pair(inputIndexToForward.value(), i));
+        }
       } else {
         // If not all outputs are forwardable, we will forward nothing and
         // proceed with the kernel normally.
@@ -131,7 +140,8 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
 
         Tensor output;
         // Copies underlying data pointer, but uses the output shape provided.
-        OP_REQUIRES(ctx, output.CopyFrom(input, output_shapes[outputIndex]));
+        // This should never fail as its failure conditions are eliminated during index selection
+        assert(output.CopyFrom(input, output_shapes[outputIndex]));
 
         ctx->set_output(outputIndex, output);
       }
