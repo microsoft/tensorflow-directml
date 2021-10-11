@@ -12,17 +12,20 @@
 
 ## Questions, Issues, and Feedback
 
+- Frequently asked questions: [FAQ](https://docs.microsoft.com/en-us/windows/ai/directml/gpu-faq)
+- Learn about our roadmap: [Wiki](https://github.com/microsoft/tensorflow-directml/wiki)
 - Ask a question: [Discussions](https://github.com/microsoft/tensorflow-directml/discussions)
 - Report a bug: [Issues](https://github.com/microsoft/tensorflow-directml/issues) 
-- Learn about our roadmap: [Wiki](https://github.com/microsoft/tensorflow-directml/wiki)
 
 You can also contact us directly at askdirectml@microsoft.com.
 
 ## Getting Started
 
-TensorFlow with DirectML is supported on both the latest versions of Windows 10 and the [Windows Subsystem for Linux](https://docs.microsoft.com/windows/wsl/about). For detailed instructions on getting started, see [GPU accelerated ML training (docs.microsoft.com)](http://aka.ms/gpuinwsldocs). Official Python packages are available on the [tensorflow-directml PyPI project](https://pypi.org/project/tensorflow-directml/).
+TensorFlow with DirectML is supported on both the latest versions of Windows 10 and the [Windows Subsystem for Linux](https://docs.microsoft.com/windows/wsl/about). For detailed instructions on getting started, see [GPU accelerated ML training (docs.microsoft.com)](http://aka.ms/gpuinwsldocs).
 
-TensorFlow with DirectML is still in active development and is in a preview state. The DirectML repository includes [a few samples](https://github.com/microsoft/DirectML/tree/master/TensorFlow) that have been tested to work with the latest builds on PyPI. These samples include both inference and training scripts, and you can either train the models from scratch or use the supplied pre-trained weights. However, we encourage testing on any TensorFlow 1.15-compatible models -- if you run into issues, please let us know!
+TensorFlow with DirectML is compatible with TensorFlow 1.15 and is supported for production use. Official Python packages are available on the [tensorflow-directml PyPI project](https://pypi.org/project/tensorflow-directml/), and C library packages are [available for download on GitHub](https://github.com/microsoft/tensorflow-directml/releases).
+
+The DirectML repository includes [a few samples](https://github.com/microsoft/DirectML/tree/master/TensorFlow) that have been tested to work with the latest builds on PyPI. These samples include both inference and training scripts, and you can either train the models from scratch or use the supplied pre-trained weights. However, we encourage testing on any TensorFlow 1.15-compatible models -- if you run into issues, please let us know!
 
 The following resources provide additional background on DirectML and TensorFlow:
 - [DirectML GitHub](https://github.com/microsoft/DirectML/)

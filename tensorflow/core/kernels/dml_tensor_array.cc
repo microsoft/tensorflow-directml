@@ -56,8 +56,10 @@ Status DmlAddToTensor(OpKernelContext* ctx, Tensor* sum, const Tensor* current,
 
   TensorValue out = op_ctx.release_output(0);
   ctx->device()->CopyTensorInSameDevice(
-      out.tensor, sum, ctx->op_device_context(),
-      [ctx](const Status& s) { OP_REQUIRES_OK(ctx, s); });
+      out.tensor, sum, ctx->op_device_context(), [ctx, out](const Status& s) {
+        OP_REQUIRES_OK(ctx, s);
+        delete out.tensor;
+      });
 
   return op_ctx.status();
 }

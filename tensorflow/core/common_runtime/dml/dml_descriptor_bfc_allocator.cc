@@ -26,6 +26,14 @@ DmlDescriptorAllocator::DmlDescriptorAllocator(
       heap_allocator_(heap_allocator) {}
 
 DescriptorAllocation DmlDescriptorAllocator::Alloc(size_t size_in_descriptors) {
+  if (size_in_descriptors == 0) {
+    // An empty allocation is possible and valid (e.g. initializing an op with
+    // no descriptors required), so don't bother calling AllocateRaw. The
+    // returned DescriptorAllocation with is valid for initializers that require
+    // zero descriptors.
+    return DescriptorAllocation(nullptr, nullptr, 0);
+  }
+
   void* p = this->AllocateRaw(0, size_in_descriptors);
   return DescriptorAllocation(this, p, size_in_descriptors);
 }
@@ -66,6 +74,7 @@ D3D12DescriptorHandles DescriptorAllocation::GetDescriptorHandles() const {
   }
   return allocator_->GetDescriptorHandles(p_);
 }
+
 void DescriptorAllocation::Reset() {
   if (allocator_ && p_) {
     allocator_->DeallocateRaw(p_);

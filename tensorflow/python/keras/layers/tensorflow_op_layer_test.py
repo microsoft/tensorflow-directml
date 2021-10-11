@@ -190,8 +190,6 @@ def _reuse_ancillary_layer():
 @keras_parameterized.run_all_keras_modes
 class AutoLambdaTest(keras_parameterized.TestCase):
 
-  # DML doesn't support float64
-  @test_util.skip_dml
   @parameterized.named_parameters(
       ('single_op_at_end', _single_op_at_end),
       ('single_identity_op_at_end', _single_identity_op_at_end),
@@ -209,6 +207,8 @@ class AutoLambdaTest(keras_parameterized.TestCase):
       ('_reuse_ancillary_layer', _reuse_ancillary_layer),
       ('_layer_with_tensor_arg', _layer_with_tensor_arg),
   )
+  # DML doesn't support float64
+  @test_util.skip_dml
   def test_autolambda(self, model_fn):
     model = model_fn()
     model.compile(

@@ -93,7 +93,7 @@ class BatchNormalizationTest(test.TestCase):
     # An atol value of 1e-3 is too small for float16's, because some adjacent
     # float16 values that y_val can take are greater than 1e-3 apart, e.g.
     # 2.16602 and 2.16797.
-    atol = 5e-3 if x_dtype == np.float16 else 1e-3
+    atol = 6e-3 if x_dtype == np.float16 else 1e-3
     self.assertAllClose(y_ref, y_val, atol=atol)
 
   def _training_ref(self, x, scale, offset, epsilon, data_format):

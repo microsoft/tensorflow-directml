@@ -1033,7 +1033,7 @@ bool FindFusedBatchNormEx(const RemapperContext& ctx, int node_index,
     // In training mode we rely on cuDNN for computing FusedBatchNorm with side
     // inputs and activation, and it has its own limitations. In inference mode
     // we have a custom CUDA kernel that doesn't not have these constraints.
-    if (is_training) {
+    if (is_training && !NodeIsOnDml(node_def)) {
       // cuDNN only supports NHWC data layout.
       string data_format;
       if (!GetNodeAttr(*fused_batch_norm_node_def, kDataFormat, &data_format)

@@ -35,7 +35,7 @@ DmlAllocator::DmlAllocator(D3D12HeapAllocator* heap_allocator,
                            const GPUOptions& gpu_options, const string& name)
     : GPUBFCAllocator(new SubAllocatorWrapper(heap_allocator),
                       memory_limit_in_bytes, gpu_options, name,
-                      GetMaxAllocationSize()),
+                      GetMaxAllocationSize(), false),
       heap_allocator_(heap_allocator) {}
 
 D3D12BufferRegion DmlAllocator::CreateBufferRegion(const void* ptr,

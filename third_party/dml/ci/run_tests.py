@@ -54,27 +54,29 @@ def main():
         else:
           conda_env.install_package(args.tensorflow_wheel)
 
-        if "pipDeps" in json_test_group:
-          for dep in json_test_group["pipDeps"]:
-            conda_env.install_package(dep)
+      if "pipDeps" in json_test_group:
+        for dep in json_test_group["pipDeps"]:
+          conda_env.install_package(dep)
 
-        if "localPipDeps" in json_test_group:
-          for dep in json_test_group["localPipDeps"]:
-            dep_abs_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)),
-                dep)
+      if "localPipDeps" in json_test_group:
+        for dep in json_test_group["localPipDeps"]:
+          dep_abs_path = os.path.join(
+              os.path.dirname(os.path.abspath(__file__)),
+              dep)
+        conda_env.install_local_package(dep_abs_path)
 
-            conda_env.install_local_package(dep_abs_path)
-
-        if os.name == "nt" and "windowsPipDeps" in json_test_group:
-          for dep in json_test_group["windowsPipDeps"]:
-            conda_env.install_package(dep)
+      if os.name == "nt" and "windowsPipDeps" in json_test_group:
+        for dep in json_test_group["windowsPipDeps"]:
+          conda_env.install_package(dep)
 
       command_line = [os.path.join(sys.path[0], "tests", script)]
-
       if "arguments" in json_test_group:
         for arg_name, arg_value in json_test_group["arguments"].items():
           command_line.append(f"{arg_name}={arg_value}")
+
+      if "switches" in json_test_group:
+        for switch_arg in json_test_group["switches"]:
+          command_line.append(switch_arg)
 
       if "flags" in json_test_group:
         for flag in json_test_group["flags"]:

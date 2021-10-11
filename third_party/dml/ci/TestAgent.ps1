@@ -42,7 +42,7 @@ foreach ($TestGroup in $TestGroups)
     if ($RunOnWsl)
     {
         $LoadLibraryPath = wsl echo $WslArtifactFolder`:`$LD_LIBRARY_PATH
-        $WslTensorFlowWheelPath = wsl ls $WslArtifactFolder/tensorflow_directml-*linux_x86_64.whl
+        $WslTensorFlowWheelPath = wsl ls $WslArtifactFolder/tensorflow_directml-*linux*_x86_64.whl
         Invoke-Expression "wsl export LD_LIBRARY_PATH='$LoadLibraryPath' '&&' python3 $WslArtifactFolder/run_tests.py --test_group $TestGroup --tensorflow_wheel $WslTensorFlowWheelPath > $BuildArtifactsPath/test_${TestGroup}_log.txt"
 
         # Because of the runfiles folder, test result paths in WSL can get very long, so we give them a unique name and put them all at the root of the artifacts folder in the Windows filesystem

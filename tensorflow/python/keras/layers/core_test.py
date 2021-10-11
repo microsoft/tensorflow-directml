@@ -275,9 +275,6 @@ class LambdaLayerTest(keras_parameterized.TestCase):
 
 class TestStatefulLambda(keras_parameterized.TestCase):
 
-  # This test uses Maximum on int32 data internally, which isn't supported by
-  # DML
-  @test_util.skip_dml
   @keras_parameterized.run_all_keras_modes
   @keras_parameterized.run_with_all_model_types
   def test_lambda_with_variable_in_model(self):

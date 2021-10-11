@@ -36,14 +36,16 @@ class GPUBFCAllocator : public BFCAllocator {
                   const string& name, size_t max_allocation_size = -1);
   GPUBFCAllocator(SubAllocator* sub_allocator, size_t total_memory,
                   const GPUOptions& gpu_options, const string& name,
-                  size_t max_allocation_size = -1);
+                  size_t max_allocation_size = -1,
+                  bool default_garbage_collection_value = true);
   ~GPUBFCAllocator() override {}
 
   TF_DISALLOW_COPY_AND_ASSIGN(GPUBFCAllocator);
 
  private:
   static bool GetAllowGrowthValue(const GPUOptions& gpu_options);
-  static bool GetGarbageCollectionValue();
+  static bool GetGarbageCollectionValue(
+      bool default_garbage_collection_value = true);
 };
 
 }  // namespace tensorflow
