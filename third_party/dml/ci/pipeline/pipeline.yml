@@ -98,7 +98,7 @@ stages:
   ${{if not(parameters.enableTests)}}:
     dependsOn: [buildStage]
   condition: succeededOrFailed()
-  pool: Package ES Standard Build
+  pool: DirectML_TFWindows_Pool
   jobs:
   - template: report.yml
     parameters:
