@@ -149,45 +149,30 @@ D3D12HeapAllocator::TryCreateTiledAllocation(uint64_t size_in_bytes) {
 
     constexpr UINT numResourceRegions = 1;
     constexpr UINT numHeapRanges = 1;
-    queue_->UpdateTileMappings(
-        allocation.resource_uav_state.Get(), numResourceRegions,
-        &resource_region_start_coordinates, &resource_region_size,
-        allocation.heaps[i].Get(), numHeapRanges, &tile_range_flags,
-        &heap_range_start_offset, &heap_range_tile_count,
-        D3D12_TILE_MAPPING_FLAG_NONE);
+
+    // This is a brand new allocation/resource, so the tile mappings are
+    // guaranteed to be set (on the GPU timeline) by the time any code can
+    // reference the returned resource. We only execute operations on a single
+    // hardware queue so there is no need to wait or signal.
+    //
+    // All resources have identical tile mappings. The repeated call to
+    // UpdateTileMappings on all resources instead of using CopyTileMappings is
+    // intentional: the latter API is not supported by all versions of PIX.
+    for (auto resource : {allocation.resource_uav_state.Get(),
+                          allocation.resource_copy_src_state.Get(),
+                          allocation.resource_copy_dst_state.Get()}) {
+      queue_->UpdateTileMappings(
+          resource, numResourceRegions, &resource_region_start_coordinates,
+          &resource_region_size, allocation.heaps[i].Get(), numHeapRanges,
+          &tile_range_flags, &heap_range_start_offset, &heap_range_tile_count,
+          D3D12_TILE_MAPPING_FLAG_NONE);
+    }
 
     resource_region_start_coordinates.X += heap_size_in_tiles;
     unmapped_resource_tiles -= heap_size_in_tiles;
   }
 
   assert(unmapped_resource_tiles == 0);
-
-  // Copy tile mappings from the primary resource.
-  {
-    D3D12_TILED_RESOURCE_COORDINATE resource_start_coordinate = {};
-    D3D12_TILE_REGION_SIZE resource_region_size = {};
-    resource_region_size.NumTiles = resource_size_in_tiles;
-
-    // This is a brand new allocation/resource, so the tile mappings are
-    // guaranteed to be set (on the GPU timeline) by the time any code can
-    // reference the returned resource. We only execute operations on a single
-    // hardware queue so there is no need to wait or signal.
-    queue_->CopyTileMappings(
-        allocation.resource_copy_src_state.Get(),  // dstResource
-        &resource_start_coordinate,                // dstCoordinate
-        allocation.resource_uav_state.Get(),       // srcResource
-        &resource_start_coordinate,                // srcCoordinate
-        &resource_region_size,                     // copy size
-        D3D12_TILE_MAPPING_FLAG_NONE);
-
-    queue_->CopyTileMappings(
-        allocation.resource_copy_dst_state.Get(),  // dstResource
-        &resource_start_coordinate,                // dstCoordinate
-        allocation.resource_uav_state.Get(),       // srcResource
-        &resource_start_coordinate,                // srcCoordinate
-        &resource_region_size,                     // copy size
-        D3D12_TILE_MAPPING_FLAG_NONE);
-  }
 
   return allocation;
 }
