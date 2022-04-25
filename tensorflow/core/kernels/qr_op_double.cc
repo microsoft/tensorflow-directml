@@ -33,4 +33,16 @@ REGISTER_KERNEL_BUILDER(Name("Qr")
                         QrOp<double>);
 #endif
 
+#ifdef TENSORFLOW_USE_DIRECTML
+// We register this operation with Host Memory to allow device colocation on DML
+// instead of the CPU
+REGISTER_KERNEL_BUILDER(Name("Qr")
+                            .Device(DEVICE_DML)
+                            .TypeConstraint<double>("T")
+                            .HostMemory("input")
+                            .HostMemory("q")
+                            .HostMemory("r"),
+                        QrOp<double>);
+#endif
+
 }  // namespace tensorflow
