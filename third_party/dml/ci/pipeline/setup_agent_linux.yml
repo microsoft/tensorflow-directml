@@ -1,8 +1,8 @@
 steps:
 - script: |
-    wget https://github.com/bazelbuild/bazel/releases/download/0.24.1/bazel-0.24.1-installer-linux-x86_64.sh
-    bash bazel-0.24.1-installer-linux-x86_64.sh --bin=$(Build.StagingDirectory)/bazel/0.24.1 --base=$(Build.StagingDirectory)/.bazel
-    echo "##vso[task.prependpath]$(Build.StagingDirectory)/bazel/0.24.1"
+    wget https://github.com/bazelbuild/bazel/releases/download/0.26.1/bazel-0.26.1-installer-linux-x86_64.sh
+    bash bazel-0.26.1-installer-linux-x86_64.sh --bin=$(Build.StagingDirectory)/bazel/0.26.1 --base=$(Build.StagingDirectory)/.bazel
+    echo "##vso[task.prependpath]$(Build.StagingDirectory)/bazel/0.26.1"
   displayName: Install Bazel
   workingDirectory: $(Build.StagingDirectory)
   target: manylinux
