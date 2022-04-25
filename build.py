@@ -206,6 +206,8 @@ def build(args):
   cl = ["bazel"]
   cl.append("--output_user_root={}".format(args.build_output))
   cl.append("build")
+  if sys.platform == "win32":
+    cl.append("--features=compiler_param_file")
   if args.force_debug:
     cl.append("-c dbg")
   if args.subcommands:
