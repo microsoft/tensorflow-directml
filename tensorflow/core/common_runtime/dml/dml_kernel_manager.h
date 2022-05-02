@@ -49,7 +49,7 @@ class NoOpInitializationHelper;
 class DmlKernelManager {
  public:
   // Can be overridden by the TF_DIRECTML_KERNEL_CACHE_SIZE environment variable
-  static constexpr size_t kDefaultMaxCacheSize = 1024;
+  static constexpr size_t kDefaultMaxCacheSize = 1536;
 
   DmlKernelManager();
 
