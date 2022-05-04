@@ -1,6 +1,12 @@
-# Release 1.15.5
+# Release 1.15.6
 
-Note that this is the last patch release for the TensorFlow 1.x series.
+## Bug Fixes and Other Changes
+* Enables forwarding of inputs to avoid copies in some scenarios
+* Removes the the use of CopyTileMappings for PIX captures
+* Increases the default cache size for the kernel cache to 1536
+* Updates the DirectML version to 1.8.2
+
+# Release 1.15.5
 
 ## Bug Fixes and Other Changes
 * Fixes an access to unitialized memory in Eigen code
