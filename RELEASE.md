@@ -1,3 +1,8 @@
+# Release 1.15.7
+
+## Bug Fixes and Other Changes
+* Fix version strings that hadn't been updated for the previous release
+
 # Release 1.15.6
 
 ## Bug Fixes and Other Changes
