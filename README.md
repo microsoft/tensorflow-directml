@@ -5,7 +5,7 @@
 | :warning: | **h5py 3.0.0 and 3.1.0 broke compatibility with TensorFlow. Please make sure that your environment has a different version of h5py before using TensorFlow-DirectML.** |
 
 
-[TensorFlow](https://www.tensorflow.org/) is an end-to-end open source platform for machine learning. This repository is a fork of [tensorflow](https://github.com/tensorflow/tensorflow) that leverages [DirectML](https://github.com/microsoft/DirectML) to provide cross-vendor hardware acceleration on Windows 10 and the Windows Subsystem for Linux (WSL). TensorFlow with DirectML enables training and inference of complex machine learning models on a wide range of DirectX 12-compatible hardware.
+[TensorFlow](https://www.tensorflow.org/) is an end-to-end open source platform for machine learning. This repository is a fork of [tensorflow](https://github.com/tensorflow/tensorflow) that leverages [DirectML](https://github.com/microsoft/DirectML) to provide cross-vendor hardware acceleration on Windows and the Windows Subsystem for Linux (WSL). TensorFlow with DirectML enables training and inference of complex machine learning models on a wide range of DirectX 12-compatible hardware.
 
 **Latest Release**:  
 [![PyPI version](https://badge.fury.io/py/tensorflow-directml.svg)](https://badge.fury.io/py/tensorflow-directml) 
@@ -21,7 +21,7 @@ You can also contact us directly at askdirectml@microsoft.com.
 
 ## Getting Started
 
-TensorFlow with DirectML is supported on both the latest versions of Windows 10 and the [Windows Subsystem for Linux](https://docs.microsoft.com/windows/wsl/about). For detailed instructions on getting started, see [GPU accelerated ML training (docs.microsoft.com)](http://aka.ms/gpuinwsldocs).
+TensorFlow with DirectML is supported on both the latest versions of Windows and the [Windows Subsystem for Linux](https://docs.microsoft.com/windows/wsl/about). For detailed instructions on getting started, see [GPU accelerated ML training (docs.microsoft.com)](http://aka.ms/gpuinwsldocs).
 
 TensorFlow with DirectML is compatible with TensorFlow 1.15 and is supported for production use. Official Python packages are available on the [tensorflow-directml PyPI project](https://pypi.org/project/tensorflow-directml/), and C library packages are [available for download on GitHub](https://github.com/microsoft/tensorflow-directml/releases).
 
@@ -34,9 +34,9 @@ The following resources provide additional background on DirectML and TensorFlow
 
 ## System Requirements
 
-### Windows 10
+### Windows
 
-* Windows 10 Version 1709, 64-bit (Build 16299 or higher)
+* Windows 10 Version 1709, 64-bit (Build 16299 or higher) or Windows 11 Version 21H2, 64-bit (Build 22000 or higher)
 * Python x86-64 3.5, 3.6, or 3.7<sup>1</sup>
 * One of the following supported GPUs:
   * AMD Radeon R5/R7/R9 2xx series or newer
@@ -47,12 +47,12 @@ The following resources provide additional background on DirectML and TensorFlow
 
 ### Windows Subsystem for Linux
 
-* Windows 10 Insider Preview, 64-bit (Build 20150 or higher)
+* Windows 10 Version 21H2, 64-bit (Build 20150 or higher) or Windows 11 Version 21H2, 64-bit (Build 22000 or higher)
 * Python x86-64 3.5, 3.6, or 3.7<sup>2</sup>
 * One of the following supported GPUs:
-  * AMD Radeon R5/R7/R9 2xx series or newer, and [20.20.01.05 WSL driver](https://www.amd.com/en/support/kb/release-notes/rn-rad-win-wsl-support)
-  * Intel HD Graphics 6xx or newer, and [28.20.100.8322 WSL driver](https://downloadcenter.intel.com/download/29526)
-  * NVIDIA GeForce GTX 9xx series GPU or newer, and [460.20 WSL driver](https://developer.nvidia.com/cuda/wsl/download)
+  * AMD Radeon R5/R7/R9 2xx series or newer, and [20.20.01.05 driver or newer](https://www.amd.com/en/support)
+  * Intel HD Graphics 6xx or newer, and [28.20.100.8322 driver or newer](https://www.intel.com/content/www/us/en/download/19344/intel-graphics-windows-dch-drivers.html)
+  * NVIDIA GeForce GTX 9xx series GPU or newer, and [460.20 driver or newer](https://www.nvidia.com/download/index.aspx)
 
 <sup>2</sup> Note: Python 3.8 or newer is **not** currently supported. To use the official PyPi packages, the CPython interpreter is required.
 
