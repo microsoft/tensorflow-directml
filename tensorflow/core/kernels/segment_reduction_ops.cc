@@ -24,8 +24,6 @@ limitations under the License.
 
 #include <vector>
 
-#include "third_party/eigen3/Eigen/Core"
-#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 #include "tensorflow/core/framework/bounds_check.h"
 #include "tensorflow/core/framework/numeric_op.h"
 #include "tensorflow/core/framework/op_kernel.h"
@@ -36,6 +34,8 @@ limitations under the License.
 #include "tensorflow/core/lib/core/status.h"
 #include "tensorflow/core/platform/logging.h"
 #include "tensorflow/core/util/util.h"
+#include "third_party/eigen3/Eigen/Core"
+#include "third_party/eigen3/unsupported/Eigen/CXX11/Tensor"
 
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 #include "tensorflow/core/common_runtime/gpu/gpu_event_mgr.h"
@@ -124,7 +124,7 @@ class SegmentReductionOp : public OpKernel {
     Eigen::DSizes<Eigen::DenseIndex, 1> dims_to_reduce;
     dims_to_reduce[0] = 0;
 #else
-    Eigen::IndexList<Eigen::type2index<0> > dims_to_reduce;
+    Eigen::IndexList<Eigen::type2index<0>> dims_to_reduce;
 #endif
     Index start = 0, end = 1;
 
@@ -507,6 +507,93 @@ class UnsortedSegmentReductionOp : public OpKernel {
   DeviceReductionFunctor reduction_functor_;
 };
 
+template <typename T, typename Index, typename DeviceReductionFunctor>
+class UnsortedSegmentReductionDmlOp : public OpKernel {
+ public:
+  explicit UnsortedSegmentReductionOp(OpKernelConstruction* context)
+      : OpKernel(context), reduction_functor_(DeviceReductionFunctor()) {}
+
+  void Compute(OpKernelContext* context) override {
+    const Tensor& dml_data = context->input(0);
+    Tensor cpu_data;
+    AllocatorAttributes cpu_alloc_attrs;
+    cpu_alloc_attrs.set_on_host(true);
+    OP_REQUIRES_OK(context,
+                   context->allocate_temp(dml_data.dtype(), dml_data.shape(),
+                                          &cpu_data, cpu_alloc_attrs));
+
+    Notification dml_data_notification;
+    context->op_device_context()->CopyDeviceTensorToCPU(
+        &dml_data, "", static_cast<Device*>(context->device()), &cpu_data,
+        [&dml_data_notification, context](const Status& copy_status) {
+          OP_REQUIRES_OK(context, copy_status);
+          dml_data_notification.Notify();
+        });
+
+    const Tensor& dml_segment_ids = context->input(1);
+    Tensor cpu_segment_ids;
+    OP_REQUIRES_OK(
+        context,
+        context->allocate_temp(dml_segment_ids.dtype(), dml_segment_ids.shape(),
+                               &cpu_segment_ids, cpu_alloc_attrs));
+
+    Notification dml_segment_ids_notification;
+    context->op_device_context()->CopyDeviceTensorToCPU(
+        &dml_segment_ids, "", static_cast<Device*>(context->device()),
+        &cpu_segment_ids,
+        [&dml_segment_ids_notification, context](const Status& copy_status) {
+          OP_REQUIRES_OK(context, copy_status);
+          dml_segment_ids_notification.Notify();
+        });
+
+    dml_data_notification.WaitForNotification();
+    dml_segment_ids_notification.WaitForNotification();
+    OP_REQUIRES_OK(context, context->status());
+
+    const Tensor& num_segments = context->input(2);
+    if (!UnsortedSegmentReductionDoValidation(this, context, cpu_data,
+                                              cpu_segment_ids, num_segments)) {
+      return;
+    }
+    const auto cpu_segment_flat = cpu_segment_ids.flat<Index>();
+    const int64 output_rows = internal::SubtleMustCopy(static_cast<int64>(
+        num_segments.dtype() == DT_INT32 ? num_segments.scalar<int32>()()
+                                         : num_segments.scalar<int64>()()));
+    OP_REQUIRES(context, output_rows >= 0,
+                errors::InvalidArgument("Input num_segments == ", output_rows,
+                                        " must not be negative."));
+    TensorShape output_shape;
+    output_shape.AddDim(output_rows);
+    for (int i = cpu_segment_ids.dims(); i < cpu_data.dims(); i++) {
+      output_shape.AddDim(cpu_data.dim_size(i));
+    }
+
+    Tensor* dml_output = nullptr;
+    OP_REQUIRES_OK(context,
+                   context->allocate_output(0, output_shape, &dml_output));
+
+    Tensor cpu_output;
+    OP_REQUIRES_OK(context, context->allocate_temp(
+                                dml_output->dtype(), dml_output->shape(),
+                                &cpu_output, cpu_alloc_attrs));
+
+    auto cpu_output_flat = cpu_output.flat_outer_dims<T>();
+    auto cpu_data_flat =
+        cpu_data.flat_inner_outer_dims<T, 2>(cpu_segment_ids.dims() - 1);
+    reduction_functor_(context, cpu_segment_ids.shape(), cpu_segment_flat,
+                       cpu_data_flat, cpu_output_flat);
+
+    context->op_device_context()->CopyCPUTensorToDevice(
+        &cpu_output, "", static_cast<Device*>(context->device()), dml_output,
+        [context](const Status& copy_status) {
+          OP_REQUIRES_OK(context, copy_status);
+        });
+  }
+
+ protected:
+  DeviceReductionFunctor reduction_functor_;
+};
+
 #define REGISTER_CPU_KERNEL_UNSORTEDSEGMENT(                           \
     name, type, index_type, initial_value_functor, reduction_functor)  \
   REGISTER_KERNEL_BUILDER(                                             \
@@ -518,7 +605,7 @@ class UnsortedSegmentReductionOp : public OpKernel {
           type, index_type,                                            \
           functor::UnsortedSegmentFunctor<CPUDevice, type, index_type, \
                                           initial_value_functor,       \
-                                          reduction_functor> >)
+                                          reduction_functor>>)
 
 #define REGISTER_REAL_CPU_UNSORTED_KERNELS(type, index_type)                   \
   REGISTER_CPU_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentSum", type, index_type,  \
@@ -560,6 +647,63 @@ REGISTER_COMPLEX_CPU_UNSORTED_KERNELS_ALL(complex128);
 #undef REGISTER_COMPLEX_CPU_UNSORTED_KERNELS_ALL
 #undef REGISTER_REAL_CPU_UNSORTED_KERNELS_ALL
 
+// Emulated kernels that run on the CPU to satisfy device colocation
+// requirements since the native DML kernels use way too much memory
+#ifdef TENSORFLOW_USE_DIRECTML
+#define REGISTER_DML_KERNEL_UNSORTEDSEGMENT(                                 \
+    name, type, index_type, initial_value_functor, reduction_kernel_functor) \
+  REGISTER_KERNEL_BUILDER(                                                   \
+      Name(name)                                                             \
+          .Device(DEVICE_DML)                                                \
+          .HostMemory("num_segments")                                        \
+          .TypeConstraint<type>("T")                                         \
+          .TypeConstraint<index_type>("Tindices"),                           \
+      UnsortedSegmentReductionDmlOp<                                         \
+          type, index_type,                                                  \
+          functor::UnsortedSegmentFunctor<CPUDevice, type, index_type,       \
+                                          initial_value_functor,             \
+                                          reduction_kernel_functor>>)
+
+// sum is the only op that supports all input types currently
+#define REGISTER_REAL_DML_UNSORTED_KERNELS(type, index_type)                   \
+  REGISTER_DML_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentMax", type, index_type,  \
+                                      functor::Lowest<type>,                   \
+                                      functor::MaxOp<type>);                   \
+  REGISTER_DML_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentMin", type, index_type,  \
+                                      functor::Highest<type>,                  \
+                                      functor::MinOp<type>);                   \
+  REGISTER_DML_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentProd", type, index_type, \
+                                      functor::One<type>,                      \
+                                      functor::ProdOp<type>);
+
+#define REGISTER_SUM_DML_UNSORTED_KERNELS(type, index_type)                   \
+  REGISTER_DML_KERNEL_UNSORTEDSEGMENT("UnsortedSegmentSum", type, index_type, \
+                                      functor::Zero<type>,                    \
+                                      functor::SumOp<type>);
+
+#define REGISTER_REAL_GPU_UNSORTED_KERNELS_ALL(type) \
+  REGISTER_REAL_GPU_UNSORTED_KERNELS(type, int32);   \
+  REGISTER_REAL_GPU_UNSORTED_KERNELS(type, int64);
+
+#define REGISTER_SUM_GPU_UNSORTED_KERNELS_ALL(type) \
+  REGISTER_SUM_GPU_UNSORTED_KERNELS(type, int32);   \
+  REGISTER_SUM_GPU_UNSORTED_KERNELS(type, int64);
+
+TF_CALL_half(REGISTER_REAL_DML_UNSORTED_KERNELS_ALL);
+TF_CALL_float(REGISTER_REAL_DML_UNSORTED_KERNELS_ALL);
+TF_CALL_int32(REGISTER_REAL_DML_UNSORTED_KERNELS_ALL);
+TF_CALL_half(REGISTER_SUM_DML_UNSORTED_KERNELS_ALL);
+TF_CALL_float(REGISTER_SUM_DML_UNSORTED_KERNELS_ALL);
+TF_CALL_int32(REGISTER_SUM_DML_UNSORTED_KERNELS_ALL);
+
+#undef REGISTER_GPU_KERNEL_UNSORTEDSEGMENT
+#undef REGISTER_REAL_GPU_UNSORTED_KERNELS
+#undef REGISTER_SUM_GPU_UNSORTED_KERNELS
+#undef REGISTER_REAL_GPU_UNSORTED_KERNELS_ALL
+#undef REGISTER_SUM_GPU_UNSORTED_KERNELS_ALL
+
+#endif  // TENSORFLOW_USE_DIRECTML
+
 #if GOOGLE_CUDA || TENSORFLOW_USE_ROCM
 #define REGISTER_GPU_KERNEL_UNSORTEDSEGMENT(                                 \
     name, type, index_type, initial_value_functor, reduction_kernel_functor) \
@@ -573,7 +717,7 @@ REGISTER_COMPLEX_CPU_UNSORTED_KERNELS_ALL(complex128);
           type, index_type,                                                  \
           functor::UnsortedSegmentFunctor<GPUDevice, type, index_type,       \
                                           initial_value_functor,             \
-                                          reduction_kernel_functor> >)
+                                          reduction_kernel_functor>>)
 
 // sum is the only op that supports all input types currently
 #define REGISTER_REAL_GPU_UNSORTED_KERNELS(type, index_type)                   \
@@ -599,7 +743,6 @@ REGISTER_COMPLEX_CPU_UNSORTED_KERNELS_ALL(complex128);
 #define REGISTER_SUM_GPU_UNSORTED_KERNELS_ALL(type) \
   REGISTER_SUM_GPU_UNSORTED_KERNELS(type, int32);   \
   REGISTER_SUM_GPU_UNSORTED_KERNELS(type, int64);
-
 
 TF_CALL_GPU_NUMBER_TYPES(REGISTER_REAL_GPU_UNSORTED_KERNELS_ALL);
 TF_CALL_int32(REGISTER_REAL_GPU_UNSORTED_KERNELS_ALL);
