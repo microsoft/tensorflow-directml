@@ -510,7 +510,7 @@ class UnsortedSegmentReductionOp : public OpKernel {
 template <typename T, typename Index, typename DeviceReductionFunctor>
 class UnsortedSegmentReductionDmlOp : public OpKernel {
  public:
-  explicit UnsortedSegmentReductionOp(OpKernelConstruction* context)
+  explicit UnsortedSegmentReductionDmlOp(OpKernelConstruction* context)
       : OpKernel(context), reduction_functor_(DeviceReductionFunctor()) {}
 
   void Compute(OpKernelContext* context) override {
