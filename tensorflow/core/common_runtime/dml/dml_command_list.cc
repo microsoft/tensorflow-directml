@@ -23,12 +23,13 @@ limitations under the License.
 namespace tensorflow {
 
 DmlCommandList::DmlCommandList(ID3D12Device* d3d_device, IDMLDevice* dml_device,
-                               D3D12_COMMAND_LIST_TYPE command_list_type)
+                               std::shared_ptr<DmlCommandQueue> queue)
     : d3d_device_(d3d_device),
       dml_device_(dml_device),
-      command_list_type_(command_list_type),
+      queue_(std::move(queue)),
       descriptor_pool_(d3d_device, 2048),
-      command_allocator_ring_(d3d_device, command_list_type) {
+      command_allocator_ring_(d3d_device, queue_->GetType(),
+                              queue_->GetCurrentCompletionEvent()) {
   DML_CHECK_SUCCEEDED(
       dml_device->CreateCommandRecorder(IID_PPV_ARGS(&recorder_)));
 }
@@ -199,25 +200,20 @@ void DmlCommandList::SetDescriptorHeap(ID3D12DescriptorHeap* descriptor_heap) {
   }
 }
 
-void DmlCommandList::Open(DmlGpuEvent completion_event) {
+void DmlCommandList::Open() {
   assert(current_descriptor_heap_ == nullptr);
-  current_completion_event_ = completion_event;
 
-  ID3D12CommandAllocator* allocator =
-      command_allocator_ring_.GetCurrentAllocator();
+  ID3D12CommandAllocator* allocator = command_allocator_ring_.GetNextAllocator(
+      queue_->GetNextCompletionEvent());
 
   if (!d3d_command_list_) {
     // Lazily create underlying D3D command list.
-    DML_CHECK_SUCCEEDED(d3d_device_->CreateCommandList(
-        0, command_list_type_, allocator, nullptr,
-        IID_PPV_ARGS(&d3d_command_list_)));
+    DML_CHECK_SUCCEEDED(
+        d3d_device_->CreateCommandList(0, queue_->GetType(), allocator, nullptr,
+                                       IID_PPV_ARGS(&d3d_command_list_)));
   } else {
     DML_CHECK_SUCCEEDED(d3d_command_list_->Reset(allocator, nullptr));
   }
-
-  // The current command allocator will become eligible for reset once this
-  // command list completes execution
-  command_allocator_ring_.AdvanceAllocator(completion_event);
 }
 
 Status DmlCommandList::Close() {
