@@ -208,9 +208,9 @@ void DmlCommandList::Open() {
 
   if (!d3d_command_list_) {
     // Lazily create underlying D3D command list.
-    DML_CHECK_SUCCEEDED(d3d_device_->CreateCommandList(
-        0, queue_->GetType(), , allocator, nullptr,
-        IID_PPV_ARGS(&d3d_command_list_)));
+    DML_CHECK_SUCCEEDED(
+        d3d_device_->CreateCommandList(0, queue_->GetType(), allocator, nullptr,
+                                       IID_PPV_ARGS(&d3d_command_list_)));
   } else {
     DML_CHECK_SUCCEEDED(d3d_command_list_->Reset(allocator, nullptr));
   }
