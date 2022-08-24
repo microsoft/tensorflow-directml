@@ -30,7 +30,7 @@ class DmlCommandList {
  public:
   // Constructs a command list.
   DmlCommandList(ID3D12Device* d3d12_device, IDMLDevice* dml_device,
-                 D3D12_COMMAND_LIST_TYPE command_list_type);
+                 std::shared_ptr<DmlCommandQueue> queue);
 
   // Records a CopyBufferRegion (see
   // ID3D12GraphicsCommandList::CopyBufferRegion) for execution. Transition
@@ -66,10 +66,8 @@ class DmlCommandList {
   void UavBarrier();
 
   // Opens the command list for recording, which is required before any of the
-  // above methods can be called. The supplied completion event indicates the
-  // fence value that will be signaled when the commands recorded to this
-  // command list have finished executing on the hardware.
-  void Open(DmlGpuEvent completion_event);
+  // above methods can be called.
+  void Open();
 
   // Closes the command list for recording, which is required before the command
   // list can be executed on a command queue. If any errors occur while
@@ -84,8 +82,7 @@ class DmlCommandList {
   Microsoft::WRL::ComPtr<IDMLDevice> dml_device_;
   Microsoft::WRL::ComPtr<IDMLCommandRecorder> recorder_;
   Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> d3d_command_list_;
-
-  D3D12_COMMAND_LIST_TYPE command_list_type_;
+  std::shared_ptr<DmlCommandQueue> queue_;
 
   // Descriptors are allocated from a pool. The current heap pointer is only
   // used to avoid redundantly setting the same heap; it does not have ownership

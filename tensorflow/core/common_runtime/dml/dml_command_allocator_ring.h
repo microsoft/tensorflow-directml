@@ -27,35 +27,38 @@ template <size_t allocator_count>
 class DmlCommandAllocatorRing {
  public:
   DmlCommandAllocatorRing(ID3D12Device* device,
-                          D3D12_COMMAND_LIST_TYPE command_list_type) {
+                          D3D12_COMMAND_LIST_TYPE command_list_type,
+                          DmlGpuEvent initial_event) {
     for (auto& info : command_allocators_) {
       DML_CHECK_SUCCEEDED(device->CreateCommandAllocator(
           command_list_type, IID_PPV_ARGS(&info.allocator)));
+
+      info.completion_event = initial_event;
     }
   }
 
-  ID3D12CommandAllocator* GetCurrentAllocator() {
-    CommandAllocatorInfo& allocator_info =
-        command_allocators_[current_command_allocator_];
+  ID3D12CommandAllocator* GetNextAllocator(DmlGpuEvent next_completion_event) {
+    size_t earliest_other_allocator =
+        (current_command_allocator_ + 1) % allocator_count;
 
-    // Take the opportunity to reset the command allocator if possible.
-    if (allocator_info.completion_event.fence &&
-        allocator_info.completion_event.IsSignaled()) {
-      DML_CHECK_SUCCEEDED(allocator_info.Get()->Reset());
+    assert(!command_allocators_[current_command_allocator_]
+                .completion_event.IsSignaled() ||
+           command_allocators_[earliest_other_allocator]
+               .completion_event.IsSignaled());
+
+    if (command_allocators_[earliest_other_allocator]
+            .completion_event.IsSignaled()) {
+      DML_CHECK_SUCCEEDED(
+          command_allocators_[earliest_other_allocator].Get()->Reset());
+      current_command_allocator_ = earliest_other_allocator;
     }
 
-    return command_allocators_[current_command_allocator_].Get();
-  }
-
-  void AdvanceAllocator(DmlGpuEvent completion_event) {
     // Set the completion event for the current allocator so it can be reset
     // eventually.
     command_allocators_[current_command_allocator_].completion_event =
-        completion_event;
+        std::move(next_completion_event);
 
-    // Advance to the next allocator.
-    current_command_allocator_ =
-        (current_command_allocator_ + 1) % allocator_count;
+    return command_allocators_[current_command_allocator_].Get();
   }
 
  private:
