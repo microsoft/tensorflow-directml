@@ -516,12 +516,14 @@ class UnsortedSegmentReductionDmlOp : public OpKernel {
 
   void Compute(OpKernelContext* context) override {
     const Tensor& dml_data = context->input(0);
-    Tensor cpu_data;
+    Tensor data;
     AllocatorAttributes cpu_alloc_attrs;
     cpu_alloc_attrs.set_on_host(true);
     OP_REQUIRES_OK(context,
                    context->allocate_temp(dml_data.dtype(), dml_data.shape(),
-                                          &cpu_data, cpu_alloc_attrs));
+                                          &data, cpu_alloc_attrs));
+
+    const Tensor& cpu_data = data;
 
     Notification dml_data_notification;
     context->op_device_context()->CopyDeviceTensorToCPU(
@@ -532,11 +534,13 @@ class UnsortedSegmentReductionDmlOp : public OpKernel {
         });
 
     const Tensor& dml_segment_ids = context->input(1);
-    Tensor cpu_segment_ids;
+    Tensor segment_ids;
     OP_REQUIRES_OK(
         context,
         context->allocate_temp(dml_segment_ids.dtype(), dml_segment_ids.shape(),
-                               &cpu_segment_ids, cpu_alloc_attrs));
+                               &segment_ids, cpu_alloc_attrs));
+
+    const Tensor& cpu_segment_ids = segment_ids;
 
     Notification dml_segment_ids_notification;
     context->op_device_context()->CopyDeviceTensorToCPU(
