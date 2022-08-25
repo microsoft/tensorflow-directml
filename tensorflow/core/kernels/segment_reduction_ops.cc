@@ -585,7 +585,7 @@ class UnsortedSegmentReductionDmlOp : public OpKernel {
                        cpu_data_flat, cpu_output_flat);
 
     context->op_device_context()->CopyCPUTensorToDevice(
-        &cpu_output, "", static_cast<Device*>(context->device()), dml_output,
+        &cpu_output, static_cast<Device*>(context->device()), dml_output,
         [context](const Status& copy_status) {
           OP_REQUIRES_OK(context, copy_status);
         });
