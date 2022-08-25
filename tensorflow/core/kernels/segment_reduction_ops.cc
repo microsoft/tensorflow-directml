@@ -523,11 +523,10 @@ class UnsortedSegmentReductionDmlOp : public OpKernel {
                    context->allocate_temp(dml_data.dtype(), dml_data.shape(),
                                           &data, cpu_alloc_attrs));
 
-    const Tensor& cpu_data = data;
 
     Notification dml_data_notification;
     context->op_device_context()->CopyDeviceTensorToCPU(
-        &dml_data, "", static_cast<Device*>(context->device()), &cpu_data,
+        &dml_data, "", static_cast<Device*>(context->device()), &data,
         [&dml_data_notification, context](const Status& copy_status) {
           OP_REQUIRES_OK(context, copy_status);
           dml_data_notification.Notify();
@@ -540,12 +539,10 @@ class UnsortedSegmentReductionDmlOp : public OpKernel {
         context->allocate_temp(dml_segment_ids.dtype(), dml_segment_ids.shape(),
                                &segment_ids, cpu_alloc_attrs));
 
-    const Tensor& cpu_segment_ids = segment_ids;
-
     Notification dml_segment_ids_notification;
     context->op_device_context()->CopyDeviceTensorToCPU(
         &dml_segment_ids, "", static_cast<Device*>(context->device()),
-        &cpu_segment_ids,
+        &segment_ids,
         [&dml_segment_ids_notification, context](const Status& copy_status) {
           OP_REQUIRES_OK(context, copy_status);
           dml_segment_ids_notification.Notify();
@@ -554,6 +551,9 @@ class UnsortedSegmentReductionDmlOp : public OpKernel {
     dml_data_notification.WaitForNotification();
     dml_segment_ids_notification.WaitForNotification();
     OP_REQUIRES_OK(context, context->status());
+
+    const Tensor& cpu_data = data;
+    const Tensor& cpu_segment_ids = segment_ids;
 
     const Tensor& num_segments = context->input(2);
     if (!UnsortedSegmentReductionDoValidation(this, context, cpu_data,
