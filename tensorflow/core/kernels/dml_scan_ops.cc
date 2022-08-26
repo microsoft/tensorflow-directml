@@ -106,6 +106,7 @@ class DmlScanKernel : public DmlKernel {
                                         tensor_shape);
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
     tensors.inputs = {input};
     tensors.outputs = {output};
 

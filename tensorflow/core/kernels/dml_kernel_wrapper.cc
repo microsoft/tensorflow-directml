@@ -108,25 +108,24 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
     for (int i = 0; i < ctx->num_outputs(); ++i) {
       absl::optional<int> inputIndexToForward =
           shared_helper->GetForwardableInputIndex(ctx, output_shapes, i);
-      
+
       bool cancelForward = true;
 
       // If the input is considered forwardable for the op
       if (inputIndexToForward) {
         int inputIndex = inputIndexToForward.value();
         const Tensor& input = ctx->input_is_ref(inputIndex)
-                            ? ctx->mutable_input(inputIndex, false)
-                            : ctx->input(inputIndex);
+                                  ? ctx->mutable_input(inputIndex, false)
+                                  : ctx->input(inputIndex);
 
         // Element counts must also match
-        if (input.NumElements() == output_shapes[i].num_elements())
-        {
+        if (input.NumElements() == output_shapes[i].num_elements()) {
           forwardIndices.emplace_back(
-            std::make_pair(inputIndexToForward.value(), i));
-            cancelForward = false;   
+              std::make_pair(inputIndexToForward.value(), i));
+          cancelForward = false;
         }
       }
-      
+
       // If not all outputs are forwardable, we will forward nothing and
       // proceed with the kernel normally.
       if (cancelForward) {
@@ -176,7 +175,8 @@ void DmlKernelWrapperBase::Compute(OpKernelContext* ctx) {
 
   // Execute the kernel
   DmlKernelContext dml_ctx(dml_device, ctx, init_helper, output_shapes,
-                           kernel->GetOutputRefsForwarding());
+                           kernel->GetOutputRefsForwarding(),
+                           kernel->SupportsInPlaceExecution());
 
   // Check for errors triggered during the kernel context's constructor (e.g.
   // OOM when allocating the output buffers)

@@ -113,6 +113,7 @@ class DmlBiasAddKernel : public DmlKernel {
     }
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
     tensors.inputs.resize(2);
     tensors.outputs.resize(1);
 

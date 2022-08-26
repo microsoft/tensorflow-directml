@@ -36,6 +36,7 @@ class DmlAddNKernel : public DmlKernel {
     TensorShape tensor_shape({ctx->GetOutputTensorShape(0).num_elements()});
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
 
     for (uint32_t i = 0; i < ctx->GetInputCount(); ++i) {
       DmlTensorInfo input;

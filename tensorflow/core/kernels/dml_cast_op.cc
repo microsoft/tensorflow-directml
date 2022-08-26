@@ -56,22 +56,23 @@ class DmlCastKernel : public DmlKernel {
         DmlTensorDesc::Create(output_dtype, tensor_shape, tensor_shape);
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
     tensors.outputs = {output};
     tensors.inputs = {input};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
-    auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
+    auto result = dml::InputTensor(scope, 0, inputs[0]);
 
     // Bool is a special case since it doesn't behave the same as uint8. The
     // uint8 version simply drops the decimals, but bool converts anything that
     // is not 0.0 to True.
     if (output_dtype == DT_BOOL &&
         (input_dtype == DT_HALF || input_dtype == DT_FLOAT)) {
-      input_tensor = dml::Ceil(dml::Abs(input_tensor));
+      result = dml::Ceil(dml::Abs(result));
     }
 
-    auto result = dml::Cast(input_tensor, dml_out_dtype);
+    auto result = dml::Cast(result, dml_out_dtype);
 
     if (output_dtype == DT_BOOL) {
       result = dml::Clip(result, 0.0, 1.0);

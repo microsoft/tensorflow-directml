@@ -250,6 +250,7 @@ class DmlTransposeKernel : public DmlKernel {
         });
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
     tensors.inputs = {input};
     tensors.outputs = {output};
 

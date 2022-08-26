@@ -78,6 +78,7 @@ class DmlReluKernel : public DmlKernel {
     tensor_info.desc = DmlTensorDesc{data_type, tensor_sizes};
 
     DmlKernelTensors tensors = {};
+    tensors.supports_in_place_execution = true;
     tensors.inputs = {tensor_info};
     tensors.outputs = {tensor_info};
 
@@ -132,6 +133,7 @@ class DmlLUGradKernel : public DmlKernel {
                                                output_shape, output_shape);
 
     DmlKernelTensors tensors = {};
+    tensors.supports_in_place_execution = true;
     tensors.inputs = {feature_tensor, input_gradient_tensor};
     tensors.outputs = {output_tensor};
 
