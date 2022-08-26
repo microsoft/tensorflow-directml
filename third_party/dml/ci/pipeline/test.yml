@@ -21,7 +21,9 @@ jobs:
 #-------------------------------------------------------------------------------------------------------------------
 - job: createTestMatrix
   displayName: Create Test Matrix
-  pool: ${{parameters.agentPools[0]}}
+  pool:
+    name: ${{parameters.agentPools[0]}}
+    demands: AP.TfArtifacts
   steps:
   - task: PowerShell@2
     inputs:
@@ -139,7 +141,9 @@ jobs:
 - job: summarize
   displayName: Summarize Results
   dependsOn: test
-  pool: ${{parameters.agentPools[0]}}
+  pool:
+    name: ${{parameters.agentPools[0]}}
+    demands: AP.TfArtifacts
   timeoutInMinutes: 30
   condition: succeededOrFailed()
   continueOnError: true
