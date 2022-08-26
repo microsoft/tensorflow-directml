@@ -152,12 +152,16 @@ DataType GetTfDataTypeFromDmlDataType(DML_TENSOR_DATA_TYPE type) {
       return DT_FLOAT;
     case DML_TENSOR_DATA_TYPE_FLOAT16:
       return DT_HALF;
+    case DML_TENSOR_DATA_TYPE_UINT64:
+      return DT_UINT64;
     case DML_TENSOR_DATA_TYPE_UINT32:
       return DT_UINT32;
     case DML_TENSOR_DATA_TYPE_UINT16:
       return DT_UINT16;
     case DML_TENSOR_DATA_TYPE_UINT8:
       return DT_UINT8;
+    case DML_TENSOR_DATA_TYPE_INT64:
+      return DT_INT64;
     case DML_TENSOR_DATA_TYPE_INT32:
       return DT_INT32;
     case DML_TENSOR_DATA_TYPE_INT16:
@@ -169,52 +173,14 @@ DataType GetTfDataTypeFromDmlDataType(DML_TENSOR_DATA_TYPE type) {
   }
 }
 
-// TFDML #24881131
-bool Is64BitIntegerType(DataType type) {
-  switch (type) {
-    case DT_UINT64:
-    case DT_INT64:
-    case DT_UINT64_REF:
-    case DT_INT64_REF:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// TFDML #24881131
-bool Is64BitSignedIntegerType(DataType type) {
-  switch (type) {
-    case DT_INT64:
-    case DT_INT64_REF:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// TFDML #24881131
-bool Is64BitUnsignedIntegerType(DataType type) {
-  switch (type) {
-    case DT_UINT64:
-    case DT_UINT64_REF:
-      return true;
-    default:
-      return false;
-  }
-}
-
-// TODO: 64-bit data support should be revisited once DML supports 64 bit
-// datatypes
-// TFDML #24881131
 DML_TENSOR_DATA_TYPE GetDmlDataTypeFromTfDataType(DataType type) {
   switch (type) {
     case DT_UINT64:
     case DT_UINT64_REF:
-      return DML_TENSOR_DATA_TYPE_UINT32;
+      return DML_TENSOR_DATA_TYPE_UINT64;
     case DT_INT64:
     case DT_INT64_REF:
-      return DML_TENSOR_DATA_TYPE_INT32;
+      return DML_TENSOR_DATA_TYPE_INT64;
     case DT_FLOAT:
     case DT_FLOAT_REF:
       return DML_TENSOR_DATA_TYPE_FLOAT32;
@@ -347,30 +313,8 @@ dml::TensorPolicy GetDmlXTensorPolicy(TensorFormat format) {
   }
 }
 
-dml::TensorPolicy GetEmulatedInt64TensorPolicy() {
-  return dml::TensorPolicy([](DML_TENSOR_DATA_TYPE dataType,
-                              DML_TENSOR_FLAGS flags,
-                              dml::Span<const uint32_t> sizes) {
-    uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
-
-    // Compute strides
-    dml::TensorDimensions strides(dimension_count);
-    uint32_t stride = 2;  // double all strides
-    for (int i = static_cast<int>(dimension_count) - 1; i >= 0; i--) {
-      strides[i] = stride;
-      stride *= sizes[i];
-    }
-
-    dml::TensorProperties props = {};
-    props.guaranteedBaseOffsetAlignment = 0;
-    props.strides = std::move(strides);
-    props.totalTensorSizeInBytes = DMLCalcBufferTensorSize(
-        dataType, dimension_count, sizes.data(), props.strides->data());
-    return props;
-  });
-}
-
-dml::TensorStrides ComputePackedStrides(const dml::Span<const uint32_t>& sizes) {
+dml::TensorStrides ComputePackedStrides(
+    const dml::Span<const uint32_t>& sizes) {
   dml::TensorStrides strides(sizes.size());
   uint32_t stride = 1;
   for (int i = sizes.size() - 1; i >= 0; --i) {

@@ -278,11 +278,6 @@ class DmlGatherKernel : public DmlKernel {
         dml::Gather(input_tensor, indices_tensor, simple_gather.gather_axis,
                     simple_gather.index_dimensions);
 
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(result);
-    }
-
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
