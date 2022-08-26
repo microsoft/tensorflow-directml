@@ -72,7 +72,7 @@ class DmlCastKernel : public DmlKernel {
       result = dml::Ceil(dml::Abs(result));
     }
 
-    auto result = dml::Cast(result, dml_out_dtype);
+    result = dml::Cast(result, dml_out_dtype);
 
     if (output_dtype == DT_BOOL) {
       result = dml::Clip(result, 0.0, 1.0);
