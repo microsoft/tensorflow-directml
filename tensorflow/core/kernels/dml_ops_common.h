@@ -67,6 +67,8 @@ struct DmlKernelParams {
 
   // OutputIndex -> InputIndex ref forwarding mapping
   absl::InlinedVector<absl::optional<uint32_t>, 8> output_refs_forwarding;
+
+  bool supports_in_place_execution = false;
 };
 
 struct DmlTensorInfo {
@@ -81,6 +83,7 @@ struct DmlKernelTensors {
   absl::InlinedVector<absl::optional<DmlTensorInfo>, 8> inputs;
   absl::InlinedVector<absl::optional<DmlTensorInfo>, 4> outputs;
   absl::InlinedVector<absl::optional<uint32_t>, 8> output_refs_forwarding;
+  bool supports_in_place_execution = false;
 };
 
 // Abstract base class of all DirectML kernel implementations. Note that this
@@ -97,6 +100,8 @@ class DmlKernel {
   absl::Span<const absl::optional<uint32_t>> GetOutputRefsForwarding() const {
     return output_refs_forwarding_;
   }
+
+  bool SupportsInPlaceExecution() const { return supports_in_place_execution_; }
 
   const InitializationHelper* GetInitializationHelper() const {
     return init_helper_.get();
@@ -183,7 +188,7 @@ class DmlKernel {
 
   Microsoft::WRL::ComPtr<ID3D12Resource> persistent_resource_;
   absl::optional<DML_BUFFER_BINDING> persistent_resource_binding_;
-  
+
   std::shared_ptr<const InitializationHelper> init_helper_;
 
   // The order and count of these descs match the DML operator, which might be
@@ -209,6 +214,8 @@ class DmlKernel {
   // needs the second input to be forwarded to it, we would have the following
   // vector: {nullopt, 1}
   absl::InlinedVector<absl::optional<uint32_t>, 8> output_refs_forwarding_;
+
+  bool supports_in_place_execution_;
 };
 
 template <typename T>

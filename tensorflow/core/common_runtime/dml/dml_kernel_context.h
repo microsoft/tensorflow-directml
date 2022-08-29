@@ -102,7 +102,8 @@ class DmlKernelContext {
       const DmlDevice* device, OpKernelContext* op_ctx,
       const InitializationHelper* init_helper,
       absl::Span<const TensorShape> output_shapes,
-      absl::Span<const absl::optional<uint32_t>> output_refs_forwarding = {});
+      absl::Span<const absl::optional<uint32_t>> output_refs_forwarding,
+      bool supports_in_place_execution);
 
   IDMLDevice* GetDmlDevice() const;
   ID3D12Device* GetD3D12Device() const;
