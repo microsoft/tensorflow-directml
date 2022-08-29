@@ -207,7 +207,7 @@ class DmlCompositeUnaryKernel : public DmlKernel {
         CreateKernelTensors(ctx, {tensor_shape}, tensor_shape);
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, inputs[0]);
 
     ExpressionFunctor expression;
