@@ -138,7 +138,7 @@ static dml::TensorStrides ComputeStrides(const TensorShape& input_shape,
 
   dml::TensorStrides output_strides(leading_dims + permutations.size(), 1);
 
-  constexpr uint32_t stride = 1;
+  uint32_t stride = 1;
 
   for (int64 i = permutations.size() - 1; i >= 0; --i) {
     int input_dim_index = permutations[i];
