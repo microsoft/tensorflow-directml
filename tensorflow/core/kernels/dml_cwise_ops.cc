@@ -595,7 +595,7 @@ REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(
     Inv,
     dml::Cast(dml::Recip(dml::Cast(x, DML_TENSOR_DATA_TYPE_FLOAT32)),
               DML_TENSOR_DATA_TYPE_FLOAT32),
-    int64)
+    true, int64)
 // TFDML #24881131
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(
     Reciprocal,
