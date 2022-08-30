@@ -96,15 +96,7 @@ absl::InlinedVector<uint32_t, DML_TENSOR_DIMENSION_COUNT_MAX1> ComputeStrides(
   // required by DML.
   absl::InlinedVector<uint32_t, DML_TENSOR_DIMENSION_COUNT_MAX1> strides(rank);
 
-  // Double the stride values to emulate 64-bit integer support.
-  // DirectML doesn't support tensor of int64 because Direct3D doesn't support
-  // the data type. A workaround is to use strides to fake 64-bit memory
-  // access while only the lower 32 bits contains the data. This trick
-  // obviously doesn't work if the data element is genuine 64-bit.
-  // TODO #24881131: 64-bit data support should be revisited once DML supports
-  // these types
-  // TFDML #24881131
-  uint32_t current_stride = Is64BitIntegerType(data_type) ? 2 : 1;
+  uint32_t current_stride = 1;
 
   for (uint32_t i = 0; i < rank; ++i) {
     // Walk backwards through our dimensions and set the corresponding DML
@@ -141,27 +133,6 @@ absl::InlinedVector<uint32_t, DML_TENSOR_DIMENSION_COUNT_MAX1> ComputeStrides(
   return strides;
 }
 
-// TODO #24881131: 64-bit data support should be revisited once DML supports
-// these types
-// TFDML #24881131
-static inline uint64_t ComputeEndPadding(DataType data_type) {
-  // The physical size of the tensor will have an extra 4 bytes at the end.
-  // DMLCalcBufferTensorSize calculates the minimum implied size, which is
-  // based on the last addressable element of the tensor plus the space for
-  // the last element. However, the size of the last element is now halved
-  // from 8 bytes to 4 bytes.
-  //
-  // Example:
-  // Original Tensor: size={2,3}, strides={3,1}, type=int64, size =
-  // (1+{1,2}*{3,1})*sizeof(int64) = 6 * 8 = 48 Emulated Tensor: size={2,3},
-  // strides={6,2}, type=int32, size = (1+{1,2}*{6,2})*sizeof(int32) = 11 * 4
-  // = 44
-  //
-  // DirectML itself won't read/write the last 4 bytes, but we want the total
-  // size to be accurate so that the entire region can be zeroed.
-  return Is64BitIntegerType(data_type) ? sizeof(uint32_t) : 0;
-}
-
 /*static*/ DmlTensorDesc DmlTensorDesc::Create(
     DataType data_type, absl::Span<const uint32_t> dimensions,
     absl::Span<const uint32_t> non_broadcast_dimensions,
@@ -188,16 +159,11 @@ static inline uint64_t ComputeEndPadding(DataType data_type) {
             std::back_inserter(dml_sizes));
   std::copy(strides.begin(), strides.end(), std::back_inserter(dml_strides));
 
-  uint64_t end_padding_in_bytes = ComputeEndPadding(data_type);
-
   const DML_TENSOR_DATA_TYPE dml_data_type =
       GetDmlDataTypeFromTfDataType(data_type);
 
   auto dml_desc = DmlTensorDesc(dml_data_type, dml_sizes, dml_strides,
                                 guaranteed_base_offset_alignment);
-
-  // Massage the end padding, if any, before returning
-  dml_desc.buffer_tensor_desc_.TotalTensorSizeInBytes += end_padding_in_bytes;
 
   return dml_desc;
 }
@@ -268,16 +234,11 @@ static inline uint64_t ComputeEndPadding(DataType data_type) {
     dml_strides[dml_dim_index] = dim_stride;
   }
 
-  uint64_t end_padding_in_bytes = ComputeEndPadding(data_type);
-
   const DML_TENSOR_DATA_TYPE dml_data_type =
       GetDmlDataTypeFromTfDataType(data_type);
 
   auto dml_desc = DmlTensorDesc(dml_data_type, dml_sizes, dml_strides,
                                 guaranteed_base_offset_alignment);
-
-  // Massage the end padding, if any, before returning
-  dml_desc.buffer_tensor_desc_.TotalTensorSizeInBytes += end_padding_in_bytes;
 
   return dml_desc;
 }
@@ -307,6 +268,10 @@ DML_TENSOR_DESC DmlTensorDesc::GetDmlDesc() {
 
 void DmlTensorDesc::ForceUnsignedDataType() {
   switch (buffer_tensor_desc_.DataType) {
+    case DML_TENSOR_DATA_TYPE_INT64:
+      buffer_tensor_desc_.DataType = DML_TENSOR_DATA_TYPE_UINT64;
+      break;
+
     case DML_TENSOR_DATA_TYPE_INT32:
       buffer_tensor_desc_.DataType = DML_TENSOR_DATA_TYPE_UINT32;
       break;
@@ -320,6 +285,7 @@ void DmlTensorDesc::ForceUnsignedDataType() {
       break;
 
       // Nothing to do if already unsigned
+    case DML_TENSOR_DATA_TYPE_UINT64:
     case DML_TENSOR_DATA_TYPE_UINT32:
     case DML_TENSOR_DATA_TYPE_UINT16:
     case DML_TENSOR_DATA_TYPE_UINT8:

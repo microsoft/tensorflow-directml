@@ -127,11 +127,6 @@ class DmlTopKKernel : public DmlKernel {
     dml::TopKOutputs result =
         dml::TopK(input_tensor, axis, k, DML_AXIS_DIRECTION_DECREASING);
 
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result.value = dml::ConvertInt32ToInt64(result.value);
-    }
-
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result.value, result.index});
 

@@ -243,10 +243,8 @@ class DmlResourceScatterNDUpdateKernel : public DmlKernel {
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
         ctx->GetDmlDeviceContext()->GetBufferForTensor(params_tensor),
-        ctx->GetDmlDeviceContext()->GetBufferForTensor(
-            ctx->GetInputTensor(1)),
-        ctx->GetDmlDeviceContext()->GetBufferForTensor(
-            ctx->GetInputTensor(2)),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(ctx->GetInputTensor(1)),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(ctx->GetInputTensor(2)),
     };
 
     // Create input bindings
@@ -283,12 +281,12 @@ template <typename BinaryOperation, DML_REDUCE_FUNCTION reduce_function,
 struct ScatterNdBinaryOperation {
   dml::Expression operator()(dml::Graph& scope, dml::Expression params,
                              dml::Expression indices, dml::Expression updates,
-                             dml::Expression strides, bool int64_indices) {
+                             dml::Expression strides) {
     // First, compute the 1D version of the indices as if we were indexing into
     // a 1D array
-    const auto broadcasted_strides = dml::Reinterpret(
-        strides, indices.GetOutputDesc().sizes,
-        dml::TensorDesc::Dimensions({0, 0, 0, int64_indices ? 2u : 1u}));
+    const auto broadcasted_strides =
+        dml::Reinterpret(strides, indices.GetOutputDesc().sizes,
+                         dml::TensorDesc::Dimensions({0, 0, 0, 1}));
 
     const auto global_indices = dml::Reduce(indices * broadcasted_strides,
                                             DML_REDUCE_FUNCTION_SUM, {3});
@@ -423,12 +421,7 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
     auto indices = dml::InputTensor(graph, 1, inputs[1]);
     auto updates = dml::InputTensor(graph, 2, inputs[2]);
     auto strides = dml::InputTensor(graph, 3, inputs[3]);
-
-    // TODO: Remove the Is64BitIntegerType hack when DML has a more solid
-    // solution for 64 bit datatypes
-    // TFDML #24881131
-    auto result = BinaryOp()(graph, input, indices, updates, strides,
-                             Is64BitIntegerType(indices_dtype));
+    auto result = BinaryOp()(graph, input, indices, updates, strides);
 
     const uint32_t buffer_size = indices_last_dim * DataTypeSize(indices_dtype);
     strides_buffer_ =
@@ -477,10 +470,8 @@ class DmlResourceScatterNDBinaryKernel : public DmlKernel {
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
         ctx->GetDmlDeviceContext()->GetBufferForTensor(params_tensor),
-        ctx->GetDmlDeviceContext()->GetBufferForTensor(
-            ctx->GetInputTensor(1)),
-        ctx->GetDmlDeviceContext()->GetBufferForTensor(
-            ctx->GetInputTensor(2)),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(ctx->GetInputTensor(1)),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(ctx->GetInputTensor(2)),
     };
 
     // Create input bindings

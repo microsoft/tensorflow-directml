@@ -163,8 +163,7 @@ struct ScatterUpdateOperation {
 
   dml::Expression operator()(dml::Graph& scope, dml::Expression params,
                              dml::Expression indices, dml::Expression updates,
-                             uint32_t scatter_axis, bool int64_indices,
-                             bool scalar_updates) {
+                             uint32_t scatter_axis, bool scalar_updates) {
     return dml::ScatterElements(params, indices, updates, scatter_axis);
   }
 };
@@ -219,8 +218,7 @@ struct ScatterBinaryOperation {
 
   dml::Expression operator()(dml::Graph& scope, dml::Expression params,
                              dml::Expression indices, dml::Expression updates,
-                             uint32_t scatter_axis, bool int64_indices,
-                             bool scalar_updates) {
+                             uint32_t scatter_axis, bool scalar_updates) {
     auto params_sizes = params.GetOutputDesc().sizes;
     uint32_t row_count = params_sizes[scatter_axis];
 
@@ -243,10 +241,8 @@ struct ScatterBinaryOperation {
         dml::Reinterpret(row_indices, broadcasted_sizes,
                          dml::TensorDesc::Dimensions({0, 0, 1, 0}));
 
-    uint32_t indices_stride_multiplier = int64_indices ? 2 : 1;
     auto broadcasted_indices = dml::Reinterpret(
-        indices, broadcasted_sizes,
-        dml::TensorDesc::Dimensions({0, indices_stride_multiplier, 0, 0}));
+        indices, broadcasted_sizes, dml::TensorDesc::Dimensions({0, 1, 0, 0}));
 
     dml::Expression broadcasted_updates =
         scalar_updates
@@ -356,11 +352,7 @@ class DmlScatterUpdateKernel : public DmlKernel {
     const uint32_t scatter_axis =
         params.GetOutputDesc().sizes.size() - flat_params_shape.dims();
 
-    // TODO: Remove the Is64BitIntegerType hack when DML has a more solid
-    // solution for 64 bit datatypes
-    // TFDML #24881131
     auto result = ScatterOp()(scope, params, indices, updates, scatter_axis,
-                              Is64BitIntegerType(ctx->GetInputDataType(1)),
                               scalar_updates);
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
@@ -381,10 +373,8 @@ class DmlScatterUpdateKernel : public DmlKernel {
     // Create input buffers
     D3D12BufferRegion input_buffers[] = {
         ctx->GetDmlDeviceContext()->GetBufferForTensor(params_tensor),
-        ctx->GetDmlDeviceContext()->GetBufferForTensor(
-            ctx->GetInputTensor(1)),
-        ctx->GetDmlDeviceContext()->GetBufferForTensor(
-            ctx->GetInputTensor(2)),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(ctx->GetInputTensor(1)),
+        ctx->GetDmlDeviceContext()->GetBufferForTensor(ctx->GetInputTensor(2)),
     };
 
     // Create input bindings

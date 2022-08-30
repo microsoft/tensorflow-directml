@@ -198,19 +198,6 @@ class DmlReduceKernel : public DmlKernel {
         reduce_function == DML_REDUCE_FUNCTION_MIN ||
         reduce_function == DML_REDUCE_FUNCTION_MAX;
 
-    // Arg functions in TF are defined with an int64 output, but since the
-    // indices cannot be negative we output uint32 values with strides instead
-    // of int32 with padding
-    const bool double_strides =
-        Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0)) ||
-        (is_arg_function_ &&
-         Is64BitSignedIntegerType(ctx->GetOutputDataType(0)));
-
-    // TFDML #24881131
-    const dml::TensorPolicy out_policy = double_strides
-                                             ? GetEmulatedInt64TensorPolicy()
-                                             : dml::TensorPolicy::Default();
-
     // Special-case for Prod operator: when reducing an empty tensor, we
     // explicitly need to return a value of 1.0 (not zero, which is the
     // default for a no-op'd operator)
@@ -262,16 +249,11 @@ class DmlReduceKernel : public DmlKernel {
 
       const auto output_sizes = tensors.outputs[0]->desc.GetSizes();
 
-      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto result = dml::FillValueConstant(
           scope,
           dml::TensorDimensions(output_sizes.begin(), output_sizes.end()),
           value_datatype, value);
-
-      // TFDML #24881131
-      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-        result = dml::ConvertInt32ToInt64(result);
-      }
 
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
@@ -306,13 +288,8 @@ class DmlReduceKernel : public DmlKernel {
       tensors.outputs = {in_out_tensor};
 
       auto input_descs = GetDmlTensorDescs(tensors.inputs);
-      auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+      auto scope = dml::Graph(ctx->GetDmlDevice());
       auto result = dml::Identity(dml::InputTensor(scope, 0, input_descs[0]));
-
-      // TFDML #24881131
-      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-        result = dml::ConvertInt32ToInt64(result);
-      }
 
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
@@ -371,15 +348,6 @@ class DmlReduceKernel : public DmlKernel {
       }
     }
 
-    // Only Arg functions need the output to be zero'ed since they're the only
-    // functions that output strided uint32. Other reduction functions either
-    // use non-strided types or use int64, which got its upper bits initialized
-    // in the constructor already.
-    // TFDML #24881131
-    if (is_arg_function_ && Is64BitIntegerType(ctx->GetOutputDataType(0))) {
-      zero_outputs_ = true;
-    }
-
     assert(input_shape.dims() == output_shape.dims());
 
     DmlTensorInfo input;
@@ -392,12 +360,6 @@ class DmlReduceKernel : public DmlKernel {
     output.desc = DmlTensorDesc::Create(ctx->GetOutputDataType(0), output_shape,
                                         output_shape);
 
-    // Coerce the output datatype to unsigned, for argmin/argmax
-    if (is_arg_function_ && DataTypeIsInteger(output.desc.GetTfDataType())) {
-      output.desc.ForceUnsignedDataType();
-      zero_outputs_ = true;
-    }
-
     DmlKernelTensors tensors;
     tensors.inputs = {input};
     tensors.outputs = {output};
@@ -405,8 +367,11 @@ class DmlReduceKernel : public DmlKernel {
     DML_TENSOR_DATA_TYPE dml_input_data_type =
         GetDmlDataTypeFromTfDataType(ctx->GetInputDataType(0));
 
+    DML_TENSOR_DATA_TYPE dml_output_data_type =
+        GetDmlDataTypeFromTfDataType(ctx->GetOutputDataType(0));
+
     auto input_descs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto result = dml::InputTensor(scope, 0, input_descs[0]);
 
     // For logical operators like Any and All, we need to cast from uint8 to
@@ -416,17 +381,11 @@ class DmlReduceKernel : public DmlKernel {
       result = dml::Cast(result, DML_TENSOR_DATA_TYPE_FLOAT32);
       result = dml::Reduce(result, reduce_function, reduce_axes);
       result = dml::Cast(result, dml_input_data_type);
+    } else if (is_arg_function_) {
+      result = dml::Reduce(result, reduce_function, reduce_axes,
+                           dml_output_data_type);
     } else {
       result = dml::Reduce(result, reduce_function, reduce_axes);
-    }
-
-    // Arg functions never return negative indices, so even though TF only
-    // supports int64, we can safely use uint32 with strides instead of int32
-    // with strides
-    // TFDML #24881131
-    if (!is_arg_function_ &&
-        Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(result);
     }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =

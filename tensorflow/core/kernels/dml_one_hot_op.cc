@@ -188,15 +188,13 @@ class DmlOneHotKernel : public DmlKernel {
       indices = dml::Cast(indices, DML_TENSOR_DATA_TYPE_UINT32);
     }
 
+    // TODO: TFDML #40634243 OneHot fails with INT64 indices
+    indices = dml::Cast(indices, DML_TENSOR_DATA_TYPE_UINT32);
+
     // TF provides the on/off values as separate tensors, but DML expects a
     // single two-element tensor with values [off, on].
     auto values = dml::Join({off_value, on_value}, 3);
     auto result = dml::OneHot(indices, values, depth, axis_dml);
-
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(result);
-    }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
