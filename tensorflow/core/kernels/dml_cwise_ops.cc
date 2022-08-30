@@ -309,10 +309,12 @@ class DmlCompositeUnaryKernel : public DmlKernel {
       DmlCompositeUnaryKernel<Dml##opName##Functor,                        \
                               supports_in_place_execution>;
 
-#define REGISTER_DML_COMPOSITE_UNARY_BOOL_KERNEL(opName, expression) \
-  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {             \
-    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)          \
-    REGISTER_BOOL_OP_KERNEL(opName);                                 \
+#define REGISTER_DML_COMPOSITE_UNARY_BOOL_KERNEL(opName, expression,          \
+                                                 supports_in_place_execution) \
+  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                      \
+    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression,                   \
+                                        supports_in_place_execution)          \
+    REGISTER_BOOL_OP_KERNEL(opName);                                          \
   }
 
 #define REGISTER_DML_COMPOSITE_BINARY_STRUCT(                          \
@@ -590,7 +592,10 @@ REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Sinh, dml::Sinh(x), true, float)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Rint, dml::Round(x), true, float)
 // TFDML #24881131
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(
-    Inv, dml::Recip(dml::Cast(x, DML_TENSOR_DATA_TYPE_FLOAT32)), int64)
+    Inv,
+    dml::Cast(dml::Recip(dml::Cast(x, DML_TENSOR_DATA_TYPE_FLOAT32)),
+              DML_TENSOR_DATA_TYPE_FLOAT32),
+    int64)
 // TFDML #24881131
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(
     Reciprocal,
@@ -636,8 +641,10 @@ REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Erf, dml::Erf(x), true, Eigen::half,
                                       float)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(IsNan, dml::IsNaN(x), false, Eigen::half,
                                       float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Round, dml::Round(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Round, dml::Identity(x), int32, int64)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Round, dml::Round(x), true, Eigen::half,
+                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Round, dml::Identity(x), true, int32,
+                                      int64)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Softplus, dml::ActivationSoftplus(x),
                                       true, Eigen::half, float)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Erfc, 1.0f - dml::Erf(x), true,
