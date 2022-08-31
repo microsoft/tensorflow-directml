@@ -110,8 +110,6 @@ class AdamOptimizerTest(test.TestCase):
   def testResourceSparse(self):
     self.doTestSparse(use_resource=True)
 
-  # DML doesn't implement UnsortedSegmentSum
-  @test_util.skip_dml
   @test_util.run_deprecated_v1
   def testSparseDevicePlacement(self):
     for index_dtype in [dtypes.int32, dtypes.int64]:

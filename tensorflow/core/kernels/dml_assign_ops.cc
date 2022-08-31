@@ -79,11 +79,6 @@ class DmlAssignModifyOp : public DmlKernel {
     auto b_tensor = dml::InputTensor(scope, 1, inputs[1]);
     auto result = Expression()(a_tensor, b_tensor);
 
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(result);
-    }
-
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 

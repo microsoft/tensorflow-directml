@@ -377,11 +377,6 @@ class DmlTernaryKernel : public DmlKernel {
     auto else_tensor = dml::InputTensor(scope, 2, inputs[2]);
     auto result = dml::If(cond_tensor, then_tensor, else_tensor);
 
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(result);
-    }
-
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 

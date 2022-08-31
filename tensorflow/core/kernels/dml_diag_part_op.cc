@@ -72,28 +72,17 @@ class DmlDiagPartKernel : public DmlKernel {
     TensorShape output_shape(
         {1, 1, 1, ctx->GetOutputTensorShape(0).num_elements()});
 
-    // TODO #24881131: 64-bit data support should be revisited
-    // TFDML #24881131
     auto dtype_tf = ctx->GetInputDataType(0);
-    bool is_64_bit_type = Is64BitIntegerType(dtype_tf);
     auto dtype_dml = GetDmlDataTypeFromTfDataType(dtype_tf);
-    uint64_t end_padding_in_bytes = is_64_bit_type ? sizeof(uint32_t) : 0;
-    uint32_t stride_multiplier = is_64_bit_type ? 2 : 1;
 
     // Flatten the input into a vector and use strides to skip over zeros
     auto out_num_elements = static_cast<uint32_t>(output_shape.num_elements());
     uint32_t input_sizes[] = {1, 1, 1, out_num_elements};
-    uint32_t input_strides[] = {
-        0,
-        0,
-        0,
-        (out_num_elements + 1) * stride_multiplier,
-    };
+    uint32_t input_strides[] = {0, 0, 0, (out_num_elements + 1)};
 
     DmlTensorInfo input;
     input.kernel_index = 0;
-    input.desc = DmlTensorDesc(dtype_dml, input_sizes, input_strides, 0,
-                               end_padding_in_bytes);
+    input.desc = DmlTensorDesc(dtype_dml, input_sizes, input_strides);
 
     DmlTensorInfo output;
     output.kernel_index = 0;
@@ -108,11 +97,6 @@ class DmlDiagPartKernel : public DmlKernel {
     auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
     auto result = dml::Identity(input_tensor);
-
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(result);
-    }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
