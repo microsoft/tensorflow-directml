@@ -70,7 +70,8 @@ REQUIRED_PACKAGES = [
     'numpy >= 1.16.0, < 1.19.0',
     'opt_einsum >= 2.3.2',
     'six >= 1.10.0',
-    'protobuf >= 3.6.1',
+    # Protobuf >= 4.00 has breaking changes not compatible with TF 1.15
+    'protobuf >= 3.6.1, < 4.0.0',
     'tensorboard >= 1.15.0, < 1.16.0',
     'tensorflow-estimator == 1.15.1',
     'termcolor >= 1.1.0',
