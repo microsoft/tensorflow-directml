@@ -92,27 +92,6 @@ class ReduceInitializationHelper : public InitializationHelper {
         reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
         reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
 
-    if (is_arg_function) {
-      OP_REQUIRES(ctx, TensorShapeUtils::IsScalar(axes_tensor.shape()),
-                  errors::InvalidArgument(
-                      "dim must be a scalar, but received tensor of shape: ",
-                      axes_tensor.shape().DebugString()));
-
-      const int32_t dim = axes_tensor.base<int32_t>()[0];
-      const int input_dims = data_tensor.dims();
-
-      int axis = dim < 0 ? dim + input_dims : dim;
-
-      OP_REQUIRES(ctx, axis < input_dims,
-                  errors::InvalidArgument("Expected dimension in the range [",
-                                          -input_dims, ", ", input_dims,
-                                          "), but got ", dim));
-      OP_REQUIRES(
-          ctx, data_tensor.dim_size(axis) > 0,
-          errors::InvalidArgument("Reduction axis ", dim, " is empty in shape ",
-                                  data_tensor.shape().DebugString()));
-    }
-
     OP_REQUIRES_OK(ctx, reduction_helper_.Simplify(
                             data_tensor.shape(), axes_tensor, attr->keep_dims));
 
