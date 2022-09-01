@@ -86,6 +86,7 @@ class DmlBroadcastToKernel : public DmlKernel {
     CHECK(ctx->GetOutputCount() == 1);
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
 
     const TensorShape input_shape = init_helper->GetCollapsedInputShape();
     const TensorShape output_shape = init_helper->GetCollapsedOutputShape();

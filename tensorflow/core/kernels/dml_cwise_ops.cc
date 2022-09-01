@@ -89,8 +89,9 @@ class ElementWiseInitHelper
 
 static DmlKernelTensors CreateKernelTensors(
     DmlKernelConstruction* ctx, absl::Span<const TensorShape> input_shapes,
-    const TensorShape& output_shape) {
+    const TensorShape& output_shape, bool supports_in_place_execution) {
   DmlKernelTensors tensors;
+  tensors.supports_in_place_execution = supports_in_place_execution;
 
   for (uint32_t i = 0; i < ctx->GetInputCount(); ++i) {
     DmlTensorInfo input;
@@ -111,7 +112,8 @@ static DmlKernelTensors CreateKernelTensors(
   return tensors;
 }
 
-template <typename ExpressionFunctor, uint32_t max_dim_count>
+template <typename ExpressionFunctor, uint32_t max_dim_count,
+          bool supports_in_place_execution>
 class DmlCompositeBinaryKernel : public DmlKernel {
  public:
   using InitHelper = ElementWiseInitHelper<max_dim_count>;
@@ -124,8 +126,8 @@ class DmlCompositeBinaryKernel : public DmlKernel {
     auto input_shapes = init_helper->GetCollapsedInputShapes();
     const TensorShape& output_shape = init_helper->GetCollapsedOutputShape();
 
-    DmlKernelTensors tensors =
-        CreateKernelTensors(ctx, input_shapes, output_shape);
+    DmlKernelTensors tensors = CreateKernelTensors(
+        ctx, input_shapes, output_shape, supports_in_place_execution);
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, inputs[0]);
@@ -177,6 +179,7 @@ class DmlMaxActivationKernel : public DmlKernel {
                                         dml_tensor_shape, dml_tensor_shape);
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
     tensors.inputs = {input};
     tensors.outputs = {output};
 
@@ -192,7 +195,7 @@ class DmlMaxActivationKernel : public DmlKernel {
   }
 };
 
-template <typename ExpressionFunctor>
+template <typename ExpressionFunctor, bool supports_in_place_execution>
 class DmlCompositeUnaryKernel : public DmlKernel {
  public:
   using InitHelper = ElementWiseInitHelper<UINT32_MAX>;
@@ -203,8 +206,8 @@ class DmlCompositeUnaryKernel : public DmlKernel {
     CHECK(ctx->GetOutputCount() == 1);
 
     TensorShape tensor_shape({ctx->GetOutputTensorShape(0).num_elements()});
-    DmlKernelTensors tensors =
-        CreateKernelTensors(ctx, {tensor_shape}, tensor_shape);
+    DmlKernelTensors tensors = CreateKernelTensors(
+        ctx, {tensor_shape}, tensor_shape, supports_in_place_execution);
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto scope = dml::Graph(ctx->GetDmlDevice());
@@ -241,92 +244,113 @@ class DmlCompositeUnaryKernel : public DmlKernel {
 #define CONCAT_NAMESPACE_NAME(opName, uniqueId) \
   CONCAT_NAMESPACE_NAME_HELPER(opName, uniqueId)
 
-#define REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)            \
+#define REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression,            \
+                                            supports_in_place_execution)   \
   struct Dml##opName##Functor {                                            \
     dml::Expression operator()(dml::Expression x) { return (expression); } \
   };                                                                       \
-  using Dml##opName##Kernel = DmlCompositeUnaryKernel<Dml##opName##Functor>;
+  using Dml##opName##Kernel =                                              \
+      DmlCompositeUnaryKernel<Dml##opName##Functor,                        \
+                              supports_in_place_execution>;
 
-#define REGISTER_DML_COMPOSITE_UNARY_BOOL_KERNEL(opName, expression) \
-  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {             \
-    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)          \
-    REGISTER_BOOL_OP_KERNEL(opName);                                 \
+#define REGISTER_DML_COMPOSITE_UNARY_BOOL_KERNEL(opName, expression,          \
+                                                 supports_in_place_execution) \
+  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                      \
+    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression,                   \
+                                        supports_in_place_execution)          \
+    REGISTER_BOOL_OP_KERNEL(opName);                                          \
   }
 
-#define REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression,       \
-                                             max_dim_count)            \
+#define REGISTER_DML_COMPOSITE_BINARY_STRUCT(                          \
+    opName, expression, max_dim_count, supports_in_place_execution)    \
   struct Dml##opName##Functor {                                        \
     dml::Expression operator()(dml::Expression x, dml::Expression y) { \
       return (expression);                                             \
     }                                                                  \
   };                                                                   \
   using Dml##opName##Kernel =                                          \
-      DmlCompositeBinaryKernel<Dml##opName##Functor, max_dim_count>;
+      DmlCompositeBinaryKernel<Dml##opName##Functor, max_dim_count,    \
+                               supports_in_place_execution>;
 
-#define REGISTER_DML_COMPOSITE_BINARY_BOOL_KERNEL(opName, expression,     \
-                                                  max_dim_count)          \
-  REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count) \
+#define REGISTER_DML_COMPOSITE_BINARY_BOOL_KERNEL(                        \
+    opName, expression, max_dim_count, supports_in_place_execution)       \
+  REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                       supports_in_place_execution)       \
   REGISTER_BOOL_OP_KERNEL(opName);
 
-#define REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(opName, expression, T1) \
-  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {              \
-    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)           \
-    REGISTER_OP_KERNEL(opName, T1);                                   \
+#define REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(opName, expression,              \
+                                              supports_in_place_execution, T1) \
+  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                       \
+    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression,                    \
+                                        supports_in_place_execution)           \
+    REGISTER_OP_KERNEL(opName, T1);                                            \
   }
 
-#define REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(opName, expression, T1, T2) \
-  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                  \
-    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)               \
-    REGISTER_OP_KERNEL(opName, T1);                                       \
-    REGISTER_OP_KERNEL(opName, T2);                                       \
+#define REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(                       \
+    opName, expression, supports_in_place_execution, T1, T2)         \
+  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {             \
+    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression,          \
+                                        supports_in_place_execution) \
+    REGISTER_OP_KERNEL(opName, T1);                                  \
+    REGISTER_OP_KERNEL(opName, T2);                                  \
   }
 
-#define REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(opName, expression, T1, T2, T3) \
-  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                      \
-    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression)                   \
-    REGISTER_OP_KERNEL(opName, T1);                                           \
-    REGISTER_OP_KERNEL(opName, T2);                                           \
-    REGISTER_OP_KERNEL(opName, T3);                                           \
+#define REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(                       \
+    opName, expression, supports_in_place_execution, T1, T2, T3)     \
+  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {             \
+    REGISTER_DML_COMPOSITE_UNARY_STRUCT(opName, expression,          \
+                                        supports_in_place_execution) \
+    REGISTER_OP_KERNEL(opName, T1);                                  \
+    REGISTER_OP_KERNEL(opName, T2);                                  \
+    REGISTER_OP_KERNEL(opName, T3);                                  \
   }
 
-#define REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(opName, expression,          \
-                                               max_dim_count, T1)           \
+#define REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(                             \
+    opName, expression, max_dim_count, supports_in_place_execution, T1)     \
   namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                    \
-    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count) \
+    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                         supports_in_place_execution)       \
     REGISTER_OP_KERNEL(opName, T1);                                         \
   }
 
-#define REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(opName, expression,          \
-                                               max_dim_count, T1, T2)       \
+#define REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(                             \
+    opName, expression, max_dim_count, supports_in_place_execution, T1, T2) \
   namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                    \
-    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count) \
+    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                         supports_in_place_execution)       \
     REGISTER_OP_KERNEL(opName, T1);                                         \
     REGISTER_OP_KERNEL(opName, T2);                                         \
   }
 
-#define REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(opName, expression,          \
-                                               max_dim_count, T1, T2, T3)   \
+#define REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(                             \
+    opName, expression, max_dim_count, supports_in_place_execution, T1, T2, \
+    T3)                                                                     \
   namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                    \
-    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count) \
+    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                         supports_in_place_execution)       \
     REGISTER_OP_KERNEL(opName, T1);                                         \
     REGISTER_OP_KERNEL(opName, T2);                                         \
     REGISTER_OP_KERNEL(opName, T3);                                         \
   }
 
-#define REGISTER_DML_COMPOSITE_BINARY_KERNEL_4(opName, expression,            \
-                                               max_dim_count, T1, T2, T3, T4) \
-  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                      \
-    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count)   \
-    REGISTER_OP_KERNEL(opName, T1);                                           \
-    REGISTER_OP_KERNEL(opName, T2);                                           \
-    REGISTER_OP_KERNEL(opName, T3);                                           \
-    REGISTER_OP_KERNEL(opName, T4);                                           \
+#define REGISTER_DML_COMPOSITE_BINARY_KERNEL_4(                             \
+    opName, expression, max_dim_count, supports_in_place_execution, T1, T2, \
+    T3, T4)                                                                 \
+  namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                    \
+    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                         supports_in_place_execution)       \
+    REGISTER_OP_KERNEL(opName, T1);                                         \
+    REGISTER_OP_KERNEL(opName, T2);                                         \
+    REGISTER_OP_KERNEL(opName, T3);                                         \
+    REGISTER_OP_KERNEL(opName, T4);                                         \
   }
 
 #define REGISTER_DML_COMPOSITE_BINARY_KERNEL_5(                             \
-    opName, expression, max_dim_count, T1, T2, T3, T4, T5)                  \
+    opName, expression, max_dim_count, supports_in_place_execution, T1, T2, \
+    T3, T4, T5)                                                             \
   namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                    \
-    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count) \
+    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                         supports_in_place_execution)       \
     REGISTER_OP_KERNEL(opName, T1);                                         \
     REGISTER_OP_KERNEL(opName, T2);                                         \
     REGISTER_OP_KERNEL(opName, T3);                                         \
@@ -335,9 +359,11 @@ class DmlCompositeUnaryKernel : public DmlKernel {
   }
 
 #define REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(                             \
-    opName, expression, max_dim_count, T1, T2, T3, T4, T5, T6)              \
+    opName, expression, max_dim_count, supports_in_place_execution, T1, T2, \
+    T3, T4, T5, T6)                                                         \
   namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                    \
-    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count) \
+    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                         supports_in_place_execution)       \
     REGISTER_OP_KERNEL(opName, T1);                                         \
     REGISTER_OP_KERNEL(opName, T2);                                         \
     REGISTER_OP_KERNEL(opName, T3);                                         \
@@ -347,9 +373,11 @@ class DmlCompositeUnaryKernel : public DmlKernel {
   }
 
 #define REGISTER_DML_COMPOSITE_BINARY_KERNEL_7(                             \
-    opName, expression, max_dim_count, T1, T2, T3, T4, T5, T6, T7)          \
+    opName, expression, max_dim_count, supports_in_place_execution, T1, T2, \
+    T3, T4, T5, T6, T7)                                                     \
   namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                    \
-    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count) \
+    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                         supports_in_place_execution)       \
     REGISTER_OP_KERNEL(opName, T1);                                         \
     REGISTER_OP_KERNEL(opName, T2);                                         \
     REGISTER_OP_KERNEL(opName, T3);                                         \
@@ -360,9 +388,11 @@ class DmlCompositeUnaryKernel : public DmlKernel {
   }
 
 #define REGISTER_DML_COMPOSITE_BINARY_KERNEL_8(                             \
-    opName, expression, max_dim_count, T1, T2, T3, T4, T5, T6, T7, T8)      \
+    opName, expression, max_dim_count, supports_in_place_execution, T1, T2, \
+    T3, T4, T5, T6, T7, T8)                                                 \
   namespace CONCAT_NAMESPACE_NAME(opName, __COUNTER__) {                    \
-    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count) \
+    REGISTER_DML_COMPOSITE_BINARY_STRUCT(opName, expression, max_dim_count, \
+                                         supports_in_place_execution)       \
     REGISTER_OP_KERNEL(opName, T1);                                         \
     REGISTER_OP_KERNEL(opName, T2);                                         \
     REGISTER_OP_KERNEL(opName, T3);                                         \
@@ -378,183 +408,210 @@ REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
     dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) *
                   dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
               DML_TENSOR_DATA_TYPE_UINT8),
-    8, uint8)
+    8, false, uint8)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
     Mul,
     dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_INT32) *
                   dml::Cast(y, DML_TENSOR_DATA_TYPE_INT32),
               DML_TENSOR_DATA_TYPE_INT8),
-    8, int8)
+    8, false, int8)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
     Mul,
     dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) *
                   dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
               DML_TENSOR_DATA_TYPE_UINT16),
-    8, uint16)
+    8, false, uint16)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
     Mul,
     dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_INT32) *
                   dml::Cast(y, DML_TENSOR_DATA_TYPE_INT32),
               DML_TENSOR_DATA_TYPE_INT16),
-    8, int16)
+    8, false, int16)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
     Add,
     dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) +
                   dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
               DML_TENSOR_DATA_TYPE_UINT8),
-    8, uint8)
+    8, false, uint8)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(
     AddV2,
     dml::Cast(dml::Cast(x, DML_TENSOR_DATA_TYPE_UINT32) +
                   dml::Cast(y, DML_TENSOR_DATA_TYPE_UINT32),
               DML_TENSOR_DATA_TYPE_UINT8),
-    8, uint8)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(Atan2, dml::ATanYX(x, y), 8, float)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(RealDiv, x / y, 8, Eigen::half, float)
+    8, false, uint8)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_1(Atan2, dml::ATanYX(x, y), 8, true, float)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(RealDiv, x / y, 8, true, Eigen::half,
+                                       float)
 // TODO: Register this operator for all types (except int32) when FloorDiv is
 // added to DML. dml::Floor(x / y) works for float types, but it doesn't work
 // for integer types since DML truncates towards zero.
 // TFDML #25977645
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_floor_div.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(FloorDiv, dml::Floor(x / y), 8,
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(FloorDiv, dml::Floor(x / y), 8, true,
                                        Eigen::half, float)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(SigmoidGrad, (y * x * (1 - x)), 8,
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(FloorMod, dml::ModulusFloor(x, y), 8,
+                                       true, Eigen::half, float, int64)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(SigmoidGrad, (y * x * (1 - x)), 8, false,
                                        Eigen::half, float)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(TanhGrad, (y * (1 - x * x)), 8,
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(TanhGrad, (y * (1 - x * x)), 8, false,
                                        Eigen::half, float)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(SqrtGrad, (y * 0.5f / x), 8, Eigen::half,
-                                       float)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(SqrtGrad, (y * 0.5f / x), 8, false,
+                                       Eigen::half, float)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(RsqrtGrad, (y * (-0.5f * x) * (x * x)),
-                                       8, Eigen::half, float)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(ReciprocalGrad, (-y * x * x), 8,
+                                       8, false, Eigen::half, float)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(ReciprocalGrad, (-y * x * x), 8, false,
                                        Eigen::half, float)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(InvGrad, (-y * x * x), 8, Eigen::half,
-                                       float)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(InvGrad, (-y * x * x), 8, false,
+                                       Eigen::half, float)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(SoftplusGrad, x / (dml::Exp(-y) + 1), 8,
-                                       Eigen::half, float)
+                                       false, Eigen::half, float)
 // softsigngrad(gradients, features) = gradients / (1 + abs(features)) ** 2
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_2(SoftsignGrad,
                                        x / dml::Pow(1 + dml::Abs(y), 2), 8,
-                                       Eigen::half, float)
+                                       false, Eigen::half, float)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_sub.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Sub, x - y, 8, Eigen::half, float, int64)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Sub, x - y, 8, true, Eigen::half, float,
+                                       int64)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_minimum.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Minimum, dml::Min(x, y), 8, Eigen::half,
-                                       float, int64)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Minimum, dml::Min(x, y), 8, true,
+                                       Eigen::half, float, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_maximum.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Maximum, dml::Max(x, y), 8, Eigen::half,
-                                       float, int64)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Maximum, dml::Max(x, y), 8, true,
+                                       Eigen::half, float, int64)
 REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(SquaredDifference,
-                                       dml::DifferenceSquare(x, y), 8,
+                                       dml::DifferenceSquare(x, y), 8, true,
                                        Eigen::half, float, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_mul1.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Mul, (x * y), 8, Eigen::half, float,
-                                       int64)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Pow, dml::Pow(x, y), 8, Eigen::half,
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Mul, (x * y), 8, true, Eigen::half,
                                        float, int64)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Pow, dml::Pow(x, y), 8, true,
+                                       Eigen::half, float, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_add1.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Add, x + y, 8, Eigen::half, float, int64)
-// TODO(b/25387198): A special kernel exists for int32 (see cwise_op_add1.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(AddV2, x + y, 8, Eigen::half, float,
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(Add, x + y, 8, true, Eigen::half, float,
                                        int64)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_4(TruncateDiv, x / y, 8, uint8, uint16,
-                                       int16, int64)
-// TODO(b/25387198): A special kernel exists for int32 (see cwise_op_div.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(Div, x / y, 8, Eigen::half, float, uint8,
+// TODO(b/25387198): A special kernel exists for int32 (see cwise_op_add1.cc).
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_3(AddV2, x + y, 8, true, Eigen::half,
+                                       float, int64)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_4(TruncateDiv, x / y, 8, true, uint8,
                                        uint16, int16, int64)
+// TODO(b/25387198): A special kernel exists for int32 (see cwise_op_div.cc).
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(Div, x / y, 8, true, Eigen::half, float,
+                                       uint8, uint16, int16, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_greater.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(Greater, x > y, 8, Eigen::half, float,
-                                       int64, uint8, int8, int16)
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(Less, x < y, 8, Eigen::half, float,
-                                       int64, uint8, int8, int16)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(Greater, x > y, 8, false, Eigen::half,
+                                       float, int64, uint8, int8, int16)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(Less, x < y, 8, false, Eigen::half,
+                                       float, int64, uint8, int8, int16)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_less_equal.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(LessEqual, x <= y, 8, float, Eigen::half,
-                                       int64, uint8, int8, int16)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(LessEqual, x <= y, 8, false, float,
+                                       Eigen::half, int64, uint8, int8, int16)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_greater_equal.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(GreaterEqual, x >= y, 8, float,
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_6(GreaterEqual, x >= y, 8, false, float,
                                        Eigen::half, int64, uint8, int8, int16)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_equal_to_1.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_7(Equal, x == y, 8, Eigen::half, float,
-                                       uint8, int8, int16, int64, bool)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_7(Equal, x == y, 8, true, Eigen::half,
+                                       float, uint8, int8, int16, int64, bool)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_not_equal_to_1.cc).
-REGISTER_DML_COMPOSITE_BINARY_KERNEL_7(NotEqual, x != y, 8, Eigen::half, float,
-                                       uint8, int8, int16, int64, bool)
+REGISTER_DML_COMPOSITE_BINARY_KERNEL_7(NotEqual, x != y, 8, true, Eigen::half,
+                                       float, uint8, int8, int16, int64, bool)
 // TODO(b/25387198): A special kernel exists for int32 (see
 // cwise_op_less.cc).
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Acos, dml::ACos(x), float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Acosh, dml::ACosh(x), float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Asin, dml::ASin(x), float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Asinh, dml::ASinh(x), float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Atan, dml::ATan(x), float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Atanh, dml::ATanh(x), float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Cosh, dml::Cosh(x), float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Sinh, dml::Sinh(x), float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Rint, dml::Round(x), float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Acos, dml::ACos(x), true, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Acosh, dml::ACosh(x), true, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Asin, dml::ASin(x), true, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Asinh, dml::ASinh(x), true, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Atan, dml::ATan(x), true, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Atanh, dml::ATanh(x), true, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Cosh, dml::Cosh(x), true, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Sinh, dml::Sinh(x), true, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(Rint, dml::Round(x), true, float)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(
-    Inv, dml::Recip(dml::Cast(x, DML_TENSOR_DATA_TYPE_FLOAT32)), int64)
+    Inv,
+    dml::Cast(dml::Recip(dml::Cast(x, DML_TENSOR_DATA_TYPE_FLOAT32)),
+              DML_TENSOR_DATA_TYPE_INT64),
+    true, int64)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_1(
-    Reciprocal, dml::Recip(dml::Cast(x, DML_TENSOR_DATA_TYPE_FLOAT32)), int64)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Relu6, dml::Clip(x, 0, 6), Eigen::half,
+    Reciprocal,
+    dml::Cast(dml::Recip(dml::Cast(x, DML_TENSOR_DATA_TYPE_FLOAT32)),
+              DML_TENSOR_DATA_TYPE_INT64),
+    true, int64)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Relu6, dml::Clip(x, 0, 6), true,
+                                      Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Ceil, dml::Ceil(x), true, Eigen::half,
                                       float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Ceil, dml::Ceil(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Cos, dml::Cos(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Elu, dml::ActivationElu(x), Eigen::half,
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Cos, dml::Cos(x), true, Eigen::half,
                                       float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Exp, dml::Exp(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Floor, dml::Floor(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Inv, dml::Recip(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Reciprocal, dml::Recip(x), Eigen::half,
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Elu, dml::ActivationElu(x), true,
+                                      Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Exp, dml::Exp(x), true, Eigen::half,
                                       float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(IsInf, dml::IsInfinity(x), Eigen::half,
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Floor, dml::Floor(x), true, Eigen::half,
                                       float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Log, dml::Log(x), Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Inv, dml::Recip(x), true, Eigen::half,
+                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Reciprocal, dml::Recip(x), true,
+                                      Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(IsInf, dml::IsInfinity(x), false,
+                                      Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Log, dml::Log(x), true, Eigen::half,
+                                      float)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Log1p, dml::Log(x, DML_SCALE_BIAS{1, 1}),
+                                      true, Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Sigmoid, dml::ActivationSigmoid(x), true,
                                       Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Sigmoid, dml::ActivationSigmoid(x),
-                                      Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Sin, dml::Sin(x), Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Sin, dml::Sin(x), true, Eigen::half,
+                                      float)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Softsign, dml::ActivationSoftsign(x),
-                                      Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Sqrt, dml::Sqrt(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Tan, dml::Tan(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Tanh, dml::Tanh(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Erf, dml::Erf(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(IsNan, dml::IsNaN(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Round, dml::Round(x), Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Round, dml::Identity(x), int32, int64)
+                                      true, Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Sqrt, dml::Sqrt(x), true, Eigen::half,
+                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Tan, dml::Tan(x), true, Eigen::half,
+                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Tanh, dml::Tanh(x), true, Eigen::half,
+                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Erf, dml::Erf(x), true, Eigen::half,
+                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(IsNan, dml::IsNaN(x), false, Eigen::half,
+                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Round, dml::Round(x), true, Eigen::half,
+                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Round, dml::Identity(x), true, int32,
+                                      int64)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Softplus, dml::ActivationSoftplus(x),
+                                      true, Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Erfc, 1.0f - dml::Erf(x), true,
                                       Eigen::half, float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Erfc, 1.0f - dml::Erf(x), Eigen::half,
-                                      float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Rsqrt, 1.0f / dml::Sqrt(x), Eigen::half,
-                                      float)
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Expm1, dml::Exp(x) - 1.0f, Eigen::half,
-                                      float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Rsqrt, 1.0f / dml::Sqrt(x), true,
+                                      Eigen::half, float)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(Expm1, dml::Exp(x) - 1.0f, true,
+                                      Eigen::half, float)
 REGISTER_DML_COMPOSITE_UNARY_KERNEL_2(IsFinite,
                                       !(dml::IsNaN(x) || dml::IsInfinity(x)),
-                                      Eigen::half, float)
+                                      false, Eigen::half, float)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_abs.cc).
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(Abs, dml::Abs(x), Eigen::half, float,
-                                      int64)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(Abs, dml::Abs(x), true, Eigen::half,
+                                      float, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_sign.cc).
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(Sign, dml::Sign(x), Eigen::half, float,
-                                      int64)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(Sign, dml::Sign(x), true, Eigen::half,
+                                      float, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_neg.cc).
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(Neg, -x, Eigen::half, float, int64)
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(Neg, -x, true, Eigen::half, float, int64)
 // TODO(b/25387198): A special kernel exists for int32 (see cwise_op_square.cc).
-REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(Square, (x * x), Eigen::half, float,
+REGISTER_DML_COMPOSITE_UNARY_KERNEL_3(Square, (x * x), true, Eigen::half, float,
                                       int64)
-REGISTER_DML_COMPOSITE_UNARY_BOOL_KERNEL(LogicalNot, dml::LogicalNot(x))
-REGISTER_DML_COMPOSITE_BINARY_BOOL_KERNEL(LogicalAnd, dml::LogicalAnd(x, y), 8)
-REGISTER_DML_COMPOSITE_BINARY_BOOL_KERNEL(LogicalOr, dml::LogicalOr(x, y), 8)
+REGISTER_DML_COMPOSITE_UNARY_BOOL_KERNEL(LogicalNot, dml::LogicalNot(x), true)
+REGISTER_DML_COMPOSITE_BINARY_BOOL_KERNEL(LogicalAnd, dml::LogicalAnd(x, y), 8,
+                                          true)
+REGISTER_DML_COMPOSITE_BINARY_BOOL_KERNEL(LogicalOr, dml::LogicalOr(x, y), 8,
+                                          true)
 REGISTER_DML_FLOAT_OP_KERNEL(Softmax, DmlMaxActivationKernel,
                              DML_OPERATOR_ACTIVATION_SOFTMAX,
                              DML_ACTIVATION_SOFTMAX_OPERATOR_DESC)
@@ -591,6 +648,7 @@ class DmlClipByValueKernel : public DmlKernel {
     CHECK(ctx->GetOutputCount() == 1);
 
     DmlKernelParams params;
+    params.supports_in_place_execution = true;
 
     // Broadcast inputs to match output shape
     params.input_shape = ctx->GetOutputTensorShape(0);
@@ -638,7 +696,8 @@ TF_CALL_uint8(DML_REGISTER_KERNEL);
 TF_CALL_uint16(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
-template <typename Functor, uint32_t max_dim_count>
+template <typename Functor, uint32_t max_dim_count,
+          bool supports_in_place_execution>
 class DmlBinaryWithZeroKernel : public DmlKernel {
  public:
   using InitHelper = ElementWiseInitHelper<max_dim_count>;
@@ -651,8 +710,8 @@ class DmlBinaryWithZeroKernel : public DmlKernel {
     auto input_shapes = init_helper->GetCollapsedInputShapes();
     const TensorShape& output_shape = init_helper->GetCollapsedOutputShape();
 
-    DmlKernelTensors tensors =
-        CreateKernelTensors(ctx, input_shapes, output_shape);
+    DmlKernelTensors tensors = CreateKernelTensors(
+        ctx, input_shapes, output_shape, supports_in_place_execution);
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto scope = dml::Graph(ctx->GetDmlDevice());
     auto x = dml::InputTensor(scope, 0, inputs[0]);
@@ -680,9 +739,9 @@ struct DmlDivNoNanFunctor {
 #define DML_REGISTER_KERNEL(type)                                           \
   REGISTER_KERNEL_BUILDER(                                                  \
       Name("DivNoNan").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
-      DmlKernelWrapper<                                                     \
-          DmlBinaryWithZeroKernel<DmlDivNoNanFunctor, kNchwDimensionCount>, \
-          GetBroadcastedOutputShapeHelper>);
+      DmlKernelWrapper<DmlBinaryWithZeroKernel<DmlDivNoNanFunctor,          \
+                                               kNchwDimensionCount, false>, \
+                       GetBroadcastedOutputShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
@@ -696,9 +755,9 @@ struct DmlMulNoNanFunctor {
 #define DML_REGISTER_KERNEL(type)                                           \
   REGISTER_KERNEL_BUILDER(                                                  \
       Name("MulNoNan").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
-      DmlKernelWrapper<                                                     \
-          DmlBinaryWithZeroKernel<DmlMulNoNanFunctor, kNchwDimensionCount>, \
-          GetBroadcastedOutputShapeHelper>);
+      DmlKernelWrapper<DmlBinaryWithZeroKernel<DmlMulNoNanFunctor,          \
+                                               kNchwDimensionCount, false>, \
+                       GetBroadcastedOutputShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
@@ -709,12 +768,12 @@ struct DmlXlogyFunctor {
   }
 };
 
-#define DML_REGISTER_KERNEL(type)                                        \
-  REGISTER_KERNEL_BUILDER(                                               \
-      Name("Xlogy").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
-      DmlKernelWrapper<                                                  \
-          DmlBinaryWithZeroKernel<DmlXlogyFunctor, kNchwDimensionCount>, \
-          GetBroadcastedOutputShapeHelper>);
+#define DML_REGISTER_KERNEL(type)                                           \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("Xlogy").Device(DEVICE_DML).TypeConstraint<type>("T"),           \
+      DmlKernelWrapper<DmlBinaryWithZeroKernel<DmlXlogyFunctor,             \
+                                               kNchwDimensionCount, false>, \
+                       GetBroadcastedOutputShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
@@ -725,12 +784,12 @@ struct DmlXdivyFunctor {
   }
 };
 
-#define DML_REGISTER_KERNEL(type)                                        \
-  REGISTER_KERNEL_BUILDER(                                               \
-      Name("Xdivy").Device(DEVICE_DML).TypeConstraint<type>("T"),        \
-      DmlKernelWrapper<                                                  \
-          DmlBinaryWithZeroKernel<DmlXdivyFunctor, kNchwDimensionCount>, \
-          GetBroadcastedOutputShapeHelper>);
+#define DML_REGISTER_KERNEL(type)                                           \
+  REGISTER_KERNEL_BUILDER(                                                  \
+      Name("Xdivy").Device(DEVICE_DML).TypeConstraint<type>("T"),           \
+      DmlKernelWrapper<DmlBinaryWithZeroKernel<DmlXdivyFunctor,             \
+                                               kNchwDimensionCount, false>, \
+                       GetBroadcastedOutputShapeHelper>);
 TF_CALL_DML_FLOAT_TYPES(DML_REGISTER_KERNEL);
 #undef DML_REGISTER_KERNEL
 
@@ -744,6 +803,7 @@ class DmlSeluKernel : public DmlKernel {
     CHECK(ctx->GetOutputCount() == 1);
 
     DmlKernelParams params;
+    params.supports_in_place_execution = true;
 
     // Broadcast inputs to match output shape
     params.input_shape = ctx->GetOutputTensorShape(0);
@@ -781,6 +841,7 @@ class DmlLeakyReluKernel : public DmlKernel {
     CHECK(ctx->GetOutputCount() == 1);
 
     DmlKernelParams params;
+    params.supports_in_place_execution = true;
 
     // Broadcast inputs to match output shape
     params.input_shape = ctx->GetOutputTensorShape(0);
@@ -822,7 +883,7 @@ class DmlApproximateEqualKernel : public DmlKernel {
     const TensorShape& output_shape = init_helper->GetCollapsedOutputShape();
 
     DmlKernelTensors tensors =
-        CreateKernelTensors(ctx, input_shapes, output_shape);
+        CreateKernelTensors(ctx, input_shapes, output_shape, false);
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto outputs = GetDmlTensorDescs(tensors.outputs);
 
@@ -887,6 +948,7 @@ class DmlBitwiseNotKernel : public DmlKernel {
     auto out_desc = out.desc.GetDmlDesc();
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
     tensors.inputs = {in};
     tensors.outputs = {out};
 
@@ -914,7 +976,7 @@ class DmlBinaryBitwiseKernel : public DmlKernel {
     const TensorShape& output_shape = init_helper->GetCollapsedOutputShape();
 
     DmlKernelTensors tensors =
-        CreateKernelTensors(ctx, input_shapes, output_shape);
+        CreateKernelTensors(ctx, input_shapes, output_shape, true);
 
     // DML only supports unsigned types, but sign doesn't matter for bitwise.
     tensors.inputs[0]->desc.ForceUnsignedDataType();
@@ -963,6 +1025,7 @@ class DmlBitCountKernel : public DmlKernel {
     auto out_desc = out.desc.GetDmlDesc();
 
     DmlKernelTensors tensors;
+    tensors.supports_in_place_execution = true;
     tensors.inputs = {in};
     tensors.outputs = {out};
 

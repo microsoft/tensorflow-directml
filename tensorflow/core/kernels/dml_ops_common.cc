@@ -109,6 +109,7 @@ static uint32_t GetDmlOutputTensorCount(DmlKernelConstruction* ctx,
     DmlKernelConstruction* ctx, const DmlKernelParams& params) {
   DmlKernelTensors tensor_descs;
   tensor_descs.output_refs_forwarding = params.output_refs_forwarding;
+  tensor_descs.supports_in_place_execution = params.supports_in_place_execution;
 
   // The number of inputs/outputs the DML operator takes
   uint32_t dml_input_count = GetDmlInputTensorCount(ctx, params);
@@ -175,8 +176,8 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   ComPtr<IDMLOperator> op;
   DML_CHECK_SUCCEEDED(dml_device->CreateOperator(&op_desc, IID_PPV_ARGS(&op)));
 
-  // For now, we don't set any flags
-  DML_EXECUTION_FLAGS execution_flags = DML_EXECUTION_FLAG_NONE;
+  DML_EXECUTION_FLAGS execution_flags =
+      DML_EXECUTION_FLAG_ALLOW_HALF_PRECISION_COMPUTATION;
 
   // Compile the operator
   ComPtr<IDMLCompiledOperator> compiled_op;
@@ -209,6 +210,7 @@ void DmlKernel::Initialize(DmlKernelConstruction* ctx,
   input_descs_ = std::move(tensor_descs.inputs);
   output_descs_ = std::move(tensor_descs.outputs);
   output_refs_forwarding_ = std::move(tensor_descs.output_refs_forwarding);
+  supports_in_place_execution_ = tensor_descs.supports_in_place_execution;
   init_helper_ = ctx->GetInitializationHelper();
 
   DML_BINDING_PROPERTIES exec_binding_props =
