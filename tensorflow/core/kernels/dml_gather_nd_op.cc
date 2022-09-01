@@ -250,11 +250,6 @@ class DmlGatherNdKernel : public DmlKernel {
       auto result = dml::Tile(
           params, {static_cast<uint32_t>(indices_leading_dims), 1, 1, 1});
 
-      // TFDML #24881131
-      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-        result = dml::ConvertInt32ToInt64(result);
-      }
-
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
@@ -275,11 +270,6 @@ class DmlGatherNdKernel : public DmlKernel {
 
       auto result = dml::GatherND(params, indices, flat_params_shape.dims(),
                                   flat_indices_shape.dims(), 0);
-
-      // TFDML #24881131
-      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-        result = dml::ConvertInt32ToInt64(result);
-      }
 
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});

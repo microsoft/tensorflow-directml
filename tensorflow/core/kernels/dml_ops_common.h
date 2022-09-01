@@ -310,9 +310,6 @@ Expression ScalarTensor(Graph& scope, T value, TensorDesc::Dimensions sizes) {
   return scalar;
 }
 
-// TFDML #24881131
-Expression ConvertInt32ToInt64(Expression int32_tensor);
-
 template <typename T>
 Expression Sequence(Graph& scope, T start, T step,
                     TensorDesc::Dimensions sizes) {

@@ -127,11 +127,9 @@ static std::vector<TensorShape> GetOutputShapesHelper(OpKernelContext* ctx) {
   return {std::move(output_shape)};
 }
 
-// TFDML #24881131
 static dml::TensorStrides ComputeStrides(const TensorShape& input_shape,
                                          absl::Span<const int> permutations,
-                                         uint32_t expected_dim_count,
-                                         bool is_uint64) {
+                                         uint32_t expected_dim_count) {
   DCHECK(input_shape.dims() == permutations.size());
 
   int leading_dims = permutations.size() < expected_dim_count
@@ -140,7 +138,7 @@ static dml::TensorStrides ComputeStrides(const TensorShape& input_shape,
 
   dml::TensorStrides output_strides(leading_dims + permutations.size(), 1);
 
-  uint32_t stride = is_uint64 ? 2 : 1;
+  uint32_t stride = 1;
 
   for (int64 i = permutations.size() - 1; i >= 0; --i) {
     int input_dim_index = permutations[i];
@@ -231,15 +229,12 @@ class DmlTransposeKernel : public DmlKernel {
         [ctx, simple_transpose](DML_TENSOR_DATA_TYPE dataType,
                                 DML_TENSOR_FLAGS flags,
                                 dml::Span<const uint32_t> sizes) {
-          const bool is_uint64 =
-              Is64BitUnsignedIntegerType(ctx->GetOutputDataType(0));
-
           uint32_t dimension_count = static_cast<uint32_t>(sizes.size());
 
           dml::TensorProperties props = {};
-          props.strides = ComputeStrides(simple_transpose.input_shape,
-                                         simple_transpose.permutations,
-                                         dimension_count, is_uint64);
+          props.strides =
+              ComputeStrides(simple_transpose.input_shape,
+                             simple_transpose.permutations, dimension_count);
 
           props.guaranteedBaseOffsetAlignment = 0;
 
@@ -256,13 +251,6 @@ class DmlTransposeKernel : public DmlKernel {
     auto inputs = GetDmlTensorDescs(tensors.inputs);
     auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
     auto result = dml::Identity(dml::InputTensor(scope, 0, inputs[0]));
-
-    const bool is_int64 = Is64BitSignedIntegerType(ctx->GetOutputDataType(0));
-
-    // TFDML #24881131
-    if (is_int64) {
-      result = dml::ConvertInt32ToInt64(result);
-    }
 
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});

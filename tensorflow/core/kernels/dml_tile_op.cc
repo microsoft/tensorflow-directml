@@ -207,11 +207,6 @@ class DmlTileKernel : public DmlKernel {
       auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
       auto result = dml::Identity(input_tensor);
 
-      // TFDML #24881131
-      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-        result = dml::ConvertInt32ToInt64(result);
-      }
-
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
@@ -232,11 +227,6 @@ class DmlTileKernel : public DmlKernel {
       auto inputs = GetDmlTensorDescs(tensors.inputs);
       auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
       auto result = dml::Tile(input_tensor, simple_tile->repeats);
-
-      // TFDML #24881131
-      if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-        result = dml::ConvertInt32ToInt64(result);
-      }
 
       Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
           scope.Compile(DML_EXECUTION_FLAG_NONE, {result});

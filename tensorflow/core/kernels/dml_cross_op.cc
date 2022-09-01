@@ -129,10 +129,7 @@ class DmlCrossKernel : public DmlKernel {
     // [bz-cy, cx-az, ay-bx]
     auto result = vector14 - vector23;
 
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(ctx->GetOutputDataType(0))) {
-      result = dml::ConvertInt32ToInt64(result);
-    } else if (is_low_precision_int) {
+    if (is_low_precision_int) {
       const auto dml_dtype = GetDmlDataTypeFromTfDataType(dtype);
       result = dml::Cast(result, dml_dtype);
     }

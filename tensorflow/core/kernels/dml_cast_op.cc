@@ -36,12 +36,6 @@ class DmlCastKernel : public DmlKernel {
     const DML_TENSOR_DATA_TYPE dml_out_dtype =
         GetDmlDataTypeFromTfDataType(output_dtype);
 
-    // TFDML #24881131
-    const dml::TensorPolicy out_policy =
-        Is64BitUnsignedIntegerType(output_dtype)
-            ? GetEmulatedInt64TensorPolicy()
-            : dml::TensorPolicy::Default();
-
     // Tensor shape doesn't matter for Cast, so don't bother with DML's 4D
     // restrictions
     TensorShape tensor_shape({ctx->GetOutputTensorShape(0).num_elements()});
@@ -60,7 +54,7 @@ class DmlCastKernel : public DmlKernel {
     tensors.inputs = {input};
 
     auto inputs = GetDmlTensorDescs(tensors.inputs);
-    auto scope = dml::Graph(ctx->GetDmlDevice(), out_policy);
+    auto scope = dml::Graph(ctx->GetDmlDevice());
     auto input_tensor = dml::InputTensor(scope, 0, inputs[0]);
 
     // Bool is a special case since it doesn't behave the same as uint8. The
@@ -77,27 +71,10 @@ class DmlCastKernel : public DmlKernel {
       result = dml::Clip(result, 0.0, 1.0);
     }
 
-    // TFDML #24881131
-    if (Is64BitSignedIntegerType(output_dtype)) {
-      result = dml::ConvertInt32ToInt64(result);
-    }
-
     Microsoft::WRL::ComPtr<IDMLCompiledOperator> compiled_op =
         scope.Compile(DML_EXECUTION_FLAG_NONE, {result});
 
     Initialize(ctx, std::move(tensors), compiled_op.Get());
-  }
-
-  StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const {
-    Tensor* output = ctx->GetOutputTensor(0);
-
-    // TFDML #24881131
-    if (Is64BitUnsignedIntegerType(output->dtype())) {
-      ctx->GetDmlDeviceContext()->ZeroBuffer(
-          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output));
-    }
-
-    return DmlKernel::Compute(ctx);
   }
 };
 

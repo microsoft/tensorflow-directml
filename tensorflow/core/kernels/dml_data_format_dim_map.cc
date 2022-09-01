@@ -158,11 +158,7 @@ class DmlDataFormaDimMapKernel : public DmlKernel {
       params = dml::Join({params, additional_params}, gather_axis);
     }
 
-    // We need strides of 4 for int32 and strides of 8 for int64 since the
-    // params are uint8
-    // TFDML #24881131
-    const uint32_t element_stride =
-        Is64BitIntegerType(ctx->GetOutputDataType(0)) ? 8 : 4;
+    constexpr uint32_t element_stride = 4;
 
     const auto out_policy = dml::TensorPolicy(
         [element_stride](DML_TENSOR_DATA_TYPE dataType, DML_TENSOR_FLAGS flags,
