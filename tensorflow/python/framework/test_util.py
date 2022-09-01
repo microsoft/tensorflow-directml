@@ -24,6 +24,7 @@ import contextlib
 import functools
 import gc
 import itertools
+import json
 import math
 import os
 import random
@@ -1395,6 +1396,21 @@ def skip_dml(func=None):
     return decorator(func)
 
   return decorator
+
+
+def should_skip_dml_device(device_pattern, driver_version=None):
+  if gpu_device_type() != "DML":
+    return False
+
+  device_descs = device_lib.list_local_devices()
+  dml_device_desc = next(x for x in device_descs if x.device_type == "DML")
+  desc_json = json.loads(dml_device_desc.physical_device_desc)
+  skip_device = re.match(device_pattern, desc_json["name"]) is not None
+
+  if skip_device:
+    return driver_version is None or desc_json["driver_version"] == driver_version
+
+  return False
 
 
 def skip_dml_linux(func=None):

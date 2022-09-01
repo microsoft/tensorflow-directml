@@ -36,6 +36,14 @@ class ConvLSTMTest(keras_parameterized.TestCase):
           data_format=['channels_first', 'channels_last'],
           return_sequences=[True, False]))
   def test_conv_lstm(self, data_format, return_sequences):
+    # TODO: Enable once the segfault bug has been fixed
+    # TFDML #41155302
+    # Some Nvidia drivers segfault when creating a convolution metacommand in
+    # multithreading scenarios
+    if test_util.should_skip_dml_device(".*NVIDIA.*", "31.0.15.2545"):
+      self.skipTest("This test is currently disabled on some Nvidia drivers because of "
+                    "a segfault in convolution")
+
     num_row = 3
     num_col = 3
     filters = 2
