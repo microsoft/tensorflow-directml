@@ -45,20 +45,20 @@ class ReduceInitializationHelper : public InitializationHelper {
       return true;
     }
 
-    // TF's Prod and All operators are different to the other reductions in that
-    // reduction of an empty tensor is defined to return 1, not 0. Because of
-    // this, reduction of empty tensors needs to be handled by the kernel to
-    // explicitly output 1. Min and Max are also different because they need to
-    // return inf and -inf, respectively.
+    // TF's Prod and All operators are different to the other reductions in
+    // that reduction of an empty tensor is defined to return 1, not 0.
+    // Because of this, reduction of empty tensors needs to be handled by
+    // the kernel to explicitly output 1. Min and Max are also different
+    // because they need to return inf and -inf, respectively.
     if (reduce_function == DML_REDUCE_FUNCTION_MULTIPLY ||
         reduce_function == DML_REDUCE_FUNCTION_MIN ||
         reduce_function == DML_REDUCE_FUNCTION_MAX) {
       return false;
     }
 
-    // Ignore the axes tensor when deciding whether to no-op. This is because
-    // it's legal to have an empty axes tensor, which turns this reduction into
-    // an identity.
+    // Ignore the axes tensor when deciding whether to no-op. This is
+    // because it's legal to have an empty axes tensor, which turns this
+    // reduction into an identity.
     if (data_tensor.NumElements() == 0) {
       return true;
     }
@@ -74,16 +74,8 @@ class ReduceInitializationHelper : public InitializationHelper {
       return {};
     }
 
-    const Tensor& input =
-        ctx->input_is_ref(0) ? ctx->mutable_input(0, false) : ctx->input(0);
-
-    bool is_identity =
-        !is_arg_function_ && (reduction_helper_.ndims() == 0 ||
-                              (reduction_helper_.ndims() == 1 &&
-                               !reduction_helper_.reduce_first_axis()));
-
     absl::optional<int> return_val;
-    if (is_identity) {
+    if (IsIdentity()) {
       return_val = 0;
     }
 
@@ -95,25 +87,39 @@ class ReduceInitializationHelper : public InitializationHelper {
     // We delegate most of the work to TF's existing ReductionHelper
     const Tensor& data_tensor = ctx->input(0);
     const Tensor& axes_tensor = ctx->input(1);
-    OP_REQUIRES_OK(ctx, reduction_helper_.Simplify(data_tensor, axes_tensor,
-                                                   attr->keep_dims));
 
-    OP_REQUIRES(
-        ctx, reduction_helper_.data_reshape().dims() <= 8,
-        errors::InvalidArgument(
-            "DML doesn't support more than 8 dimensions for Reduction after "
-            "simplifying the inputs and collapsing axes together."));
+    static constexpr bool is_arg_function =
+        reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
+        reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
+
+    OP_REQUIRES_OK(ctx, reduction_helper_.Simplify(
+                            data_tensor.shape(), axes_tensor, attr->keep_dims));
+
+    OP_REQUIRES(ctx, reduction_helper_.data_reshape().dims() <= 8,
+                errors::InvalidArgument(
+                    "DML doesn't support more than 8 dimensions for Reduction "
+                    "after "
+                    "simplifying the inputs and collapsing axes together."));
+
+    // Euclidean Norm scalar is a special case that is never identity
+    bool is_euclidean_scalar = reduce_function == DML_REDUCE_FUNCTION_L2 &&
+                               data_tensor.NumElements() == 1;
+
+    is_identity_ = !is_arg_function && !is_euclidean_scalar &&
+                   (reduction_helper_.ndims() == 0 ||
+                    (reduction_helper_.ndims() == 1 &&
+                     !reduction_helper_.reduce_first_axis()));
   }
 
   const ReductionHelper& GetReductionHelper() const {
     return reduction_helper_;
   }
 
+  bool IsIdentity() const { return is_identity_; }
+
  private:
   ReductionHelper reduction_helper_;
-  static constexpr bool is_arg_function_ =
-      reduce_function == DML_REDUCE_FUNCTION_ARGMIN ||
-      reduce_function == DML_REDUCE_FUNCTION_ARGMAX;
+  bool is_identity_;
 };
 
 template <DML_REDUCE_FUNCTION reduce_function>
@@ -170,8 +176,6 @@ class DmlReduceKernel : public DmlKernel {
                            const InitHelper* init_helper) {
     CHECK(ctx->GetInputCount() == 2);
     CHECK(ctx->GetOutputCount() == 1);
-
-    const Tensor& axes_tensor = ctx->GetConstantInputTensor(1);
 
     // Use TF's existing ReductionHelper to help compute axes for reduction. The
     // ReductionHelper does a couple of useful things.
@@ -242,6 +246,14 @@ class DmlReduceKernel : public DmlKernel {
           value.UInt8 = EmptyKernelReturnValue<bool>(reduce_function);
         } break;
 
+        case DML_TENSOR_DATA_TYPE_UINT64: {
+          value.UInt64 = EmptyKernelReturnValue<uint64_t>(reduce_function);
+        } break;
+
+        case DML_TENSOR_DATA_TYPE_INT64: {
+          value.Int64 = EmptyKernelReturnValue<int64_t>(reduce_function);
+        } break;
+
         default:
           assert(false);
           LOG(FATAL) << "Unsupported datatype";
@@ -263,18 +275,11 @@ class DmlReduceKernel : public DmlKernel {
       return;
     }
 
-    // This logic copied from the CPU implementation:
-    // tensorflow/core/kernels/reduction_ops_common.h(155)
-    bool is_identity =
-        !is_arg_function_ &&
-        (reduce_helper.ndims() == 0 ||
-         (reduce_helper.ndims() == 1 && !reduce_helper.reduce_first_axis()));
-
-    if (is_identity) {
-      // Since the reduce helper may have removed dimensions of size 1, we can't
-      // just take its shape as-is. We know that this is an identity scenario,
-      // so we can just collapse all dimensions into one and use the same tensor
-      // desc for both the input and the output.
+    if (init_helper->IsIdentity()) {
+      // Since the reduce helper may have removed dimensions of size 1, we
+      // can't just take its shape as-is. We know that this is an identity
+      // scenario, so we can just collapse all dimensions into one and use
+      // the same tensor desc for both the input and the output.
       TensorShape in_out_shape(
           {1, 1, 1, ctx->GetInputTensorShape(0).num_elements()});
 
