@@ -183,7 +183,8 @@ bool IsSoftwareAdapter(IDXGIAdapter1* adapter) {
 };
 
 std::vector<DmlAdapterImpl> EnumerateAdapterImpls() {
-  ComPtr<IDXGIFactory4> dxgi_factory = TryCreateDxgiFactory(DxCallErrorHandling::Warning);
+  ComPtr<IDXGIFactory4> dxgi_factory =
+      TryCreateDxgiFactory(DxCallErrorHandling::Warning);
   if (!dxgi_factory) {
     return {};
   }
@@ -247,10 +248,14 @@ void DmlAdapterImpl::Initialize(IDXCoreAdapter* adapter) {
   DML_CHECK_SUCCEEDED(adapter->GetPropertySize(
       DXCoreAdapterProperty::DriverDescription, &driver_description_size));
 
-  std::vector<char> driver_description(driver_description_size);
+  std::string driver_description(driver_description_size, '\0');
   DML_CHECK_SUCCEEDED(
       adapter->GetProperty(DXCoreAdapterProperty::DriverDescription,
-                           driver_description_size, driver_description.data()));
+                           driver_description_size, &driver_description[0]));
+
+  // Remove the terminating null character that
+  // DXCoreAdapterProperty::DriverDescription returned
+  driver_description.pop_back();
 
   LARGE_INTEGER driver_version;
   DML_CHECK_SUCCEEDED(adapter->GetProperty(DXCoreAdapterProperty::DriverVersion,
@@ -272,7 +277,7 @@ void DmlAdapterImpl::Initialize(IDXCoreAdapter* adapter) {
   driver_version_ = tensorflow::DriverVersion(driver_version.QuadPart);
   vendor_id_ = static_cast<tensorflow::VendorID>(hardware_id.vendorID);
   device_id_ = hardware_id.deviceID;
-  description_.assign(driver_description.begin(), driver_description.end());
+  description_ = std::move(driver_description);
   is_compute_only_ = !is_graphics_supported;
 }
 
