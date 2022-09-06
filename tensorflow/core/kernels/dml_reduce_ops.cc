@@ -387,8 +387,33 @@ class DmlReduceKernel : public DmlKernel {
       result = dml::Reduce(result, reduce_function, reduce_axes);
       result = dml::Cast(result, dml_input_data_type);
     } else if (is_arg_function_) {
+      // ARGMAX and ARGMIN in DML don't support outputs with less than 32
+      // bit precision
+      const bool is_low_precision_output =
+          dml_output_data_type == DML_TENSOR_DATA_TYPE_INT16 ||
+          dml_output_data_type == DML_TENSOR_DATA_TYPE_INT8;
+
+      auto casted_dml_output_data_type = dml_output_data_type;
+
+      if (is_low_precision_output) {
+        casted_dml_output_data_type = DML_TENSOR_DATA_TYPE_INT32;
+      } else {
+        const bool is_low_precision_unsigned_output =
+            dml_output_data_type == DML_TENSOR_DATA_TYPE_UINT16 ||
+            dml_output_data_type == DML_TENSOR_DATA_TYPE_UINT8;
+
+        if (is_low_precision_unsigned_output) {
+          casted_dml_output_data_type = DML_TENSOR_DATA_TYPE_UINT32;
+        }
+      }
+
       result = dml::Reduce(result, reduce_function, reduce_axes,
-                           dml_output_data_type);
+                           casted_dml_output_data_type);
+
+      // Cast back to the original TensorFlow low precision type
+      if (dml_output_data_type != casted_dml_output_data_type) {
+        result = dml::Cast(result, dml_output_data_type);
+      }
     } else {
       result = dml::Reduce(result, reduce_function, reduce_axes);
     }
