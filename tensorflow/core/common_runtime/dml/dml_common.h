@@ -131,6 +131,9 @@ static constexpr uint32_t kNchwSpatialDimensionCount = 2;
 static constexpr uint32_t kNcdhwDimensionCount = 5;
 static constexpr uint32_t kNcdhwSpatialDimensionCount = 3;
 
+// 8 dimensions are supported for elementwise operators
+static constexpr uint32_t kBinaryCwiseOpMaxDimCount = 8;
+
 // The batch and channel dimensions of NCW, NCHW, NCDHW....
 static constexpr uint32_t kNonspatialDimensionCount = 2;
 
