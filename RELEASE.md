@@ -1,3 +1,13 @@
+# Release 1.15.8
+
+## Bug Fixes and Other Changes
+* Prevent unbounded growth of command allocator memory
+* Add unsorted segment ops for DML (emulated on the CPU)
+* Add emulated support for int64
+* Add CPU emulated versions of UnsortedSegmentSum, UnsortedSegmentMax, UnsortedSegmentMin and UnsortedSegmentProd
+* Pin protobuf version between 3.61 (inclusive) and 4.0.0 (exclusive) since version >= 4.0.0 is not compatible with TensorFlow 1.15
+* Optimize output allocation for inputs that can be executed in-place and directly forwarded to the output
+
 # Release 1.15.7
 
 ## Bug Fixes and Other Changes
