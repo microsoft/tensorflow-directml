@@ -7,6 +7,7 @@
 * Add CPU emulated versions of UnsortedSegmentSum, UnsortedSegmentMax, UnsortedSegmentMin and UnsortedSegmentProd
 * Pin protobuf version between 3.61 (inclusive) and 4.0.0 (exclusive) since version >= 4.0.0 is not compatible with TensorFlow 1.15
 * Optimize output allocation for inputs that can be executed in-place and directly forwarded to the output
+* Add a DirectML kernel for InTopKV2
 
 # Release 1.15.7
 
