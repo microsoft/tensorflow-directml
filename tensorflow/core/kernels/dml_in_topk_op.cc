@@ -46,11 +46,11 @@ class DmlInTopKInitHelper : public InitializationHelper {
                                         targets_in.dim_size(0)));
 
     // TODO: Remove once K is moved into device memory
-    if (k_in.dtype() == TF_INT32) {
-      k_ = k_in.base<int32_t>()[0];
+    if (k_in.dtype() == DT_INT32) {
+      k_ = k_in.scalar<int32_t>()();
     } else {
-      assert(k_in.dtype() == TF_INT64);
-      k_ = k_in.base<int64_t>()[0];
+      assert(k_in.dtype() == DT_INT64);
+      k_ = k_in.scalar<int32_t>()();
     }
   }
   int GetK() const { return k_; }
@@ -109,14 +109,14 @@ class DmlInTopKKernel : public DmlKernel {
     dml::Expression classes;
     dml::Expression num_classes_tensor;
     dml::Expression zero_tensor;
-    if (ctx->GetInputDataType(1) == TF_INT32) {
+    if (ctx->GetInputDataType(1) == DT_INT32) {
       classes = dml::Sequence<int32_t>(scope, 0, 1, {1, 1, 1, num_classes});
       num_classes_tensor = dml::ScalarTensor<int32_t>(
           scope, num_classes, targets.GetOutputDesc().sizes);
       zero_tensor =
           dml::ScalarTensor<int32_t>(scope, 0, targets.GetOutputDesc().sizes);
     } else {
-      assert(ctx->GetInputDataType(1) == TF_INT64);
+      assert(ctx->GetInputDataType(1) == DT_INT64);
       classes = dml::Sequence<int64_t>(scope, 0, 1, {1, 1, 1, num_classes});
       num_classes_tensor = dml::ScalarTensor<int64_t>(
           scope, num_classes, targets.GetOutputDesc().sizes);
