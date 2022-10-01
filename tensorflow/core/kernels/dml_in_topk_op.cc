@@ -64,11 +64,12 @@ class DmlInTopKKernel : public DmlKernel {
   using InitHelper = DmlInTopKInitHelper;
   explicit DmlInTopKKernel(DmlKernelConstruction* ctx,
                            const InitHelper* init_helper) {
+    const auto predictions_shape = ctx->GetInputTensorShape(0);
+
     DmlTensorInfo predictions_info;
     predictions_info.kernel_index = 0;
-    predictions_info.desc = DmlTensorDesc::Create(ctx->GetInputDataType(0),
-                                                  ctx->GetInputTensorShape(0),
-                                                  ctx->GetInputTensorShape(0));
+    predictions_info.desc = DmlTensorDesc::Create(
+        ctx->GetInputDataType(0), predictions_shape, predictions_shape);
 
     DmlTensorInfo targets_info;
     targets_info.kernel_index = 1;
@@ -88,6 +89,11 @@ class DmlInTopKKernel : public DmlKernel {
     tensors.outputs = {output_info};
 
     int64_t k = init_helper->GetK();
+
+    // DML doesn't support K values bigger than the size of the TopK axis,
+    // so clamp it to the maximum
+    k = std::min<int64_t>(
+        k, predictions_shape.dim_size(predictions_shape.dims() - 1));
 
     // When K is smaller than 1, none of the targets are in the top K
     if (k < 1) {
