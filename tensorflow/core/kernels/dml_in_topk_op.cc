@@ -175,9 +175,9 @@ class DmlInTopKKernel : public DmlKernel {
 
   StatusOr<DmlGpuEvent> Compute(DmlKernelContext* ctx) const override {
     if (all_false_) {
-      Tensor& output = ctx->GetOutputTensor(0);
+      Tensor* output = ctx->GetOutputTensor(0);
       return ctx->GetDmlDeviceContext()->ZeroBuffer(
-          ctx->GetDmlDeviceContext()->GetBufferForTensor(output));
+          ctx->GetDmlDeviceContext()->GetBufferForTensor(*output));
     }
 
     return DmlKernel::Compute(ctx);
