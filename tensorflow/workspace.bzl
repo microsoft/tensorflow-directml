@@ -90,8 +90,8 @@ def tf_repositories(path_prefix = "", tf_repo_name = ""):
     # URL must point at the DirectML redistributable NuGet package.
     dml_repository(
         name = "dml_redist",
-        url = "https://www.nuget.org/api/v2/package/Microsoft.AI.DirectML/1.8.2",
-        sha256 = "a58141244b075cc3abfdc247310224b68b64ddd2aaac25ea04ed703deb5d4f9b",
+        url = "https://www.nuget.org/api/v2/package/Microsoft.AI.DirectML/1.9.1",
+        sha256 = "cc2951e10d22ae41902e91afe7c2e4b2322d5ed49b3f396a05ef9e27c78aaeff",
         build_file = "//third_party/dml/redist:BUILD.bazel",
     )
 
