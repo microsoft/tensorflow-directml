@@ -8079,6 +8079,7 @@ tf_kernel_library(
         "dml_ops_common.cc",
         "dml_cwise_ops.cc",
         "dml_image_ops.cc",
+        "dml_in_topk_op.cc",
         "dml_relu_op.cc",
         "dml_random_ops.cc",
         "dml_batch_norm_ops.cc",
